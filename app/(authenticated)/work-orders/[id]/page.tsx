@@ -89,6 +89,38 @@ export default async function WorkOrderDetailPage({
         (cbTech as { technician_name?: string }).technician_name ?? (cbTech as { name?: string }).name ?? null;
   }
 
+  let crewLeadName: string | null = null;
+  let crewMemberNames: string[] = [];
+  const assignedCrewId = row.assigned_crew_id as string | null;
+  if (assignedCrewId) {
+    const { data: crewRow } = await supabase
+      .from("crews")
+      .select("id, technicians!crew_lead_id(technician_name, name)")
+      .eq("id", assignedCrewId)
+      .maybeSingle();
+    if (crewRow) {
+      const lead = Array.isArray((crewRow as Record<string, unknown>).technicians)
+        ? (crewRow as Record<string, unknown>).technicians[0]
+        : (crewRow as Record<string, unknown>).technicians;
+      if (lead && typeof lead === "object")
+        crewLeadName = (lead as { technician_name?: string }).technician_name ?? (lead as { name?: string }).name ?? null;
+    }
+    const { data: mems } = await supabase
+      .from("crew_members")
+      .select("technician_id")
+      .eq("crew_id", assignedCrewId)
+      .order("sort_order");
+    if (mems?.length) {
+      const { data: techs } = await supabase
+        .from("technicians")
+        .select("technician_name, name")
+        .in("id", mems.map((m) => (m as { technician_id: string }).technician_id));
+      crewMemberNames = (techs ?? []).map(
+        (t) => (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? ""
+      );
+    }
+  }
+
   const workOrder = {
     ...row,
     company_name: comp && typeof comp === "object" && "name" in comp ? (comp as { name?: string }).name : null,
@@ -99,6 +131,8 @@ export default async function WorkOrderDetailPage({
     asset_name: ast && typeof ast === "object" ? (ast as { asset_name?: string }).asset_name ?? (ast as { name?: string }).name : null,
     technician_name: tech && typeof tech === "object" ? (tech as { technician_name?: string }).technician_name ?? (tech as { name?: string }).name : null,
     crew_name: crew && typeof crew === "object" && "name" in crew ? (crew as { name?: string }).name : null,
+    crew_lead_name: crewLeadName,
+    crew_member_names: crewMemberNames,
     completed_by_technician_name: completedByTechnicianName,
   };
 

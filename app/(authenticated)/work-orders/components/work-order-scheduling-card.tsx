@@ -36,6 +36,12 @@ export function WorkOrderSchedulingCard({ workOrder, onAssignTechnician }: WorkO
         <Row label="Due date" value={formatDate(workOrder.due_date as string)} />
         <Row label="Assigned technician" value={workOrder.technician_name as string} />
         <Row label="Assigned crew" value={workOrder.crew_name as string} />
+        {workOrder.crew_name && (workOrder.crew_lead_name as string) && (
+          <Row label="Crew lead" value={workOrder.crew_lead_name as string} />
+        )}
+        {workOrder.crew_name && Array.isArray(workOrder.crew_member_names) && (workOrder.crew_member_names as string[]).length > 0 && (
+          <Row label="Crew members" value={(workOrder.crew_member_names as string[]).join(", ")} />
+        )}
         <Row label="Estimated hours" value={workOrder.estimated_hours != null ? String(workOrder.estimated_hours) : null} />
         <Row label="Actual hours" value={workOrder.actual_hours != null ? String(workOrder.actual_hours) : null} />
       </dl>
