@@ -12,6 +12,7 @@ import { WorkOrderLocationCard } from "./work-order-location-card";
 import { WorkOrderSchedulingCard } from "./work-order-scheduling-card";
 import { WorkOrderChecklistCard } from "./work-order-checklist-card";
 import { WorkOrderPartsCard } from "./work-order-parts-card";
+import { WorkOrderCostSummary } from "./work-order-cost-summary";
 import { WorkOrderNotesCard } from "./work-order-notes-card";
 import { WorkOrderStatusTimeline } from "./work-order-status-timeline";
 import { WorkOrderCompletionCard } from "./work-order-completion-card";
@@ -32,11 +33,24 @@ type WorkOrderDetailViewProps = {
   workOrder: Record<string, unknown>;
   notes: { id: string; body: string; note_type: string | null; created_at: string }[];
   checklistItems: { id: string; label: string; completed: boolean; sort_order: number }[];
-  partUsage: { id: string; quantity_used: number; unit_cost: number | null; total_cost: number | null; created_at: string }[];
+  partUsage: PartUsageForDetail[];
   statusHistory: { id: string; from_status: string | null; to_status: string; changed_at: string }[];
   attachments: { id: string; file_name: string; file_url: string; file_type: string | null; created_at: string }[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  inventoryItems: { id: string; name: string; sku: string | null; unit: string | null; cost: number | null; quantity: number }[];
+};
+
+export type PartUsageForDetail = {
+  id: string;
+  quantity_used: number;
+  unit_cost: number | null;
+  total_cost: number | null;
+  created_at: string;
+  part_name_snapshot: string | null;
+  sku_snapshot: string | null;
+  unit_of_measure: string | null;
+  used_at: string | null;
 };
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";
@@ -51,6 +65,7 @@ export function WorkOrderDetailView({
   attachments,
   technicians,
   crews,
+  inventoryItems,
 }: WorkOrderDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -196,6 +211,11 @@ export function WorkOrderDetailView({
             workOrderId={id}
             partUsage={partUsage}
             onPartsChange={() => router.refresh()}
+            inventoryItems={inventoryItems}
+          />
+          <WorkOrderCostSummary
+            partsTotal={partUsage.reduce((sum, p) => sum + (p.total_cost ?? 0), 0)}
+            actualHours={workOrder.actual_hours as number | null | undefined}
           />
         </div>
 

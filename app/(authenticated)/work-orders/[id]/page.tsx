@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import { WorkOrderDetailView } from "../components/work-order-detail-view";
+import { WorkOrderDetailView, type PartUsageForDetail } from "../components/work-order-detail-view";
 
 export const metadata = {
   title: "Work Order | Cornerstone Tech",
@@ -116,9 +116,15 @@ export default async function WorkOrderDetailPage({
 
   const { data: partUsage } = await supabase
     .from("work_order_part_usage")
-    .select("id, quantity_used, unit_cost, total_cost, created_at")
+    .select("id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at")
     .eq("work_order_id", id)
     .order("created_at", { ascending: false });
+
+  const { data: inventoryItems } = await supabase
+    .from("inventory_items")
+    .select("id, name, sku, unit, cost, quantity")
+    .eq("company_id", companyId)
+    .order("name");
 
   const { data: statusHistory } = await supabase
     .from("work_order_status_history")
@@ -172,11 +178,12 @@ export default async function WorkOrderDetailPage({
         workOrder={workOrder as Record<string, unknown>}
         notes={(notes ?? []) as { id: string; body: string; note_type: string | null; created_at: string }[]}
         checklistItems={(checklistItems ?? []) as { id: string; label: string; completed: boolean; sort_order: number }[]}
-        partUsage={(partUsage ?? []) as { id: string; quantity_used: number; unit_cost: number | null; total_cost: number | null; created_at: string }[]}
+        partUsage={(partUsage ?? []) as PartUsageForDetail[]}
         statusHistory={(statusHistory ?? []) as { id: string; from_status: string | null; to_status: string; changed_at: string }[]}
         attachments={(attachments ?? []) as { id: string; file_name: string; file_url: string; file_type: string | null; created_at: string }[]}
         technicians={technicianOptions}
         crews={crewOptions}
+        inventoryItems={(inventoryItems ?? []) as { id: string; name: string; sku: string | null; unit: string | null; cost: number | null; quantity: number }[]}
       />
     </div>
   );

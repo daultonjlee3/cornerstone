@@ -495,30 +495,105 @@ export async function addWorkOrderChecklistItem(
   return { success: true };
 }
 
+export type AddPartUsagePayload = {
+  inventory_item_id?: string | null;
+  part_name_snapshot?: string | null;
+  sku_snapshot?: string | null;
+  unit_of_measure?: string | null;
+  quantity_used: number;
+  unit_cost: number | null;
+  notes?: string | null;
+  deduct_inventory?: boolean;
+};
+
 export async function addWorkOrderPartUsage(
   workOrderId: string,
-  quantityUsed: number,
-  unitCost: number | null,
-  totalCost: number | null
+  payload: AddPartUsagePayload
 ): Promise<WorkOrderFormState> {
   const tenantId = await getTenantId();
   if (!tenantId) return { error: "Unauthorized." };
+  if (payload.quantity_used <= 0) return { error: "Quantity must be greater than zero." };
+
   const supabase = await createClient();
   const { data: wo } = await supabase
     .from("work_orders")
-    .select("company_id")
+    .select("company_id, status")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!wo) return { error: "Work order not found." };
-  const allowed = await companyBelongsToTenant(wo.company_id, tenantId);
+  const allowed = await companyBelongsToTenant((wo as { company_id: string }).company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
-  const { error } = await supabase.from("work_order_part_usage").insert({
-    work_order_id: workOrderId,
-    quantity_used: quantityUsed,
-    unit_cost: unitCost,
-    total_cost: totalCost,
-  });
-  if (error) return { error: error.message };
+
+  const companyId = (wo as { company_id: string }).company_id;
+  let unitCost = payload.unit_cost;
+  let partName = payload.part_name_snapshot ?? null;
+  let sku = payload.sku_snapshot ?? null;
+  let unitOfMeasure = payload.unit_of_measure ?? null;
+
+  if (payload.inventory_item_id) {
+    const { data: item } = await supabase
+      .from("inventory_items")
+      .select("id, name, sku, unit, cost, quantity")
+      .eq("id", payload.inventory_item_id)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (!item) return { error: "Inventory item not found or access denied." };
+    const inv = item as { name: string; sku?: string | null; unit?: string | null; cost?: number | null; quantity?: number };
+    if (unitCost == null && inv.cost != null) unitCost = inv.cost;
+    if (!partName) partName = inv.name;
+    if (!sku) sku = inv.sku ?? null;
+    if (!unitOfMeasure) unitOfMeasure = inv.unit ?? null;
+    if (payload.deduct_inventory) {
+      const onHand = Number(inv.quantity ?? 0);
+      if (payload.quantity_used > onHand)
+        return { error: `Not enough stock. Quantity on hand: ${onHand}. Requested: ${payload.quantity_used}.` };
+    }
+  }
+
+  const finalUnitCost = unitCost ?? 0;
+  const totalCost = payload.quantity_used * finalUnitCost;
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("work_order_part_usage")
+    .insert({
+      work_order_id: workOrderId,
+      inventory_item_id: payload.inventory_item_id || null,
+      part_name_snapshot: partName,
+      sku_snapshot: sku,
+      unit_of_measure: unitOfMeasure,
+      quantity_used: payload.quantity_used,
+      unit_cost: finalUnitCost,
+      total_cost: totalCost,
+      notes: payload.notes || null,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) return { error: insertError.message };
+  if (!inserted?.id) return { error: "Failed to create part usage." };
+
+  if (payload.inventory_item_id && payload.deduct_inventory) {
+    const { data: invRow } = await supabase
+      .from("inventory_items")
+      .select("quantity")
+      .eq("id", payload.inventory_item_id)
+      .single();
+    const currentQty = Number((invRow as { quantity?: number })?.quantity ?? 0);
+    const newQty = Math.max(0, currentQty - payload.quantity_used);
+    await supabase
+      .from("inventory_items")
+      .update({ quantity: newQty })
+      .eq("id", payload.inventory_item_id);
+    await supabase.from("inventory_transactions").insert({
+      inventory_item_id: payload.inventory_item_id,
+      quantity_delta: -payload.quantity_used,
+      transaction_type: "issue",
+      reference_type: "work_order_part_usage",
+      reference_id: inserted.id,
+      notes: payload.notes || `Work order ${workOrderId}`,
+    });
+  }
+
   revalidatePath(`/work-orders/${workOrderId}`);
   return { success: true };
 }
