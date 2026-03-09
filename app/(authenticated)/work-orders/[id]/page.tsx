@@ -34,6 +34,7 @@ export default async function WorkOrderDetailPage({
       `
       id, work_order_number, title, description, category, priority, status,
       company_id, customer_id, property_id, building_id, unit_id, asset_id,
+      source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date, completed_at,
       completion_date, resolution_summary, completion_notes, root_cause,
       follow_up_required, customer_visible_summary, internal_completion_notes,

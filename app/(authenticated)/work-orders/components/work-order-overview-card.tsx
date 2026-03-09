@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { formatDateTime } from "./detail-utils";
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";
@@ -24,6 +25,8 @@ export function WorkOrderOverviewCard({ workOrder }: WorkOrderOverviewCardProps)
     .filter(Boolean)
     .join(" • ") || null;
   const nte = workOrder.nte_amount != null ? `$${Number(workOrder.nte_amount).toFixed(2)}` : null;
+  const sourceType = (workOrder.source_type as string | null) ?? null;
+  const pmPlanId = (workOrder.preventive_maintenance_plan_id as string | null) ?? null;
 
   return (
     <div className={cardClass}>
@@ -33,6 +36,22 @@ export function WorkOrderOverviewCard({ workOrder }: WorkOrderOverviewCardProps)
         <Row label="Customer" value={workOrder.customer_name as string} />
         <Row label="Requested by" value={requestedBy} />
         <Row label="Requested at" value={formatDateTime(workOrder.requested_at as string)} />
+        <Row
+          label="Source"
+          value={
+            sourceType === "preventive_maintenance" ? (
+              pmPlanId ? (
+                <Link href={`/preventive-maintenance/${pmPlanId}`} className="text-[var(--accent)] hover:underline">
+                  Preventive maintenance
+                </Link>
+              ) : (
+                "Preventive maintenance"
+              )
+            ) : (
+              "Manual"
+            )
+          }
+        />
         <Row
           label="Billable"
           value={workOrder.billable ? "Yes" : "No"}
