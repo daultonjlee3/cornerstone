@@ -92,6 +92,10 @@ export function WorkOrderPartsCard({
       setError("Unit cost must be zero or greater.");
       return;
     }
+    if (!inventoryItemId && !partNameManual.trim()) {
+      setError("Select an inventory item or enter a part name.");
+      return;
+    }
 
     const payload: AddPartUsagePayload = {
       quantity_used: qty,
@@ -277,7 +281,12 @@ export function WorkOrderPartsCard({
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isPending || !quantity || parseFloat(quantity) <= 0}
+                  disabled={
+                    isPending ||
+                    !quantity ||
+                    parseFloat(quantity) <= 0 ||
+                    (!inventoryItemId && !partNameManual.trim())
+                  }
                   className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
                 >
                   {isPending ? "Adding…" : "Add"}

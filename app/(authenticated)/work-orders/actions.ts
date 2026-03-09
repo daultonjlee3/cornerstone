@@ -328,6 +328,7 @@ export async function updateWorkOrderAssignment(
   if (error) return { error: error.message };
   revalidatePath("/work-orders");
   revalidatePath(`/work-orders/${id}`);
+  revalidatePath("/dispatch");
   return { success: true };
 }
 
@@ -573,18 +574,30 @@ export async function addWorkOrderPartUsage(
   if (!inserted?.id) return { error: "Failed to create part usage." };
 
   if (payload.inventory_item_id && payload.deduct_inventory) {
-    const { data: invRow } = await supabase
+    const { data: invRow, error: invReadError } = await supabase
       .from("inventory_items")
       .select("quantity")
       .eq("id", payload.inventory_item_id)
-      .single();
+      .maybeSingle();
+    if (invReadError) {
+      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
+      return { error: `Failed to read inventory: ${invReadError.message}` };
+    }
+    if (!invRow) {
+      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
+      return { error: "Inventory item no longer found." };
+    }
     const currentQty = Number((invRow as { quantity?: number })?.quantity ?? 0);
     const newQty = Math.max(0, currentQty - payload.quantity_used);
-    await supabase
+    const { error: updateError } = await supabase
       .from("inventory_items")
       .update({ quantity: newQty })
       .eq("id", payload.inventory_item_id);
-    await supabase.from("inventory_transactions").insert({
+    if (updateError) {
+      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
+      return { error: `Failed to update inventory: ${updateError.message}` };
+    }
+    const { error: txError } = await supabase.from("inventory_transactions").insert({
       inventory_item_id: payload.inventory_item_id,
       quantity_delta: -payload.quantity_used,
       transaction_type: "issue",
@@ -592,6 +605,11 @@ export async function addWorkOrderPartUsage(
       reference_id: inserted.id,
       notes: payload.notes || `Work order ${workOrderId}`,
     });
+    if (txError) {
+      await supabase.from("inventory_items").update({ quantity: currentQty }).eq("id", payload.inventory_item_id);
+      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
+      return { error: `Failed to record inventory transaction: ${txError.message}` };
+    }
   }
 
   revalidatePath(`/work-orders/${workOrderId}`);

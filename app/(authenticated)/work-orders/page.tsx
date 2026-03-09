@@ -150,9 +150,11 @@ export default async function WorkOrdersPage({
         building_id: typeof searchParams?.building_id === "string" ? searchParams.building_id : undefined,
         unit_id: typeof searchParams?.unit_id === "string" ? searchParams.unit_id : undefined,
         asset_id: typeof searchParams?.asset_id === "string" ? searchParams.asset_id : undefined,
+        title: typeof searchParams?.title === "string" ? decodeURIComponent(searchParams.title) : undefined,
+        description: typeof searchParams?.description === "string" ? decodeURIComponent(searchParams.description) : undefined,
       }
     : null;
-  const autoOpenNew = wantNew && (prefill?.company_id ?? prefill?.property_id ?? prefill?.building_id ?? prefill?.unit_id ?? prefill?.asset_id);
+  const autoOpenNew = wantNew && (prefill?.company_id ?? prefill?.property_id ?? prefill?.building_id ?? prefill?.unit_id ?? prefill?.asset_id ?? prefill?.title ?? prefill?.description);
   const editId = typeof searchParams?.edit === "string" ? searchParams.edit : null;
   const technicianOptions = (techniciansData ?? []).map((t) => ({
     id: t.id,

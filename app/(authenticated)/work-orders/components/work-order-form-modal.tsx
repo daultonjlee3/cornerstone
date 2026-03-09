@@ -58,6 +58,10 @@ export type WorkOrderPrefill = {
   building_id?: string;
   unit_id?: string;
   asset_id?: string;
+  /** Prefill title when creating from asset/location (e.g. "AC - Maintenance"). */
+  title?: string;
+  /** Prefill description when creating from asset (e.g. asset details). */
+  description?: string;
 };
 
 type WorkOrderFormModalProps = {
@@ -271,19 +275,29 @@ export function WorkOrderFormModal({
     () => (companyId ? properties.filter((p) => p.company_id === companyId) : []),
     [companyId, properties]
   );
-  const buildingsFiltered = useMemo(
-    () => (propertyId ? buildings.filter((b) => b.property_id === propertyId) : []),
-    [propertyId, buildings]
-  );
+  const buildingsFiltered = useMemo(() => {
+    let list = propertyId ? buildings.filter((b) => b.property_id === propertyId) : [];
+    if (buildingId && !list.some((b) => b.id === buildingId)) {
+      const bld = buildings.find((b) => b.id === buildingId);
+      if (bld) list = [bld, ...list];
+    }
+    return list;
+  }, [propertyId, buildings, buildingId]);
   const buildingIdsForProperty = useMemo(
     () => buildingsFiltered.map((b) => b.id),
     [buildingsFiltered]
   );
   const unitsFiltered = useMemo(() => {
-    if (buildingId) return units.filter((u) => u.building_id === buildingId);
-    if (propertyId && buildingIdsForProperty.length) return units.filter((u) => buildingIdsForProperty.includes(u.building_id));
-    return [];
-  }, [buildingId, propertyId, buildingIdsForProperty, units]);
+    let list: typeof units;
+    if (buildingId) list = units.filter((u) => u.building_id === buildingId);
+    else if (propertyId && buildingIdsForProperty.length) list = units.filter((u) => buildingIdsForProperty.includes(u.building_id));
+    else list = [];
+    if (unitId && !list.some((u) => u.id === unitId)) {
+      const unit = units.find((u) => u.id === unitId);
+      if (unit) list = [unit, ...list];
+    }
+    return list;
+  }, [buildingId, propertyId, buildingIdsForProperty, units, unitId]);
   const customersFiltered = useMemo(
     () => (companyId ? customers.filter((c) => c.company_id === companyId) : []),
     [companyId, customers]
@@ -331,6 +345,8 @@ export function WorkOrderFormModal({
   if (!open) return null;
 
   const wo = workOrder ?? emptyWorkOrder;
+  const titleDefault = isEdit ? wo.title : (prefill?.title ?? wo.title);
+  const descriptionDefault = isEdit ? (wo.description ?? "") : (prefill?.description ?? wo.description ?? "");
   const inputClass = "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
   const labelClass = "mb-1 block text-sm font-medium text-[var(--foreground)]";
   const sectionTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)] border-b border-[var(--card-border)] pb-2";
@@ -371,11 +387,11 @@ export function WorkOrderFormModal({
               </div>
               <div>
                 <label htmlFor="title" className={labelClass}>Title *</label>
-                <input id="title" name="title" type="text" required defaultValue={wo.title} className={inputClass} />
+                <input id="title" name="title" type="text" required defaultValue={titleDefault} className={inputClass} />
               </div>
               <div>
                 <label htmlFor="description" className={labelClass}>Description</label>
-                <textarea id="description" name="description" rows={2} defaultValue={wo.description ?? ""} className={inputClass} />
+                <textarea id="description" name="description" rows={2} defaultValue={descriptionDefault} className={inputClass} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>

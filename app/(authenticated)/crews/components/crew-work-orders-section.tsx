@@ -10,8 +10,10 @@ type WorkOrderRow = {
   work_order_number: string | null;
   title: string;
   status: string;
+  priority?: string | null;
   scheduled_date: string | null;
   updated_at: string;
+  location?: string;
 };
 
 type CrewWorkOrdersSectionProps = {
@@ -41,7 +43,9 @@ export function CrewWorkOrdersSection({ workOrders }: CrewWorkOrdersSectionProps
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Work order</th>
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Title</th>
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Status</th>
+                <th className="py-2 text-left font-medium text-[var(--muted)]">Priority</th>
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Scheduled</th>
+                <th className="py-2 text-left font-medium text-[var(--muted)]">Location</th>
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Updated</th>
               </tr>
             </thead>
@@ -59,7 +63,9 @@ export function CrewWorkOrdersSection({ workOrders }: CrewWorkOrdersSectionProps
                       {wo.status.replace(/_/g, " ")}
                     </span>
                   </td>
+                  <td className="py-2 text-[var(--muted)] capitalize">{wo.priority ?? "—"}</td>
                   <td className="py-2 text-[var(--muted)]">{formatDate(wo.scheduled_date)}</td>
+                  <td className="py-2 text-[var(--muted)] max-w-[140px] truncate" title={wo.location}>{wo.location ?? "—"}</td>
                   <td className="py-2 text-[var(--muted)]">{formatDate(wo.updated_at)}</td>
                 </tr>
               ))}

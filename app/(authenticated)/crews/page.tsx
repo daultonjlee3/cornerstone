@@ -7,7 +7,11 @@ export const metadata = {
   description: "Teams & labor groups",
 };
 
-export default async function CrewsPage() {
+export default async function CrewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,6 +28,7 @@ export default async function CrewsPage() {
   if (!membership) redirect("/onboarding");
 
   const tenantId = membership.tenant_id;
+  const searchQuery = (await searchParams)?.q?.trim() ?? "";
 
   const { data: crewsRaw } = await supabase
     .from("crews")
@@ -65,7 +70,7 @@ export default async function CrewsPage() {
     });
   }
 
-  const crews = (crewsRaw ?? []).map((c) => {
+  let crews = (crewsRaw ?? []).map((c) => {
     const row = c as Record<string, unknown>;
     const comp = Array.isArray(row.companies) ? row.companies[0] : row.companies;
     const lead = Array.isArray(row.technicians) ? row.technicians[0] : row.technicians;
@@ -91,6 +96,15 @@ export default async function CrewsPage() {
       active_work_orders: woCountByCrew[id] ?? 0,
     };
   });
+
+  if (searchQuery) {
+    const term = searchQuery.toLowerCase();
+    crews = crews.filter(
+      (c) =>
+        (c.name && String(c.name).toLowerCase().includes(term)) ||
+        (c.company_name && String(c.company_name).toLowerCase().includes(term))
+    );
+  }
 
   const { data: companies } = await supabase
     .from("companies")
@@ -120,13 +134,14 @@ export default async function CrewsPage() {
           Crews
         </h1>
         <p className="mt-1 text-[var(--muted)]">
-          Teams and labor groups for work order assignment.
+          Teams & labor groups
         </p>
       </div>
       <CrewsList
         crews={crews}
         companies={companyOptions}
         technicians={technicianOptions}
+        searchQuery={searchQuery}
       />
     </div>
   );

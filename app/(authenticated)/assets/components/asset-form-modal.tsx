@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 export type Asset = {
   id: string;
@@ -11,19 +11,24 @@ export type Asset = {
   building_id: string | null;
   unit_id: string | null;
   asset_tag: string | null;
+  asset_type?: string | null;
   category: string | null;
   manufacturer: string | null;
   model: string | null;
   serial_number: string | null;
   install_date: string | null;
+  warranty_expires?: string | null;
   status: string;
+  condition?: string | null;
   notes: string | null;
+  description?: string | null;
+  location_notes?: string | null;
 };
 
 type CompanyOption = { id: string; name: string };
-type PropertyOption = { id: string; name: string };
-type BuildingOption = { id: string; name: string };
-type UnitOption = { id: string; name: string };
+type PropertyOption = { id: string; name: string; company_id?: string };
+type BuildingOption = { id: string; name: string; property_id?: string };
+type UnitOption = { id: string; name: string; building_id?: string };
 
 type AssetFormModalProps = {
   open: boolean;
@@ -35,6 +40,15 @@ type AssetFormModalProps = {
   units: UnitOption[];
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
 };
+
+import { ASSET_TYPE_OPTIONS } from "../constants";
+
+const CONDITION_OPTIONS = ["excellent", "good", "fair", "poor"] as const;
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "retired", label: "Retired" },
+] as const;
 
 const emptyAsset: Asset = {
   id: "",
@@ -53,6 +67,9 @@ const emptyAsset: Asset = {
   notes: null,
 };
 
+const inputClass =
+  "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
+
 export function AssetFormModal({
   open,
   onClose,
@@ -65,6 +82,53 @@ export function AssetFormModal({
 }: AssetFormModalProps) {
   const isEdit = !!asset?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
+  const a = asset ?? emptyAsset;
+
+  const [companyId, setCompanyId] = useState(a.company_id || "");
+  const [propertyId, setPropertyId] = useState(a.property_id ?? "");
+  const [buildingId, setBuildingId] = useState(a.building_id ?? "");
+  const [unitId, setUnitId] = useState(a.unit_id ?? "");
+  const [assetTypeSelect, setAssetTypeSelect] = useState(
+    () => (a.asset_type ?? a.category ?? "").trim()
+  );
+
+  useEffect(() => {
+    if (open && a) {
+      setCompanyId(a.company_id || "");
+      setPropertyId(a.property_id ?? "");
+      setBuildingId(a.building_id ?? "");
+      setUnitId(a.unit_id ?? "");
+      setAssetTypeSelect((a.asset_type ?? a.category ?? "").trim());
+    }
+  }, [open, a.company_id, a.property_id, a.building_id, a.unit_id, a.asset_type, a.category]);
+
+  const typeDropdownOptions = useMemo(() => {
+    const current = (a.asset_type ?? a.category ?? "").trim();
+    if (current && !ASSET_TYPE_OPTIONS.includes(current as (typeof ASSET_TYPE_OPTIONS)[number])) {
+      return [current, ...ASSET_TYPE_OPTIONS];
+    }
+    return [...ASSET_TYPE_OPTIONS];
+  }, [a.asset_type, a.category]);
+
+  const propertiesFiltered = useMemo(
+    () => (companyId ? properties.filter((p) => p.company_id === companyId) : []),
+    [companyId, properties]
+  );
+  const buildingsFiltered = useMemo(
+    () => (propertyId ? buildings.filter((b) => b.property_id === propertyId) : []),
+    [propertyId, buildings]
+  );
+  const unitsFiltered = useMemo(
+    () => (buildingId ? units.filter((u) => u.building_id === buildingId) : []),
+    [buildingId, units]
+  );
+
+  useEffect(() => {
+    if (companyId && propertyId && !propertiesFiltered.some((p) => p.id === propertyId))
+      setPropertyId("");
+    if (propertyId && buildingId && !buildingsFiltered.some((b) => b.id === buildingId))
+      setBuildingId("");
+  }, [companyId, propertyId, buildingId, propertiesFiltered, buildingsFiltered]);
 
   useEffect(() => {
     if (state?.success) onClose();
@@ -72,7 +136,6 @@ export function AssetFormModal({
 
   if (!open) return null;
 
-  const a = asset ?? emptyAsset;
   const displayName = a.asset_name ?? a.name ?? "";
 
   return (
@@ -112,8 +175,14 @@ export function AssetFormModal({
               id="company_id"
               name="company_id"
               required
-              defaultValue={a.company_id}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={companyId}
+              onChange={(e) => {
+                setCompanyId(e.target.value);
+                setPropertyId("");
+                setBuildingId("");
+                setUnitId("");
+              }}
+              className={inputClass}
             >
               <option value="">Select company</option>
               {companies.map((c) => (
@@ -130,11 +199,16 @@ export function AssetFormModal({
             <select
               id="property_id"
               name="property_id"
-              defaultValue={a.property_id ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={propertyId}
+              onChange={(e) => {
+                setPropertyId(e.target.value);
+                setBuildingId("");
+                setUnitId("");
+              }}
+              className={inputClass}
             >
               <option value="">None</option>
-              {properties.map((p) => (
+              {propertiesFiltered.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -148,11 +222,15 @@ export function AssetFormModal({
             <select
               id="building_id"
               name="building_id"
-              defaultValue={a.building_id ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={buildingId}
+              onChange={(e) => {
+                setBuildingId(e.target.value);
+                setUnitId("");
+              }}
+              className={inputClass}
             >
               <option value="">None</option>
-              {buildings.map((b) => (
+              {buildingsFiltered.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
@@ -166,11 +244,12 @@ export function AssetFormModal({
             <select
               id="unit_id"
               name="unit_id"
-              defaultValue={a.unit_id ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={unitId}
+              onChange={(e) => setUnitId(e.target.value)}
+              className={inputClass}
             >
               <option value="">None</option>
-              {units.map((u) => (
+              {unitsFiltered.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>
@@ -190,6 +269,34 @@ export function AssetFormModal({
             />
           </div>
           <div>
+            <label htmlFor="asset_type" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+              Type
+            </label>
+            <select
+              id="asset_type"
+              name="asset_type"
+              value={assetTypeSelect}
+              onChange={(e) => setAssetTypeSelect(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">—</option>
+              {typeDropdownOptions.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            {assetTypeSelect === "Other" && (
+              <input
+                type="text"
+                name="asset_type_custom"
+                placeholder="Custom type (optional)"
+                className={inputClass + " mt-2"}
+                aria-label="Custom type when Other is selected"
+              />
+            )}
+          </div>
+          <div>
             <label htmlFor="category" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Category
             </label>
@@ -198,7 +305,7 @@ export function AssetFormModal({
               name="category"
               type="text"
               defaultValue={a.category ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className={inputClass}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -249,8 +356,40 @@ export function AssetFormModal({
                 name="install_date"
                 type="date"
                 defaultValue={a.install_date ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className={inputClass}
               />
+            </div>
+            <div>
+              <label htmlFor="warranty_expires" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                Warranty expiration
+              </label>
+              <input
+                id="warranty_expires"
+                name="warranty_expires"
+                type="date"
+                defaultValue={a.warranty_expires ?? ""}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="condition" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                Condition
+              </label>
+              <select
+                id="condition"
+                name="condition"
+                defaultValue={a.condition ?? ""}
+                className={inputClass}
+              >
+                <option value="">—</option>
+                {CONDITION_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="status" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
@@ -260,12 +399,40 @@ export function AssetFormModal({
                 id="status"
                 name="status"
                 defaultValue={a.status}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className={inputClass}
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
               </select>
             </div>
+          </div>
+          <div>
+            <label htmlFor="description" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows={2}
+              defaultValue={a.description ?? ""}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="location_notes" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+              Location notes
+            </label>
+            <textarea
+              id="location_notes"
+              name="location_notes"
+              rows={2}
+              defaultValue={a.location_notes ?? ""}
+              placeholder="Where exactly the asset is located"
+              className={inputClass}
+            />
           </div>
           <div>
             <label htmlFor="notes" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
@@ -276,7 +443,7 @@ export function AssetFormModal({
               name="notes"
               rows={2}
               defaultValue={a.notes ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className={inputClass}
             />
           </div>
           <div className="flex gap-3 pt-2">

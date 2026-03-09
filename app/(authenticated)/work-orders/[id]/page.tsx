@@ -111,13 +111,18 @@ export default async function WorkOrderDetailPage({
       .eq("crew_id", assignedCrewId)
       .order("sort_order");
     if (mems?.length) {
+      const techIds = mems.map((m) => (m as { technician_id: string }).technician_id);
       const { data: techs } = await supabase
         .from("technicians")
-        .select("technician_name, name")
-        .in("id", mems.map((m) => (m as { technician_id: string }).technician_id));
-      crewMemberNames = (techs ?? []).map(
-        (t) => (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? ""
+        .select("id, technician_name, name")
+        .in("id", techIds);
+      const techById = new Map(
+        (techs ?? []).map((t) => [
+          (t as { id: string }).id,
+          (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? "",
+        ])
       );
+      crewMemberNames = techIds.map((id) => techById.get(id) ?? "—");
     }
   }
 
