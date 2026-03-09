@@ -189,6 +189,7 @@ export default async function WorkOrdersPage({
       assigned_technician_id, assigned_crew_id,
       estimated_hours, estimated_technicians, actual_hours,
       billable, nte_amount, updated_at,
+      source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
       completed_at, completion_status,
       companies(name),
       customers(name),

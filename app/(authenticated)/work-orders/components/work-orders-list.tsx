@@ -261,6 +261,7 @@ export function WorkOrdersList({
                   <th className="px-4 py-3 font-medium text-[var(--foreground)]">Customer</th>
                   <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property / Location</th>
                   <th className="px-4 py-3 font-medium text-[var(--foreground)]">Asset</th>
+                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Source</th>
                   <th className="px-4 py-3 font-medium text-[var(--foreground)]">Priority</th>
                   <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
                   <th className="px-4 py-3 font-medium text-[var(--foreground)]">Scheduled</th>
@@ -300,6 +301,22 @@ export function WorkOrdersList({
                     <td className="px-4 py-3 text-[var(--muted)]">{wo.customer_name ?? "—"}</td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-[140px] truncate" title={wo.location ?? undefined}>{wo.location ?? "—"}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{wo.asset_name ?? "—"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">
+                      {(wo.source_type as string | undefined) === "preventive_maintenance" ? (
+                        (wo.preventive_maintenance_plan_id as string | undefined) ? (
+                          <Link
+                            href={`/preventive-maintenance/${wo.preventive_maintenance_plan_id as string}`}
+                            className="text-[var(--accent)] hover:underline"
+                          >
+                            PM
+                          </Link>
+                        ) : (
+                          "PM"
+                        )
+                      ) : (
+                        "Manual"
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <WorkOrderPriorityBadge priority={wo.priority ?? "medium"} />
                     </td>

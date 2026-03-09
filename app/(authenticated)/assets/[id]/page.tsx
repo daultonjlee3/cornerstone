@@ -1,0 +1,257 @@
+import Link from "next/link";
+import { createClient } from "@/src/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
+
+export const metadata = {
+  title: "Asset | Cornerstone Tech",
+  description: "Asset detail and preventive maintenance",
+};
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    return new Date(value + "T12:00:00").toLocaleDateString(undefined, {
+      dateStyle: "medium",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+export default async function AssetDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: membership } = await supabase
+    .from("tenant_memberships")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (!membership) redirect("/onboarding");
+
+  const { data: assetRaw, error } = await supabase
+    .from("assets")
+    .select(
+      "id, tenant_id, company_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, warranty_expires, description, location_notes, notes, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !assetRaw) notFound();
+  if ((assetRaw as { tenant_id: string }).tenant_id !== membership.tenant_id) notFound();
+
+  const row = assetRaw as Record<string, unknown>;
+  const company = Array.isArray(row.companies) ? row.companies[0] : row.companies;
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+  const building = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
+  const unit = Array.isArray(row.units) ? row.units[0] : row.units;
+
+  const asset = {
+    id: row.id as string,
+    company_id: row.company_id as string,
+    property_id: (row.property_id as string | null) ?? null,
+    building_id: (row.building_id as string | null) ?? null,
+    unit_id: (row.unit_id as string | null) ?? null,
+    name:
+      (row.asset_name as string | null) ??
+      (row.name as string | null) ??
+      (row.id as string),
+    asset_type: (row.asset_type as string | null) ?? null,
+    category: (row.category as string | null) ?? null,
+    manufacturer: (row.manufacturer as string | null) ?? null,
+    model: (row.model as string | null) ?? null,
+    serial_number: (row.serial_number as string | null) ?? null,
+    status: (row.status as string | null) ?? "active",
+    condition: (row.condition as string | null) ?? null,
+    install_date: (row.install_date as string | null) ?? null,
+    warranty_expires: (row.warranty_expires as string | null) ?? null,
+    description: (row.description as string | null) ?? null,
+    location_notes: (row.location_notes as string | null) ?? null,
+    notes: (row.notes as string | null) ?? null,
+    company_name:
+      company && typeof company === "object"
+        ? ((company as { name?: string }).name ?? null)
+        : null,
+    property_name:
+      property && typeof property === "object"
+        ? ((property as { property_name?: string }).property_name ??
+          (property as { name?: string }).name ??
+          null)
+        : null,
+    building_name:
+      building && typeof building === "object"
+        ? ((building as { building_name?: string }).building_name ??
+          (building as { name?: string }).name ??
+          null)
+        : null,
+    unit_name:
+      unit && typeof unit === "object"
+        ? ((unit as { unit_name?: string }).unit_name ??
+          (unit as { name_or_number?: string }).name_or_number ??
+          null)
+        : null,
+  };
+
+  const { data: plansRaw } = await supabase
+    .from("preventive_maintenance_plans")
+    .select("id, name, frequency_type, frequency_interval, next_run_date, status")
+    .eq("asset_id", id)
+    .order("next_run_date", { ascending: true });
+
+  const plans = (plansRaw ?? []).map((plan) => ({
+    id: (plan as { id: string }).id,
+    name: (plan as { name: string }).name,
+    frequency_type: (plan as { frequency_type: string }).frequency_type,
+    frequency_interval: Number((plan as { frequency_interval?: number }).frequency_interval ?? 1),
+    next_run_date: (plan as { next_run_date?: string | null }).next_run_date ?? null,
+    status: (plan as { status: string }).status,
+  }));
+
+  const nextPmDue =
+    plans.find((plan) => plan.status === "active" && plan.next_run_date)?.next_run_date ??
+    null;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+        <Link href="/assets" className="hover:text-[var(--foreground)]">
+          Assets
+        </Link>
+        <span>/</span>
+        <span className="text-[var(--foreground)]">{asset.name}</span>
+      </div>
+
+      <header className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-[var(--foreground)]">{asset.name}</h1>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {asset.company_name ?? "—"} •{" "}
+              {[asset.property_name, asset.building_name, asset.unit_name]
+                .filter(Boolean)
+                .join(" / ") || "No linked location"}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-[var(--muted)]">Next PM due</p>
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              {formatDate(nextPmDue)}
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+          <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">Asset details</h2>
+          <dl className="space-y-2 text-sm">
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Type</dt>
+              <dd className="text-[var(--foreground)]">{asset.asset_type ?? asset.category ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Manufacturer / Model</dt>
+              <dd className="text-[var(--foreground)]">
+                {[asset.manufacturer, asset.model].filter(Boolean).join(" / ") || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Serial number</dt>
+              <dd className="text-[var(--foreground)]">{asset.serial_number ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Status / Condition</dt>
+              <dd className="text-[var(--foreground)]">
+                {[asset.status, asset.condition].filter(Boolean).join(" / ")}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Install date</dt>
+              <dd className="text-[var(--foreground)]">{formatDate(asset.install_date)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Warranty expires</dt>
+              <dd className="text-[var(--foreground)]">{formatDate(asset.warranty_expires)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+          <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+            Description & notes
+          </h2>
+          <p className="whitespace-pre-wrap text-sm text-[var(--foreground)]">
+            {asset.description ?? "No description"}
+          </p>
+          <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--muted)]">
+            {asset.location_notes ?? asset.notes ?? "No notes"}
+          </p>
+        </section>
+      </div>
+
+      <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">
+            Preventive Maintenance Plans
+          </h2>
+          <Link
+            href={`/preventive-maintenance?new=1&company_id=${encodeURIComponent(
+              asset.company_id
+            )}&asset_id=${encodeURIComponent(asset.id)}`}
+            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+          >
+            Create PM Plan
+          </Link>
+        </div>
+        {plans.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">
+            No PM plans linked to this asset yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--card-border)]">
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Plan</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Frequency</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Next run</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((plan) => (
+                  <tr key={plan.id} className="border-b border-[var(--card-border)] last:border-0">
+                    <td className="px-2 py-2 text-[var(--foreground)]">
+                      <Link
+                        href={`/preventive-maintenance/${plan.id}`}
+                        className="text-[var(--accent)] hover:underline"
+                      >
+                        {plan.name}
+                      </Link>
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      Every {plan.frequency_interval} {plan.frequency_type}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {formatDate(plan.next_run_date)}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">{plan.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

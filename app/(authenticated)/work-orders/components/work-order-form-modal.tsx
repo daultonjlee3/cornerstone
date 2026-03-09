@@ -31,6 +31,9 @@ export type WorkOrder = {
   actual_hours: number | null;
   billable: boolean;
   nte_amount: number | null;
+  source_type?: string | null;
+  preventive_maintenance_plan_id?: string | null;
+  preventive_maintenance_run_id?: string | null;
   updated_at?: string | null;
   completed_at?: string | null;
 };
