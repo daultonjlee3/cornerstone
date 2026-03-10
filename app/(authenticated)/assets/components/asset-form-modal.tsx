@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
+import { LocationBreadcrumb } from "@/src/components/ui/location-breadcrumb";
 
 export type Asset = {
   id: string;
@@ -121,6 +122,22 @@ export function AssetFormModal({
   const unitsFiltered = useMemo(
     () => (buildingId ? units.filter((u) => u.building_id === buildingId) : []),
     [buildingId, units]
+  );
+  const selectedCompanyName = useMemo(
+    () => companies.find((company) => company.id === companyId)?.name ?? null,
+    [companies, companyId]
+  );
+  const selectedPropertyName = useMemo(
+    () => properties.find((property) => property.id === propertyId)?.name ?? null,
+    [properties, propertyId]
+  );
+  const selectedBuildingName = useMemo(
+    () => buildings.find((building) => building.id === buildingId)?.name ?? null,
+    [buildings, buildingId]
+  );
+  const selectedUnitName = useMemo(
+    () => units.find((unit) => unit.id === unitId)?.name ?? null,
+    [units, unitId]
   );
 
   useEffect(() => {
@@ -256,6 +273,13 @@ export function AssetFormModal({
               ))}
             </select>
           </div>
+          <LocationBreadcrumb
+            className="-mt-1"
+            company={selectedCompanyName}
+            property={selectedPropertyName}
+            building={selectedBuildingName}
+            unit={selectedUnitName}
+          />
           <div>
             <label htmlFor="asset_tag" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Asset tag

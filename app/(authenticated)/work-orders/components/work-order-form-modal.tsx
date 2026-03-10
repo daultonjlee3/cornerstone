@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { LocationBreadcrumb } from "@/src/components/ui/location-breadcrumb";
 
 export type WorkOrder = {
   id: string;
@@ -325,6 +326,23 @@ export function WorkOrderFormModal({
     return list;
   }, [companyId, propertyId, buildingId, unitId, assets]);
 
+  const selectedCompanyName = useMemo(
+    () => companies.find((company) => company.id === companyId)?.name ?? null,
+    [companies, companyId]
+  );
+  const selectedPropertyName = useMemo(
+    () => properties.find((property) => property.id === propertyId)?.name ?? null,
+    [properties, propertyId]
+  );
+  const selectedBuildingName = useMemo(
+    () => buildings.find((building) => building.id === buildingId)?.name ?? null,
+    [buildings, buildingId]
+  );
+  const selectedUnitName = useMemo(
+    () => units.find((unit) => unit.id === unitId)?.name ?? null,
+    [units, unitId]
+  );
+
   const handleCompanyChange = (value: string) => {
     setCompanyId(value);
     setCustomerId("");
@@ -488,6 +506,13 @@ export function WorkOrderFormModal({
           {/* Section 3: Location & Asset */}
           <div>
             <h3 className={sectionTitleClass}>Location & Asset</h3>
+            <LocationBreadcrumb
+              className="mb-3"
+              company={selectedCompanyName}
+              property={selectedPropertyName}
+              building={selectedBuildingName}
+              unit={selectedUnitName}
+            />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="property_id" className={labelClass}>Property</label>

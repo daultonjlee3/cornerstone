@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import { revalidatePath } from "next/cache";
 
 export type AssetFormState = { error?: string; success?: boolean };
@@ -71,6 +72,15 @@ export async function saveAsset(
       ? "inactive"
       : "active";
 
+  const supabase = await createClient();
+  const hierarchyError = await validateLocationHierarchy(supabase, {
+    companyId,
+    propertyId,
+    buildingId,
+    unitId,
+  });
+  if (hierarchyError) return { error: hierarchyError };
+
   const payload = {
     name: assetName,
     asset_name: assetName,
@@ -99,7 +109,6 @@ export async function saveAsset(
     notes: (formData.get("notes") as string)?.trim() || null,
   };
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   if (id) {
     const { data: row } = await supabase.from("assets").select("*").eq("id", id).maybeSingle();

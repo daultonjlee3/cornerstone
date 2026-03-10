@@ -24,7 +24,7 @@ export function Shell({ children, tenantName, companyName }: ShellProps) {
           onMenuClick={() => setSidebarOpen(true)}
         />
         <div className="min-h-0 flex-1 overflow-auto">
-          <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">{children}</div>
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
         </div>
       </div>
     </div>

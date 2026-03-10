@@ -23,6 +23,8 @@ import {
   type PreventiveMaintenanceTemplate,
 } from "./pm-template-form-modal";
 import { PreventiveMaintenanceBulkTemplateModal } from "./pm-bulk-template-modal";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
 
 type CompanyOption = { id: string; name: string };
 type AssetOption = {
@@ -406,27 +408,27 @@ export function PreventiveMaintenancePlansList({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Name</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Asset</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Frequency</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Next Run</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Technician</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-4 py-3 font-semibold">Name</th>
+                  <th className="px-4 py-3 font-semibold">Asset</th>
+                  <th className="px-4 py-3 font-semibold">Frequency</th>
+                  <th className="px-4 py-3 font-semibold">Next Run</th>
+                  <th className="px-4 py-3 font-semibold">Technician</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {plans.map((plan) => (
                   <tr
                     key={plan.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
+                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >
-                    <td className="px-4 py-3 text-[var(--foreground)]">
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">
                       <Link
                         href={`/preventive-maintenance/${plan.id}`}
                         className="font-medium text-[var(--accent)] hover:underline"
@@ -434,32 +436,22 @@ export function PreventiveMaintenancePlansList({
                         {plan.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
                       {plan.asset_name ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
                       {frequencyDisplay(plan)}
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
                       {formatDate(plan.next_run_date)}
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
                       {plan.technician_name ?? "—"}
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          plan.status === "active"
-                            ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
-                            : plan.status === "paused"
-                              ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                              : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
-                      >
-                        {plan.status}
-                      </span>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={plan.status} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={`/preventive-maintenance/${plan.id}`}
@@ -547,21 +539,23 @@ export function PreventiveMaintenancePlansList({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)]">
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Template</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Frequency</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Priority</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/40 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-2 py-2 font-semibold">Template</th>
+                  <th className="px-2 py-2 font-semibold">Frequency</th>
+                  <th className="px-2 py-2 font-semibold">Priority</th>
+                  <th className="px-2 py-2 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {templates.map((template) => (
-                  <tr key={template.id} className="border-b border-[var(--card-border)] last:border-0">
+                  <tr key={template.id} className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/40">
                     <td className="px-2 py-2 text-[var(--foreground)]">{template.name}</td>
                     <td className="px-2 py-2 text-[var(--muted)]">
                       Every {template.frequency_interval} {template.frequency_type}
                     </td>
-                    <td className="px-2 py-2 text-[var(--muted)]">{template.priority}</td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      <PriorityBadge priority={template.priority} />
+                    </td>
                     <td className="px-2 py-2">
                       <div className="flex gap-2">
                         <button

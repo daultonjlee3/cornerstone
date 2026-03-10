@@ -13,6 +13,7 @@ export const navConfig: NavGroup[] = [
     label: "Core Structure",
     items: [
       { label: "Dashboard", href: "/dashboard" },
+      { label: "Operations Center", href: "/operations" },
       { label: "Companies", href: "/companies" },
       { label: "Properties", href: "/properties" },
       { label: "Buildings", href: "/buildings" },

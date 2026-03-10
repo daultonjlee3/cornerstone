@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
 
 export const metadata = {
   title: "Technician Work Queue | Cornerstone Tech",
@@ -364,52 +366,54 @@ export default async function TechnicianWorkQueuePage({
           No work orders match the current technician queue filters.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Work Order</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Title</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Asset</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Property / Location</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Scheduled Time</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Priority</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Type</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Assigned</th>
-                  <th className="px-3 py-2 font-medium text-[var(--foreground)]">Execute</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-3 py-2.5 font-semibold">Work Order</th>
+                  <th className="px-3 py-2.5 font-semibold">Title</th>
+                  <th className="px-3 py-2.5 font-semibold">Asset</th>
+                  <th className="px-3 py-2.5 font-semibold">Property / Location</th>
+                  <th className="px-3 py-2.5 font-semibold">Scheduled Time</th>
+                  <th className="px-3 py-2.5 font-semibold">Priority</th>
+                  <th className="px-3 py-2.5 font-semibold">Type</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
+                  <th className="px-3 py-2.5 font-semibold">Assigned</th>
+                  <th className="px-3 py-2.5 font-semibold">Execute</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((workOrder) => (
-                  <tr key={workOrder.id} className="border-b border-[var(--card-border)] last:border-0">
-                    <td className="px-3 py-2 text-[var(--foreground)]">
+                  <tr key={workOrder.id} className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50">
+                    <td className="px-3 py-3 text-[var(--foreground)]">
                       {workOrder.work_order_number ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-[var(--foreground)]">{workOrder.title}</td>
-                    <td className="px-3 py-2 text-[var(--muted)]">{workOrder.asset_name ?? "—"}</td>
-                    <td className="px-3 py-2 text-[var(--muted)]">{workOrder.location || "—"}</td>
-                    <td className="px-3 py-2 text-[var(--muted)]">
+                    <td className="px-3 py-3 text-[var(--foreground)]">{workOrder.title}</td>
+                    <td className="px-3 py-3 text-[var(--muted)]">{workOrder.asset_name ?? "—"}</td>
+                    <td className="px-3 py-3 text-[var(--muted)]">{workOrder.location || "—"}</td>
+                    <td className="px-3 py-3 text-[var(--muted)]">
                       {workOrder.scheduled_start
                         ? `${formatDateTime(workOrder.scheduled_start)} - ${formatDateTime(
                             workOrder.scheduled_end
                           )}`
                         : formatDate(workOrder.scheduled_date)}
                     </td>
-                    <td className="px-3 py-2 text-[var(--muted)]">{workOrder.priority}</td>
-                    <td className="px-3 py-2 text-[var(--muted)]">
+                    <td className="px-3 py-3 text-[var(--muted)]">
+                      <PriorityBadge priority={workOrder.priority} />
+                    </td>
+                    <td className="px-3 py-3 text-[var(--muted)]">
                       {workOrder.is_pm ? "PM" : "Reactive"}
                     </td>
-                    <td className="px-3 py-2 text-[var(--muted)]">
-                      {workOrder.status.replace(/_/g, " ")}
+                    <td className="px-3 py-3 text-[var(--muted)]">
+                      <StatusBadge status={workOrder.status} />
                     </td>
-                    <td className="px-3 py-2 text-[var(--muted)]">
+                    <td className="px-3 py-3 text-[var(--muted)]">
                       {[workOrder.assigned_technician_name, workOrder.assigned_crew_name]
                         .filter(Boolean)
                         .join(" / ") || "—"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-3">
                       <Link
                         href={`/technicians/work-queue/${workOrder.id}`}
                         className="text-[var(--accent)] hover:underline"

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { DispatchWorkOrder } from "../types";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
 
 export type DispatchWorkOrderCardProps = {
   workOrder: DispatchWorkOrder;
@@ -65,14 +67,6 @@ function getJobTypeLabel(jobType: string): string {
   }
 }
 
-/** Priority badge: Emergency, High, Normal */
-function getPriorityLabel(priority: string | null | undefined): string {
-  if (priority === "emergency") return "Emergency";
-  if (priority === "urgent") return "Emergency";
-  if (priority === "high") return "High";
-  return "Normal";
-}
-
 function getTypeBorderClass(jobType: string): string {
   switch (jobType) {
     case "emergency":
@@ -103,13 +97,6 @@ function getTypeBgClass(jobType: string): string {
   }
 }
 
-function getPriorityBadgeClass(priority: string | null | undefined): string {
-  if (priority === "emergency") return "bg-red-500/20 text-red-700 dark:text-red-300";
-  if (priority === "urgent") return "bg-red-500/20 text-red-700 dark:text-red-300";
-  if (priority === "high") return "bg-amber-500/20 text-amber-700 dark:text-amber-300";
-  return "bg-[var(--muted)]/20 text-[var(--muted)]";
-}
-
 export function DispatchWorkOrderCard({
   workOrder,
   variant = "block",
@@ -130,7 +117,6 @@ export function DispatchWorkOrderCard({
   const jobType = getJobType(workOrder);
   const typeBorder = getTypeBorderClass(jobType);
   const typeBg = getTypeBgClass(jobType);
-  const priorityBadgeClass = getPriorityBadgeClass(priority);
   const showActions = showQuickActions && hover && !isDragging && onOpenWorkOrder;
 
   if (variant === "compact") {
@@ -163,12 +149,11 @@ export function DispatchWorkOrderCard({
       )}
 
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${priorityBadgeClass}`}>
-          {getPriorityLabel(priority)}
-        </span>
+        <PriorityBadge priority={priority} />
         <span className="rounded bg-[var(--muted)]/20 px-1.5 py-0.5 text-xs text-[var(--muted)]">
           {getJobTypeLabel(jobType)}
         </span>
+        {workOrder.status ? <StatusBadge status={workOrder.status} /> : null}
       </div>
 
       {timeRange && (

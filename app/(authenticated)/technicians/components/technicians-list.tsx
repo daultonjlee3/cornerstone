@@ -5,6 +5,7 @@ import { useTransition, useState } from "react";
 import { deleteTechnician, saveTechnician } from "../actions";
 import type { Technician } from "./technician-form-modal";
 import { TechnicianFormModal } from "./technician-form-modal";
+import { StatusBadge } from "@/src/components/ui/status-badge";
 
 type CompanyOption = { id: string; name: string };
 
@@ -104,39 +105,31 @@ export function TechniciansList({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Name</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Company</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Trade</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="w-24 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-4 py-3 font-semibold">Name</th>
+                  <th className="px-4 py-3 font-semibold">Company</th>
+                  <th className="px-4 py-3 font-semibold">Trade</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="w-24 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {initialList.map((t) => (
                   <tr
                     key={t.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
+                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >
-                    <td className="px-4 py-3 text-[var(--foreground)]">{technicianDisplayName(t)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{companyDisplay(t as Technician & { company_name?: string })}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{t.trade ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          t.status === "active"
-                            ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                            : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
-                      >
-                        {t.status}
-                      </span>
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">{technicianDisplayName(t)}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{companyDisplay(t as Technician & { company_name?: string })}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{t.trade ?? "—"}</td>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={t.status} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <div className="flex gap-2">
                         <button
                           type="button"

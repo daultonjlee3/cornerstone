@@ -202,6 +202,35 @@ export default async function AssetDetailPage({
   });
   const lastServicedAt =
     asset.last_serviced_at ?? serviceHistory[0]?.completed_at ?? null;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const { count: recentFailureCount } = await supabase
+    .from("work_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("asset_id", id)
+    .eq("status", "completed")
+    .gte("completed_at", thirtyDaysAgo.toISOString())
+    .in("category", ["repair", "emergency"]);
+  const today = new Date().toISOString().slice(0, 10);
+  const staleServiceCutoff = new Date();
+  staleServiceCutoff.setMonth(staleServiceCutoff.getMonth() - 6);
+  const hasOverduePm = plans.some(
+    (plan) =>
+      plan.status === "active" &&
+      Boolean(plan.next_run_date) &&
+      String(plan.next_run_date) < today
+  );
+  const isStaleService = !lastServicedAt || new Date(lastServicedAt) < staleServiceCutoff;
+  const healthWarnings: string[] = [];
+  if ((recentFailureCount ?? 0) >= 2) {
+    healthWarnings.push(`${recentFailureCount} completed failures in the last 30 days`);
+  }
+  if (hasOverduePm) {
+    healthWarnings.push("Preventive maintenance is overdue");
+  }
+  if (isStaleService) {
+    healthWarnings.push("Asset has not been serviced in 6+ months");
+  }
 
   return (
     <div className="space-y-6">
@@ -236,6 +265,26 @@ export default async function AssetDetailPage({
           </div>
         </div>
       </header>
+
+      <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Asset Health Indicators</h2>
+        {healthWarnings.length === 0 ? (
+          <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">
+            Asset health is stable based on recent maintenance and PM schedule.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {healthWarnings.map((warning) => (
+              <li
+                key={warning}
+                className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
+              >
+                {warning}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">

@@ -258,31 +258,31 @@ export function WorkOrdersList({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Work Order #</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Title</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Company</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Customer</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property / Location</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Asset</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Source</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Priority</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Scheduled</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Assigned To</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Updated</th>
-                  <th className="w-28 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-4 py-3 font-semibold">Work Order #</th>
+                  <th className="px-4 py-3 font-semibold">Title</th>
+                  <th className="px-4 py-3 font-semibold">Company</th>
+                  <th className="px-4 py-3 font-semibold">Customer</th>
+                  <th className="px-4 py-3 font-semibold">Property / Location</th>
+                  <th className="px-4 py-3 font-semibold">Asset</th>
+                  <th className="px-4 py-3 font-semibold">Source</th>
+                  <th className="px-4 py-3 font-semibold">Priority</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Scheduled</th>
+                  <th className="px-4 py-3 font-semibold">Assigned To</th>
+                  <th className="px-4 py-3 font-semibold">Updated</th>
+                  <th className="w-28 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {initialList.map((wo) => (
                   <tr
                     key={wo.id}
-                    className={`border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50 ${
+                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50 ${
                       wo.status === "completed"
                         ? "bg-[var(--muted)]/5"
                         : ""
@@ -292,7 +292,7 @@ export function WorkOrdersList({
                         : ""
                     }`}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <Link
                         href={`/work-orders/${wo.id}`}
                         className="font-medium text-[var(--accent)] hover:underline"
@@ -300,16 +300,16 @@ export function WorkOrdersList({
                         {wo.work_order_number ?? "—"}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[var(--foreground)]">
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">
                       <Link href={`/work-orders/${wo.id}`} className="hover:underline">
                         {wo.title}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{wo.company_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{wo.customer_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)] max-w-[140px] truncate" title={wo.location ?? undefined}>{wo.location ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{wo.asset_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.company_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.customer_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)] max-w-[140px] truncate" title={wo.location ?? undefined}>{wo.location ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.asset_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
                       {(wo.source_type as string | undefined) === "preventive_maintenance" ? (
                         (wo.preventive_maintenance_plan_id as string | undefined) ? (
                           <Link
@@ -325,16 +325,16 @@ export function WorkOrdersList({
                         "Manual"
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <WorkOrderPriorityBadge priority={wo.priority ?? "medium"} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <WorkOrderStatusBadge status={wo.status ?? "new"} />
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{assignedDisplay(wo)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{assignedDisplay(wo)}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
+                    <td className="px-4 py-3.5">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <Link
                           href={`/work-orders/${wo.id}`}

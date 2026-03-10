@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
   calculateNextRunDateAfterExecution,
   formatDateOnly,
@@ -157,35 +158,13 @@ export async function saveWorkOrder(
       return { error: "Selected customer does not belong to the selected company." };
   }
 
-  if (propertyId) {
-    const { data: prop } = await supabase
-      .from("properties")
-      .select("id, company_id")
-      .eq("id", propertyId)
-      .maybeSingle();
-    if (!prop) return { error: "Selected property was not found." };
-    if (prop.company_id !== companyId) return { error: "Selected property does not belong to the selected company." };
-  }
-  if (buildingId) {
-    const { data: bld } = await supabase
-      .from("buildings")
-      .select("id, property_id")
-      .eq("id", buildingId)
-      .maybeSingle();
-    if (!bld) return { error: "Selected building was not found." };
-    if (!propertyId) return { error: "Please select a property when selecting a building." };
-    if (bld.property_id !== propertyId) return { error: "Selected building does not belong to the selected property." };
-  }
-  if (unitId) {
-    const { data: un } = await supabase
-      .from("units")
-      .select("id, building_id")
-      .eq("id", unitId)
-      .maybeSingle();
-    if (!un) return { error: "Selected unit was not found." };
-    if (!buildingId) return { error: "Please select a building when selecting a unit." };
-    if (un.building_id !== buildingId) return { error: "Selected unit does not belong to the selected building." };
-  }
+  const hierarchyError = await validateLocationHierarchy(supabase, {
+    companyId,
+    propertyId,
+    buildingId,
+    unitId,
+  });
+  if (hierarchyError) return { error: hierarchyError };
   if (assetId) {
     const { data: ast } = await supabase
       .from("assets")
@@ -706,6 +685,9 @@ export async function completeWorkOrder(
   if (!allowed) return { error: "Unauthorized." };
   if (String(beforeState.status ?? "") === "cancelled") {
     return { error: "Cancelled work orders cannot be completed." };
+  }
+  if (!beforeState.started_at) {
+    return { error: "Work order must be started before it can be completed." };
   }
 
   const completedAt = payload.completed_at

@@ -8,6 +8,7 @@ import type { Asset } from "./asset-form-modal";
 import { AssetFormModal } from "./asset-form-modal";
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import type { WorkOrderPrefill } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
+import { StatusBadge } from "@/src/components/ui/status-badge";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id?: string | undefined };
@@ -373,30 +374,30 @@ export function AssetsList({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Asset</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Type</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Building</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Unit</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Manufacturer</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Model</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Condition</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="w-40 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-4 py-3 font-semibold">Asset</th>
+                  <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Property</th>
+                  <th className="px-4 py-3 font-semibold">Building</th>
+                  <th className="px-4 py-3 font-semibold">Unit</th>
+                  <th className="px-4 py-3 font-semibold">Manufacturer</th>
+                  <th className="px-4 py-3 font-semibold">Model</th>
+                  <th className="px-4 py-3 font-semibold">Condition</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="w-40 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {initialAssets.map((a) => (
                   <tr
                     key={a.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
+                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >
-                    <td className="px-4 py-3 text-[var(--foreground)]">
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">
                       <Link
                         href={`/assets/${a.id}`}
                         className="font-medium text-[var(--accent)] hover:underline"
@@ -404,13 +405,13 @@ export function AssetsList({
                         {assetDisplayName(a)}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{typeDisplay(a)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.property_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.building_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.unit_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.manufacturer ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.model ?? "—"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{typeDisplay(a)}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.property_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.building_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.unit_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.manufacturer ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.model ?? "—"}</td>
+                    <td className="px-4 py-3.5">
                       {a.condition ? (
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -429,20 +430,10 @@ export function AssetsList({
                         "—"
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          a.status === "active"
-                            ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                            : a.status === "retired"
-                            ? "bg-[var(--muted)]/30 text-[var(--muted)]"
-                            : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
-                      >
-                        {a.status}
-                      </span>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={a.status} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <div className="flex flex-wrap gap-2">
                         <Link
                           href={`/assets/${a.id}`}
