@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
+import { AssetHealthIndicator } from "../components/asset-health-indicator";
+import { AssetIntelligencePanel } from "../components/asset-intelligence-panel";
+import { AssetTimeline } from "../components/asset-timeline";
+import { getAssetIntelligenceSnapshot } from "@/src/lib/assets/assetIntelligenceService";
 
 export const metadata = {
   title: "Asset | Cornerstone Tech",
@@ -53,7 +57,7 @@ export default async function AssetDetailPage({
   const { data: assetRaw, error } = await supabase
     .from("assets")
     .select(
-      "id, tenant_id, company_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, warranty_expires, description, location_notes, notes, last_serviced_at, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+      "id, tenant_id, company_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months, health_score, failure_risk, last_health_calculation, warranty_expires, description, location_notes, notes, last_serviced_at, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -85,6 +89,13 @@ export default async function AssetDetailPage({
     status: (row.status as string | null) ?? "active",
     condition: (row.condition as string | null) ?? null,
     install_date: (row.install_date as string | null) ?? null,
+    expected_life_years: (row.expected_life_years as number | null) ?? null,
+    replacement_cost: (row.replacement_cost as number | null) ?? null,
+    maintenance_cost_last_12_months:
+      (row.maintenance_cost_last_12_months as number | null) ?? null,
+    health_score: (row.health_score as number | null) ?? null,
+    failure_risk: (row.failure_risk as number | null) ?? null,
+    last_health_calculation: (row.last_health_calculation as string | null) ?? null,
     warranty_expires: (row.warranty_expires as string | null) ?? null,
     description: (row.description as string | null) ?? null,
     location_notes: (row.location_notes as string | null) ?? null,
@@ -270,6 +281,41 @@ export default async function AssetDetailPage({
     healthWarnings.push("Asset has not been serviced in 6+ months");
   }
 
+  const intelligence = await getAssetIntelligenceSnapshot(id);
+  const workOrderNumberById = new Map(
+    serviceHistoryWithPhotos.map((entry) => [entry.id, entry.work_order_number ?? entry.title])
+  );
+  const { data: partHistoryRows } = serviceHistoryWithPhotos.length
+    ? await supabase
+        .from("work_order_part_usage")
+        .select(
+          "id, work_order_id, part_name_snapshot, quantity_used, unit_of_measure, total_cost, used_at, created_at"
+        )
+        .in(
+          "work_order_id",
+          serviceHistoryWithPhotos.map((entry) => entry.id)
+        )
+        .order("created_at", { ascending: false })
+        .limit(100)
+    : { data: [] as unknown[] };
+  const partsHistory = (partHistoryRows ?? []).map((row) => {
+    const item = row as Record<string, unknown>;
+    const workOrderId = (item.work_order_id as string | null) ?? null;
+    return {
+      id: item.id as string,
+      work_order_id: workOrderId,
+      work_order_number: workOrderId ? workOrderNumberById.get(workOrderId) ?? "Work order" : "Work order",
+      part_name: (item.part_name_snapshot as string | null) ?? "Part",
+      quantity_used: Number(item.quantity_used ?? 0),
+      unit_of_measure: (item.unit_of_measure as string | null) ?? null,
+      total_cost: Number(item.total_cost ?? 0),
+      used_at: (item.used_at as string | null) ?? (item.created_at as string | null) ?? null,
+    };
+  });
+  const upcomingPmCount = plans.filter(
+    (plan) => plan.status === "active" && plan.next_run_date && plan.next_run_date >= today
+  ).length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -300,29 +346,58 @@ export default async function AssetDetailPage({
             <p className="text-sm font-medium text-[var(--foreground)]">
               {formatDateTime(lastServicedAt)}
             </p>
+            <Link
+              href="/assets/intelligence"
+              className="mt-3 inline-flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+            >
+              Portfolio Intelligence
+            </Link>
           </div>
         </div>
       </header>
 
-      <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
-        <h2 className="text-sm font-semibold text-[var(--foreground)]">Asset Health Indicators</h2>
-        {healthWarnings.length === 0 ? (
-          <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">
-            Asset health is stable based on recent maintenance and PM schedule.
+      <section className="grid gap-4 lg:grid-cols-2">
+        <AssetHealthIndicator
+          score={intelligence.health.healthScore}
+          failureRisk={intelligence.health.failureRisk}
+          lastCalculatedAt={intelligence.health.lastCalculatedAt}
+        />
+        <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+            Quick Asset Signals
+          </h2>
+          {healthWarnings.length === 0 ? (
+            <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
+              Asset health is stable based on recent maintenance and PM schedule.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {healthWarnings.map((warning) => (
+                <li
+                  key={warning}
+                  className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
+                >
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-xs text-[var(--muted)]">
+            Maintenance cost (12m): $
+            {intelligence.health.maintenanceCostLast12Months.toLocaleString(undefined, {
+              maximumFractionDigits: 0,
+            })}
           </p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {healthWarnings.map((warning) => (
-              <li
-                key={warning}
-                className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
-              >
-                {warning}
-              </li>
-            ))}
-          </ul>
-        )}
+        </section>
       </section>
+
+      <AssetIntelligencePanel
+        health={intelligence.health}
+        insights={intelligence.insights}
+        upcomingPmCount={upcomingPmCount}
+      />
+
+      <AssetTimeline events={intelligence.timeline} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
@@ -355,6 +430,22 @@ export default async function AssetDetailPage({
             <div>
               <dt className="text-xs text-[var(--muted)]">Warranty expires</dt>
               <dd className="text-[var(--foreground)]">{formatDate(asset.warranty_expires)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Expected life</dt>
+              <dd className="text-[var(--foreground)]">
+                {asset.expected_life_years != null ? `${asset.expected_life_years} years` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Replacement cost</dt>
+              <dd className="text-[var(--foreground)]">
+                {asset.replacement_cost != null
+                  ? `$${asset.replacement_cost.toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}`
+                  : "—"}
+              </dd>
             </div>
           </dl>
         </section>
@@ -497,6 +588,50 @@ export default async function AssetDetailPage({
                         >
                           {entry.photo_count} photo{entry.photo_count === 1 ? "" : "s"}
                         </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">Parts History</h2>
+        {partsHistory.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No parts history linked to completed work orders.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--card-border)]">
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Date</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Part</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Quantity</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Cost</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Work Order</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partsHistory.map((part) => (
+                  <tr key={part.id} className="border-b border-[var(--card-border)] last:border-0">
+                    <td className="px-2 py-2 text-[var(--muted)]">{formatDateTime(part.used_at)}</td>
+                    <td className="px-2 py-2 text-[var(--foreground)]">{part.part_name}</td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {part.quantity_used} {part.unit_of_measure ?? ""}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      ${part.total_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--foreground)]">
+                      {part.work_order_id ? (
+                        <Link href={`/work-orders/${part.work_order_id}`} className="text-[var(--accent)] hover:underline">
+                          {part.work_order_number}
+                        </Link>
                       ) : (
                         "—"
                       )}

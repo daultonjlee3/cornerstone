@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
@@ -1421,7 +1422,7 @@ export async function addWorkOrderPartUsage(
   const supabase = await createClient();
   const { data: wo } = await supabase
     .from("work_orders")
-    .select("company_id, status")
+    .select("company_id, status, asset_id")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!wo) return { error: "Work order not found." };
@@ -1512,6 +1513,15 @@ export async function addWorkOrderPartUsage(
       await supabase.from("inventory_items").update({ quantity: currentQty }).eq("id", payload.inventory_item_id);
       await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
       return { error: `Failed to record inventory transaction: ${txError.message}` };
+    }
+  }
+
+  const assetId = (wo as { asset_id?: string | null }).asset_id ?? null;
+  if (assetId) {
+    try {
+      await calculateAssetHealth(assetId);
+    } catch {
+      // Keep part usage logging resilient even if intelligence recalculation fails.
     }
   }
 

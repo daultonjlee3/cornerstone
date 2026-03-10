@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import { revalidatePath } from "next/cache";
 
@@ -101,6 +102,14 @@ export async function saveAsset(
     model: (formData.get("model") as string)?.trim() || null,
     serial_number: (formData.get("serial_number") as string)?.trim() || null,
     install_date: installDateRaw || null,
+    expected_life_years: (() => {
+      const value = Number((formData.get("expected_life_years") as string)?.trim() ?? NaN);
+      return Number.isFinite(value) && value > 0 ? Math.round(value) : null;
+    })(),
+    replacement_cost: (() => {
+      const value = Number((formData.get("replacement_cost") as string)?.trim() ?? NaN);
+      return Number.isFinite(value) && value >= 0 ? Number(value.toFixed(2)) : null;
+    })(),
     warranty_expires: warrantyExpiresRaw || null,
     status,
     condition: (formData.get("condition") as string)?.trim() || null,
@@ -137,6 +146,11 @@ export async function saveAsset(
       afterState: updated as Record<string, unknown>,
     });
     revalidatePath(`/assets/${id}`);
+    try {
+      await calculateAssetHealth(id);
+    } catch {
+      // Do not block core asset edits if intelligence recalculation fails.
+    }
   } else {
     const { data: inserted, error } = await supabase
       .from("assets")
@@ -153,6 +167,11 @@ export async function saveAsset(
       performedBy: actorId,
       afterState: inserted as Record<string, unknown>,
     });
+    try {
+      await calculateAssetHealth((inserted as { id: string }).id);
+    } catch {
+      // Do not block asset creation if intelligence recalculation fails.
+    }
   }
   revalidatePath("/assets");
   return { success: true };
@@ -213,6 +232,11 @@ export async function updateAssetStatus(
     beforeState: { status: (row as { status?: string }).status ?? null },
     afterState: { status: (updated as { status?: string }).status ?? status },
   });
+  try {
+    await calculateAssetHealth(id);
+  } catch {
+    // Do not block status transitions if intelligence recalculation fails.
+  }
   revalidatePath("/assets");
   revalidatePath(`/assets/${id}`);
   return { success: true };

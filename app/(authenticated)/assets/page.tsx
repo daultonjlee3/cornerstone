@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { saveAsset } from "./actions";
@@ -179,7 +180,9 @@ export default async function AssetsPage({
       `
       id, asset_name, name, company_id, property_id, building_id, unit_id,
       asset_tag, asset_type, category, manufacturer, model, serial_number,
-      install_date, warranty_expires, status, condition, notes, description, location_notes,
+      install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months,
+      health_score, failure_risk, last_health_calculation,
+      warranty_expires, status, condition, notes, description, location_notes,
       properties(property_name, name),
       buildings(building_name, name),
       units(unit_name, name_or_number),
@@ -269,13 +272,21 @@ export default async function AssetsPage({
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
           Assets
         </h1>
         <p className="mt-1 text-[var(--muted)]">
           Track equipment and assets by location.
         </p>
+        </div>
+        <Link
+          href="/assets/intelligence"
+          className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+        >
+          Open Asset Intelligence
+        </Link>
       </div>
       <AssetsList
         assets={assets as AssetRow[]}

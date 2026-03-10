@@ -22,6 +22,8 @@ export type AssetRow = Asset & {
   company_name?: string;
   asset_type?: string | null;
   condition?: string | null;
+  health_score?: number | null;
+  failure_risk?: number | null;
 };
 
 type FilterParams = {
@@ -74,6 +76,14 @@ function locationDisplay(a: AssetRow): string {
 
 function typeDisplay(a: AssetRow): string {
   return a.asset_type ?? a.category ?? "—";
+}
+
+function healthToneClass(score: number): string {
+  if (score >= 90) return "bg-emerald-100 text-emerald-700";
+  if (score >= 70) return "bg-blue-100 text-blue-700";
+  if (score >= 50) return "bg-amber-100 text-amber-700";
+  if (score >= 30) return "bg-orange-100 text-orange-700";
+  return "bg-red-100 text-red-700";
 }
 
 /** Build work order prefill from asset for quick-dispatch modal. Populates full location hierarchy. */
@@ -376,11 +386,12 @@ export function AssetsList({
       ) : (
         <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[980px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
                   <th className="px-4 py-3 font-semibold">Asset</th>
                   <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Health</th>
                   <th className="px-4 py-3 font-semibold">Property</th>
                   <th className="px-4 py-3 font-semibold">Building</th>
                   <th className="px-4 py-3 font-semibold">Unit</th>
@@ -406,6 +417,24 @@ export function AssetsList({
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{typeDisplay(a)}</td>
+                    <td className="px-4 py-3.5">
+                      {a.health_score != null ? (
+                        <div className="space-y-1">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${healthToneClass(
+                              Number(a.health_score)
+                            )}`}
+                          >
+                            {Number(a.health_score).toFixed(0)}
+                          </span>
+                          <p className="text-[11px] text-[var(--muted)]">
+                            Risk {a.failure_risk != null ? Number(a.failure_risk).toFixed(0) : "—"}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-[var(--muted)]">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{a.property_name ?? "—"}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{a.building_name ?? "—"}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{a.unit_name ?? "—"}</td>

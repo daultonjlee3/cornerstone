@@ -18,6 +18,8 @@ export type Asset = {
   model: string | null;
   serial_number: string | null;
   install_date: string | null;
+  expected_life_years?: number | null;
+  replacement_cost?: number | null;
   warranty_expires?: string | null;
   status: string;
   condition?: string | null;
@@ -64,6 +66,8 @@ const emptyAsset: Asset = {
   model: null,
   serial_number: null,
   install_date: null,
+  expected_life_years: null,
+  replacement_cost: null,
   status: "active",
   notes: null,
 };
@@ -392,6 +396,41 @@ export function AssetFormModal({
                 name="warranty_expires"
                 type="date"
                 defaultValue={a.warranty_expires ?? ""}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="expected_life_years"
+                className="mb-1 block text-sm font-medium text-[var(--foreground)]"
+              >
+                Expected life (years)
+              </label>
+              <input
+                id="expected_life_years"
+                name="expected_life_years"
+                type="number"
+                min={1}
+                defaultValue={a.expected_life_years ?? ""}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="replacement_cost"
+                className="mb-1 block text-sm font-medium text-[var(--foreground)]"
+              >
+                Replacement cost
+              </label>
+              <input
+                id="replacement_cost"
+                name="replacement_cost"
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={a.replacement_cost ?? ""}
                 className={inputClass}
               />
             </div>
