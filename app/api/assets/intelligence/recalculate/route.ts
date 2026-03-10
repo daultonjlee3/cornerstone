@@ -28,7 +28,9 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to recalculate asset intelligence.";
+      error instanceof Error
+        ? error.message
+        : "Failed to recalculate asset intelligence.";
     const status = message.toLowerCase().includes("unauthorized") ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
   }

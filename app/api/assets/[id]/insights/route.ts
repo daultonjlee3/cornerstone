@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import { getAssetInsights } from "@/src/lib/assets/assetIntelligenceService";
 import { calculateFailureRisk } from "@/src/lib/assets/assetHealthService";
+import { generateAssetInsightForAsset } from "@/src/lib/assets/assetIntelligenceInsightsService";
 
 export async function GET(
   _request: Request,
@@ -15,11 +16,17 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const [insights, risk] = await Promise.all([
+    const [insights, risk, operationalInsights] = await Promise.all([
       getAssetInsights(id),
       calculateFailureRisk(id),
+      generateAssetInsightForAsset(id),
     ]);
-    return NextResponse.json({ assetId: id, failureRisk: risk, insights });
+    return NextResponse.json({
+      assetId: id,
+      failureRisk: risk,
+      insights,
+      operationalInsights,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load asset insights.";
     const status = message.toLowerCase().includes("unauthorized") ? 403 : 400;

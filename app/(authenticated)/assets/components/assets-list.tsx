@@ -33,6 +33,7 @@ type FilterParams = {
   type: string;
   condition: string;
   status: string;
+  health_status: string;
 };
 
 type StatusOption = { value: string; label: string };
@@ -341,13 +342,31 @@ export function AssetsList({
               ))}
             </select>
           </div>
+          <div className="w-36">
+            <label htmlFor="assets-health-status" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Health
+            </label>
+            <select
+              id="assets-health-status"
+              value={filterParams.health_status}
+              onChange={(e) => applyFilters({ health_status: e.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            >
+              <option value="">All</option>
+              <option value="excellent">Excellent</option>
+              <option value="good">Good</option>
+              <option value="warning">Warning</option>
+              <option value="poor">Poor</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
           <button
             type="submit"
             className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             Search
           </button>
-          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status) && (
+          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status) && (
             <button
               type="button"
               onClick={() =>
@@ -358,6 +377,7 @@ export function AssetsList({
                   type: "",
                   condition: "",
                   status: "",
+                  health_status: "",
                 })
               }
               className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
@@ -371,7 +391,7 @@ export function AssetsList({
       {initialAssets.length === 0 ? (
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">
-            {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status
+            {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status
               ? "No assets match your filters."
               : "No assets yet."}
           </p>

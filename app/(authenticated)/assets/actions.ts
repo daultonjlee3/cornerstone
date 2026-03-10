@@ -3,6 +3,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
+import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import { revalidatePath } from "next/cache";
 
@@ -151,6 +152,7 @@ export async function saveAsset(
     } catch {
       // Do not block core asset edits if intelligence recalculation fails.
     }
+    revalidateAssetIntelligenceCaches({ assetId: id, companyId });
   } else {
     const { data: inserted, error } = await supabase
       .from("assets")
@@ -172,8 +174,13 @@ export async function saveAsset(
     } catch {
       // Do not block asset creation if intelligence recalculation fails.
     }
+    revalidateAssetIntelligenceCaches({
+      assetId: (inserted as { id: string }).id,
+      companyId,
+    });
   }
   revalidatePath("/assets");
+  revalidatePath("/assets/intelligence");
   return { success: true };
 }
 
@@ -189,7 +196,9 @@ export async function deleteAsset(id: string): Promise<AssetFormState> {
 
   const { error } = await supabase.from("assets").delete().eq("id", id);
   if (error) return { error: error.message };
+  revalidateAssetIntelligenceCaches({ assetId: id, companyId: row.company_id });
   revalidatePath("/assets");
+  revalidatePath("/assets/intelligence");
   return { success: true };
 }
 
@@ -237,7 +246,12 @@ export async function updateAssetStatus(
   } catch {
     // Do not block status transitions if intelligence recalculation fails.
   }
+  revalidateAssetIntelligenceCaches({
+    assetId: id,
+    companyId: (row as { company_id: string }).company_id,
+  });
   revalidatePath("/assets");
+  revalidatePath("/assets/intelligence");
   revalidatePath(`/assets/${id}`);
   return { success: true };
 }

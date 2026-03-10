@@ -1,8 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { createClient } from "@/src/lib/supabase/server";
 import { calculateAssetHealth, getAssetHealthBreakdown } from "./assetHealthService";
 import { getAssetIntelligenceContext, resolveTenantScope } from "./asset-intelligence-context";
+import {
+  generateAssetInsights,
+  getPortfolioFailurePatterns,
+} from "./assetIntelligenceInsightsService";
 import type {
   AssetInsightRecord,
   AssetIntelligenceDashboard,
@@ -336,7 +340,7 @@ export async function getAssetIntelligenceDashboard(
 
   const loader = unstable_cache(
     async (): Promise<AssetIntelligenceDashboard> => {
-      const [assetsRows, insightsRows, pmRows] = await Promise.all([
+      const [assetsRows, pmRows, topInsights, failurePatterns] = await Promise.all([
         scopedSupabase
           .from("assets")
           .select(
@@ -344,20 +348,23 @@ export async function getAssetIntelligenceDashboard(
           )
           .in("company_id", scopedCompanyIds),
         scopedSupabase
-          .from("asset_insights")
-          .select("asset_id, pattern_type, frequency, severity, recommendation, is_active")
-          .in("company_id", scopedCompanyIds)
-          .eq("is_active", true)
-          .order("detected_at", { ascending: false }),
-        scopedSupabase
           .from("preventive_maintenance_plans")
           .select("id, next_run_date, status")
           .in("company_id", scopedCompanyIds)
           .eq("status", "active"),
+        generateAssetInsights(scope.tenantId, {
+          companyId: options?.companyId ?? null,
+          limit: 5,
+          supabase: scopedSupabase,
+        }),
+        getPortfolioFailurePatterns(scope.tenantId, {
+          companyId: options?.companyId ?? null,
+          limit: 8,
+          supabase: scopedSupabase,
+        }),
       ]);
 
       const assets = (assetsRows.data ?? []) as Record<string, unknown>[];
-      const insights = (insightsRows.data ?? []) as Record<string, unknown>[];
       const pmPlans = (pmRows.data ?? []) as Record<string, unknown>[];
       const totalAssets = assets.length;
 
@@ -391,24 +398,6 @@ export async function getAssetIntelligenceDashboard(
       const pmComplianceRate =
         pmPlans.length === 0 ? 100 : Number((((pmPlans.length - overduePmCount) / pmPlans.length) * 100).toFixed(1));
 
-      const recurringIssues = insights
-        .filter((insight) => String(insight.pattern_type ?? "").startsWith("recurring_failure:"))
-        .slice(0, 10)
-        .map((insight) => {
-          const asset = assets.find((item) => item.id === insight.asset_id);
-          return {
-            assetId: (insight.asset_id as string) ?? "",
-            assetName:
-              ((asset?.asset_name as string | undefined) ??
-                (asset?.name as string | undefined) ??
-                "Asset"),
-            patternType: (insight.pattern_type as string) ?? "recurring_failure",
-            frequency: Number((insight.frequency as number | null | undefined) ?? 0),
-            severity: (insight.severity as AssetInsightRecord["severity"]) ?? "medium",
-            recommendation: (insight.recommendation as string) ?? "",
-          };
-        });
-
       const highFailureRiskAssets = [...assets]
         .sort(
           (a, b) =>
@@ -428,6 +417,68 @@ export async function getAssetIntelligenceDashboard(
             Number((asset.maintenance_cost_last_12_months as number | null | undefined) ?? 0) || 0,
         }));
 
+      const replacementCandidates = [...assets]
+        .map((asset) => {
+          const maintenanceCostLast12Months =
+            Number((asset.maintenance_cost_last_12_months as number | null | undefined) ?? 0) || 0;
+          const replacementCost =
+            Number((asset.replacement_cost as number | null | undefined) ?? NaN) || null;
+          const expectedLifeYears =
+            Number((asset.expected_life_years as number | null | undefined) ?? NaN) || null;
+          const installDate = (asset.install_date as string | null) ?? null;
+          const ageYears =
+            installDate != null
+              ? (now.getTime() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+              : null;
+          const maintenancePercentOfReplacement =
+            replacementCost && replacementCost > 0
+              ? Number(((maintenanceCostLast12Months / replacementCost) * 100).toFixed(1))
+              : null;
+          const lifePct =
+            ageYears != null && expectedLifeYears != null && expectedLifeYears > 0
+              ? ageYears / expectedLifeYears
+              : null;
+          const shouldFlag =
+            (maintenancePercentOfReplacement ?? 0) > 30 || (lifePct ?? 0) > 0.85;
+          if (!shouldFlag) return null;
+          const severity: AssetInsightRecord["severity"] =
+            (maintenancePercentOfReplacement ?? 0) > 45 || (lifePct ?? 0) >= 1
+              ? "critical"
+              : (maintenancePercentOfReplacement ?? 0) > 35 || (lifePct ?? 0) >= 0.95
+              ? "high"
+              : "medium";
+          return {
+            id: (asset.id as string) ?? "",
+            assetName: ((asset.asset_name as string | undefined) ?? (asset.name as string | undefined) ?? "Asset"),
+            healthScore:
+              Number((asset.health_score as number | null | undefined) ?? NaN) || null,
+            failureRisk:
+              Number((asset.failure_risk as number | null | undefined) ?? NaN) || null,
+            expectedLifeYears,
+            ageYears: ageYears != null ? Number(ageYears.toFixed(1)) : null,
+            maintenanceCostLast12Months,
+            replacementCost,
+            maintenancePercentOfReplacement,
+            recommendation:
+              "Plan replacement in upcoming capital cycle while reducing failure risk with targeted maintenance.",
+            severity,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+          const severityRank = (value: AssetInsightRecord["severity"]) =>
+            value === "critical" ? 4 : value === "high" ? 3 : value === "medium" ? 2 : 1;
+          const left = a as NonNullable<typeof a>;
+          const right = b as NonNullable<typeof b>;
+          const rankDelta = severityRank(right.severity) - severityRank(left.severity);
+          if (rankDelta !== 0) return rankDelta;
+          return (
+            (right.maintenancePercentOfReplacement ?? 0) -
+            (left.maintenancePercentOfReplacement ?? 0)
+          );
+        })
+        .slice(0, 8) as AssetIntelligenceDashboard["replacementCandidates"];
+
       const maintenanceCostLeaderboard = [...assets]
         .sort(
           (a, b) =>
@@ -440,8 +491,41 @@ export async function getAssetIntelligenceDashboard(
           assetName: ((asset.asset_name as string | undefined) ?? (asset.name as string | undefined) ?? "Asset"),
           maintenanceCostLast12Months:
             Number((asset.maintenance_cost_last_12_months as number | null | undefined) ?? 0) || 0,
-          replacementCost:
-            Number((asset.replacement_cost as number | null | undefined) ?? NaN) || null,
+          replacementCost: Number((asset.replacement_cost as number | null | undefined) ?? NaN) || null,
+          maintenancePercentOfReplacement: (() => {
+            const replacementCost = Number((asset.replacement_cost as number | null | undefined) ?? NaN);
+            if (!Number.isFinite(replacementCost) || replacementCost <= 0) return null;
+            const maintenanceCost = Number(
+              (asset.maintenance_cost_last_12_months as number | null | undefined) ?? 0
+            );
+            return Number(((maintenanceCost / replacementCost) * 100).toFixed(1));
+          })(),
+          recommendation: (() => {
+            const replacementCost = Number((asset.replacement_cost as number | null | undefined) ?? NaN);
+            const maintenanceCost = Number(
+              (asset.maintenance_cost_last_12_months as number | null | undefined) ?? 0
+            );
+            if (!Number.isFinite(replacementCost) || replacementCost <= 0) {
+              return "Add replacement cost to enable replace-vs-repair guidance.";
+            }
+            const pct = (maintenanceCost / replacementCost) * 100;
+            if (pct > 35) return "Escalate replace-vs-repair decision now.";
+            if (pct > 30) return "Start replacement planning and budget scoping.";
+            if (pct > 20) return "Monitor monthly trend and prepare trigger thresholds.";
+            return "Maintenance spend remains in acceptable range.";
+          })(),
+          severity: (() : AssetInsightRecord["severity"] => {
+            const replacementCost = Number((asset.replacement_cost as number | null | undefined) ?? NaN);
+            if (!Number.isFinite(replacementCost) || replacementCost <= 0) return "low";
+            const maintenanceCost = Number(
+              (asset.maintenance_cost_last_12_months as number | null | undefined) ?? 0
+            );
+            const pct = (maintenanceCost / replacementCost) * 100;
+            if (pct > 45) return "critical";
+            if (pct > 35) return "high";
+            if (pct > 20) return "medium";
+            return "low";
+          })(),
         }));
 
       return {
@@ -456,7 +540,9 @@ export async function getAssetIntelligenceDashboard(
           count: healthBuckets[category],
         })),
         highFailureRiskAssets,
-        recurringIssues,
+        topInsights,
+        failurePatterns,
+        replacementCandidates,
         maintenanceCostLeaderboard,
       };
     },
@@ -471,6 +557,21 @@ export async function getAssetIntelligenceDashboard(
   );
 
   return loader();
+}
+
+export function revalidateAssetIntelligenceCaches(options?: {
+  assetId?: string | null;
+  companyId?: string | null;
+}) {
+  revalidateTag("asset-intelligence-dashboard", "max");
+  revalidateTag("asset-intelligence-insights", "max");
+  revalidateTag("asset-intelligence-failure-patterns", "max");
+  if (options?.assetId) {
+    revalidateTag(`asset-health-${options.assetId}`, "max");
+  }
+  if (options?.companyId) {
+    revalidateTag(`asset-intelligence-company-${options.companyId}`, "max");
+  }
 }
 
 export async function getAssetIntelligenceSnapshot(
@@ -521,5 +622,11 @@ export async function recalculateAssetIntelligenceForScope(
     }
   }
 
+  revalidateAssetIntelligenceCaches({
+    companyId:
+      options?.companyId && scopedCompanyIds.includes(options.companyId)
+        ? options.companyId
+        : null,
+  });
   return { processed: staleAssets.length - errors.length, errors };
 }

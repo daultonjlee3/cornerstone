@@ -101,7 +101,10 @@ export default async function AssetIntelligencePage({
         </form>
       </header>
 
-      <AssetIntelligenceDashboardView data={dashboardData} />
+      <AssetIntelligenceDashboardView
+        data={dashboardData}
+        selectedCompanyId={selectedCompanyId}
+      />
     </div>
   );
 }

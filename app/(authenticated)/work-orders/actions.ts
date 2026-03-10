@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
+import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
@@ -1182,6 +1183,7 @@ export async function completeWorkOrder(
   if (assetId) {
     revalidatePath("/assets");
     revalidatePath(`/assets/${assetId}`);
+    revalidatePath("/assets/intelligence");
   }
   return { success: true };
 }
@@ -1523,6 +1525,8 @@ export async function addWorkOrderPartUsage(
     } catch {
       // Keep part usage logging resilient even if intelligence recalculation fails.
     }
+    revalidateAssetIntelligenceCaches({ assetId, companyId });
+    revalidatePath("/assets/intelligence");
   }
 
   revalidatePath(`/work-orders/${workOrderId}`);

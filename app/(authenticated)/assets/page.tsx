@@ -12,6 +12,14 @@ export const metadata = {
 };
 
 type SearchParams = { [key: string]: string | string[] | undefined };
+type HealthStatusFilter = "excellent" | "good" | "warning" | "poor" | "critical";
+const VALID_HEALTH_FILTERS = new Set<HealthStatusFilter>([
+  "excellent",
+  "good",
+  "warning",
+  "poor",
+  "critical",
+]);
 
 function getStringParam(
   params: SearchParams | null,
@@ -54,6 +62,11 @@ export default async function AssetsPage({
   const typeFilter = getStringParam(params ?? {}, "type");
   const conditionFilter = getStringParam(params ?? {}, "condition");
   const statusFilter = getStringParam(params ?? {}, "status");
+  const rawHealthStatus = getStringParam(params ?? {}, "health_status");
+  const healthStatusFilter =
+    rawHealthStatus && VALID_HEALTH_FILTERS.has(rawHealthStatus as HealthStatusFilter)
+      ? (rawHealthStatus as HealthStatusFilter)
+      : null;
 
   const { data: companies } = await supabase
     .from("companies")
@@ -196,6 +209,17 @@ export default async function AssetsPage({
   if (typeFilter) assetsQuery = assetsQuery.eq("asset_type", typeFilter);
   if (conditionFilter) assetsQuery = assetsQuery.eq("condition", conditionFilter);
   if (statusFilter) assetsQuery = assetsQuery.eq("status", statusFilter);
+  if (healthStatusFilter === "excellent") {
+    assetsQuery = assetsQuery.gte("health_score", 90);
+  } else if (healthStatusFilter === "good") {
+    assetsQuery = assetsQuery.gte("health_score", 70).lt("health_score", 90);
+  } else if (healthStatusFilter === "warning") {
+    assetsQuery = assetsQuery.gte("health_score", 50).lt("health_score", 70);
+  } else if (healthStatusFilter === "poor") {
+    assetsQuery = assetsQuery.gte("health_score", 30).lt("health_score", 50);
+  } else if (healthStatusFilter === "critical") {
+    assetsQuery = assetsQuery.lt("health_score", 30);
+  }
 
   if (q && q.trim()) {
     const term = q.trim().replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -304,6 +328,7 @@ export default async function AssetsPage({
           type: typeFilter ?? "",
           condition: conditionFilter ?? "",
           status: statusFilter ?? "",
+          health_status: healthStatusFilter ?? "",
         }}
         error={error?.message ?? null}
         saveAction={saveAsset}

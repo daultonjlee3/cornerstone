@@ -2,6 +2,30 @@ export type HealthCategory = "excellent" | "good" | "warning" | "poor" | "critic
 
 export type AssetInsightSeverity = "low" | "medium" | "high" | "critical";
 
+export type AssetIntelligenceInsightType =
+  | "critical_asset_health"
+  | "high_failure_risk"
+  | "replacement_candidate"
+  | "recurring_failure_pattern"
+  | "abnormal_repair_frequency"
+  | "pm_compliance_risk"
+  | "downtime_risk"
+  | "parts_replacement_frequency"
+  | "maintenance_cost_pressure";
+
+export type AssetIntelligenceInsight = {
+  id: string;
+  type: AssetIntelligenceInsightType;
+  severity: AssetInsightSeverity;
+  title: string;
+  description: string;
+  assetId: string;
+  assetName: string;
+  recommendation: string;
+  createdAt: string;
+  companyId?: string | null;
+};
+
 export type AssetInsightRecord = {
   id: string;
   asset_id: string;
@@ -82,18 +106,35 @@ export type AssetIntelligenceDashboard = {
     failureRisk: number | null;
     maintenanceCostLast12Months: number;
   }[];
-  recurringIssues: {
-    assetId: string;
-    assetName: string;
-    patternType: string;
-    frequency: number;
+  topInsights: AssetIntelligenceInsight[];
+  failurePatterns: {
+    patternKey: string;
+    label: string;
+    occurrences: number;
+    affectedAssets: number;
     severity: AssetInsightSeverity;
     recommendation: string;
+  }[];
+  replacementCandidates: {
+    id: string;
+    assetName: string;
+    healthScore: number | null;
+    failureRisk: number | null;
+    expectedLifeYears: number | null;
+    ageYears: number | null;
+    maintenanceCostLast12Months: number;
+    replacementCost: number | null;
+    maintenancePercentOfReplacement: number | null;
+    recommendation: string;
+    severity: AssetInsightSeverity;
   }[];
   maintenanceCostLeaderboard: {
     id: string;
     assetName: string;
     maintenanceCostLast12Months: number;
     replacementCost: number | null;
+    maintenancePercentOfReplacement: number | null;
+    recommendation: string;
+    severity: AssetInsightSeverity;
   }[];
 };
