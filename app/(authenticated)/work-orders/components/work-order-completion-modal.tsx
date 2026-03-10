@@ -50,6 +50,7 @@ export function WorkOrderCompletionModal({
   const [completedAt, setCompletedAt] = useState(defaultCompletedAt());
   const [resolutionSummary, setResolutionSummary] = useState("");
   const [completionNotes, setCompletionNotes] = useState("");
+  const [partsUsedSummary, setPartsUsedSummary] = useState("");
   const [rootCause, setRootCause] = useState("");
   const [actualHours, setActualHours] = useState<string>(estimatedHours != null ? String(estimatedHours) : "");
   const [completionStatus, setCompletionStatus] = useState<string>("successful");
@@ -72,6 +73,7 @@ export function WorkOrderCompletionModal({
         completion_date: completedAt ? completedAt.slice(0, 10) : null,
         resolution_summary: summary,
         completion_notes: completionNotes.trim() || null,
+        parts_used_summary: partsUsedSummary.trim() || null,
         root_cause: rootCause.trim() || null,
         actual_hours: actualHours ? parseFloat(actualHours) : null,
         follow_up_required: followUpRequired,
@@ -155,13 +157,26 @@ export function WorkOrderCompletionModal({
               </div>
               <div>
                 <label htmlFor="completion-root-cause" className={labelOptionalClass}>
-                  Root cause (optional)
+                  Condition observed (optional)
                 </label>
                 <input
                   id="completion-root-cause"
                   type="text"
                   value={rootCause}
                   onChange={(e) => setRootCause(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="completion-parts-used" className={labelOptionalClass}>
+                  Parts used (optional)
+                </label>
+                <textarea
+                  id="completion-parts-used"
+                  rows={2}
+                  value={partsUsedSummary}
+                  onChange={(e) => setPartsUsedSummary(e.target.value)}
+                  placeholder="Summarize parts/materials used if not logged in Parts & materials."
                   className={inputClass}
                 />
               </div>

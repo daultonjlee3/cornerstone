@@ -410,9 +410,20 @@ export async function updateWorkOrderStatus(
     };
   }
 
+  const updatePayload: Record<string, unknown> = {
+    status: normalizedStatus,
+    created_by_user_id: actorId,
+  };
+  if (normalizedStatus === "in_progress" && !beforeState.started_at) {
+    updatePayload.started_at = new Date().toISOString();
+  }
+  if (normalizedStatus === "on_hold") {
+    updatePayload.last_paused_at = new Date().toISOString();
+  }
+
   const { data: updated, error } = await supabase
     .from("work_orders")
-    .update({ status: normalizedStatus, created_by_user_id: actorId })
+    .update(updatePayload)
     .eq("id", id)
     .select("*")
     .single();
@@ -430,6 +441,37 @@ export async function updateWorkOrderStatus(
     afterState: { status: afterState.status as string | null },
     metadata: { source: "updateWorkOrderStatus" },
   });
+  if (
+    toComparableStatus(beforeState.status as string | null) !== "in_progress" &&
+    toComparableStatus(normalizedStatus) === "in_progress"
+  ) {
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId: (afterState.company_id as string) ?? (beforeState.company_id as string),
+      entityType: "work_order",
+      entityId: id,
+      actionType: "job_started",
+      performedBy: actorId,
+      metadata: {
+        started_at:
+          (afterState.started_at as string | null) ?? new Date().toISOString(),
+      },
+    });
+  }
+  if (toComparableStatus(normalizedStatus) === "on_hold") {
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId: (afterState.company_id as string) ?? (beforeState.company_id as string),
+      entityType: "work_order",
+      entityId: id,
+      actionType: "job_paused",
+      performedBy: actorId,
+      metadata: {
+        paused_at:
+          (afterState.last_paused_at as string | null) ?? new Date().toISOString(),
+      },
+    });
+  }
 
   revalidatePath("/work-orders");
   revalidatePath(`/work-orders/${id}`);
@@ -626,6 +668,7 @@ export type WorkOrderCompletionPayload = {
   completion_date?: string | null;
   resolution_summary: string;
   completion_notes?: string | null;
+  parts_used_summary?: string | null;
   root_cause?: string | null;
   actual_hours?: number | null;
   follow_up_required?: boolean;
@@ -674,6 +717,8 @@ export async function completeWorkOrder(
     payload.completion_status && VALID_COMPLETION_STATUSES.includes(payload.completion_status as (typeof VALID_COMPLETION_STATUSES)[number])
       ? payload.completion_status
       : "successful";
+  const completionNotes = (payload.completion_notes ?? "").trim() || null;
+  const partsUsedSummary = (payload.parts_used_summary ?? "").trim() || null;
 
   const update: Record<string, unknown> = {
     status: "completed",
@@ -681,7 +726,7 @@ export async function completeWorkOrder(
     completed_at: completedAt,
     completion_date: completionDate || null,
     resolution_summary: resolutionSummary,
-    completion_notes: (payload.completion_notes ?? "").trim() || null,
+    completion_notes: completionNotes,
     root_cause: (payload.root_cause ?? "").trim() || null,
     actual_hours: payload.actual_hours ?? null,
     follow_up_required: payload.follow_up_required ?? false,
@@ -718,12 +763,48 @@ export async function completeWorkOrder(
     companyId,
     entityType: "work_order",
     entityId: id,
+    actionType: "job_completed",
+    performedBy: actorId,
+    metadata: {
+      completed_at: completedAt,
+      actual_hours: payload.actual_hours ?? null,
+      completion_status: completionStatus,
+    },
+  });
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId,
+    entityType: "work_order",
+    entityId: id,
     actionType: "work_order_status_changed",
     performedBy: actorId,
     beforeState: { status: beforeState.status as string | null },
     afterState: { status: "completed" },
     metadata: { source: "completeWorkOrder" },
   });
+  if (completionNotes || partsUsedSummary) {
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "work_order",
+      entityId: id,
+      actionType: "completion_notes_added",
+      performedBy: actorId,
+      metadata: {
+        completion_notes: completionNotes,
+        parts_used_summary: partsUsedSummary,
+      },
+    });
+  }
+  if (partsUsedSummary) {
+    const { error: completionNoteError } = await supabase.from("work_order_notes").insert({
+      work_order_id: id,
+      body: `Parts used: ${partsUsedSummary}`,
+      note_type: "completion",
+      created_by_id: actorId,
+    });
+    if (completionNoteError) return { error: completionNoteError.message };
+  }
 
   const assetId = (afterState.asset_id as string | null) ?? null;
   if (assetId) {

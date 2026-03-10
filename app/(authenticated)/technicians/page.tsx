@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Technician } from "./components/technician-form-modal";
@@ -81,6 +82,14 @@ export default async function TechniciansPage() {
         <p className="mt-1 text-[var(--muted)]">
           Manage technicians and assign them to work orders.
         </p>
+        <div className="mt-3">
+          <Link
+            href="/technicians/work-queue"
+            className="inline-flex rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+          >
+            Open Technician Work Queue
+          </Link>
+        </div>
       </div>
       <TechniciansList
         technicians={technicians}
