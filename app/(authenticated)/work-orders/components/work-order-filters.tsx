@@ -10,7 +10,15 @@ type FilterOptions = {
   crews: { id: string; name: string; company_id?: string | null }[];
 };
 
-const STATUS_OPTIONS = ["open", "assigned", "in_progress", "on_hold", "completed", "cancelled", "closed"] as const;
+const STATUS_OPTIONS = [
+  "new",
+  "ready_to_schedule",
+  "scheduled",
+  "in_progress",
+  "on_hold",
+  "completed",
+  "cancelled",
+] as const;
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent", "emergency"] as const;
 const CATEGORY_OPTIONS = ["repair", "preventive_maintenance", "inspection", "installation", "emergency", "general"] as const;
 const SORT_OPTIONS = [

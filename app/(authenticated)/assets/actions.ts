@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { insertActivityLog } from "@/src/lib/activity-logs";
 import { revalidatePath } from "next/cache";
 
 export type AssetFormState = { error?: string; success?: boolean };
@@ -29,6 +30,15 @@ async function companyBelongsToTenant(companyId: string, tenantId: string): Prom
     .eq("tenant_id", tenantId)
     .maybeSingle();
   return !!data;
+}
+
+async function getActorId(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
 }
 
 export async function saveAsset(
@@ -90,17 +100,50 @@ export async function saveAsset(
   };
 
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   if (id) {
-    const { data: row } = await supabase.from("assets").select("company_id").eq("id", id).maybeSingle();
+    const { data: row } = await supabase.from("assets").select("*").eq("id", id).maybeSingle();
     if (!row) return { error: "Asset not found." };
-    const allowedUpdate = await companyBelongsToTenant(row.company_id, tenantId);
+    const beforeState = row as Record<string, unknown>;
+    const allowedUpdate = await companyBelongsToTenant(
+      (beforeState.company_id as string) ?? "",
+      tenantId
+    );
     if (!allowedUpdate) return { error: "Unauthorized." };
-    const { error } = await supabase.from("assets").update(payload).eq("id", id);
+    const { data: updated, error } = await supabase
+      .from("assets")
+      .update(payload)
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) return { error: error.message };
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "asset",
+      entityId: id,
+      actionType: "asset_edited",
+      performedBy: actorId,
+      beforeState,
+      afterState: updated as Record<string, unknown>,
+    });
     revalidatePath(`/assets/${id}`);
   } else {
-    const { error } = await supabase.from("assets").insert(payload);
+    const { data: inserted, error } = await supabase
+      .from("assets")
+      .insert(payload)
+      .select("*")
+      .single();
     if (error) return { error: error.message };
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "asset",
+      entityId: (inserted as { id: string }).id,
+      actionType: "asset_created",
+      performedBy: actorId,
+      afterState: inserted as Record<string, unknown>,
+    });
   }
   revalidatePath("/assets");
   return { success: true };
@@ -131,13 +174,36 @@ export async function updateAssetStatus(
   if (!tenantId) return { error: "Unauthorized." };
 
   const supabase = await createClient();
-  const { data: row } = await supabase.from("assets").select("company_id").eq("id", id).maybeSingle();
+  const actorId = await getActorId(supabase);
+  const { data: row } = await supabase
+    .from("assets")
+    .select("id, company_id, status")
+    .eq("id", id)
+    .maybeSingle();
   if (!row) return { error: "Asset not found." };
-  const allowed = await companyBelongsToTenant(row.company_id, tenantId);
+  const allowed = await companyBelongsToTenant(
+    (row as { company_id: string }).company_id,
+    tenantId
+  );
   if (!allowed) return { error: "Unauthorized." };
 
-  const { error } = await supabase.from("assets").update({ status }).eq("id", id);
+  const { data: updated, error } = await supabase
+    .from("assets")
+    .update({ status })
+    .eq("id", id)
+    .select("id, company_id, status")
+    .single();
   if (error) return { error: error.message };
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: (row as { company_id: string }).company_id,
+    entityType: "asset",
+    entityId: id,
+    actionType: "asset_edited",
+    performedBy: actorId,
+    beforeState: { status: (row as { status?: string }).status ?? null },
+    afterState: { status: (updated as { status?: string }).status ?? status },
+  });
   revalidatePath("/assets");
   revalidatePath(`/assets/${id}`);
   return { success: true };

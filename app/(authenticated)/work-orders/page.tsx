@@ -196,7 +196,7 @@ export default async function WorkOrdersPage({
       properties(property_name, name),
       buildings(building_name, name),
       units(unit_name, name_or_number),
-      assets(asset_name, name),
+      assets!work_orders_asset_id_fkey(asset_name, name),
       technicians!assigned_technician_id(technician_name, name),
       crews!assigned_crew_id(name)
     `)
@@ -262,10 +262,11 @@ export default async function WorkOrdersPage({
   }) as (WorkOrder & { technician_name?: string; crew_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
 
   const stats = {
-    open: workOrders.filter((wo) => wo.status === "open").length,
-    assigned: workOrders.filter((wo) => wo.status === "assigned").length,
+    new: workOrders.filter((wo) => wo.status === "new" || wo.status === "open").length,
+    readyToSchedule: workOrders.filter((wo) => wo.status === "ready_to_schedule" || wo.status === "assigned").length,
+    scheduled: workOrders.filter((wo) => wo.status === "scheduled").length,
     inProgress: workOrders.filter((wo) => wo.status === "in_progress").length,
-    dueToday: workOrders.filter((wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled" && wo.status !== "closed").length,
+    dueToday: workOrders.filter((wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled").length,
     completedThisWeek: workOrders.filter((wo) => wo.status === "completed" && wo.updated_at && String(wo.updated_at) >= weekAgoStr).length,
   };
 

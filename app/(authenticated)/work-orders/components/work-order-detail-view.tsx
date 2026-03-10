@@ -18,12 +18,12 @@ import { WorkOrderStatusTimeline } from "./work-order-status-timeline";
 import { WorkOrderCompletionCard } from "./work-order-completion-card";
 
 const STATUS_OPTIONS_FOR_DROPDOWN = [
-  "open",
-  "assigned",
+  "new",
+  "ready_to_schedule",
+  "scheduled",
   "in_progress",
   "on_hold",
   "cancelled",
-  "closed",
 ] as const;
 
 type TechnicianOption = { id: string; name: string };
@@ -75,9 +75,9 @@ export function WorkOrderDetailView({
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   const id = workOrder.id as string;
-  const status = (workOrder.status as string) ?? "open";
+  const status = (workOrder.status as string) ?? "new";
   const priority = (workOrder.priority as string) ?? "medium";
-  const isCompleted = status === "completed" || status === "closed";
+  const isCompleted = status === "completed";
 
   const setStatus = (newStatus: string) => {
     setStatusDropdown(false);

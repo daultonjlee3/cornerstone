@@ -159,7 +159,7 @@ const emptyWorkOrder: WorkOrder = {
   description: null,
   category: null,
   priority: "medium",
-  status: "open",
+  status: "new",
   requested_by_name: null,
   requested_by_email: null,
   requested_by_phone: null,
@@ -178,7 +178,14 @@ const emptyWorkOrder: WorkOrder = {
 };
 
 const PRIORITIES = ["low", "medium", "high", "urgent", "emergency"] as const;
-const STATUSES = ["open", "assigned", "in_progress", "on_hold", "completed", "cancelled", "closed"] as const;
+const STATUSES = [
+  "new",
+  "ready_to_schedule",
+  "scheduled",
+  "in_progress",
+  "on_hold",
+  "cancelled",
+] as const;
 const CATEGORIES = [
   "repair",
   "preventive_maintenance",

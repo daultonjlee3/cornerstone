@@ -28,8 +28,9 @@ type AssetOption = {
 type TechnicianOption = { id: string; name: string };
 
 export type WorkOrderListStats = {
-  open: number;
-  assigned: number;
+  new: number;
+  readyToSchedule: number;
+  scheduled: number;
   inProgress: number;
   dueToday: number;
   completedThisWeek: number;
@@ -44,7 +45,14 @@ type WorkOrderListRow = WorkOrder & {
   asset_name?: string;
 };
 
-const STATUS_OPTIONS_QUICK = ["open", "assigned", "in_progress", "on_hold", "cancelled", "closed"] as const;
+const STATUS_OPTIONS_QUICK = [
+  "new",
+  "ready_to_schedule",
+  "scheduled",
+  "in_progress",
+  "on_hold",
+  "cancelled",
+] as const;
 
 type CustomerOption = { id: string; name: string; company_id: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
@@ -275,7 +283,7 @@ export function WorkOrdersList({
                   <tr
                     key={wo.id}
                     className={`border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50 ${
-                      wo.status === "completed" || wo.status === "closed"
+                      wo.status === "completed"
                         ? "bg-[var(--muted)]/5"
                         : ""
                     } ${
@@ -321,7 +329,7 @@ export function WorkOrdersList({
                       <WorkOrderPriorityBadge priority={wo.priority ?? "medium"} />
                     </td>
                     <td className="px-4 py-3">
-                      <WorkOrderStatusBadge status={wo.status ?? "open"} />
+                      <WorkOrderStatusBadge status={wo.status ?? "new"} />
                     </td>
                     <td className="px-4 py-3 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{assignedDisplay(wo)}</td>

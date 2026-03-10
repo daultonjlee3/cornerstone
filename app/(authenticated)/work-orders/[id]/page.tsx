@@ -48,7 +48,7 @@ export default async function WorkOrderDetailPage({
       properties(property_name, name),
       buildings(building_name, name),
       units(unit_name, name_or_number),
-      assets(asset_name, name),
+      assets!work_orders_asset_id_fkey(asset_name, name),
       technicians!assigned_technician_id(technician_name, name),
       crews(name)
     `

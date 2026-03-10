@@ -130,7 +130,7 @@ export function WorkOrderAssignmentModal({
             Assign work order
           </h2>
           <p className="mt-0.5 text-xs text-[var(--muted)]">
-            Assign technician or crew and set schedule. Status will move to Assigned when set.
+            Assign technician or crew and set schedule. Status will move to Ready or Scheduled based on availability.
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-4">

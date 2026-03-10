@@ -18,6 +18,18 @@ function formatDate(value: string | null | undefined): string {
   }
 }
 
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return "—";
+  }
+}
+
 export default async function AssetDetailPage({
   params,
 }: {
@@ -41,7 +53,7 @@ export default async function AssetDetailPage({
   const { data: assetRaw, error } = await supabase
     .from("assets")
     .select(
-      "id, tenant_id, company_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, warranty_expires, description, location_notes, notes, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+      "id, tenant_id, company_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, warranty_expires, description, location_notes, notes, last_serviced_at, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -77,6 +89,7 @@ export default async function AssetDetailPage({
     description: (row.description as string | null) ?? null,
     location_notes: (row.location_notes as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
+    last_serviced_at: (row.last_serviced_at as string | null) ?? null,
     company_name:
       company && typeof company === "object"
         ? ((company as { name?: string }).name ?? null)
@@ -120,6 +133,76 @@ export default async function AssetDetailPage({
     plans.find((plan) => plan.status === "active" && plan.next_run_date)?.next_run_date ??
     null;
 
+  const { data: serviceRaw } = await supabase
+    .from("work_orders")
+    .select(
+      "id, work_order_number, title, source_type, preventive_maintenance_plan_id, completion_notes, completed_at, completed_by_technician_id, assigned_crew_id, technicians!completed_by_technician_id(technician_name, name), crews!assigned_crew_id(name)"
+    )
+    .eq("asset_id", id)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(50);
+
+  const pmPlanIds = Array.from(
+    new Set(
+      (serviceRaw ?? [])
+        .map(
+          (row) =>
+            (row as { preventive_maintenance_plan_id?: string | null })
+              .preventive_maintenance_plan_id
+        )
+        .filter(Boolean) as string[]
+    )
+  );
+  const { data: pmPlanRows } = pmPlanIds.length
+    ? await supabase
+        .from("preventive_maintenance_plans")
+        .select("id, name")
+        .in("id", pmPlanIds)
+    : { data: [] as unknown[] };
+  const pmPlanById = new Map(
+    (pmPlanRows ?? []).map((row) => [
+      (row as { id: string }).id,
+      (row as { name: string }).name,
+    ])
+  );
+
+  const serviceHistory = (serviceRaw ?? []).map((row) => {
+    const serviceRow = row as Record<string, unknown>;
+    const completedTech = Array.isArray(serviceRow.technicians)
+      ? serviceRow.technicians[0]
+      : serviceRow.technicians;
+    const assignedCrew = Array.isArray(serviceRow.crews)
+      ? serviceRow.crews[0]
+      : serviceRow.crews;
+    const completedBy =
+      completedTech && typeof completedTech === "object"
+        ? ((completedTech as { technician_name?: string }).technician_name ??
+          (completedTech as { name?: string }).name ??
+          null)
+        : null;
+    const crewName =
+      assignedCrew && typeof assignedCrew === "object"
+        ? ((assignedCrew as { name?: string }).name ?? null)
+        : null;
+    const pmPlanId =
+      (serviceRow.preventive_maintenance_plan_id as string | null) ?? null;
+    return {
+      id: serviceRow.id as string,
+      work_order_number: (serviceRow.work_order_number as string | null) ?? null,
+      title: (serviceRow.title as string) ?? "Work order",
+      completed_at: (serviceRow.completed_at as string | null) ?? null,
+      source_type: (serviceRow.source_type as string | null) ?? null,
+      preventive_maintenance_plan_id: pmPlanId,
+      preventive_maintenance_plan_name: pmPlanId ? pmPlanById.get(pmPlanId) ?? null : null,
+      completion_notes: (serviceRow.completion_notes as string | null) ?? null,
+      completed_by: completedBy,
+      crew_name: crewName,
+    };
+  });
+  const lastServicedAt =
+    asset.last_serviced_at ?? serviceHistory[0]?.completed_at ?? null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -145,6 +228,10 @@ export default async function AssetDetailPage({
             <p className="text-xs text-[var(--muted)]">Next PM due</p>
             <p className="text-sm font-medium text-[var(--foreground)]">
               {formatDate(nextPmDue)}
+            </p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Last serviced</p>
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              {formatDateTime(lastServicedAt)}
             </p>
           </div>
         </div>
@@ -245,6 +332,73 @@ export default async function AssetDetailPage({
                       {formatDate(plan.next_run_date)}
                     </td>
                     <td className="px-2 py-2 text-[var(--muted)]">{plan.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+          Asset Service History
+        </h2>
+        {serviceHistory.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">
+            No completed work orders for this asset yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--card-border)]">
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Date</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Work Order</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Type</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Technician / Crew</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Completion Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serviceHistory.map((entry) => (
+                  <tr key={entry.id} className="border-b border-[var(--card-border)] last:border-0">
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {formatDateTime(entry.completed_at)}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--foreground)]">
+                      <Link href={`/work-orders/${entry.id}`} className="text-[var(--accent)] hover:underline">
+                        {entry.work_order_number ?? entry.title}
+                      </Link>
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {entry.source_type === "preventive_maintenance" ? (
+                        <span>
+                          PM
+                          {entry.preventive_maintenance_plan_id ? (
+                            <>
+                              {" "}
+                              (
+                              <Link
+                                href={`/preventive-maintenance/${entry.preventive_maintenance_plan_id}`}
+                                className="text-[var(--accent)] hover:underline"
+                              >
+                                {entry.preventive_maintenance_plan_name ?? "Plan"}
+                              </Link>
+                              )
+                            </>
+                          ) : null}
+                        </span>
+                      ) : (
+                        "Reactive"
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {[entry.completed_by, entry.crew_name].filter(Boolean).join(" / ") || "—"}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {entry.completion_notes ?? "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

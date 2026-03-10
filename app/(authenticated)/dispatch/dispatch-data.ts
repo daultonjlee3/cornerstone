@@ -35,11 +35,13 @@ const PRIORITY_OPTIONS = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
   { value: "urgent", label: "Urgent" },
+  { value: "emergency", label: "Emergency" },
 ];
 
 const STATUS_OPTIONS = [
-  { value: "open", label: "Open" },
-  { value: "assigned", label: "Assigned" },
+  { value: "new", label: "New" },
+  { value: "ready_to_schedule", label: "Ready to schedule" },
+  { value: "scheduled", label: "Scheduled" },
   { value: "in_progress", label: "In progress" },
   { value: "on_hold", label: "On hold" },
 ];
@@ -152,7 +154,15 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     `
     )
     .in("company_id", companyIds)
-    .in("status", ["open", "assigned", "in_progress", "on_hold"]);
+    .in("status", [
+      "open",
+      "assigned",
+      "new",
+      "ready_to_schedule",
+      "scheduled",
+      "in_progress",
+      "on_hold",
+    ]);
 
   if (q?.trim()) {
     query = query.or(`title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
@@ -234,10 +244,18 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     if (scheduled === today && hasCrew) {
       scheduledToday.push(wo);
     }
-    if (!scheduled && !hasCrew && (wo.status === "open" || wo.status === "assigned")) {
+    if (
+      !scheduled &&
+      !hasCrew &&
+      ["open", "assigned", "new", "ready_to_schedule"].includes(wo.status ?? "")
+    ) {
       unscheduled.push(wo);
     }
-    if (scheduled === today && !hasCrew && (wo.status === "open" || wo.status === "assigned")) {
+    if (
+      scheduled === today &&
+      !hasCrew &&
+      ["open", "assigned", "new", "ready_to_schedule"].includes(wo.status ?? "")
+    ) {
       ready.push(wo);
     }
   }

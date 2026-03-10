@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { insertActivityLog } from "@/src/lib/activity-logs";
 import {
   calculateNextRunDate,
   calculateNextRunDateAfterExecution,
@@ -65,6 +66,15 @@ async function getTenantId(): Promise<string | null> {
     .limit(1)
     .maybeSingle();
   return data?.tenant_id ?? null;
+}
+
+async function getActorId(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
 }
 
 async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
@@ -210,9 +220,11 @@ async function createWorkOrderFromPlan(
     description: descriptionParts.length ? descriptionParts.join("\n\n") : null,
     category: "preventive_maintenance",
     priority: parsePriority(plan.priority),
-    status: "open",
+    status: "ready_to_schedule",
     requested_at: new Date().toISOString(),
-    scheduled_date: scheduledDate,
+    scheduled_date: null,
+    scheduled_start: null,
+    scheduled_end: null,
     due_date: scheduledDate,
     assigned_technician_id: plan.assigned_technician_id,
     estimated_hours:
@@ -238,7 +250,9 @@ async function processPlanRun(
   supabase: Awaited<ReturnType<typeof createClient>>,
   plan: PlanRow,
   scheduledDate: string,
-  forceCreateWorkOrder: boolean
+  forceCreateWorkOrder: boolean,
+  tenantId: string,
+  actorId: string | null
 ): Promise<{ status: "generated" | "skipped" | "failed"; workOrderGenerated: boolean; error?: string }> {
   const scheduled = formatDateOnly(scheduledDate);
 
@@ -263,18 +277,12 @@ async function processPlanRun(
   const runId = (runRow as { id: string }).id;
   let generatedWorkOrderId: string | null = null;
   const shouldCreateWorkOrder = forceCreateWorkOrder || plan.auto_create_work_order;
+  let runStatus: "generated" | "skipped" | "failed" = "generated";
+  let runNotes: string | null = forceCreateWorkOrder ? "Manual run generation" : null;
 
   if (shouldCreateWorkOrder) {
     try {
       generatedWorkOrderId = await createWorkOrderFromPlan(supabase, plan, runId, scheduled);
-      const { error } = await supabase
-        .from("preventive_maintenance_runs")
-        .update({
-          generated_work_order_id: generatedWorkOrderId,
-          status: "generated",
-        })
-        .eq("id", runId);
-      if (error) return { status: "failed", workOrderGenerated: false, error: error.message };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await supabase
@@ -283,6 +291,21 @@ async function processPlanRun(
         .eq("id", runId);
       return { status: "failed", workOrderGenerated: false, error: message };
     }
+  } else {
+    runStatus = "skipped";
+    runNotes = "Auto-create work order disabled for plan.";
+  }
+
+  const { error: runUpdateError } = await supabase
+    .from("preventive_maintenance_runs")
+    .update({
+      generated_work_order_id: generatedWorkOrderId,
+      status: runStatus,
+      notes: runNotes,
+    })
+    .eq("id", runId);
+  if (runUpdateError) {
+    return { status: "failed", workOrderGenerated: false, error: runUpdateError.message };
   }
 
   const nextRun = calculateNextRunDateAfterExecution({
@@ -302,6 +325,47 @@ async function processPlanRun(
 
   if (updatePlanError) {
     return { status: "failed", workOrderGenerated: !!generatedWorkOrderId, error: updatePlanError.message };
+  }
+
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: plan.company_id,
+    entityType: "preventive_maintenance_run",
+    entityId: runId,
+    actionType: "pm_run_generated",
+    performedBy: actorId,
+    metadata: {
+      preventive_maintenance_plan_id: plan.id,
+      generated_work_order_id: generatedWorkOrderId,
+      auto_create_work_order: plan.auto_create_work_order,
+      force_create_work_order: forceCreateWorkOrder,
+    },
+    afterState: {
+      status: runStatus,
+      scheduled_date: scheduled,
+      generated_work_order_id: generatedWorkOrderId,
+    },
+  });
+
+  if (generatedWorkOrderId) {
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId: plan.company_id,
+      entityType: "work_order",
+      entityId: generatedWorkOrderId,
+      actionType: "pm_work_order_created",
+      performedBy: actorId,
+      metadata: {
+        preventive_maintenance_plan_id: plan.id,
+        preventive_maintenance_run_id: runId,
+      },
+      afterState: {
+        source_type: "preventive_maintenance",
+        preventive_maintenance_plan_id: plan.id,
+        preventive_maintenance_run_id: runId,
+        status: "ready_to_schedule",
+      },
+    });
   }
 
   return { status: "generated", workOrderGenerated: !!generatedWorkOrderId };
@@ -368,21 +432,24 @@ export async function savePreventiveMaintenancePlan(
     formData.get("auto_create_work_order") !== "off";
 
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
+  let beforeState: Record<string, unknown> | null = null;
 
   let nextRunDate = startDate;
   if (id) {
     const { data: existing } = await supabase
       .from("preventive_maintenance_plans")
-      .select("id, company_id, last_run_date")
+      .select("*")
       .eq("id", id)
       .maybeSingle();
     if (!existing) return { error: "Plan not found." };
+    beforeState = existing as Record<string, unknown>;
     const belongs = await companyBelongsToTenant(
-      (existing as { company_id: string }).company_id,
+      (beforeState.company_id as string) ?? "",
       tenantId
     );
     if (!belongs) return { error: "Unauthorized." };
-    const lastRunDate = (existing as { last_run_date?: string | null }).last_run_date ?? null;
+    const lastRunDate = (beforeState.last_run_date as string | null) ?? null;
     if (lastRunDate) {
       nextRunDate = calculateNextRunDate({
         frequencyType,
@@ -414,15 +481,40 @@ export async function savePreventiveMaintenancePlan(
   };
 
   if (id) {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("preventive_maintenance_plans")
       .update(payload)
-      .eq("id", id);
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) return { error: error.message };
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "preventive_maintenance_plan",
+      entityId: id,
+      actionType: "pm_plan_edited",
+      performedBy: actorId,
+      beforeState,
+      afterState: updated as Record<string, unknown>,
+    });
     revalidatePath(`/preventive-maintenance/${id}`);
   } else {
-    const { error } = await supabase.from("preventive_maintenance_plans").insert(payload);
+    const { data: inserted, error } = await supabase
+      .from("preventive_maintenance_plans")
+      .insert(payload)
+      .select("*")
+      .single();
     if (error) return { error: error.message };
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "preventive_maintenance_plan",
+      entityId: (inserted as { id: string }).id,
+      actionType: "pm_plan_created",
+      performedBy: actorId,
+      afterState: inserted as Record<string, unknown>,
+    });
   }
 
   revalidatePath("/preventive-maintenance");
@@ -471,9 +563,10 @@ export async function updatePreventiveMaintenancePlanStatus(
   if (!tenantId) return { error: "Unauthorized." };
 
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("preventive_maintenance_plans")
-    .select("id, company_id, asset_id")
+    .select("id, company_id, asset_id, status")
     .eq("id", id)
     .maybeSingle();
   if (!row) return { error: "Plan not found." };
@@ -484,11 +577,31 @@ export async function updatePreventiveMaintenancePlanStatus(
   );
   if (!allowed) return { error: "Unauthorized." };
 
-  const { error } = await supabase
+  const beforeState = row as Record<string, unknown>;
+  const { data: updated, error } = await supabase
     .from("preventive_maintenance_plans")
     .update({ status })
-    .eq("id", id);
+    .eq("id", id)
+    .select("*")
+    .single();
   if (error) return { error: error.message };
+
+  const actionType =
+    status === "paused"
+      ? "pm_plan_paused"
+      : status === "active" && (beforeState.status as string) === "paused"
+        ? "pm_plan_resumed"
+        : "pm_plan_status_changed";
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: (beforeState.company_id as string) ?? null,
+    entityType: "preventive_maintenance_plan",
+    entityId: id,
+    actionType,
+    performedBy: actorId,
+    beforeState: { status: beforeState.status as string | null },
+    afterState: { status: (updated as { status?: string }).status ?? status },
+  });
 
   revalidatePath("/preventive-maintenance");
   revalidatePath(`/preventive-maintenance/${id}`);
@@ -741,6 +854,7 @@ export async function generatePreventiveMaintenanceNow(
   if (!tenantId) return { error: "Unauthorized." };
 
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("preventive_maintenance_plans")
     .select("*")
@@ -757,13 +871,16 @@ export async function generatePreventiveMaintenanceNow(
     supabase,
     plan,
     formatDateOnly(new Date()),
-    true
+    true,
+    tenantId,
+    actorId
   );
 
   revalidatePath("/preventive-maintenance");
   revalidatePath(`/preventive-maintenance/${planId}`);
   if (plan.asset_id) revalidatePath(`/assets/${plan.asset_id}`);
   revalidatePath("/work-orders");
+  revalidatePath("/dispatch");
 
   if (result.status === "failed") {
     return { error: result.error ?? "Failed to generate PM run.", failed: 1 };
@@ -787,6 +904,7 @@ export async function generateDuePreventiveMaintenanceRuns(
   const runDate = targetDate ? formatDateOnly(targetDate) : formatDateOnly(new Date());
 
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
@@ -813,7 +931,9 @@ export async function generateDuePreventiveMaintenanceRuns(
       supabase,
       plan,
       plan.next_run_date,
-      false
+      false,
+      tenantId,
+      actorId
     );
     if (result.status === "generated") {
       generatedRuns += 1;
@@ -828,6 +948,7 @@ export async function generateDuePreventiveMaintenanceRuns(
   revalidatePath("/preventive-maintenance");
   revalidatePath("/work-orders");
   revalidatePath("/assets");
+  revalidatePath("/dispatch");
 
   return {
     success: true,
