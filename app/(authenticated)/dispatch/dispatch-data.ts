@@ -46,6 +46,7 @@ export type DispatchTechnicianWorkload = {
   scheduledToday: number;
   inProgress: number;
   workloadHoursToday: number;
+  dailyCapacityHours: number;
   availableCapacityHours: number;
   crewMemberships: string[];
 };
@@ -59,6 +60,7 @@ export type DispatchCrewWorkload = {
   scheduledToday: number;
   activeJobs: number;
   workloadHoursToday: number;
+  dailyCapacityHours: number;
   availableCapacityHours: number;
 };
 
@@ -468,54 +470,108 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   });
 
   const activeWorkOrders = all.filter((wo) => {
-    const status = toComparableStatus(wo.status ?? "");
-    return status !== "completed" && status !== "cancelled";
+    const normalized = toComparableStatus(wo.status ?? "");
+    return normalized !== "completed" && normalized !== "cancelled";
   });
+
+  const technicianStats = new Map<
+    string,
+    { currentAssignments: number; scheduledToday: number; inProgress: number; workloadHoursToday: number }
+  >();
+  const crewStats = new Map<
+    string,
+    { currentAssignments: number; scheduledToday: number; activeJobs: number; workloadHoursToday: number }
+  >();
+
+  activeWorkOrders.forEach((wo) => {
+    const comparableStatus = toComparableStatus(wo.status ?? "");
+    const hours = wo.scheduled_date === today ? parseScheduledHours(wo) : 0;
+
+    if (wo.assigned_technician_id) {
+      const key = wo.assigned_technician_id;
+      const current = technicianStats.get(key) ?? {
+        currentAssignments: 0,
+        scheduledToday: 0,
+        inProgress: 0,
+        workloadHoursToday: 0,
+      };
+      current.currentAssignments += 1;
+      if (wo.scheduled_date === today) {
+        current.scheduledToday += 1;
+        current.workloadHoursToday += hours;
+      }
+      if (comparableStatus === "in_progress") current.inProgress += 1;
+      technicianStats.set(key, current);
+    }
+
+    if (wo.assigned_crew_id) {
+      const key = wo.assigned_crew_id;
+      const current = crewStats.get(key) ?? {
+        currentAssignments: 0,
+        scheduledToday: 0,
+        activeJobs: 0,
+        workloadHoursToday: 0,
+      };
+      current.currentAssignments += 1;
+      if (wo.scheduled_date === today) {
+        current.scheduledToday += 1;
+        current.workloadHoursToday += hours;
+      }
+      if (comparableStatus === "in_progress") current.activeJobs += 1;
+      crewStats.set(key, current);
+    }
+  });
+
   const technicianWorkloads: DispatchTechnicianWorkload[] = allTechnicians.map((tech) => {
-    const assignedJobs = activeWorkOrders.filter((wo) => wo.assigned_technician_id === tech.id);
-    const assignedToday = assignedJobs.filter((wo) => wo.scheduled_date === today);
-    const inProgressJobs = assignedJobs.filter(
-      (wo) => toComparableStatus(wo.status ?? "") === "in_progress"
-    );
-    const workloadHoursToday = assignedToday.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
+    const stats = technicianStats.get(tech.id) ?? {
+      currentAssignments: 0,
+      scheduledToday: 0,
+      inProgress: 0,
+      workloadHoursToday: 0,
+    };
     const crewMemberships = crewList
       .filter((crew) => (crewMembersByCrewId.get(crew.id) ?? []).includes(tech.id))
       .map((crew) => crew.name);
+    const dailyCapacityHours = 8;
+    const workloadHoursToday = Math.round(stats.workloadHoursToday * 10) / 10;
     return {
       id: tech.id,
       name: tech.name,
       status: tech.status,
-      currentAssignments: assignedJobs.length,
-      scheduledToday: assignedToday.length,
-      inProgress: inProgressJobs.length,
-      workloadHoursToday: Math.round(workloadHoursToday * 10) / 10,
-      availableCapacityHours: Math.round(Math.max(0, 8 - workloadHoursToday) * 10) / 10,
+      currentAssignments: stats.currentAssignments,
+      scheduledToday: stats.scheduledToday,
+      inProgress: stats.inProgress,
+      workloadHoursToday,
+      dailyCapacityHours,
+      availableCapacityHours: Math.round((dailyCapacityHours - workloadHoursToday) * 10) / 10,
       crewMemberships,
     };
   });
 
   const crewWorkloads: DispatchCrewWorkload[] = crewList.map((crew) => {
-    const assignedJobs = activeWorkOrders.filter((wo) => wo.assigned_crew_id === crew.id);
-    const assignedToday = assignedJobs.filter((wo) => wo.scheduled_date === today);
-    const activeJobs = assignedJobs.filter(
-      (wo) => toComparableStatus(wo.status ?? "") === "in_progress"
-    );
+    const stats = crewStats.get(crew.id) ?? {
+      currentAssignments: 0,
+      scheduledToday: 0,
+      activeJobs: 0,
+      workloadHoursToday: 0,
+    };
     const memberIds = crewMembersByCrewId.get(crew.id) ?? [];
     const memberNames = memberIds
       .map((id) => technicianNameById.get(id))
       .filter((value): value is string => Boolean(value));
-    const workloadHoursToday = assignedToday.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
-    const dailyCapacity = Math.max(1, memberIds.length) * 8;
+    const workloadHoursToday = Math.round(stats.workloadHoursToday * 10) / 10;
+    const dailyCapacityHours = Math.max(1, memberIds.length) * 8;
     return {
       id: crew.id,
       name: crew.name,
       memberCount: memberIds.length,
       memberNames,
-      currentAssignments: assignedJobs.length,
-      scheduledToday: assignedToday.length,
-      activeJobs: activeJobs.length,
-      workloadHoursToday: Math.round(workloadHoursToday * 10) / 10,
-      availableCapacityHours: Math.round((dailyCapacity - workloadHoursToday) * 10) / 10,
+      currentAssignments: stats.currentAssignments,
+      scheduledToday: stats.scheduledToday,
+      activeJobs: stats.activeJobs,
+      workloadHoursToday,
+      dailyCapacityHours,
+      availableCapacityHours: Math.round((dailyCapacityHours - workloadHoursToday) * 10) / 10,
     };
   });
 

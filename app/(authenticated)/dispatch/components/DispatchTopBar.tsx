@@ -148,139 +148,159 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         </div>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-        <div className="col-span-2 flex gap-2">
-          <input
-            type="search"
-            placeholder="Search WO #, title, description..."
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") applySearch();
-            }}
-            className="ui-input"
-          />
-          <Button variant="secondary" onClick={applySearch}>
-            Apply
-          </Button>
-        </div>
+      <div className="grid gap-3 xl:grid-cols-3">
+        <section className="space-y-2 rounded-xl border border-[var(--card-border)] bg-slate-50/70 p-3 xl:col-span-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+            Search & location
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="search"
+              placeholder="Search WO #, title, description..."
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") applySearch();
+              }}
+              className="ui-input"
+            />
+            <Button variant="secondary" onClick={applySearch}>
+              Apply
+            </Button>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <select
+              value={filterState.companyId}
+              onChange={(event) => patchState({ companyId: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All companies</option>
+              {filterOptions.companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={filterState.companyId}
-          onChange={(event) => patchState({ companyId: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All companies</option>
-          {filterOptions.companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
+            <select
+              value={filterState.propertyId}
+              onChange={(event) => patchState({ propertyId: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All properties</option>
+              {propertyOptions.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.property_name ?? property.name ?? property.id}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={filterState.propertyId}
-          onChange={(event) => patchState({ propertyId: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All properties</option>
-          {propertyOptions.map((property) => (
-            <option key={property.id} value={property.id}>
-              {property.property_name ?? property.name ?? property.id}
-            </option>
-          ))}
-        </select>
+            <select
+              value={filterState.assetId}
+              onChange={(event) => patchState({ assetId: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All assets</option>
+              {filterOptions.assets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.name}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={filterState.assignmentType}
-          onChange={(event) => patchState({ assignmentType: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All assignment types</option>
-          {filterOptions.assignmentTypes.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+            <select
+              value={filterState.category}
+              onChange={(event) => patchState({ category: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All categories</option>
+              {filterOptions.categories.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
 
-        <select
-          value={filterState.technicianId}
-          onChange={(event) => patchState({ technicianId: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All technicians</option>
-          {filterOptions.technicians.map((technician) => (
-            <option key={technician.id} value={technician.id}>
-              {technician.name}
-            </option>
-          ))}
-        </select>
+        <section className="space-y-2 rounded-xl border border-[var(--card-border)] bg-slate-50/70 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+            Assignment
+          </p>
+          <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-1">
+            <select
+              value={filterState.assignmentType}
+              onChange={(event) => patchState({ assignmentType: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All assignment types</option>
+              {filterOptions.assignmentTypes.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={filterState.crewId}
-          onChange={(event) => patchState({ crewId: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All crews</option>
-          {filterOptions.crews.map((crew) => (
-            <option key={crew.id} value={crew.id}>
-              {crew.name}
-            </option>
-          ))}
-        </select>
+            <select
+              value={filterState.technicianId}
+              onChange={(event) => patchState({ technicianId: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All technicians</option>
+              {filterOptions.technicians.map((technician) => (
+                <option key={technician.id} value={technician.id}>
+                  {technician.name}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={filterState.status}
-          onChange={(event) => patchState({ status: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All statuses</option>
-          {filterOptions.statuses.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+            <select
+              value={filterState.crewId}
+              onChange={(event) => patchState({ crewId: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All crews</option>
+              {filterOptions.crews.map((crew) => (
+                <option key={crew.id} value={crew.id}>
+                  {crew.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
 
-        <select
-          value={filterState.priority}
-          onChange={(event) => patchState({ priority: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All priorities</option>
-          {filterOptions.priorities.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <section className="space-y-2 rounded-xl border border-[var(--card-border)] bg-slate-50/70 p-3 xl:col-span-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+            Work state
+          </p>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <select
+              value={filterState.status}
+              onChange={(event) => patchState({ status: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All statuses</option>
+              {filterOptions.statuses.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={filterState.assetId}
-          onChange={(event) => patchState({ assetId: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All assets</option>
-          {filterOptions.assets.map((asset) => (
-            <option key={asset.id} value={asset.id}>
-              {asset.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filterState.category}
-          onChange={(event) => patchState({ category: event.target.value })}
-          className="ui-select"
-        >
-          <option value="">All categories</option>
-          {filterOptions.categories.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+            <select
+              value={filterState.priority}
+              onChange={(event) => patchState({ priority: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All priorities</option>
+              {filterOptions.priorities.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -1,19 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useCallback, useState } from "react";
-import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { useMemo, useRef, useCallback, useState, useEffect } from "react";
+import { useDraggable } from "@dnd-kit/core";
 import {
   getTimeSlotLabels,
   getWorkOrderPosition,
-  getSlotId,
   heightPercentToHours,
   addHours,
   toSlotISO,
   DAY_START_HOUR,
-  DEFAULT_AVAILABLE_HOURS,
 } from "./dispatch-board-utils";
 import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
 import type { DispatchViewMode } from "../filter-state";
+import { ScheduleLane } from "./ScheduleLane";
 
 const UNASSIGNED_LANE_ID = "__unassigned__";
 
@@ -84,90 +83,20 @@ function getDurationHours(workOrder: BoardWorkOrder): number {
   return workOrder.estimated_hours ?? 1;
 }
 
-function DroppableSlot({
-  crewId,
-  hour,
-  selectedDate,
-  isOver,
-}: {
-  crewId: string;
-  hour: number;
-  selectedDate: string;
-  isOver: boolean;
-}) {
-  const { setNodeRef } = useDroppable({
-    id: getSlotId(crewId, hour),
-    data: { crewId, date: selectedDate, defaultHour: hour },
-  });
-  return (
-    <div
-      ref={setNodeRef}
-      className={`min-h-[28px] flex-1 ${isOver ? "bg-[var(--accent)]/15" : ""}`}
-    />
-  );
+function getCurrentTimePercent(now: Date): number | null {
+  const dayStart = DAY_START_HOUR * 60;
+  const dayEnd = 18 * 60;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (minutes < dayStart || minutes > dayEnd) return null;
+  return ((minutes - dayStart) / (dayEnd - dayStart)) * 100;
 }
 
-function DroppableCrewColumn({
-  crew,
-  selectedDate,
-  overCrewId,
-  timeLabels,
-  children,
-}: {
-  crew: BoardCrew;
-  selectedDate: string;
-  overCrewId: string | null;
-  timeLabels: { hour: number; label: string }[];
-  children: React.ReactNode;
-}) {
-  const { setNodeRef, isOver: isOverDroppable } = useDroppable({
-    id: `crew-${crew.id}`,
-    data: {
-      crewId: crew.id,
-      date: selectedDate,
-      defaultHour: DAY_START_HOUR,
-    },
-  });
-  const totalHours = crew.total_scheduled_hours ?? 0;
-  const remaining = Math.max(0, DEFAULT_AVAILABLE_HOURS - totalHours);
-  const jobCount = crew.job_count ?? 0;
-  const highlight = isOverDroppable || (overCrewId != null && String(overCrewId).startsWith(`crew-${crew.id}`));
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`relative flex min-w-[12rem] flex-1 flex-col border-r border-[var(--card-border)] last:border-r-0 ${
-        highlight ? "bg-[var(--accent)]/10" : "bg-[var(--background)]"
-      }`}
-    >
-      <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-3 py-2">
-        <span className="text-sm font-medium text-[var(--foreground)]">
-          {crew.name ?? `Crew ${crew.id.slice(0, 8)}`}
-        </span>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--muted)]">
-          <span>{totalHours.toFixed(1)}h scheduled</span>
-          <span>{jobCount} jobs</span>
-          <span>{remaining.toFixed(1)}h left</span>
-        </div>
-      </div>
-      <div className="relative flex min-h-[320px] flex-1 flex-col">
-        <div className="absolute inset-0 flex flex-col">
-          {timeLabels.map(({ hour }) => (
-            <DroppableSlot
-              key={hour}
-              crewId={crew.id}
-              hour={hour}
-              selectedDate={selectedDate}
-              isOver={overCrewId === getSlotId(crew.id, hour)}
-            />
-          ))}
-        </div>
-        <div className="absolute inset-0 pointer-events-none">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+function getCurrentTimeSlot(now: Date): { hour: number; minute: number } | null {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const dayStart = DAY_START_HOUR * 60;
+  const dayEnd = 18 * 60;
+  if (minutes < dayStart || minutes > dayEnd) return null;
+  return { hour: now.getHours(), minute: now.getMinutes() };
 }
 
 function ResizeHandle({
@@ -281,7 +210,7 @@ function DraggableBoardCard({
           <div
             {...listeners}
             {...attributes}
-            className="h-full cursor-grab active:cursor-grabbing overflow-hidden rounded-lg"
+            className="h-full cursor-grab overflow-hidden rounded-lg transition-transform duration-150 active:cursor-grabbing"
           >
             <div className="h-full overflow-auto">
               {children}
@@ -313,6 +242,26 @@ export function DispatchBoard({
   onOpenWorkOrder,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
+  const dayScrollRef = useRef<HTMLDivElement | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const nowPercent = useMemo(() => getCurrentTimePercent(now), [now]);
+  const currentTime = useMemo(() => getCurrentTimeSlot(now), [now]);
+  const nowLabel = useMemo(
+    () => now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+    [now]
+  );
+  useEffect(() => {
+    if (view !== "day") return;
+    if (nowPercent == null) return;
+    const el = dayScrollRef.current;
+    if (!el) return;
+    const targetTop = (nowPercent / 100) * el.scrollHeight - el.clientHeight * 0.35;
+    el.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  }, [selectedDate, view, nowPercent]);
   const lanes = useMemo(
     () => {
       const unassignedToday = workOrders.filter((wo) => {
@@ -460,15 +409,17 @@ export function DispatchBoard({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-auto">
+    <div ref={dayScrollRef} className="flex h-full flex-col overflow-auto">
       <div className="flex shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]">
-        <div className="w-14 shrink-0 border-r border-[var(--card-border)] py-2" aria-hidden />
+        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-slate-100/70 px-1.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+          Time
+        </div>
         {lanes.map((crew) => (
           <div
             key={crew.id}
-            className="min-w-[12rem] flex-1 border-r border-[var(--card-border)] px-3 py-2 last:border-r-0"
+            className="min-w-[13rem] flex-1 border-r border-[var(--card-border)] bg-gradient-to-b from-slate-100/70 to-slate-50/70 px-3 py-2 last:border-r-0"
           >
-            <span className="text-xs font-medium text-[var(--muted)]">
+            <span className="text-xs font-semibold uppercase tracking-[0.07em] text-[var(--muted)]">
               {crew.name ?? `Crew ${crew.id.slice(0, 8)}`}
             </span>
             <div className="text-xs text-[var(--muted)]">
@@ -477,26 +428,44 @@ export function DispatchBoard({
           </div>
         ))}
       </div>
-      <div className="flex min-h-0 flex-1">
-        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-[var(--card)]/30">
-          {timeLabels.map(({ hour, label }) => (
+      <div className="relative flex min-h-0 flex-1">
+        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full border border-red-200 bg-red-50/90 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+          Current time: {nowLabel}
+        </div>
+        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-slate-100/70">
+          {timeLabels.map(({ hour, label }, index) => {
+            const isCurrentHour = currentTime?.hour === hour;
+            return (
             <div
               key={hour}
-              className="flex h-[40px] items-start justify-end border-b border-[var(--card-border)]/50 pr-2 pt-0.5 text-xs text-[var(--muted)]"
+              className={`relative flex h-[40px] items-start justify-end border-b border-slate-200/80 pr-2 pt-0.5 text-xs text-[var(--muted)] ${
+                index % 2 === 0 ? "bg-slate-100/80" : "bg-slate-50/80"
+              } ${isCurrentHour ? "bg-red-50/70" : ""}`}
               style={{ height: `${100 / timeLabels.length}%`, minHeight: "40px" }}
             >
               {label}
+              {isCurrentHour ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500/90"
+                  style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
+                />
+              ) : null}
             </div>
-          ))}
+          );
+          })}
         </div>
         <div className="flex min-w-0 flex-1">
           {lanes.map((crew) => (
-            <DroppableCrewColumn
+            <ScheduleLane
               key={crew.id}
-              crew={crew}
+              id={crew.id}
+              name={crew.name ?? `Crew ${crew.id.slice(0, 8)}`}
               selectedDate={selectedDate}
+              totalScheduledHours={crew.total_scheduled_hours ?? 0}
+              jobCount={crew.job_count ?? 0}
               overCrewId={overCrewId}
               timeLabels={timeLabels}
+              currentTime={currentTime}
             >
               {(workOrdersByCrew.get(crew.id) ?? []).map((wo) => (
                 <DraggableBoardCard
@@ -516,9 +485,20 @@ export function DispatchBoard({
                   />
                 </DraggableBoardCard>
               ))}
-            </DroppableCrewColumn>
+            </ScheduleLane>
           ))}
         </div>
+        {nowPercent !== null ? (
+          <div className="pointer-events-none absolute inset-x-0 z-30" style={{ top: `${nowPercent}%` }}>
+            <div className="relative">
+              <div className="absolute -top-2 left-1 z-10 flex items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                {nowLabel}
+              </div>
+              <div className="h-0 border-t-[3px] border-red-500/95 shadow-[0_0_0_1px_rgba(248,113,113,0.14)]" />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

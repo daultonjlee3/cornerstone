@@ -225,12 +225,40 @@ export function DispatchView({
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Unassigned Work Orders" value={insights.unassignedWorkOrders} description="Needs technician or crew assignment" />
+        <MetricCard
+          title="Unassigned Work Orders"
+          value={insights.unassignedWorkOrders}
+          description="Needs technician or crew assignment"
+        />
         <MetricCard title="Scheduled Today" value={insights.scheduledToday} description="With assignment and schedule" />
         <MetricCard title="In Progress Today" value={insights.inProgressToday} description="Active execution jobs" />
-        <MetricCard title="Overdue Work Orders" value={insights.overdue} description="Past due without completion" trend={insights.overdue > 0 ? { label: "Requires immediate attention", tone: "bad" } : { label: "No overdue jobs", tone: "good" }} />
-        <MetricCard title="High Priority Open Jobs" value={insights.highPriorityOpenJobs} description="High, urgent, and emergency work" />
-        <MetricCard title="Technicians Working Today" value={insights.techniciansWorkingToday} description="Unique technicians scheduled today" />
+        <MetricCard
+          title="Overdue Work Orders"
+          value={insights.overdue}
+          description="Past due without completion"
+          className="border-red-200/80 bg-red-50/50"
+          trend={
+            insights.overdue > 0
+              ? { label: "Requires immediate attention", tone: "bad" }
+              : { label: "No overdue jobs", tone: "good" }
+          }
+        />
+        <MetricCard
+          title="High Priority Open Jobs"
+          value={insights.highPriorityOpenJobs}
+          description="High, urgent, and emergency work"
+          className="border-amber-200/80 bg-amber-50/40"
+          trend={
+            insights.highPriorityOpenJobs > 0
+              ? { label: "Prioritize dispatch now", tone: "bad" }
+              : { label: "Priority backlog controlled", tone: "good" }
+          }
+        />
+        <MetricCard
+          title="Technicians Working Today"
+          value={insights.techniciansWorkingToday}
+          description="Unique technicians scheduled today"
+        />
         <MetricCard title="Crews Working Today" value={insights.crewsWorkingToday} description="Unique crews scheduled today" />
       </section>
 
@@ -292,7 +320,12 @@ export function DispatchView({
               </div>
             </main>
 
-            <DragOverlay dropAnimation={null}>
+            <DragOverlay
+              dropAnimation={{
+                duration: 180,
+                easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            >
               {activeWo ? (
                 <div className="min-w-[10rem] max-w-[14rem] cursor-grabbing opacity-95 shadow-xl">
                   <DispatchWorkOrderCard

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DispatchWorkOrder } from "../types";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { DispatchCard } from "./DispatchCard";
 
 export type DispatchWorkOrderCardProps = {
   workOrder: DispatchWorkOrder;
@@ -77,34 +78,28 @@ function getJobTypeLabel(jobType: string): string {
   }
 }
 
-function getTypeBorderClass(jobType: string): string {
+function getTypeBadgeClass(jobType: string): string {
   switch (jobType) {
     case "emergency":
-      return "border-l-4 border-l-red-500";
+      return "border border-red-200 bg-red-100 text-red-700";
     case "preventive_maintenance":
-      return "border-l-4 border-l-blue-500";
+      return "border border-blue-200 bg-blue-100 text-blue-700";
     case "inspection":
-      return "border-l-4 border-l-purple-500";
+      return "border border-purple-200 bg-purple-100 text-purple-700";
     case "installation":
-      return "border-l-4 border-l-green-500";
+      return "border border-green-200 bg-green-100 text-green-700";
+    case "repair":
+      return "border border-amber-200 bg-amber-100 text-amber-700";
     default:
-      return "border-l-4 border-l-[var(--card-border)]";
+      return "border border-slate-200 bg-slate-100 text-slate-700";
   }
 }
 
-function getTypeBgClass(jobType: string): string {
-  switch (jobType) {
-    case "emergency":
-      return "bg-red-500/10";
-    case "preventive_maintenance":
-      return "bg-blue-500/10";
-    case "inspection":
-      return "bg-purple-500/10";
-    case "installation":
-      return "bg-green-500/10";
-    default:
-      return "bg-[var(--card)]";
-  }
+function isOverdue(wo: DispatchWorkOrder): boolean {
+  if (!wo.due_date) return false;
+  const status = String(wo.status ?? "").toLowerCase();
+  if (status === "completed" || status === "cancelled" || status === "closed") return false;
+  return wo.due_date < new Date().toISOString().slice(0, 10);
 }
 
 export function DispatchWorkOrderCard({
@@ -126,64 +121,65 @@ export function DispatchWorkOrderCard({
   const location = getLocationLine(workOrder);
   const assignment = getAssignmentLine(workOrder);
   const jobType = getJobType(workOrder);
-  const typeBorder = getTypeBorderClass(jobType);
-  const typeBg = getTypeBgClass(jobType);
+  const typeBadgeClass = getTypeBadgeClass(jobType);
+  const overdue = isOverdue(workOrder);
   const showActions = showQuickActions && hover && !isDragging && onOpenWorkOrder;
 
   if (variant === "compact") {
     return (
-      <div
-        className={`rounded-xl border border-[var(--card-border)] ${typeBorder} ${typeBg} px-3 py-2 text-sm shadow-[var(--shadow-soft)] ${
-          isDragging ? "opacity-75 shadow-lg" : ""
-        }`}
-      >
+      <DispatchCard priority={priority} isOverdue={overdue} isDragging={isDragging} className="text-sm">
         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           {workOrder.work_order_number ?? "Work order"}
         </p>
-        <p className="truncate font-medium text-[var(--foreground)]">{title}</p>
-        {workOrder.asset_name ? (
-          <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{workOrder.asset_name}</p>
+        <p className="truncate text-[15px] font-semibold leading-tight text-[var(--foreground)]">{title}</p>
+        {workOrder.asset_name || location ? (
+          <p className="mt-1 truncate text-xs text-[var(--muted)]">
+            {[workOrder.asset_name, location].filter(Boolean).join(" • ")}
+          </p>
         ) : null}
-        {timeRange && <p className="mt-0.5 text-xs text-[var(--muted)]">{timeRange}</p>}
-      </div>
+        {timeRange ? <p className="mt-1 text-xs text-[var(--muted)]">{timeRange}</p> : null}
+      </DispatchCard>
     );
   }
 
   return (
-    <div
-      className={`relative rounded-xl border border-[var(--card-border)] ${typeBorder} ${typeBg} p-3 shadow-[var(--shadow-soft)] ${
-        isDragging ? "opacity-90 shadow-lg" : ""
-      }`}
+    <DispatchCard
+      priority={priority}
+      isOverdue={overdue}
+      isDragging={isDragging}
+      className="cursor-grab active:cursor-grabbing"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
       <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         {workOrder.work_order_number ?? "Work order"}
       </p>
-      <p className="truncate text-sm font-medium text-[var(--foreground)]">{title}</p>
-      {workOrder.asset_name ? (
-        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{workOrder.asset_name}</p>
-      ) : null}
+      <p className="truncate text-base font-semibold leading-tight text-[var(--foreground)]">{title}</p>
 
-      {location && (
-        <p className="mt-1 truncate text-xs text-[var(--muted)]" title={location}>
-          {location}
+      {(workOrder.asset_name || location) && (
+        <p className="mt-1 truncate text-sm text-[var(--muted-strong)]" title={location ?? undefined}>
+          {[workOrder.asset_name, location].filter(Boolean).join(" • ")}
         </p>
       )}
 
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <PriorityBadge priority={priority} />
-        <span className="rounded bg-[var(--muted)]/20 px-1.5 py-0.5 text-xs text-[var(--muted)]">
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass}`}>
           {getJobTypeLabel(jobType)}
         </span>
         {workOrder.status ? <StatusBadge status={workOrder.status} /> : null}
+        {overdue ? (
+          <span className="rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+            Overdue
+          </span>
+        ) : null}
       </div>
 
       {timeRange && (
-        <p className="mt-1.5 text-xs text-[var(--muted)]">{timeRange}</p>
+        <p className="mt-2 text-xs text-[var(--muted)]">{timeRange}</p>
       )}
 
-      {showCrew ? <p className={`mt-1 text-xs font-medium ${assignment.tone}`}>{assignment.label}</p> : null}
+      {showCrew ? <p className={`mt-1.5 text-xs font-semibold ${assignment.tone}`}>{assignment.label}</p> : null}
 
       {showActions && (
         <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-1 rounded-b-lg border-t border-[var(--card-border)] bg-[var(--card)]/95 px-2 py-1.5">
@@ -233,6 +229,6 @@ export function DispatchWorkOrderCard({
           </button>
         </div>
       )}
-    </div>
+    </DispatchCard>
   );
 }

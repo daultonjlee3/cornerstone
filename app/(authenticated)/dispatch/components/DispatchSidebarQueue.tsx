@@ -1,7 +1,7 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
+import { QueueSection } from "./QueueSection";
 
 /** Work order shape for queue items (compatible with LoadDispatchResult lists). */
 type QueueWorkOrder = {
@@ -28,65 +28,44 @@ function DraggableQueueCard({ workOrder, children }: { workOrder: QueueWorkOrder
   );
 }
 
-function QueueSection({
-  title,
-  items,
-  variant,
-  onOpenWorkOrder,
-}: {
-  title: string;
-  items: QueueWorkOrder[];
-  variant: "overdue" | "ready" | "unscheduled";
-  onOpenWorkOrder?: (id: string, action?: "view" | "reassign" | "complete" | "open") => void;
-}) {
-  const borderColor =
-    variant === "overdue"
-      ? "border-amber-500/40 bg-amber-500/5"
-      : variant === "ready"
-        ? "border-emerald-500/40 bg-emerald-500/5"
-        : "border-[var(--card-border)] bg-[var(--card)]/30";
-  return (
-    <section className="shrink-0">
-      <h3
-        className={`sticky top-0 z-10 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wider ${borderColor} text-[var(--muted)]`}
-      >
-        {title}
-        <span className="ml-2 font-normal tabular-nums">{items.length}</span>
-      </h3>
-      <ul className="flex flex-col gap-2 p-2">
-        {items.length === 0 ? (
-          <li className="py-4 text-center text-xs text-[var(--muted)]">None</li>
-        ) : (
-          items.map((wo) => (
-            <li key={wo.id}>
-              <DraggableQueueCard workOrder={wo}>
-                <DispatchWorkOrderCard
-                  workOrder={wo}
-                  variant="block"
-                  showScheduledTime
-                  showCrew={false}
-                  showQuickActions={!!onOpenWorkOrder}
-                  onOpenWorkOrder={onOpenWorkOrder}
-                />
-              </DraggableQueueCard>
-            </li>
-          ))
-        )}
-      </ul>
-    </section>
-  );
-}
-
 export function DispatchSidebarQueue({ unscheduled, overdue, ready, onOpenWorkOrder }: DispatchSidebarQueueProps) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/70">
-      <div className="border-b border-[var(--card-border)] px-3 py-3">
+    <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-gradient-to-b from-[var(--card)] to-slate-50/60">
+      <div className="sticky top-0 z-20 border-b border-[var(--card-border)] bg-[var(--card)]/95 px-3 py-3 backdrop-blur">
         <p className="text-sm font-semibold text-[var(--foreground)]">Dispatch Queue</p>
-        <p className="text-xs text-[var(--muted)]">Drag items into schedule lanes or open for reassignment.</p>
+        <p className="text-xs text-[var(--muted)]">
+          Prioritize overdue jobs, then drag into a lane to schedule.
+        </p>
       </div>
-      <QueueSection title="Overdue" items={overdue} variant="overdue" onOpenWorkOrder={onOpenWorkOrder} />
-      <QueueSection title="Ready" items={ready} variant="ready" onOpenWorkOrder={onOpenWorkOrder} />
-      <QueueSection title="Unscheduled" items={unscheduled} variant="unscheduled" onOpenWorkOrder={onOpenWorkOrder} />
+      <div className="py-3">
+        <QueueSection
+          title="Overdue"
+          items={overdue}
+          variant="overdue"
+          DraggableWrapper={({ workOrder, children }) => (
+            <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
+          )}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+        <QueueSection
+          title="Ready"
+          items={ready}
+          variant="ready"
+          DraggableWrapper={({ workOrder, children }) => (
+            <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
+          )}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+        <QueueSection
+          title="Unscheduled"
+          items={unscheduled}
+          variant="unscheduled"
+          DraggableWrapper={({ workOrder, children }) => (
+            <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
+          )}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+      </div>
     </aside>
   );
 }
