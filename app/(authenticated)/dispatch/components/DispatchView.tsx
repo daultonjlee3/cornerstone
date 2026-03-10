@@ -12,6 +12,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { updateWorkOrderAssignment } from "@/app/(authenticated)/work-orders/actions";
+import { parseSlotId } from "./dispatch-board-utils";
 import { DispatchTopBar } from "./DispatchTopBar";
 import { DispatchSidebarQueue } from "./DispatchSidebarQueue";
 import { DispatchBoard } from "./DispatchBoard";
@@ -89,8 +90,18 @@ export function DispatchView({
 
       const overId = String(over.id);
       const dropData = over.data.current as { crewId?: string; date?: string; defaultHour?: number } | undefined;
-      const crewId = dropData?.crewId ?? (overId.startsWith("crew-") ? overId.slice("crew-".length) : null);
-      const dropDate = dropData?.date ?? (overId.startsWith("crew-") ? filterState.selectedDate : null);
+      let crewId = dropData?.crewId ?? (overId.startsWith("crew-") ? overId.slice("crew-".length) : null);
+      let dropDate = dropData?.date ?? (overId.startsWith("crew-") ? filterState.selectedDate : null);
+      let defaultHour = dropData?.defaultHour ?? 8;
+
+      if (overId.startsWith("slot-")) {
+        const parsed = parseSlotId(overId);
+        if (parsed) {
+          crewId = parsed.crewId;
+          defaultHour = parsed.hour;
+          dropDate = dropData?.date ?? filterState.selectedDate;
+        }
+      }
 
       if (!crewId || !dropDate) return;
 
@@ -104,7 +115,6 @@ export function DispatchView({
 
       if (!workOrder) return;
 
-      const defaultHour = dropData?.defaultHour ?? 8;
       const startISO = toSlotISO(dropDate, defaultHour);
       const hours = workOrder.estimated_hours ?? 1;
       const endISO = addHours(startISO, hours);
@@ -138,6 +148,32 @@ export function DispatchView({
       router.push(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [pathname, router, filterState]
+  );
+
+  const handleResizeEnd = useCallback(
+    async (
+      workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null },
+      newEndISO: string
+    ) => {
+      setDropError(null);
+      const result = await updateWorkOrderAssignment(workOrder.id, {
+        assigned_technician_id: null,
+        assigned_crew_id: workOrder.assigned_crew_id ?? null,
+        scheduled_date: workOrder.scheduled_date ?? null,
+        scheduled_start: workOrder.scheduled_start ?? null,
+        scheduled_end: newEndISO,
+      });
+      if (result?.error) setDropError(result.error);
+      else router.refresh();
+    },
+    [router]
+  );
+
+  const handleOpenWorkOrder = useCallback(
+    (id: string) => {
+      router.push(`/work-orders/${id}`);
+    },
+    [router]
   );
 
   const { crews, unscheduled, overdue, ready, filterOptions, insights, error, workOrders } = initialData;
@@ -191,6 +227,7 @@ export function DispatchView({
             unscheduled={unscheduled}
             overdue={overdue}
             ready={ready}
+            onOpenWorkOrder={handleOpenWorkOrder}
           />
           <main className="min-w-0 flex-1 border-l border-[var(--card-border)] bg-[var(--background)] pl-4">
             <div className="h-full min-h-0">
@@ -201,6 +238,8 @@ export function DispatchView({
                 view={filterState.viewMode}
                 workOrders={workOrders}
                 onSelectDate={handleSelectDate}
+                onResizeEnd={handleResizeEnd}
+                onOpenWorkOrder={handleOpenWorkOrder}
               />
             </div>
           </main>

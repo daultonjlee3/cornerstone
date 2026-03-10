@@ -10,9 +10,9 @@ import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components
 import type { WorkOrderPrefill } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 
 type CompanyOption = { id: string; name: string };
-type PropertyOption = { id: string; name: string; company_id?: string };
-type BuildingOption = { id: string; name: string; property_id?: string };
-type UnitOption = { id: string; name: string; building_id?: string };
+type PropertyOption = { id: string; name: string; company_id?: string | undefined };
+type BuildingOption = { id: string; name: string; property_id?: string | undefined };
+type UnitOption = { id: string; name: string; building_id?: string | undefined };
 
 export type AssetRow = Asset & {
   property_name?: string;
@@ -34,6 +34,7 @@ type FilterParams = {
 
 type StatusOption = { value: string; label: string };
 
+/** Option types compatible with WorkOrderFormModal (ids may be optional from page data). */
 type WorkOrderFormData = {
   companies: { id: string; name: string }[];
   customers: { id: string; name: string; company_id: string }[];
@@ -57,7 +58,7 @@ type AssetsListProps = {
   statusOptions: readonly StatusOption[];
   filterParams: FilterParams;
   error?: string | null;
-  saveAction: (payload: FormData) => Promise<{ error?: string; success?: boolean }>;
+  saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
   workOrderFormData?: WorkOrderFormData | null;
 };
 
@@ -520,9 +521,9 @@ export function AssetsList({
           prefill={selectedAssetForWO ? buildWoPrefillFromAsset(selectedAssetForWO) : null}
           companies={workOrderFormData.companies}
           customers={workOrderFormData.customers}
-          properties={workOrderFormData.properties}
-          buildings={workOrderFormData.buildings}
-          units={workOrderFormData.units}
+          properties={workOrderFormData.properties as { id: string; name: string; company_id: string }[]}
+          buildings={workOrderFormData.buildings as { id: string; name: string; property_id: string }[]}
+          units={workOrderFormData.units as { id: string; name: string; building_id: string }[]}
           assets={workOrderFormData.assets}
           technicians={workOrderFormData.technicians}
           crews={workOrderFormData.crews}

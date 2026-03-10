@@ -2,7 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { saveAsset } from "./actions";
 import { ASSET_TYPE_OPTIONS } from "./constants";
-import { AssetsList } from "./components/assets-list";
+import { AssetsList, type AssetRow } from "./components/assets-list";
 import { saveWorkOrder } from "../work-orders/actions";
 
 export const metadata = {
@@ -278,7 +278,7 @@ export default async function AssetsPage({
         </p>
       </div>
       <AssetsList
-        assets={assets}
+        assets={assets as AssetRow[]}
         companies={companyOptions}
         properties={propertyOptions}
         buildings={buildingOptions}

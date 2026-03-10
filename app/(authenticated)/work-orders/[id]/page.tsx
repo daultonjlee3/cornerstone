@@ -100,11 +100,13 @@ export default async function WorkOrderDetailPage({
       .eq("id", assignedCrewId)
       .maybeSingle();
     if (crewRow) {
-      const lead = Array.isArray((crewRow as Record<string, unknown>).technicians)
-        ? (crewRow as Record<string, unknown>).technicians[0]
-        : (crewRow as Record<string, unknown>).technicians;
-      if (lead && typeof lead === "object")
-        crewLeadName = (lead as { technician_name?: string }).technician_name ?? (lead as { name?: string }).name ?? null;
+      const crewRecord = crewRow as Record<string, unknown>;
+      const techs = crewRecord.technicians;
+      const lead = Array.isArray(techs) ? techs[0] : techs;
+      if (lead && typeof lead === "object") {
+        const leadObj = lead as { technician_name?: string; name?: string };
+        crewLeadName = leadObj.technician_name ?? leadObj.name ?? null;
+      }
     }
     const { data: mems } = await supabase
       .from("crew_members")

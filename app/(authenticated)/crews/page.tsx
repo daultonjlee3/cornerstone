@@ -1,6 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { CrewsList } from "./components/crews-list";
+import { CrewsList, type CrewRow } from "./components/crews-list";
 
 export const metadata = {
   title: "Crews | Cornerstone Tech",
@@ -138,7 +138,7 @@ export default async function CrewsPage({
         </p>
       </div>
       <CrewsList
-        crews={crews}
+        crews={crews as CrewRow[]}
         companies={companyOptions}
         technicians={technicianOptions}
         searchQuery={searchQuery}
