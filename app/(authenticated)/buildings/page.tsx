@@ -40,7 +40,7 @@ export default async function BuildingsPage() {
             Manage buildings at each property.
           </p>
         </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company and property first, then add buildings.</p>
         </div>
       </div>
@@ -65,7 +65,7 @@ export default async function BuildingsPage() {
             Manage buildings at each property.
           </p>
         </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a property first, then add buildings.</p>
         </div>
       </div>

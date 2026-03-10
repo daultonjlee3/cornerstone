@@ -69,7 +69,7 @@ const emptyAsset: Asset = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
+  "ui-input";
 
 export function AssetFormModal({
   open,

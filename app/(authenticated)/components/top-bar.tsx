@@ -11,7 +11,7 @@ type TopBarProps = {
 export function TopBar({ tenantName, companyName, onMenuClick }: TopBarProps) {
   const initials = `${tenantName.slice(0, 1)}${companyName.slice(0, 1)}`.toUpperCase();
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] bg-[var(--card)] px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] bg-[var(--card)]/95 px-4 backdrop-blur sm:px-6">
       <button
         type="button"
         onClick={onMenuClick}
@@ -40,7 +40,7 @@ export function TopBar({ tenantName, companyName, onMenuClick }: TopBarProps) {
             id="topbar-search"
             type="search"
             placeholder="Search work orders, assets, technicians..."
-            className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] py-2 pl-9 pr-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            className="ui-input !bg-[var(--background)] py-2 pl-9 pr-3"
           />
         </div>
       </div>

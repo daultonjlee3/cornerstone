@@ -6,13 +6,7 @@ type CardProps = {
 };
 
 export function Card({ children, className = "" }: CardProps) {
-  return (
-    <section
-      className={`rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-[0_8px_30px_rgba(15,23,42,0.06)] ${className}`}
-    >
-      {children}
-    </section>
-  );
+  return <section className={`ui-card ${className}`}>{children}</section>;
 }
 
 export function CardHeader({ children, className = "" }: CardProps) {

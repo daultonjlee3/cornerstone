@@ -30,7 +30,7 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-2xl ${className}`}
+        className={`relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card)] shadow-2xl ${className}`}
       >
         <header className="sticky top-0 z-10 border-b border-[var(--card-border)] bg-[var(--card)] px-6 py-4">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">{title}</h2>

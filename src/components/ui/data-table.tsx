@@ -6,13 +6,7 @@ type DataTableProps = {
 };
 
 export function DataTable({ children, className = "" }: DataTableProps) {
-  return (
-    <div
-      className={`overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-[0_8px_24px_rgba(15,23,42,0.05)] ${className}`}
-    >
-      <div className="overflow-x-auto">{children}</div>
-    </div>
-  );
+  return <div className={`ui-table-shell ${className}`}><div className="overflow-x-auto">{children}</div></div>;
 }
 
 export function Table({ children, className = "" }: DataTableProps) {
@@ -46,8 +40,8 @@ type TrProps = {
 export function Tr({ children, className = "", clickable = false }: TrProps) {
   return (
     <tr
-      className={`border-b border-[var(--card-border)] last:border-0 ${
-        clickable ? "cursor-pointer hover:bg-[var(--background)]/50" : ""
+      className={`border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/45 ${
+        clickable ? "cursor-pointer" : ""
       } ${className}`}
     >
       {children}

@@ -19,7 +19,7 @@ export function FormField({
 }: FormFieldProps) {
   return (
     <div className={className}>
-      <label htmlFor={htmlFor} className="mb-1 block text-xs font-medium text-[var(--muted)]">
+      <label htmlFor={htmlFor} className="ui-label">
         {label}
         {required ? <span className="ml-0.5 text-red-500">*</span> : null}
       </label>

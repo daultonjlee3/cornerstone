@@ -375,8 +375,8 @@ export function WorkOrderFormModal({
   const wo = workOrder ?? emptyWorkOrder;
   const titleDefault = isEdit ? wo.title : (prefill?.title ?? wo.title);
   const descriptionDefault = isEdit ? (wo.description ?? "") : (prefill?.description ?? wo.description ?? "");
-  const inputClass = "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
-  const labelClass = "mb-1 block text-sm font-medium text-[var(--foreground)]";
+  const inputClass = "ui-input";
+  const labelClass = "ui-label";
   const sectionTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)] border-b border-[var(--card-border)] pb-2";
 
   const requestedAtDefault = wo.requested_at ?? (isEdit ? "" : new Date().toISOString().slice(0, 16));

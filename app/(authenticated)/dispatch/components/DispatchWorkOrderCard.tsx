@@ -122,7 +122,7 @@ export function DispatchWorkOrderCard({
   if (variant === "compact") {
     return (
       <div
-        className={`rounded-lg border border-[var(--card-border)] ${typeBorder} ${typeBg} px-3 py-2 text-sm ${
+        className={`rounded-xl border border-[var(--card-border)] ${typeBorder} ${typeBg} px-3 py-2 text-sm shadow-[var(--shadow-soft)] ${
           isDragging ? "opacity-75 shadow-lg" : ""
         }`}
       >
@@ -134,7 +134,7 @@ export function DispatchWorkOrderCard({
 
   return (
     <div
-      className={`relative rounded-lg border border-[var(--card-border)] ${typeBorder} ${typeBg} p-3 shadow-sm ${
+      className={`relative rounded-xl border border-[var(--card-border)] ${typeBorder} ${typeBg} p-3 shadow-[var(--shadow-soft)] ${
         isDragging ? "opacity-90 shadow-lg" : ""
       }`}
       onMouseEnter={() => setHover(true)}

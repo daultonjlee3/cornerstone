@@ -66,7 +66,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
             </svg>
           </button>
         </div>
-        <div className="flex rounded-lg border border-[var(--card-border)] p-0.5">
+        <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
           {(["day", "week", "month"] as const).map((mode) => (
             <button
               key={mode}
@@ -83,11 +83,19 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-4 text-xs text-[var(--muted)]">
-        <span>Overdue: {insights.overdue}</span>
-        <span>Ready: {insights.ready}</span>
-        <span>Unscheduled: {insights.unscheduled}</span>
-        <span>Scheduled today: {insights.scheduledToday}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+          Overdue: {insights.overdue}
+        </span>
+        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+          Ready: {insights.ready}
+        </span>
+        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
+          Unscheduled: {insights.unscheduled}
+        </span>
+        <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">
+          Scheduled today: {insights.scheduledToday}
+        </span>
       </div>
     </div>
   );

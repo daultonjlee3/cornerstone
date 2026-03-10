@@ -41,7 +41,7 @@ export default async function PropertiesPage() {
             Manage properties for your organization.
           </p>
         </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add properties.</p>
         </div>
       </div>

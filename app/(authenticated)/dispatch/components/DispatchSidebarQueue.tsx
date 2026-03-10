@@ -79,7 +79,7 @@ function QueueSection({
 
 export function DispatchSidebarQueue({ unscheduled, overdue, ready, onOpenWorkOrder }: DispatchSidebarQueueProps) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/50">
+    <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/70">
       <QueueSection title="Overdue" items={overdue} variant="overdue" onOpenWorkOrder={onOpenWorkOrder} />
       <QueueSection title="Ready" items={ready} variant="ready" onOpenWorkOrder={onOpenWorkOrder} />
       <QueueSection title="Unscheduled" items={unscheduled} variant="unscheduled" onOpenWorkOrder={onOpenWorkOrder} />

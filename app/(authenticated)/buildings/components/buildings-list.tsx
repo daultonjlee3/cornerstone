@@ -7,6 +7,17 @@ import { deleteBuilding } from "../actions";
 import type { Building } from "./building-form-modal";
 import { BuildingFormModal } from "./building-form-modal";
 import { saveBuilding } from "../actions";
+import { Button } from "@/src/components/ui/button";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+} from "@/src/components/ui/data-table";
 
 type PropertyOption = { id: string; name: string };
 
@@ -81,92 +92,69 @@ export function BuildingsList({
       )}
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Buildings</h2>
-        <button
-          type="button"
-          onClick={openNew}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        >
+        <Button type="button" onClick={openNew}>
           New Building
-        </button>
+        </Button>
       </div>
 
       {initialBuildings.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">No buildings yet.</p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
+          <Button type="button" onClick={openNew} className="mt-4">
             Add your first building
-          </button>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Building</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="w-24 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {initialBuildings.map((b) => (
-                  <tr
-                    key={b.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
-                  >
-                    <td className="px-4 py-3 text-[var(--foreground)]">
-                      {buildingDisplayName(b)}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
-                      {b.property && "name" in b.property ? b.property.name : (b.property as { property_name?: string })?.property_name ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          b.status === "active"
-                            ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                            : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
+        <DataTable>
+          <Table className="min-w-[650px]">
+            <TableHead>
+              <Th>Building</Th>
+              <Th>Property</Th>
+              <Th>Status</Th>
+              <Th className="w-32">Actions</Th>
+            </TableHead>
+            <TBody>
+              {initialBuildings.map((b) => (
+                <Tr key={b.id}>
+                  <Td>{buildingDisplayName(b)}</Td>
+                  <Td className="text-[var(--muted)]">
+                    {b.property && "name" in b.property
+                      ? b.property.name
+                      : (b.property as { property_name?: string })?.property_name ?? "—"}
+                  </Td>
+                  <Td>
+                    <StatusBadge status={b.status} />
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/work-orders?new=1&company_id=${encodeURIComponent((b.property as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent(b.property_id)}&building_id=${encodeURIComponent(b.id)}`}
+                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/work-orders?new=1&company_id=${encodeURIComponent((b.property as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent(b.property_id)}&building_id=${encodeURIComponent(b.id)}`}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Create Work Order
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(b)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(b.id, buildingDisplayName(b))}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                        Create Work Order
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(b)}
+                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(b.id, buildingDisplayName(b))}
+                        disabled={isPending}
+                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        </DataTable>
       )}
 
       <BuildingFormModal

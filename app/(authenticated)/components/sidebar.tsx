@@ -30,13 +30,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       )}
       <aside
         className={`
-          fixed left-0 top-0 z-50 h-screen w-64 shrink-0 border-r border-[var(--card-border)] bg-[var(--card)]
+          fixed left-0 top-0 z-50 h-screen w-64 shrink-0 border-r border-[var(--card-border)] bg-[var(--card)] shadow-[0_6px_18px_rgba(15,23,42,0.05)]
           flex flex-col
           transition-transform duration-200 ease-out lg:translate-x-0
           ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--card-border)] px-4 lg:justify-start">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] px-4 lg:justify-start">
           <Link
             href="/dashboard"
             className="text-lg font-semibold tracking-tight text-[var(--foreground)]"
@@ -60,7 +60,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <h3 className="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
                 {group.label}
               </h3>
-              <ul className="space-y-0.5">
+              <ul className="space-y-1">
                 {group.items.map((item) => {
                   const active = isActive(item.href, pathname ?? "");
                   return (
@@ -69,10 +69,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                         href={item.href}
                         onClick={onClose}
                         className={`
-                          block border-l-2 py-2 pl-4 pr-4 text-sm transition-colors
+                          block rounded-r-lg border-l-2 py-2 pl-4 pr-4 text-sm transition-colors
                           ${active
-                            ? "border-[var(--accent)] bg-[var(--accent)]/10 font-medium text-[var(--accent)]"
-                            : "border-transparent text-[var(--foreground)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
+                            ? "border-[var(--accent)] bg-[var(--accent)]/12 font-medium text-[var(--accent)]"
+                            : "border-transparent text-[var(--foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                           }
                         `}
                       >

@@ -40,7 +40,7 @@ export default async function UnitsPage() {
             Manage spaces within buildings.
           </p>
         </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company, property, and building first, then add units.</p>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default async function UnitsPage() {
             Manage spaces within buildings.
           </p>
         </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a building first, then add units.</p>
         </div>
       </div>

@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { Modal } from "@/src/components/ui/modal";
+import { FormField } from "@/src/components/ui/form-field";
+import { Button } from "@/src/components/ui/button";
 
 export type Property = {
   id: string;
@@ -51,50 +54,40 @@ export function PropertyFormModal({
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  if (!open) return null;
-
   const p = property ?? emptyProperty;
   const displayName = p.property_name ?? (p as { name?: string }).name ?? "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" aria-hidden onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
-        <div className="sticky top-0 border-b border-[var(--card-border)] bg-[var(--card)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            {isEdit ? "Edit Property" : "New Property"}
-          </h2>
-        </div>
-        <form action={formAction} className="space-y-4 p-6">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit Property" : "New Property"}
+      className="max-w-md"
+    >
+      <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={p.id} />}
           {state?.error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {state.error}
             </p>
           )}
-          <div>
-            <label htmlFor="property_name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Property name *
-            </label>
+          <FormField label="Property name" htmlFor="property_name" required>
             <input
               id="property_name"
               name="property_name"
               type="text"
               required
               defaultValue={displayName}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="company_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Company *
-            </label>
+          </FormField>
+          <FormField label="Company" htmlFor="company_id" required>
             <select
               id="company_id"
               name="company_id"
               required
               defaultValue={p.company_id}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="">Select company</option>
               {companies.map((c) => (
@@ -103,101 +96,74 @@ export function PropertyFormModal({
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label htmlFor="address_line1" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Address line 1
-            </label>
+          </FormField>
+          <FormField label="Address line 1" htmlFor="address_line1">
             <input
               id="address_line1"
               name="address_line1"
               type="text"
               defaultValue={p.address_line1 ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="address_line2" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Address line 2
-            </label>
+          </FormField>
+          <FormField label="Address line 2" htmlFor="address_line2">
             <input
               id="address_line2"
               name="address_line2"
               type="text"
               defaultValue={p.address_line2 ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="city" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-                City
-              </label>
+            <FormField label="City" htmlFor="city">
               <input
                 id="city"
                 name="city"
                 type="text"
                 defaultValue={p.city ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="ui-input"
               />
-            </div>
-            <div>
-              <label htmlFor="state" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-                State
-              </label>
+            </FormField>
+            <FormField label="State" htmlFor="state">
               <input
                 id="state"
                 name="state"
                 type="text"
                 defaultValue={p.state ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="ui-input"
               />
-            </div>
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="zip" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Zip
-            </label>
+          <FormField label="Zip" htmlFor="zip">
             <input
               id="zip"
               name="zip"
               type="text"
               defaultValue={p.zip ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="status" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Status
-            </label>
+          </FormField>
+          <FormField label="Status" htmlFor="status">
             <select
               id="status"
               name="status"
               defaultValue={p.status}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
+          </FormField>
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? "Saving…" : isEdit ? "Save" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-[var(--foreground)] hover:bg-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            </Button>
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
