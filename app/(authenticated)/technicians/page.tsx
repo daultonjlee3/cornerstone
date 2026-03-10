@@ -82,12 +82,18 @@ export default async function TechniciansPage() {
         <p className="mt-1 text-[var(--muted)]">
           Manage technicians and assign them to work orders.
         </p>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Link
             href="/technicians/work-queue"
             className="inline-flex rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
           >
             Open Technician Work Queue
+          </Link>
+          <Link
+            href="/technician/jobs"
+            className="inline-flex rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+          >
+            Open Technician Portal
           </Link>
         </div>
       </div>

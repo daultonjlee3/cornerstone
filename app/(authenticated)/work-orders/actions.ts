@@ -178,6 +178,152 @@ async function validateAssignmentTargets(
   return null;
 }
 
+async function resolveActorTechnicianIdForCompany(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  {
+    actorId,
+    companyId,
+  }: {
+    actorId: string | null;
+    companyId: string | null;
+  }
+): Promise<string | null> {
+  if (!actorId || !companyId) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const email = (user?.email ?? "").trim();
+  if (!email) return null;
+  const { data: technician } = await supabase
+    .from("technicians")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .eq("email", email)
+    .limit(1)
+    .maybeSingle();
+  return (technician as { id?: string } | null)?.id ?? null;
+}
+
+function diffMinutes(startIso: string, endIso: string): number {
+  const startMs = new Date(startIso).getTime();
+  const endMs = new Date(endIso).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  return Math.max(0, Math.round((endMs - startMs) / 60000));
+}
+
+async function startLaborSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  {
+    workOrderId,
+    technicianId,
+    actorId,
+    startedAt,
+  }: {
+    workOrderId: string;
+    technicianId: string | null;
+    actorId: string | null;
+    startedAt: string;
+  }
+): Promise<{ id: string } | null> {
+  const { data: existing } = await supabase
+    .from("work_order_labor_entries")
+    .select("id")
+    .eq("work_order_id", workOrderId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return existing as { id: string };
+
+  const { data: inserted, error } = await supabase
+    .from("work_order_labor_entries")
+    .insert({
+      work_order_id: workOrderId,
+      technician_id: technicianId,
+      created_by_user_id: actorId,
+      started_at: startedAt,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  if (error) return null;
+  return (inserted as { id: string } | null) ?? null;
+}
+
+async function stopLaborSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  {
+    workOrderId,
+    endedAt,
+  }: {
+    workOrderId: string;
+    endedAt: string;
+  }
+): Promise<{ id: string; duration_minutes: number } | null> {
+  const { data: active } = await supabase
+    .from("work_order_labor_entries")
+    .select("id, started_at")
+    .eq("work_order_id", workOrderId)
+    .eq("is_active", true)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!active) return null;
+
+  const startedAt = (active as { started_at: string }).started_at;
+  const durationMinutes = diffMinutes(startedAt, endedAt);
+  const { data: updated, error } = await supabase
+    .from("work_order_labor_entries")
+    .update({
+      ended_at: endedAt,
+      duration_minutes: durationMinutes,
+      is_active: false,
+    })
+    .eq("id", (active as { id: string }).id)
+    .select("id, duration_minutes")
+    .single();
+  if (error) return null;
+  return (
+    (updated as { id: string; duration_minutes?: number } | null) != null
+      ? {
+          id: (updated as { id: string }).id,
+          duration_minutes: Number(
+            (updated as { duration_minutes?: number }).duration_minutes ?? durationMinutes
+          ),
+        }
+      : null
+  );
+}
+
+async function getTotalLaborMinutes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workOrderId: string
+): Promise<number> {
+  const { data: rows } = await supabase
+    .from("work_order_labor_entries")
+    .select("started_at, ended_at, duration_minutes")
+    .eq("work_order_id", workOrderId);
+  return (rows ?? []).reduce((sum, row) => {
+    const typed = row as {
+      started_at?: string | null;
+      ended_at?: string | null;
+      duration_minutes?: number | null;
+    };
+    if (typed.duration_minutes != null) return sum + Number(typed.duration_minutes);
+    if (typed.started_at && typed.ended_at) return sum + diffMinutes(typed.started_at, typed.ended_at);
+    return sum;
+  }, 0);
+}
+
+function sanitizeFileName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120);
+}
+
 export async function saveWorkOrder(
   _prev: WorkOrderFormState,
   formData: FormData
@@ -472,9 +618,40 @@ export async function updateWorkOrderStatus(
   if (error) return { error: error.message };
 
   const afterState = (updated as Record<string, unknown>) ?? {};
+  const companyId = (afterState.company_id as string) ?? (beforeState.company_id as string);
+  const actorTechnicianId = await resolveActorTechnicianIdForCompany(supabase, {
+    actorId,
+    companyId: companyId ?? null,
+  });
+  if (
+    toComparableStatus(beforeState.status as string | null) !== "in_progress" &&
+    toComparableStatus(normalizedStatus) === "in_progress"
+  ) {
+    await startLaborSession(supabase, {
+      workOrderId: id,
+      technicianId: actorTechnicianId,
+      actorId,
+      startedAt:
+        (afterState.started_at as string | null) ??
+        (updatePayload.started_at as string | undefined) ??
+        new Date().toISOString(),
+    });
+  }
+  if (
+    toComparableStatus(beforeState.status as string | null) === "in_progress" &&
+    ["on_hold", "cancelled"].includes(toComparableStatus(normalizedStatus))
+  ) {
+    await stopLaborSession(supabase, {
+      workOrderId: id,
+      endedAt:
+        (afterState.last_paused_at as string | null) ??
+        new Date().toISOString(),
+    });
+  }
+
   await insertActivityLog(supabase, {
     tenantId,
-    companyId: (afterState.company_id as string) ?? (beforeState.company_id as string),
+    companyId,
     entityType: "work_order",
     entityId: id,
     actionType: "work_order_status_changed",
@@ -518,6 +695,8 @@ export async function updateWorkOrderStatus(
   revalidatePath("/work-orders");
   revalidatePath(`/work-orders/${id}`);
   revalidatePath("/dispatch");
+  revalidatePath("/technician/jobs");
+  revalidatePath(`/technician/jobs/${id}`);
   return { success: true };
 }
 
@@ -709,6 +888,8 @@ export async function updateWorkOrderAssignment(
   revalidatePath("/work-orders");
   revalidatePath(`/work-orders/${id}`);
   revalidatePath("/dispatch");
+  revalidatePath("/technician/jobs");
+  revalidatePath(`/technician/jobs/${id}`);
   return { success: true };
 }
 
@@ -799,6 +980,29 @@ export async function completeWorkOrder(
   const afterState = (updated as Record<string, unknown>) ?? {};
   const companyId =
     (afterState.company_id as string) ?? (beforeState.company_id as string);
+  const actorTechnicianId = await resolveActorTechnicianIdForCompany(supabase, {
+    actorId,
+    companyId: companyId ?? null,
+  });
+  const closedLaborSession = await stopLaborSession(supabase, {
+    workOrderId: id,
+    endedAt: completedAt,
+  });
+  const totalLaborMinutes = await getTotalLaborMinutes(supabase, id);
+  const derivedActualHours =
+    totalLaborMinutes > 0 ? Number((totalLaborMinutes / 60).toFixed(2)) : null;
+  const finalActualHours = payload.actual_hours ?? derivedActualHours;
+  if (
+    finalActualHours != null &&
+    Number(afterState.actual_hours ?? NaN) !== finalActualHours
+  ) {
+    await supabase
+      .from("work_orders")
+      .update({ actual_hours: finalActualHours })
+      .eq("id", id);
+    afterState.actual_hours = finalActualHours;
+  }
+
   await insertActivityLog(supabase, {
     tenantId,
     companyId,
@@ -819,10 +1023,26 @@ export async function completeWorkOrder(
     performedBy: actorId,
     metadata: {
       completed_at: completedAt,
-      actual_hours: payload.actual_hours ?? null,
+      actual_hours: finalActualHours,
       completion_status: completionStatus,
     },
   });
+  if (closedLaborSession || totalLaborMinutes > 0) {
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "work_order",
+      entityId: id,
+      actionType: "labor_logged",
+      performedBy: actorId,
+      metadata: {
+        technician_id: payload.completed_by_technician_id ?? actorTechnicianId,
+        total_labor_minutes: totalLaborMinutes,
+        total_labor_hours: finalActualHours,
+        closed_labor_entry_id: closedLaborSession?.id ?? null,
+      },
+    });
+  }
   await insertActivityLog(supabase, {
     tenantId,
     companyId,
@@ -956,6 +1176,8 @@ export async function completeWorkOrder(
   revalidatePath("/work-orders");
   revalidatePath(`/work-orders/${id}`);
   revalidatePath("/dispatch");
+  revalidatePath("/technician/jobs");
+  revalidatePath(`/technician/jobs/${id}`);
   if (assetId) {
     revalidatePath("/assets");
     revalidatePath(`/assets/${assetId}`);
@@ -966,11 +1188,13 @@ export async function completeWorkOrder(
 export async function addWorkOrderNote(
   workOrderId: string,
   body: string,
-  noteType: "internal" | "customer_visible" | "completion" = "internal"
+  noteType: "internal" | "customer_visible" | "completion" = "internal",
+  technicianId: string | null = null
 ): Promise<WorkOrderFormState> {
   const tenantId = await getTenantId();
   if (!tenantId) return { error: "Unauthorized." };
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
     .select("company_id")
@@ -979,17 +1203,133 @@ export async function addWorkOrderNote(
   if (!row) return { error: "Work order not found." };
   const allowed = await companyBelongsToTenant(row.company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const resolvedTechnicianId =
+    technicianId ||
+    (await resolveActorTechnicianIdForCompany(supabase, {
+      actorId,
+      companyId: (row as { company_id?: string | null }).company_id ?? null,
+    }));
   const { error } = await supabase.from("work_order_notes").insert({
     work_order_id: workOrderId,
     body: body.trim(),
     note_type: noteType,
-    created_by_id: user?.id ?? null,
+    created_by_id: actorId,
+    technician_id: resolvedTechnicianId,
   });
   if (error) return { error: error.message };
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: (row as { company_id: string }).company_id,
+    entityType: "work_order",
+    entityId: workOrderId,
+    actionType: "work_order_note_added",
+    performedBy: actorId,
+    metadata: {
+      note_type: noteType,
+      technician_id: resolvedTechnicianId,
+      body_excerpt: body.trim().slice(0, 180),
+    },
+  });
+
   revalidatePath(`/work-orders/${workOrderId}`);
+  revalidatePath(`/technicians/work-queue/${workOrderId}`);
+  revalidatePath(`/technician/jobs/${workOrderId}`);
+  return { success: true };
+}
+
+export async function uploadWorkOrderPhoto(
+  workOrderId: string,
+  payload: {
+    fileDataUrl: string;
+    fileName: string;
+    mimeType: string;
+    caption?: string | null;
+    technicianId?: string | null;
+  }
+): Promise<WorkOrderFormState> {
+  const tenantId = await getTenantId();
+  if (!tenantId) return { error: "Unauthorized." };
+
+  const supabase = await createClient();
+  const actorId = await getActorId(supabase);
+  const { data: row } = await supabase
+    .from("work_orders")
+    .select("company_id, asset_id")
+    .eq("id", workOrderId)
+    .maybeSingle();
+  if (!row) return { error: "Work order not found." };
+  const companyId = (row as { company_id?: string | null }).company_id ?? null;
+  if (!companyId) return { error: "Work order company is missing." };
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { error: "Unauthorized." };
+
+  const dataUrl = (payload.fileDataUrl ?? "").trim();
+  if (!dataUrl.startsWith("data:image/")) {
+    return { error: "Only image uploads are supported." };
+  }
+  if (dataUrl.length > 8_000_000) {
+    return { error: "Image is too large. Please use an image under 6MB." };
+  }
+
+  const name = sanitizeFileName(payload.fileName || "photo.jpg") || "photo.jpg";
+  const caption = (payload.caption ?? "").trim() || null;
+  const resolvedTechnicianId =
+    payload.technicianId ||
+    (await resolveActorTechnicianIdForCompany(supabase, { actorId, companyId }));
+
+  const { data: inserted, error } = await supabase
+    .from("work_order_attachments")
+    .insert({
+      work_order_id: workOrderId,
+      file_name: name,
+      file_url: dataUrl,
+      file_type: payload.mimeType || "image/jpeg",
+      uploaded_by_user_id: actorId,
+      technician_id: resolvedTechnicianId,
+      caption,
+    })
+    .select("id")
+    .single();
+  if (error) return { error: error.message };
+
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId,
+    entityType: "work_order",
+    entityId: workOrderId,
+    actionType: "work_order_photo_uploaded",
+    performedBy: actorId,
+    metadata: {
+      attachment_id: (inserted as { id?: string } | null)?.id ?? null,
+      file_name: name,
+      mime_type: payload.mimeType || "image/jpeg",
+      technician_id: resolvedTechnicianId,
+      caption,
+    },
+  });
+  if ((row as { asset_id?: string | null }).asset_id) {
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "asset",
+      entityId: (row as { asset_id: string }).asset_id,
+      actionType: "asset_service_photo_added",
+      performedBy: actorId,
+      metadata: {
+        work_order_id: workOrderId,
+        attachment_id: (inserted as { id?: string } | null)?.id ?? null,
+        technician_id: resolvedTechnicianId,
+      },
+    });
+  }
+
+  revalidatePath(`/work-orders/${workOrderId}`);
+  revalidatePath(`/technicians/work-queue/${workOrderId}`);
+  revalidatePath(`/technician/jobs/${workOrderId}`);
+  revalidatePath("/assets");
+  if ((row as { asset_id?: string | null }).asset_id) {
+    revalidatePath(`/assets/${(row as { asset_id: string }).asset_id}`);
+  }
   return { success: true };
 }
 

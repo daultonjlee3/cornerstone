@@ -200,8 +200,46 @@ export default async function AssetDetailPage({
       crew_name: crewName,
     };
   });
+  const completedWorkOrderIds = serviceHistory.map((entry) => entry.id);
+  const { data: attachmentRows } = completedWorkOrderIds.length
+    ? await supabase
+        .from("work_order_attachments")
+        .select("id, work_order_id, file_name, file_url, file_type")
+        .in("work_order_id", completedWorkOrderIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as unknown[] };
+  const photoAttachmentsByWorkOrderId = new Map<
+    string,
+    { id: string; file_name: string; file_url: string }[]
+  >();
+  (attachmentRows ?? []).forEach((row) => {
+    const typed = row as {
+      id?: string;
+      work_order_id?: string;
+      file_name?: string | null;
+      file_url?: string | null;
+      file_type?: string | null;
+    };
+    if (!typed.work_order_id || !typed.file_url) return;
+    if (!String(typed.file_type ?? "").startsWith("image/")) return;
+    const list = photoAttachmentsByWorkOrderId.get(typed.work_order_id) ?? [];
+    list.push({
+      id: typed.id ?? typed.work_order_id,
+      file_name: typed.file_name ?? "Photo",
+      file_url: typed.file_url,
+    });
+    photoAttachmentsByWorkOrderId.set(typed.work_order_id, list);
+  });
+  const serviceHistoryWithPhotos = serviceHistory.map((entry) => {
+    const photos = photoAttachmentsByWorkOrderId.get(entry.id) ?? [];
+    return {
+      ...entry,
+      photo_count: photos.length,
+      first_photo_url: photos[0]?.file_url ?? null,
+    };
+  });
   const lastServicedAt =
-    asset.last_serviced_at ?? serviceHistory[0]?.completed_at ?? null;
+    asset.last_serviced_at ?? serviceHistoryWithPhotos[0]?.completed_at ?? null;
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const { count: recentFailureCount } = await supabase
@@ -393,13 +431,13 @@ export default async function AssetDetailPage({
         <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">
           Asset Service History
         </h2>
-        {serviceHistory.length === 0 ? (
+        {serviceHistoryWithPhotos.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">
             No completed work orders for this asset yet.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
+            <table className="w-full min-w-[960px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--card-border)]">
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Date</th>
@@ -407,10 +445,11 @@ export default async function AssetDetailPage({
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Type</th>
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Technician / Crew</th>
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Completion Notes</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Photos</th>
                 </tr>
               </thead>
               <tbody>
-                {serviceHistory.map((entry) => (
+                {serviceHistoryWithPhotos.map((entry) => (
                   <tr key={entry.id} className="border-b border-[var(--card-border)] last:border-0">
                     <td className="px-2 py-2 text-[var(--muted)]">
                       {formatDateTime(entry.completed_at)}
@@ -447,6 +486,20 @@ export default async function AssetDetailPage({
                     </td>
                     <td className="px-2 py-2 text-[var(--muted)]">
                       {entry.completion_notes ?? "—"}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {entry.photo_count > 0 ? (
+                        <a
+                          href={entry.first_photo_url ?? "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[var(--accent)] hover:underline"
+                        >
+                          {entry.photo_count} photo{entry.photo_count === 1 ? "" : "s"}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 ))}
