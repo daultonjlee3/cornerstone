@@ -1108,6 +1108,12 @@ export async function completeWorkOrder(
         last_service_work_order_id: id,
       },
     });
+    try {
+      await calculateAssetHealth(assetId);
+    } catch {
+      // Keep completion flow resilient even if intelligence recalculation fails.
+    }
+    revalidateAssetIntelligenceCaches({ assetId, companyId });
   }
 
   const sourceType = (afterState.source_type as string | null) ?? null;
