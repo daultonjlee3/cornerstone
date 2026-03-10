@@ -57,6 +57,8 @@ export default async function DispatchPage({
     status: filterState.status || null,
     crew_id: filterState.crewId || null,
     technician_id: filterState.technicianId || null,
+    assignment_type: filterState.assignmentType || null,
+    asset_id: filterState.assetId || null,
     category: filterState.category || null,
   });
 

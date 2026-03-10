@@ -80,6 +80,10 @@ function QueueSection({
 export function DispatchSidebarQueue({ unscheduled, overdue, ready, onOpenWorkOrder }: DispatchSidebarQueueProps) {
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/70">
+      <div className="border-b border-[var(--card-border)] px-3 py-3">
+        <p className="text-sm font-semibold text-[var(--foreground)]">Dispatch Queue</p>
+        <p className="text-xs text-[var(--muted)]">Drag items into schedule lanes or open for reassignment.</p>
+      </div>
       <QueueSection title="Overdue" items={overdue} variant="overdue" onOpenWorkOrder={onOpenWorkOrder} />
       <QueueSection title="Ready" items={ready} variant="ready" onOpenWorkOrder={onOpenWorkOrder} />
       <QueueSection title="Unscheduled" items={unscheduled} variant="unscheduled" onOpenWorkOrder={onOpenWorkOrder} />

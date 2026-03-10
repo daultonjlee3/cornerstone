@@ -2,6 +2,9 @@
 
 import { useTransition, useState, useEffect } from "react";
 import { updateWorkOrderAssignment } from "../actions";
+import { Modal } from "@/src/components/ui/modal";
+import { Button } from "@/src/components/ui/button";
+import { FormField } from "@/src/components/ui/form-field";
 
 type TechnicianOption = { id: string; name: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
@@ -24,9 +27,7 @@ type WorkOrderAssignmentModalProps = {
   onSuccess: () => void;
 };
 
-const inputClass =
-  "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
-const labelClass = "mb-1 block text-xs font-medium text-[var(--muted)]";
+type AssignmentMode = "none" | "technician" | "crew";
 
 function toDateInputValue(iso: string | null): string {
   if (!iso) return "";
@@ -59,6 +60,7 @@ export function WorkOrderAssignmentModal({
 }: WorkOrderAssignmentModalProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("none");
   const [technicianId, setTechnicianId] = useState("");
   const [crewId, setCrewId] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
@@ -67,13 +69,26 @@ export function WorkOrderAssignmentModal({
 
   useEffect(() => {
     if (!open) return;
-    setTechnicianId(initial.assigned_technician_id ?? "");
-    setCrewId(initial.assigned_crew_id ?? "");
+    const nextMode: AssignmentMode = initial.assigned_technician_id
+      ? "technician"
+      : initial.assigned_crew_id
+        ? "crew"
+        : "none";
+    setAssignmentMode(nextMode);
+    setTechnicianId(nextMode === "technician" ? initial.assigned_technician_id ?? "" : "");
+    setCrewId(nextMode === "crew" ? initial.assigned_crew_id ?? "" : "");
     setScheduledDate(toDateInputValue(initial.scheduled_date));
     setScheduledStart(toTimeInputValue(initial.scheduled_start));
     setScheduledEnd(toTimeInputValue(initial.scheduled_end));
     setError(null);
-  }, [open, initial.assigned_technician_id, initial.assigned_crew_id, initial.scheduled_date, initial.scheduled_start, initial.scheduled_end]);
+  }, [
+    open,
+    initial.assigned_technician_id,
+    initial.assigned_crew_id,
+    initial.scheduled_date,
+    initial.scheduled_start,
+    initial.scheduled_end,
+  ]);
 
   const crewsFiltered = companyId
     ? crews.filter((c) => !c.company_id || c.company_id === companyId)
@@ -99,9 +114,11 @@ export function WorkOrderAssignmentModal({
     }
 
     startTransition(async () => {
+      const nextTechnicianId = assignmentMode === "technician" ? technicianId || null : null;
+      const nextCrewId = assignmentMode === "crew" ? crewId || null : null;
       const result = await updateWorkOrderAssignment(workOrderId, {
-        assigned_technician_id: technicianId || null,
-        assigned_crew_id: crewId || null,
+        assigned_technician_id: nextTechnicianId,
+        assigned_crew_id: nextCrewId,
         scheduled_date: scheduledDate || null,
         scheduled_start: startVal,
         scheduled_end: endVal,
@@ -115,39 +132,75 @@ export function WorkOrderAssignmentModal({
     });
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="assignment-modal-title"
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Assign work order"
+      description="Assign to one technician or one crew, then schedule the work."
+      className="max-w-md"
     >
-      <div className="w-full max-w-md rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
-        <div className="border-b border-[var(--card-border)] px-4 py-3">
-          <h2 id="assignment-modal-title" className="text-lg font-semibold text-[var(--foreground)]">
-            Assign work order
-          </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">
-            Assign technician or crew and set schedule. Status will move to Ready or Scheduled based on availability.
-          </p>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {error}
             </div>
           )}
           <div>
-            <label htmlFor="assign-modal-technician" className={labelClass}>
-              Technician
-            </label>
+            <p className="ui-label">Assignment type</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                  assignmentMode === "none"
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "border-[var(--card-border)] text-[var(--muted)] hover:bg-[var(--background)]"
+                }`}
+                onClick={() => {
+                  setAssignmentMode("none");
+                  setTechnicianId("");
+                  setCrewId("");
+                }}
+              >
+                Unassigned
+              </button>
+              <button
+                type="button"
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                  assignmentMode === "technician"
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "border-[var(--card-border)] text-[var(--muted)] hover:bg-[var(--background)]"
+                }`}
+                onClick={() => {
+                  setAssignmentMode("technician");
+                  setCrewId("");
+                }}
+              >
+                Technician
+              </button>
+              <button
+                type="button"
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                  assignmentMode === "crew"
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "border-[var(--card-border)] text-[var(--muted)] hover:bg-[var(--background)]"
+                }`}
+                onClick={() => {
+                  setAssignmentMode("crew");
+                  setTechnicianId("");
+                }}
+              >
+                Crew
+              </button>
+            </div>
+          </div>
+          <FormField label="Technician" htmlFor="assign-modal-technician">
             <select
               id="assign-modal-technician"
               value={technicianId}
               onChange={(e) => setTechnicianId(e.target.value)}
-              className={inputClass}
+              disabled={assignmentMode !== "technician"}
+              className="ui-select disabled:cursor-not-allowed disabled:bg-[var(--background)] disabled:text-[var(--muted)]"
             >
               <option value="">None</option>
               {technicians.map((t) => (
@@ -156,16 +209,14 @@ export function WorkOrderAssignmentModal({
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label htmlFor="assign-modal-crew" className={labelClass}>
-              Crew
-            </label>
+          </FormField>
+          <FormField label="Crew" htmlFor="assign-modal-crew">
             <select
               id="assign-modal-crew"
               value={crewId}
               onChange={(e) => setCrewId(e.target.value)}
-              className={inputClass}
+              disabled={assignmentMode !== "crew"}
+              className="ui-select disabled:cursor-not-allowed disabled:bg-[var(--background)] disabled:text-[var(--muted)]"
             >
               <option value="">None</option>
               {crewsFiltered.map((c) => (
@@ -174,63 +225,45 @@ export function WorkOrderAssignmentModal({
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label htmlFor="assign-modal-date" className={labelClass}>
-              Scheduled date
-            </label>
+          </FormField>
+          <FormField label="Scheduled date" htmlFor="assign-modal-date">
             <input
               id="assign-modal-date"
               type="date"
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
-              className={inputClass}
+              className="ui-input"
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="assign-modal-start" className={labelClass}>
-                Start time
-              </label>
+            <FormField label="Start time" htmlFor="assign-modal-start">
               <input
                 id="assign-modal-start"
                 type="time"
                 value={scheduledStart}
                 onChange={(e) => setScheduledStart(e.target.value)}
-                className={inputClass}
+                className="ui-input"
               />
-            </div>
-            <div>
-              <label htmlFor="assign-modal-end" className={labelClass}>
-                End time
-              </label>
+            </FormField>
+            <FormField label="End time" htmlFor="assign-modal-end">
               <input
                 id="assign-modal-end"
                 type="time"
                 value={scheduledEnd}
                 onChange={(e) => setScheduledEnd(e.target.value)}
-                className={inputClass}
+                className="ui-input"
               />
-            </div>
+            </FormField>
           </div>
           <div className="flex gap-2 pt-2">
-            <button
-              type="submit"
-              disabled={isPending || isCompletedOrCancelled}
-              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
-            >
+            <Button type="submit" disabled={isPending || isCompletedOrCancelled}>
               {isPending ? "Saving…" : "Save assignment"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-            >
+            </Button>
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

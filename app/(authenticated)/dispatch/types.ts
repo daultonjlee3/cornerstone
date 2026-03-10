@@ -4,6 +4,7 @@
 
 export type DispatchWorkOrder = {
   id: string;
+  work_order_number?: string | null;
   title?: string | null;
   status?: string | null;
   priority?: string | null;
@@ -15,12 +16,16 @@ export type DispatchWorkOrder = {
   assigned_crew_id?: string | null;
   assigned_crew_name?: string | null;
   assigned_technician_id?: string | null;
+  assigned_technician_name?: string | null;
   estimated_hours?: number | null;
   company_id?: string | null;
   property_id?: string | null;
   building_id?: string | null;
   unit_id?: string | null;
+  asset_id?: string | null;
+  asset_name?: string | null;
   location?: string | null;
+  assignment_type?: "technician" | "crew" | "unassigned";
   /** Resolved display: "Property / Building / Unit" */
   property_name?: string | null;
   building_name?: string | null;

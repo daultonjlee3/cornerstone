@@ -13,6 +13,8 @@ export type DispatchFilterState = {
   status: string;
   crewId: string;
   technicianId: string;
+  assignmentType: string;
+  assetId: string;
   category: string;
   viewMode: DispatchViewMode;
   selectedDate: string; // YYYY-MM-DD
@@ -26,6 +28,8 @@ const DEFAULT_FILTER_STATE: DispatchFilterState = {
   status: "",
   crewId: "",
   technicianId: "",
+  assignmentType: "",
+  assetId: "",
   category: "",
   viewMode: "day",
   selectedDate: "",
@@ -76,6 +80,8 @@ export function parseFilterStateFromParams(
     status: get("status"),
     crewId: get("crew_id"),
     technicianId: get("technician_id"),
+    assignmentType: get("assignment_type"),
+    assetId: get("asset_id"),
     category: get("category"),
     viewMode,
     selectedDate,
@@ -94,6 +100,8 @@ export function filterStateToParams(state: DispatchFilterState): URLSearchParams
   if (state.status) params.set("status", state.status);
   if (state.crewId) params.set("crew_id", state.crewId);
   if (state.technicianId) params.set("technician_id", state.technicianId);
+  if (state.assignmentType) params.set("assignment_type", state.assignmentType);
+  if (state.assetId) params.set("asset_id", state.assetId);
   if (state.category) params.set("category", state.category);
   return params;
 }
@@ -117,6 +125,8 @@ export function hasActiveFilters(state: DispatchFilterState): boolean {
     state.status ||
     state.crewId ||
     state.technicianId ||
+    state.assignmentType ||
+    state.assetId ||
     state.category
   );
 }

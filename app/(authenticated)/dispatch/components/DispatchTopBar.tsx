@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import type { DispatchFilterState } from "../filter-state";
-import { filterStateToParams } from "../filter-state";
+import { filterStateToParams, hasActiveFilters } from "../filter-state";
 import type { DispatchFilterOptions, DispatchInsights } from "../dispatch-data";
+import { Button } from "@/src/components/ui/button";
 
 export type DispatchTopBarProps = {
   filterState: DispatchFilterState;
@@ -19,11 +21,34 @@ function formatDisplayDate(dateStr: string): string {
 export function DispatchTopBar({ filterState, filterOptions, insights }: DispatchTopBarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [searchText, setSearchText] = useState(filterState.search);
 
-  const setView = (viewMode: "day" | "week" | "month") => {
-    const next: DispatchFilterState = { ...filterState, viewMode };
+  const propertyOptions = useMemo(() => {
+    if (!filterState.companyId) return filterOptions.properties;
+    return filterOptions.properties.filter((row) => row.company_id === filterState.companyId);
+  }, [filterOptions.properties, filterState.companyId]);
+
+  const pushState = (next: DispatchFilterState) => {
     const params = filterStateToParams(next);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const patchState = (patch: Partial<DispatchFilterState>) => {
+    const next: DispatchFilterState = {
+      ...filterState,
+      ...patch,
+    };
+    if (
+      patch.companyId !== undefined &&
+      patch.companyId !== filterState.companyId
+    ) {
+      next.propertyId = "";
+    }
+    pushState(next);
+  };
+
+  const setView = (viewMode: "day" | "week" | "month") => {
+    patchState({ viewMode });
   };
 
   const shiftDate = (delta: number) => {
@@ -33,69 +58,229 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     const date = `${y}-${m}-${day}`;
-    const next: DispatchFilterState = { ...filterState, selectedDate: date };
-    const params = filterStateToParams(next);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    patchState({ selectedDate: date });
+  };
+
+  const applySearch = () => {
+    patchState({ search: searchText.trim() });
+  };
+
+  const clearFilters = () => {
+    setSearchText("");
+    patchState({
+      search: "",
+      companyId: "",
+      propertyId: "",
+      priority: "",
+      status: "",
+      crewId: "",
+      technicianId: "",
+      assignmentType: "",
+      assetId: "",
+      category: "",
+    });
   };
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-[var(--card-border)] bg-[var(--card)] px-4 py-3">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => shiftDate(-1)}
-            className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
-            aria-label="Previous day"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <span className="min-w-[180px] text-sm font-medium text-[var(--foreground)]">
-            {formatDisplayDate(filterState.selectedDate)}
-          </span>
-          <button
-            type="button"
-            onClick={() => shiftDate(1)}
-            className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
-            aria-label="Next day"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
-          {(["day", "week", "month"] as const).map((mode) => (
+    <div className="space-y-4 border-b border-[var(--card-border)] bg-[var(--card)] px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1">
             <button
-              key={mode}
               type="button"
-              onClick={() => setView(mode)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize ${
-                filterState.viewMode === mode
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              }`}
+              onClick={() => shiftDate(-1)}
+              className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
+              aria-label="Previous day"
             >
-              {mode}
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
-          ))}
+            <span className="min-w-[180px] text-sm font-medium text-[var(--foreground)]">
+              {formatDisplayDate(filterState.selectedDate)}
+            </span>
+            <button
+              type="button"
+              onClick={() => shiftDate(1)}
+              className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
+              aria-label="Next day"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
+            {(["day", "week", "month"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize ${
+                  filterState.viewMode === mode
+                    ? "bg-[var(--accent)] text-white"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+            Overdue: {insights.overdue}
+          </span>
+          <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+            Ready: {insights.ready}
+          </span>
+          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
+            Unscheduled: {insights.unscheduled}
+          </span>
+          <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">
+            Scheduled today: {insights.scheduledToday}
+          </span>
+          {hasActiveFilters(filterState) ? (
+            <Button variant="secondary" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          ) : null}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
-          Overdue: {insights.overdue}
-        </span>
-        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
-          Ready: {insights.ready}
-        </span>
-        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
-          Unscheduled: {insights.unscheduled}
-        </span>
-        <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">
-          Scheduled today: {insights.scheduledToday}
-        </span>
+
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+        <div className="col-span-2 flex gap-2">
+          <input
+            type="search"
+            placeholder="Search WO #, title, description..."
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") applySearch();
+            }}
+            className="ui-input"
+          />
+          <Button variant="secondary" onClick={applySearch}>
+            Apply
+          </Button>
+        </div>
+
+        <select
+          value={filterState.companyId}
+          onChange={(event) => patchState({ companyId: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All companies</option>
+          {filterOptions.companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.propertyId}
+          onChange={(event) => patchState({ propertyId: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All properties</option>
+          {propertyOptions.map((property) => (
+            <option key={property.id} value={property.id}>
+              {property.property_name ?? property.name ?? property.id}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.assignmentType}
+          onChange={(event) => patchState({ assignmentType: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All assignment types</option>
+          {filterOptions.assignmentTypes.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.technicianId}
+          onChange={(event) => patchState({ technicianId: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All technicians</option>
+          {filterOptions.technicians.map((technician) => (
+            <option key={technician.id} value={technician.id}>
+              {technician.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.crewId}
+          onChange={(event) => patchState({ crewId: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All crews</option>
+          {filterOptions.crews.map((crew) => (
+            <option key={crew.id} value={crew.id}>
+              {crew.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.status}
+          onChange={(event) => patchState({ status: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All statuses</option>
+          {filterOptions.statuses.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.priority}
+          onChange={(event) => patchState({ priority: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All priorities</option>
+          {filterOptions.priorities.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.assetId}
+          onChange={(event) => patchState({ assetId: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All assets</option>
+          {filterOptions.assets.map((asset) => (
+            <option key={asset.id} value={asset.id}>
+              {asset.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterState.category}
+          onChange={(event) => patchState({ category: event.target.value })}
+          className="ui-select"
+        >
+          <option value="">All categories</option>
+          {filterOptions.categories.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

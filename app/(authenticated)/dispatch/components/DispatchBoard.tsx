@@ -15,6 +15,8 @@ import {
 import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
 import type { DispatchViewMode } from "../filter-state";
 
+const UNASSIGNED_LANE_ID = "__unassigned__";
+
 /** Minimal crew shape for the board (from LoadDispatchResult.crews). */
 type BoardCrew = {
   id: string;
@@ -45,6 +47,42 @@ export type DispatchBoardProps = {
   onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
   onOpenWorkOrder?: (id: string, action?: "view" | "reassign" | "complete" | "open") => void;
 };
+
+function addDays(dateStr: string, delta: number): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + delta);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function startOfWeek(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const day = d.getDay(); // Sunday=0
+  const offset = day === 0 ? -6 : 1 - day; // Monday start
+  d.setDate(d.getDate() + offset);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const date = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${date}`;
+}
+
+function formatDayLabel(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function getDurationHours(workOrder: BoardWorkOrder): number {
+  if (workOrder.scheduled_start && workOrder.scheduled_end) {
+    const start = new Date(workOrder.scheduled_start).getTime();
+    const end = new Date(workOrder.scheduled_end).getTime();
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+      return (end - start) / (60 * 60 * 1000);
+    }
+  }
+  return workOrder.estimated_hours ?? 1;
+}
 
 function DroppableSlot({
   crewId,
@@ -270,33 +308,153 @@ export function DispatchBoard({
   overCrewId,
   view,
   workOrders,
+  onSelectDate,
   onResizeEnd,
   onOpenWorkOrder,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
+  const lanes = useMemo(
+    () => {
+      const unassignedToday = workOrders.filter((wo) => {
+        const date = wo.scheduled_date ?? selectedDate;
+        return date === selectedDate && !wo.assigned_crew_id;
+      });
+      const unassignedHours = unassignedToday.reduce(
+        (sum, wo) => sum + getDurationHours(wo),
+        0
+      );
+      return [
+        {
+          id: UNASSIGNED_LANE_ID,
+          name: "Individual / Unassigned",
+          total_scheduled_hours: Math.round(unassignedHours * 10) / 10,
+          job_count: unassignedToday.length,
+        },
+        ...crews,
+      ];
+    },
+    [crews, workOrders, selectedDate]
+  );
 
   const workOrdersByCrew = useMemo(() => {
     const map = new Map<string, BoardWorkOrder[]>();
-    for (const c of crews) {
+    for (const c of lanes) {
       map.set(c.id, []);
     }
     for (const wo of workOrders) {
       const date = wo.scheduled_date ?? selectedDate;
       if (date !== selectedDate) continue;
-      const crewId = wo.assigned_crew_id ?? null;
-      if (crewId) {
-        const list = map.get(crewId) ?? [];
+      const laneId = wo.assigned_crew_id ?? UNASSIGNED_LANE_ID;
+      if (map.has(laneId)) {
+        const list = map.get(laneId) ?? [];
         list.push(wo);
-        map.set(crewId, list);
+        map.set(laneId, list);
       }
     }
     return map;
-  }, [crews, workOrders, selectedDate]);
+  }, [lanes, workOrders, selectedDate]);
 
-  if (view !== "day") {
+  if (view === "week") {
+    const weekStart = startOfWeek(selectedDate);
+    const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+    const workOrdersByDate = new Map<string, BoardWorkOrder[]>();
+    days.forEach((day) => workOrdersByDate.set(day, []));
+    workOrders.forEach((wo) => {
+      const day = wo.scheduled_date ?? "";
+      if (!workOrdersByDate.has(day)) return;
+      const list = workOrdersByDate.get(day) ?? [];
+      list.push(wo);
+      workOrdersByDate.set(day, list);
+    });
+
     return (
-      <div className="flex h-full items-center justify-center p-8 text-[var(--muted)]">
-        <p className="text-sm">Week and month views are not implemented yet. Use day view.</p>
+      <div className="grid h-full min-h-0 gap-3 overflow-auto p-3 md:grid-cols-2 xl:grid-cols-4">
+        {days.map((day) => {
+          const list = workOrdersByDate.get(day) ?? [];
+          const inProgress = list.filter((wo) => wo.status === "in_progress").length;
+          const highPriority = list.filter((wo) =>
+            ["high", "urgent", "emergency"].includes(String(wo.priority ?? "").toLowerCase())
+          ).length;
+          return (
+            <section
+              key={day}
+              className="flex min-h-[240px] flex-col rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3 shadow-[var(--shadow-soft)]"
+            >
+              <button
+                type="button"
+                onClick={() => onSelectDate(day)}
+                className="text-left text-sm font-semibold text-[var(--foreground)] hover:text-[var(--accent)]"
+              >
+                {formatDayLabel(day)}
+              </button>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {list.length} scheduled · {inProgress} in progress · {highPriority} high priority
+              </p>
+              <div className="mt-3 space-y-2">
+                {list.slice(0, 4).map((wo) => (
+                  <DispatchWorkOrderCard
+                    key={wo.id}
+                    workOrder={wo}
+                    variant="compact"
+                    showScheduledTime
+                    showQuickActions
+                    onOpenWorkOrder={onOpenWorkOrder}
+                  />
+                ))}
+                {list.length > 4 ? (
+                  <p className="text-xs text-[var(--muted)]">+{list.length - 4} more jobs</p>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (view === "month") {
+    const monthDate = new Date(`${selectedDate}T12:00:00`);
+    const monthStart = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}-01`;
+    const gridStart = startOfWeek(monthStart);
+    const gridDays = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+    const workOrdersByDate = new Map<string, BoardWorkOrder[]>();
+    gridDays.forEach((day) => workOrdersByDate.set(day, []));
+    workOrders.forEach((wo) => {
+      const day = wo.scheduled_date ?? "";
+      if (!workOrdersByDate.has(day)) return;
+      const list = workOrdersByDate.get(day) ?? [];
+      list.push(wo);
+      workOrdersByDate.set(day, list);
+    });
+
+    return (
+      <div className="grid h-full min-h-0 grid-cols-7 gap-px overflow-auto bg-[var(--card-border)]">
+        {gridDays.map((day) => {
+          const list = workOrdersByDate.get(day) ?? [];
+          const isCurrentMonth = day.slice(0, 7) === selectedDate.slice(0, 7);
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => onSelectDate(day)}
+              className={`min-h-[112px] bg-[var(--card)] p-2 text-left hover:bg-[var(--background)] ${
+                isCurrentMonth ? "" : "opacity-60"
+              }`}
+            >
+              <p className="text-xs font-semibold text-[var(--foreground)]">
+                {new Date(`${day}T12:00:00`).getDate()}
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">{list.length} jobs</p>
+              {list.slice(0, 2).map((wo) => (
+                <p key={wo.id} className="mt-1 truncate text-xs text-[var(--foreground)]">
+                  {(typeof wo.work_order_number === "string" && wo.work_order_number) ||
+                    (typeof wo.title === "string" && wo.title) ||
+                    "Work order"}
+                </p>
+              ))}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -305,7 +463,7 @@ export function DispatchBoard({
     <div className="flex h-full flex-col overflow-auto">
       <div className="flex shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]">
         <div className="w-14 shrink-0 border-r border-[var(--card-border)] py-2" aria-hidden />
-        {crews.map((crew) => (
+        {lanes.map((crew) => (
           <div
             key={crew.id}
             className="min-w-[12rem] flex-1 border-r border-[var(--card-border)] px-3 py-2 last:border-r-0"
@@ -332,7 +490,7 @@ export function DispatchBoard({
           ))}
         </div>
         <div className="flex min-w-0 flex-1">
-          {crews.map((crew) => (
+          {lanes.map((crew) => (
             <DroppableCrewColumn
               key={crew.id}
               crew={crew}

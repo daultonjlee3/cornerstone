@@ -38,6 +38,16 @@ function getLocationLine(wo: DispatchWorkOrder): string | null {
   return parts.length ? parts.join(" / ") : null;
 }
 
+function getAssignmentLine(wo: DispatchWorkOrder): { label: string; tone: string } {
+  if (wo.assigned_technician_name) {
+    return { label: `Assigned to ${wo.assigned_technician_name}`, tone: "text-blue-700" };
+  }
+  if (wo.assigned_crew_name) {
+    return { label: `Assigned to ${wo.assigned_crew_name}`, tone: "text-teal-700" };
+  }
+  return { label: "Unassigned", tone: "text-amber-700" };
+}
+
 /** Job type for display and color: emergency, preventive_maintenance, inspection, installation, repair, general. */
 function getJobType(wo: DispatchWorkOrder): string {
   if (wo.source_type === "preventive_maintenance" || wo.category === "preventive_maintenance")
@@ -114,6 +124,7 @@ export function DispatchWorkOrderCard({
       ? formatTimeRange(workOrder.scheduled_start, workOrder.scheduled_end)
       : null;
   const location = getLocationLine(workOrder);
+  const assignment = getAssignmentLine(workOrder);
   const jobType = getJobType(workOrder);
   const typeBorder = getTypeBorderClass(jobType);
   const typeBg = getTypeBgClass(jobType);
@@ -126,7 +137,13 @@ export function DispatchWorkOrderCard({
           isDragging ? "opacity-75 shadow-lg" : ""
         }`}
       >
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          {workOrder.work_order_number ?? "Work order"}
+        </p>
         <p className="truncate font-medium text-[var(--foreground)]">{title}</p>
+        {workOrder.asset_name ? (
+          <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{workOrder.asset_name}</p>
+        ) : null}
         {timeRange && <p className="mt-0.5 text-xs text-[var(--muted)]">{timeRange}</p>}
       </div>
     );
@@ -140,7 +157,13 @@ export function DispatchWorkOrderCard({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
+      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+        {workOrder.work_order_number ?? "Work order"}
+      </p>
       <p className="truncate text-sm font-medium text-[var(--foreground)]">{title}</p>
+      {workOrder.asset_name ? (
+        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{workOrder.asset_name}</p>
+      ) : null}
 
       {location && (
         <p className="mt-1 truncate text-xs text-[var(--muted)]" title={location}>
@@ -160,9 +183,7 @@ export function DispatchWorkOrderCard({
         <p className="mt-1.5 text-xs text-[var(--muted)]">{timeRange}</p>
       )}
 
-      {showCrew && workOrder.assigned_crew_name && (
-        <p className="mt-1 text-xs text-[var(--muted)]">Crew: {workOrder.assigned_crew_name}</p>
-      )}
+      {showCrew ? <p className={`mt-1 text-xs font-medium ${assignment.tone}`}>{assignment.label}</p> : null}
 
       {showActions && (
         <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-1 rounded-b-lg border-t border-[var(--card-border)] bg-[var(--card)]/95 px-2 py-1.5">

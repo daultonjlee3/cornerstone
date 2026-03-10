@@ -123,6 +123,61 @@ async function generateWorkOrderNumber(
   return `WO-${next}`;
 }
 
+async function validateAssignmentTargets(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  {
+    tenantId,
+    companyId,
+    technicianId,
+    crewId,
+  }: {
+    tenantId: string;
+    companyId: string;
+    technicianId: string | null;
+    crewId: string | null;
+  }
+): Promise<string | null> {
+  if (technicianId && crewId) {
+    return "Assign either a technician or a crew, not both.";
+  }
+
+  if (technicianId) {
+    const { data: technician } = await supabase
+      .from("technicians")
+      .select("id, company_id, status")
+      .eq("id", technicianId)
+      .maybeSingle();
+    if (!technician) return "Selected technician was not found.";
+    if ((technician as { company_id?: string | null }).company_id !== companyId) {
+      return "Selected technician does not belong to the selected company.";
+    }
+    if ((technician as { status?: string | null }).status !== "active") {
+      return "Selected technician is not active.";
+    }
+  }
+
+  if (crewId) {
+    const { data: crew } = await supabase
+      .from("crews")
+      .select("id, tenant_id, company_id, is_active")
+      .eq("id", crewId)
+      .maybeSingle();
+    if (!crew) return "Selected crew was not found.";
+    if ((crew as { tenant_id?: string | null }).tenant_id !== tenantId) {
+      return "Selected crew does not belong to this tenant.";
+    }
+    const crewCompanyId = (crew as { company_id?: string | null }).company_id ?? null;
+    if (crewCompanyId && crewCompanyId !== companyId) {
+      return "Selected crew does not belong to the selected company.";
+    }
+    if ((crew as { is_active?: boolean | null }).is_active === false) {
+      return "Selected crew is inactive.";
+    }
+  }
+
+  return null;
+}
+
 export async function saveWorkOrder(
   _prev: WorkOrderFormState,
   formData: FormData
@@ -213,6 +268,14 @@ export async function saveWorkOrder(
   const nteAmountRaw = (formData.get("nte_amount") as string)?.trim();
   const billable = formData.get("billable") !== null && formData.get("billable") !== "off";
   const actorId = await getActorId(supabase);
+
+  const assignmentValidationError = await validateAssignmentTargets(supabase, {
+    tenantId,
+    companyId,
+    technicianId: assignedTechnicianId,
+    crewId: assignedCrewId,
+  });
+  if (assignmentValidationError) return { error: assignmentValidationError };
 
   const payload: Record<string, unknown> = {
     tenant_id: tenantId,
@@ -494,6 +557,13 @@ export async function updateWorkOrderAssignment(
 
   const nextTechnicianId = payload.assigned_technician_id || null;
   const nextCrewId = payload.assigned_crew_id || null;
+  const assignmentValidationError = await validateAssignmentTargets(supabase, {
+    tenantId,
+    companyId: (beforeState.company_id as string) ?? "",
+    technicianId: nextTechnicianId,
+    crewId: nextCrewId,
+  });
+  if (assignmentValidationError) return { error: assignmentValidationError };
   const nextScheduledDate =
     payload.scheduled_date !== undefined
       ? payload.scheduled_date || null

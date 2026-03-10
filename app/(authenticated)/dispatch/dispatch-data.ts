@@ -9,6 +9,7 @@ export type LoadDispatchResult = {
   ready: DispatchWorkOrder[];
   filterOptions: DispatchFilterOptions;
   insights: DispatchInsights;
+  workforce: DispatchWorkforce;
   error: string | null;
 };
 
@@ -17,6 +18,8 @@ export type DispatchFilterOptions = {
   properties: { id: string; property_name?: string; name?: string; company_id: string }[];
   crews: { id: string; name: string }[];
   technicians: { id: string; name: string }[];
+  assets: { id: string; name: string }[];
+  assignmentTypes: { value: string; label: string }[];
   priorities: { value: string; label: string }[];
   statuses: { value: string; label: string }[];
   categories: { value: string; label: string }[];
@@ -27,7 +30,41 @@ export type DispatchInsights = {
   overdue: number;
   ready: number;
   unscheduled: number;
+  unassignedWorkOrders: number;
   scheduledToday: number;
+  inProgressToday: number;
+  highPriorityOpenJobs: number;
+  techniciansWorkingToday: number;
+  crewsWorkingToday: number;
+};
+
+export type DispatchTechnicianWorkload = {
+  id: string;
+  name: string;
+  status: string;
+  currentAssignments: number;
+  scheduledToday: number;
+  inProgress: number;
+  workloadHoursToday: number;
+  availableCapacityHours: number;
+  crewMemberships: string[];
+};
+
+export type DispatchCrewWorkload = {
+  id: string;
+  name: string;
+  memberCount: number;
+  memberNames: string[];
+  currentAssignments: number;
+  scheduledToday: number;
+  activeJobs: number;
+  workloadHoursToday: number;
+  availableCapacityHours: number;
+};
+
+export type DispatchWorkforce = {
+  technicians: DispatchTechnicianWorkload[];
+  crews: DispatchCrewWorkload[];
 };
 
 const PRIORITY_OPTIONS = [
@@ -46,6 +83,12 @@ const STATUS_OPTIONS = [
   { value: "on_hold", label: "On hold" },
 ];
 
+const ASSIGNMENT_TYPE_OPTIONS = [
+  { value: "unassigned", label: "Unassigned" },
+  { value: "technician", label: "Technician" },
+  { value: "crew", label: "Crew" },
+];
+
 type LoadDispatchParams = {
   tenantId: string;
   companyIds: string[];
@@ -57,8 +100,29 @@ type LoadDispatchParams = {
   status: string | null;
   crew_id: string | null;
   technician_id: string | null;
+  assignment_type: string | null;
+  asset_id: string | null;
   category: string | null;
 };
+
+function toComparableStatus(value: string | null | undefined): string {
+  if (!value) return "";
+  if (value === "open") return "new";
+  if (value === "assigned") return "ready_to_schedule";
+  if (value === "closed") return "completed";
+  return value;
+}
+
+function parseScheduledHours(workOrder: DispatchWorkOrder): number {
+  if (workOrder.scheduled_start && workOrder.scheduled_end) {
+    const start = new Date(workOrder.scheduled_start).getTime();
+    const end = new Date(workOrder.scheduled_end).getTime();
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+      return (end - start) / (60 * 60 * 1000);
+    }
+  }
+  return workOrder.estimated_hours ?? 1;
+}
 
 export async function loadDispatchData(params: LoadDispatchParams): Promise<LoadDispatchResult> {
   const {
@@ -89,54 +153,120 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
         properties: [],
         crews: [],
         technicians: [],
+        assets: [],
+        assignmentTypes: ASSIGNMENT_TYPE_OPTIONS,
         priorities: PRIORITY_OPTIONS,
         statuses: STATUS_OPTIONS,
         categories: [],
       },
-      insights: { total: 0, overdue: 0, ready: 0, unscheduled: 0, scheduledToday: 0 },
+      insights: {
+        total: 0,
+        overdue: 0,
+        ready: 0,
+        unscheduled: 0,
+        unassignedWorkOrders: 0,
+        scheduledToday: 0,
+        inProgressToday: 0,
+        highPriorityOpenJobs: 0,
+        techniciansWorkingToday: 0,
+        crewsWorkingToday: 0,
+      },
+      workforce: { technicians: [], crews: [] },
       error: null,
     };
   }
 
-  const { data: companies } = await supabase
-    .from("companies")
-    .select("id, name")
-    .eq("tenant_id", tenantId)
-    .order("name");
-  const companyList = (companies ?? []) as { id: string; name: string }[];
+  const [
+    { data: companies },
+    { data: properties },
+    { data: crewsData },
+    { data: techniciansData },
+    { data: assetsData },
+  ] = await Promise.all([
+    supabase.from("companies").select("id, name").eq("tenant_id", tenantId).order("name"),
+    supabase
+      .from("properties")
+      .select("id, property_name, name, company_id")
+      .in("company_id", companyIds)
+      .order("property_name"),
+    supabase
+      .from("crews")
+      .select("id, name, is_active, company_id")
+      .eq("tenant_id", tenantId)
+      .order("name"),
+    supabase
+      .from("technicians")
+      .select("id, technician_name, name, status, company_id")
+      .in("company_id", companyIds)
+      .order("technician_name")
+      .order("name"),
+    supabase
+      .from("assets")
+      .select("id, asset_name, name")
+      .in("company_id", companyIds)
+      .order("asset_name")
+      .order("name"),
+  ]);
 
-  const { data: properties } = await supabase
-    .from("properties")
-    .select("id, property_name, name, company_id")
-    .in("company_id", companyIds)
-    .order("property_name");
+  const companyList = (companies ?? []) as { id: string; name: string }[];
   const propertyList = (properties ?? []) as {
     id: string;
     property_name?: string;
     name?: string;
     company_id: string;
   }[];
-
-  const { data: crewsData } = await supabase
-    .from("crews")
-    .select("id, name")
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true)
-    .order("name");
-  const crewList = (crewsData ?? []) as { id: string; name: string }[];
-
-  const { data: techniciansData } = await supabase
-    .from("technicians")
-    .select("id, technician_name, name")
-    .in("company_id", companyIds)
-    .eq("status", "active")
-    .order("technician_name");
-  const technicianList = (techniciansData ?? []).map((t) => ({
+  const allCrews = (crewsData ?? []) as Array<{
+    id: string;
+    name: string;
+    is_active?: boolean | null;
+    company_id?: string | null;
+  }>;
+  const crewList = allCrews
+    .filter((row) => row.is_active !== false)
+    .map((row) => ({ id: row.id, name: row.name }));
+  const crewCompanyById = new Map(
+    allCrews.map((row) => [row.id, row.company_id ?? null] as const)
+  );
+  const allTechnicians = (techniciansData ?? []).map((t) => ({
     id: (t as { id: string }).id,
-    name: ((t as { technician_name?: string; name?: string }).technician_name ||
-      (t as { name?: string }).name ||
-      "Unknown") as string,
+    name:
+      (t as { technician_name?: string | null; name?: string | null }).technician_name ??
+      (t as { name?: string | null }).name ??
+      "Unknown",
+    status: (t as { status?: string | null }).status ?? "active",
+    company_id: (t as { company_id?: string | null }).company_id ?? null,
   }));
+  const technicianList = allTechnicians
+    .filter((t) => t.status === "active")
+    .map((t) => ({ id: t.id, name: t.name }));
+  const assetList = (assetsData ?? []).map((a) => ({
+    id: (a as { id: string }).id,
+    name:
+      (a as { asset_name?: string | null; name?: string | null }).asset_name ??
+      (a as { name?: string | null }).name ??
+      "Unnamed asset",
+  }));
+
+  const technicianNameById = new Map(allTechnicians.map((t) => [t.id, t.name]));
+  const crewNameById = new Map(crewList.map((c) => [c.id, c.name]));
+
+  const crewIds = crewList.map((c) => c.id);
+  const crewMembersByCrewId = new Map<string, string[]>();
+  crewIds.forEach((id) => crewMembersByCrewId.set(id, []));
+  if (crewIds.length > 0) {
+    const { data: crewMembersRaw } = await supabase
+      .from("crew_members")
+      .select("crew_id, technician_id")
+      .in("crew_id", crewIds);
+    (crewMembersRaw ?? []).forEach((row) => {
+      const crewId = (row as { crew_id?: string }).crew_id;
+      const technicianId = (row as { technician_id?: string }).technician_id;
+      if (!crewId || !technicianId) return;
+      const members = crewMembersByCrewId.get(crewId) ?? [];
+      members.push(technicianId);
+      crewMembersByCrewId.set(crewId, members);
+    });
+  }
 
   let query = supabase
     .from("work_orders")
@@ -146,11 +276,13 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       scheduled_date, scheduled_start, scheduled_end, due_date,
       assigned_crew_id, assigned_technician_id, estimated_hours,
       company_id, property_id, building_id, unit_id,
+      work_order_number, asset_id,
       source_type, preventive_maintenance_plan_id,
       updated_at,
       properties(property_name, name),
       buildings(building_name, name),
-      units(unit_name, name_or_number)
+      units(unit_name, name_or_number),
+      assets!work_orders_asset_id_fkey(asset_name, name)
     `
     )
     .in("company_id", companyIds)
@@ -165,7 +297,9 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     ]);
 
   if (q?.trim()) {
-    query = query.or(`title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
+    query = query.or(
+      `work_order_number.ilike.%${q.trim()}%,title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`
+    );
   }
   if (company_id) query = query.eq("company_id", company_id);
   if (property_id) query = query.eq("property_id", property_id);
@@ -173,6 +307,14 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   if (status) query = query.eq("status", status);
   if (crew_id) query = query.eq("assigned_crew_id", crew_id);
   if (technician_id) query = query.eq("assigned_technician_id", technician_id);
+  if (params.assignment_type === "unassigned") {
+    query = query.is("assigned_technician_id", null).is("assigned_crew_id", null);
+  } else if (params.assignment_type === "technician") {
+    query = query.not("assigned_technician_id", "is", null);
+  } else if (params.assignment_type === "crew") {
+    query = query.not("assigned_crew_id", "is", null);
+  }
+  if (params.asset_id) query = query.eq("asset_id", params.asset_id);
   if (category) query = query.eq("category", category);
 
   const { data: workOrdersRaw, error } = await query.order("scheduled_date", { ascending: true });
@@ -189,40 +331,77 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
         properties: propertyList,
         crews: crewList,
         technicians: technicianList,
+        assets: assetList,
+        assignmentTypes: ASSIGNMENT_TYPE_OPTIONS,
         priorities: PRIORITY_OPTIONS,
         statuses: STATUS_OPTIONS,
         categories: [],
       },
-      insights: { total: 0, overdue: 0, ready: 0, unscheduled: 0, scheduledToday: 0 },
+      insights: {
+        total: 0,
+        overdue: 0,
+        ready: 0,
+        unscheduled: 0,
+        unassignedWorkOrders: 0,
+        scheduledToday: 0,
+        inProgressToday: 0,
+        highPriorityOpenJobs: 0,
+        techniciansWorkingToday: 0,
+        crewsWorkingToday: 0,
+      },
+      workforce: { technicians: [], crews: [] },
       error: error.message,
     };
   }
 
-  type Rel = { property_name?: string; name?: string; building_name?: string; unit_name?: string; name_or_number?: string } | null;
+  type Rel = {
+    property_name?: string;
+    name?: string;
+    building_name?: string;
+    unit_name?: string;
+    name_or_number?: string;
+    asset_name?: string;
+  } | null;
   type Row = Record<string, unknown> & {
     properties?: Rel | Rel[];
     buildings?: Rel | Rel[];
     units?: Rel | Rel[];
+    assets?: Rel | Rel[];
   };
   const first = (v: Rel | Rel[] | undefined): Rel => (Array.isArray(v) ? v[0] : v ?? null);
+  const categorySet = new Set<string>();
   const all: DispatchWorkOrder[] = (workOrdersRaw ?? []).map((row: Row) => {
-    const { properties: propRel, buildings: bldRel, units: unitRel, ...rest } = row;
+    const { properties: propRel, buildings: bldRel, units: unitRel, assets: assetRel, ...rest } = row;
     const p = first(propRel);
     const b = first(bldRel);
     const u = first(unitRel);
+    const a = first(assetRel);
     const propertyName = p && typeof p === "object" ? (p.property_name ?? p.name ?? null) : null;
     const buildingName = b && typeof b === "object" ? (b.building_name ?? b.name ?? null) : null;
     const unitName = u && typeof u === "object" ? (u.unit_name ?? u.name_or_number ?? null) : null;
+    const assetName = a && typeof a === "object" ? (a.asset_name ?? a.name ?? null) : null;
     const crewId = rest.assigned_crew_id as string | null | undefined;
-    const assigned_crew_name = crewId
-      ? (crewList.find((c) => c.id === crewId)?.name ?? null)
+    const technicianId = rest.assigned_technician_id as string | null | undefined;
+    const assigned_crew_name = crewId ? crewNameById.get(crewId) ?? null : null;
+    const assigned_technician_name = technicianId
+      ? technicianNameById.get(technicianId) ?? null
       : null;
+    const assignment_type: DispatchWorkOrder["assignment_type"] = technicianId
+      ? "technician"
+      : crewId
+        ? "crew"
+        : "unassigned";
+    const categoryValue = (rest.category as string | null | undefined) ?? null;
+    if (categoryValue) categorySet.add(categoryValue);
     return {
       ...rest,
       property_name: propertyName,
       building_name: buildingName,
       unit_name: unitName,
+      asset_name: assetName,
+      assigned_technician_name,
       assigned_crew_name: assigned_crew_name ?? undefined,
+      assignment_type,
     } as DispatchWorkOrder;
   });
 
@@ -232,55 +411,122 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   const ready: DispatchWorkOrder[] = [];
   const unscheduled: DispatchWorkOrder[] = [];
   const scheduledToday: DispatchWorkOrder[] = [];
+  const highPriorityOpen = new Set<string>();
+  const techniciansWorkingToday = new Set<string>();
+  const crewsWorkingToday = new Set<string>();
+  let inProgressToday = 0;
+  let unassignedWorkOrders = 0;
 
   for (const wo of all) {
     const scheduled = wo.scheduled_date ?? null;
     const due = wo.due_date ?? null;
-    const hasCrew = !!wo.assigned_crew_id;
+    const comparableStatus = toComparableStatus(wo.status ?? "");
+    const isTerminal = comparableStatus === "completed" || comparableStatus === "cancelled";
+    const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
+    const isQueueStatus = ["new", "ready_to_schedule"].includes(comparableStatus);
 
-    if (due && due < today && wo.status !== "completed") {
+    if (!hasAssignment && !isTerminal) unassignedWorkOrders += 1;
+    if (comparableStatus === "in_progress") inProgressToday += 1;
+    if (scheduled === today && wo.assigned_technician_id) {
+      techniciansWorkingToday.add(wo.assigned_technician_id);
+    }
+    if (scheduled === today && wo.assigned_crew_id) {
+      crewsWorkingToday.add(wo.assigned_crew_id);
+    }
+    if (
+      !isTerminal &&
+      ["high", "urgent", "emergency"].includes((wo.priority ?? "").toLowerCase())
+    ) {
+      highPriorityOpen.add(wo.id);
+    }
+    if (due && due < today && !isTerminal) {
       overdue.push(wo);
     }
-    if (scheduled === today && hasCrew) {
+    if (scheduled === today && hasAssignment) {
       scheduledToday.push(wo);
     }
-    if (
-      !scheduled &&
-      !hasCrew &&
-      ["open", "assigned", "new", "ready_to_schedule"].includes(wo.status ?? "")
-    ) {
-      unscheduled.push(wo);
-    }
-    if (
-      scheduled === today &&
-      !hasCrew &&
-      ["open", "assigned", "new", "ready_to_schedule"].includes(wo.status ?? "")
-    ) {
+    if (isQueueStatus && !hasAssignment && !scheduled && comparableStatus === "ready_to_schedule") {
       ready.push(wo);
+      continue;
+    }
+    if (isQueueStatus && !hasAssignment && !scheduled) {
+      unscheduled.push(wo);
     }
   }
 
   const crews: DispatchCrew[] = crewList.map((c) => {
     const crewWos = scheduledToday.filter((wo) => wo.assigned_crew_id === c.id);
-    let totalHours = 0;
-    for (const wo of crewWos) {
-      if (wo.scheduled_start && wo.scheduled_end) {
-        const start = new Date(wo.scheduled_start).getTime();
-        const end = new Date(wo.scheduled_end).getTime();
-        totalHours += (end - start) / (60 * 60 * 1000);
-      } else {
-        totalHours += wo.estimated_hours ?? 1;
-      }
-    }
+    const totalHours = crewWos.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
     return {
       id: c.id,
       name: c.name,
-      company_id: null,
+      company_id: crewCompanyById.get(c.id) ?? null,
       scheduled_today: crewWos,
       total_scheduled_hours: Math.round(totalHours * 10) / 10,
       job_count: crewWos.length,
     };
   });
+
+  const activeWorkOrders = all.filter((wo) => {
+    const status = toComparableStatus(wo.status ?? "");
+    return status !== "completed" && status !== "cancelled";
+  });
+  const technicianWorkloads: DispatchTechnicianWorkload[] = allTechnicians.map((tech) => {
+    const assignedJobs = activeWorkOrders.filter((wo) => wo.assigned_technician_id === tech.id);
+    const assignedToday = assignedJobs.filter((wo) => wo.scheduled_date === today);
+    const inProgressJobs = assignedJobs.filter(
+      (wo) => toComparableStatus(wo.status ?? "") === "in_progress"
+    );
+    const workloadHoursToday = assignedToday.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
+    const crewMemberships = crewList
+      .filter((crew) => (crewMembersByCrewId.get(crew.id) ?? []).includes(tech.id))
+      .map((crew) => crew.name);
+    return {
+      id: tech.id,
+      name: tech.name,
+      status: tech.status,
+      currentAssignments: assignedJobs.length,
+      scheduledToday: assignedToday.length,
+      inProgress: inProgressJobs.length,
+      workloadHoursToday: Math.round(workloadHoursToday * 10) / 10,
+      availableCapacityHours: Math.round(Math.max(0, 8 - workloadHoursToday) * 10) / 10,
+      crewMemberships,
+    };
+  });
+
+  const crewWorkloads: DispatchCrewWorkload[] = crewList.map((crew) => {
+    const assignedJobs = activeWorkOrders.filter((wo) => wo.assigned_crew_id === crew.id);
+    const assignedToday = assignedJobs.filter((wo) => wo.scheduled_date === today);
+    const activeJobs = assignedJobs.filter(
+      (wo) => toComparableStatus(wo.status ?? "") === "in_progress"
+    );
+    const memberIds = crewMembersByCrewId.get(crew.id) ?? [];
+    const memberNames = memberIds
+      .map((id) => technicianNameById.get(id))
+      .filter((value): value is string => Boolean(value));
+    const workloadHoursToday = assignedToday.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
+    const dailyCapacity = Math.max(1, memberIds.length) * 8;
+    return {
+      id: crew.id,
+      name: crew.name,
+      memberCount: memberIds.length,
+      memberNames,
+      currentAssignments: assignedJobs.length,
+      scheduledToday: assignedToday.length,
+      activeJobs: activeJobs.length,
+      workloadHoursToday: Math.round(workloadHoursToday * 10) / 10,
+      availableCapacityHours: Math.round((dailyCapacity - workloadHoursToday) * 10) / 10,
+    };
+  });
+
+  const categoryOptions = Array.from(categorySet)
+    .sort((a, b) => a.localeCompare(b))
+    .map((value) => ({
+      value,
+      label: value
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase()),
+    }));
 
   return {
     crews,
@@ -293,16 +539,38 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       properties: propertyList,
       crews: crewList,
       technicians: technicianList,
+      assets: assetList,
+      assignmentTypes: ASSIGNMENT_TYPE_OPTIONS,
       priorities: PRIORITY_OPTIONS,
       statuses: STATUS_OPTIONS,
-      categories: [],
+      categories: categoryOptions,
     },
     insights: {
       total: all.length,
       overdue: overdue.length,
       ready: ready.length,
       unscheduled: unscheduled.length,
+      unassignedWorkOrders,
       scheduledToday: scheduledToday.length,
+      inProgressToday,
+      highPriorityOpenJobs: highPriorityOpen.size,
+      techniciansWorkingToday: techniciansWorkingToday.size,
+      crewsWorkingToday: crewsWorkingToday.size,
+    },
+    workforce: {
+      technicians: technicianWorkloads.sort((a, b) => {
+        if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+        if (b.currentAssignments !== a.currentAssignments) {
+          return b.currentAssignments - a.currentAssignments;
+        }
+        return a.name.localeCompare(b.name);
+      }),
+      crews: crewWorkloads.sort((a, b) => {
+        if (b.currentAssignments !== a.currentAssignments) {
+          return b.currentAssignments - a.currentAssignments;
+        }
+        return a.name.localeCompare(b.name);
+      }),
     },
     error: null,
   };
