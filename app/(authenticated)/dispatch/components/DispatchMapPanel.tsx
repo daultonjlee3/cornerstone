@@ -228,87 +228,53 @@ export function DispatchMapPanel({
       selectedWorkOrder.assigned_technician_id !== selectedTechnician.id
   );
 
+  const compactSelect = "ui-select min-h-0 w-full min-w-0 py-1 text-[10px]";
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center justify-between gap-1.5">
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <div className="flex shrink-0 items-center justify-between gap-1">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
           Map
         </p>
-        <span className="text-[10px] text-[var(--muted)]">
+        <span className="text-[9px] text-[var(--muted)]">
           {workOrderCoordinates.length} jobs · {technicianCoordinates.length} techs
         </span>
       </div>
-
-      <section className="grid shrink-0 grid-cols-2 gap-1.5">
-        <input
-          type="date"
-          className="ui-input col-span-2 min-h-0 py-1.5 text-sm"
-          value={filterState.selectedDate}
-          onChange={(event) => onPatchFilters({ selectedDate: event.target.value })}
-        />
+      <div className="grid shrink-0 grid-cols-3 gap-1">
         <select
-          className="ui-select min-h-0 py-1.5 text-sm"
+          className={compactSelect}
           value={filterState.technicianId}
-          onChange={(event) => onPatchFilters({ technicianId: event.target.value })}
+          onChange={(e) => onPatchFilters({ technicianId: e.target.value })}
+          title="Focus technician"
         >
-          <option value="">All technicians</option>
-          {filterOptions.technicians.map((technician) => (
-            <option key={technician.id} value={technician.id}>
-              {technician.name}
-            </option>
+          <option value="">All techs</option>
+          {filterOptions.technicians.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
         <select
-          className="ui-select min-h-0 py-1.5 text-sm"
+          className={compactSelect}
           value={filterState.priority}
-          onChange={(event) => onPatchFilters({ priority: event.target.value })}
+          onChange={(e) => onPatchFilters({ priority: e.target.value })}
+          title="Priority"
         >
-            <option value="">All priorities</option>
-            {filterOptions.priorities.map((priority) => (
-              <option key={priority.value} value={priority.value}>
-                {priority.label}
-              </option>
-            ))}
-        </select>
-        <select
-          className="ui-select min-h-0 py-1.5 text-sm"
-          value={filterState.status}
-          onChange={(event) => onPatchFilters({ status: event.target.value })}
-        >
-          <option value="">All statuses</option>
-          {filterOptions.statuses.map((status) => (
-            <option key={status.value} value={status.value}>
-              {status.label}
-            </option>
+          <option value="">Priority</option>
+          {filterOptions.priorities.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <select
-          className="ui-select min-h-0 py-1.5 text-sm"
+          className={compactSelect}
           value={filterState.propertyId}
-          onChange={(event) => onPatchFilters({ propertyId: event.target.value })}
+          onChange={(e) => onPatchFilters({ propertyId: e.target.value })}
+          title="Property"
         >
-          <option value="">All properties</option>
-          {propertyOptions.map((property) => (
-            <option key={property.id} value={property.id}>
-              {property.property_name ?? property.name ?? property.id}
-            </option>
+          <option value="">Property</option>
+          {propertyOptions.map((p) => (
+            <option key={p.id} value={p.id}>{p.property_name ?? p.name ?? p.id}</option>
           ))}
         </select>
-        <select
-          className="ui-select min-h-0 py-1.5 text-sm"
-          value={filterState.buildingId}
-          onChange={(event) => onPatchFilters({ buildingId: event.target.value })}
-        >
-          <option value="">All buildings</option>
-          {buildingOptions.map((building) => (
-            <option key={building.id} value={building.id}>
-              {building.building_name ?? building.name ?? building.id}
-            </option>
-          ))}
-        </select>
-      </section>
-
-      <div className="min-h-[320px] flex-1 overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]/50">
+      </div>
+      <div className="min-h-[350px] flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50">
         <MapContainer
           center={[mapCenter.latitude, mapCenter.longitude]}
           zoom={zoomLevel}

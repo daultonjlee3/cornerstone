@@ -927,23 +927,23 @@ export function DispatchView({
         />
 
         {error && (
-          <div className="shrink-0 border-b border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+          <div className="shrink-0 border-b border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">
             {error}
           </div>
         )}
         {dropError && (
-          <div className="shrink-0 border-b border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-300">
+          <div className="shrink-0 border-b border-red-500/50 bg-red-500/10 px-2 py-1 text-xs text-red-700 dark:text-red-300">
             {dropError}
           </div>
         )}
 
         {hasNoResults && (
-          <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--background)]/50 px-4 py-6 text-center">
-            <p className="text-sm font-medium text-[var(--foreground)]">
+          <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--background)]/50 px-2 py-3 text-center">
+            <p className="text-xs font-medium text-[var(--foreground)]">
               No work orders match current filters
             </p>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Try changing filters or date, or clear filters to see all work orders.
+            <p className="mt-0.5 text-[10px] text-[var(--muted)]">
+              Change filters or date to see work orders.
             </p>
           </div>
         )}
@@ -976,13 +976,13 @@ export function DispatchView({
             >
               <div className="flex h-full min-h-0 flex-col">
                 {filterState.viewMode === "day" ? (
-                  <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-3 py-2">
-                    <span className="text-xs font-medium text-[var(--muted)]">Dispatch View:</span>
-                    <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-1">
+                    <span className="text-[10px] font-medium text-[var(--muted)]">View:</span>
+                    <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
                       <button
                         type="button"
                         onClick={() => setDispatchBoardMode("technicians")}
-                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                        className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
                           dispatchBoardMode === "technicians"
                             ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
                             : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -993,7 +993,7 @@ export function DispatchView({
                       <button
                         type="button"
                         onClick={() => setDispatchBoardMode("crews")}
-                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                        className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
                           dispatchBoardMode === "crews"
                             ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
                             : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -1004,20 +1004,19 @@ export function DispatchView({
                     </div>
                     {dispatchBoardMode === "technicians" &&
                       initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
                           disabled={technicianPage === 0}
-                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-2 py-1 text-sm font-medium text-[var(--foreground)] disabled:opacity-50"
+                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
                           aria-label="Previous page"
                         >
                           ←
                         </button>
-                        <span className="text-xs text-[var(--muted)]">
-                          Technicians {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
-                          {Math.min((technicianPage + 1) * TECHNICIAN_PAGE_SIZE, initialData.workforce.technicians.length)} of{" "}
-                          {initialData.workforce.technicians.length}
+                        <span className="text-[10px] text-[var(--muted)]">
+                          {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
+                          {Math.min((technicianPage + 1) * TECHNICIAN_PAGE_SIZE, initialData.workforce.technicians.length)} of {initialData.workforce.technicians.length}
                         </span>
                         <button
                           type="button"
@@ -1030,7 +1029,7 @@ export function DispatchView({
                             technicianPage >=
                             Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1
                           }
-                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-2 py-1 text-sm font-medium text-[var(--foreground)] disabled:opacity-50"
+                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
                           aria-label="Next page"
                         >
                           →
@@ -1103,21 +1102,21 @@ export function DispatchView({
               <span />
             </aside>
           ) : (
-            <aside className="hidden w-[380px] shrink-0 flex-col border-l border-[var(--card-border)] bg-[var(--background)]/30 xl:flex">
-              <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-                <div className="flex shrink-0 items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    Map & workload
+            <aside className="hidden w-[360px] shrink-0 flex-col overflow-hidden border-l border-[var(--card-border)] bg-[var(--background)]/30 xl:flex">
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+                <div className="flex shrink-0 items-center justify-between gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Intelligence
                   </span>
                   <button
                     type="button"
                     onClick={() => setInsightsCollapsed(true)}
-                    className="rounded border border-[var(--card-border)] bg-[var(--card)] px-2 py-1 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+                    className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
                   >
                     Collapse
                   </button>
                 </div>
-                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+                <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
                   <DispatchMapPanel
                     workOrders={optimisticWorkOrders}
                     workforce={workforce}

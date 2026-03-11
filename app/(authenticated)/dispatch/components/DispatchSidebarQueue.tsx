@@ -119,7 +119,7 @@ export function DispatchSidebarQueue({
   return (
     <aside
       ref={setNodeRef}
-      className={`flex w-64 shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/95 ${
+      className={`flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/95 ${
         highlighted ? "bg-amber-50/90 ring-2 ring-inset ring-amber-400/40" : ""
       }`}
     >
