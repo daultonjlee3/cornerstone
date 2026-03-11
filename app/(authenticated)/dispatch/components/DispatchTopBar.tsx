@@ -96,29 +96,30 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
     });
   };
 
-  const selectClass = "ui-select min-h-0 w-auto min-w-0 py-1 text-[11px]";
+  const selectClass = "ui-select h-7 min-h-0 w-auto min-w-0 border-[var(--card-border)] py-0 pl-2 pr-6 text-[11px]";
   return (
-    <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-2 py-1.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+    <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-2 py-1">
+      {/* Row 1: Date navigation + view tabs */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => shiftDate(-1)}
-            className="rounded p-1 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
-            aria-label="Previous day"
+            className="rounded p-0.5 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
+            aria-label="Previous"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="min-w-[140px] text-xs font-medium text-[var(--foreground)]">
+          <span className="min-w-[132px] text-[11px] font-medium text-[var(--foreground)]">
             {formatDisplayDate(filterState.selectedDate)}
           </span>
           <button
             type="button"
             onClick={() => shiftDate(1)}
-            className="rounded p-1 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
-            aria-label="Next day"
+            className="rounded p-0.5 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
+            aria-label="Next"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -143,28 +144,34 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
             </button>
           ))}
         </div>
+      </div>
+      {/* Row 2: Search bar */}
+      <div className="mt-1 flex items-center gap-1.5">
         <input
           type="search"
-          placeholder="Search…"
+          placeholder="Search work orders by #, title…"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && applySearch()}
-          className="ui-input h-7 w-32 min-w-0 shrink-0 py-0 text-[11px] sm:w-40"
+          className="ui-input h-7 min-h-0 flex-1 min-w-0 py-0 text-[11px]"
         />
         <button
           type="button"
           onClick={applySearch}
-          className="rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-0.5 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/40"
+          className="shrink-0 rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-0.5 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/40"
         >
           Search
         </button>
+      </div>
+      {/* Row 3: Inline dropdown filters */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
         <select
           value={filterState.companyId}
           onChange={(e) => patchState({ companyId: e.target.value })}
           className={selectClass}
           title="Company"
         >
-          <option value="">All companies</option>
+          <option value="">Company</option>
           {filterOptions.companies.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -175,7 +182,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           className={selectClass}
           title="Property"
         >
-          <option value="">All properties</option>
+          <option value="">Property</option>
           {propertyOptions.map((p) => (
             <option key={p.id} value={p.id}>{p.property_name ?? p.name ?? p.id}</option>
           ))}
@@ -186,20 +193,20 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           className={selectClass}
           title="Building"
         >
-          <option value="">All buildings</option>
+          <option value="">Building</option>
           {buildingOptions.map((b) => (
             <option key={b.id} value={b.id}>{b.building_name ?? b.name ?? b.id}</option>
           ))}
         </select>
         <select
-          value={filterState.status}
-          onChange={(e) => patchState({ status: e.target.value })}
+          value={filterState.assetId}
+          onChange={(e) => patchState({ assetId: e.target.value })}
           className={selectClass}
-          title="Status"
+          title="Asset"
         >
-          <option value="">All statuses</option>
-          {filterOptions.statuses.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+          <option value="">Asset</option>
+          {filterOptions.assets.map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
           ))}
         </select>
         <select
@@ -208,29 +215,29 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           className={selectClass}
           title="Priority"
         >
-          <option value="">All priorities</option>
+          <option value="">Priority</option>
           {filterOptions.priorities.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <select
-          value={filterState.assignmentType}
-          onChange={(e) => patchState({ assignmentType: e.target.value })}
+          value={filterState.status}
+          onChange={(e) => patchState({ status: e.target.value })}
           className={selectClass}
-          title="Assignment"
+          title="Status"
         >
-          <option value="">Assignment</option>
-          {filterOptions.assignmentTypes.map((o) => (
+          <option value="">Status</option>
+          {filterOptions.statuses.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <select
           value={filterState.technicianId}
           onChange={(e) => patchState({ technicianId: e.target.value })}
-          className={`${selectClass} max-w-[100px]`}
+          className={`${selectClass} max-w-[110px]`}
           title="Technician"
         >
-          <option value="">All techs</option>
+          <option value="">Technician</option>
           {filterOptions.technicians.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
@@ -241,26 +248,29 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           className={selectClass}
           title="Crew"
         >
-          <option value="">All crews</option>
+          <option value="">Crew</option>
           {filterOptions.crews.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
-        <span className="ml-1 shrink-0 border-l border-[var(--card-border)] pl-2" />
-        <span className="rounded border border-red-200/80 bg-red-50/80 px-1 py-0.5 text-[10px] text-red-700">
-          O: {insights.overdue}
-        </span>
-        <span className="rounded border border-emerald-200/80 bg-emerald-50/80 px-1 py-0.5 text-[10px] text-emerald-700">
-          R: {insights.ready}
-        </span>
-        <span className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] text-slate-700">
-          U: {insights.unscheduled}
-        </span>
-        <span className="rounded border border-blue-200/80 bg-blue-50/80 px-1 py-0.5 text-[10px] text-blue-700">
-          Today: {insights.scheduledToday}
-        </span>
+        <select
+          value={filterState.assignmentType}
+          onChange={(e) => patchState({ assignmentType: e.target.value })}
+          className={selectClass}
+          title="Assignment type"
+        >
+          <option value="">Assignment</option>
+          {filterOptions.assignmentTypes.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <span className="shrink-0 border-l border-[var(--card-border)] pl-2" />
+        <span className="rounded border border-red-200/80 bg-red-50/80 px-1 py-0.5 text-[10px] text-red-700">O: {insights.overdue}</span>
+        <span className="rounded border border-emerald-200/80 bg-emerald-50/80 px-1 py-0.5 text-[10px] text-emerald-700">R: {insights.ready}</span>
+        <span className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] text-slate-700">U: {insights.unscheduled}</span>
+        <span className="rounded border border-blue-200/80 bg-blue-50/80 px-1 py-0.5 text-[10px] text-blue-700">Today: {insights.scheduledToday}</span>
         {hasActiveFilters(filterState) ? (
-          <Button variant="secondary" size="sm" className="h-6 px-1.5 text-[10px]" onClick={clearFilters}>
+          <Button variant="secondary" size="sm" className="h-6 shrink-0 px-1.5 text-[10px]" onClick={clearFilters}>
             Clear
           </Button>
         ) : null}
