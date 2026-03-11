@@ -61,7 +61,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
     pushState(next);
   };
 
-  const setView = (viewMode: "day" | "week" | "month") => {
+  const setView = (viewMode: "day" | "week" | "month" | "map") => {
     patchState({ viewMode });
   };
 
@@ -125,11 +125,13 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
             </svg>
           </button>
         </div>
-        <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
-          {(["day", "week", "month"] as const).map((mode) => (
+        <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5" role="tablist" aria-label="Dispatch view">
+          {(["day", "week", "month", "map"] as const).map((mode) => (
             <button
               key={mode}
               type="button"
+              role="tab"
+              aria-selected={filterState.viewMode === mode}
               onClick={() => setView(mode)}
               className={`rounded px-2 py-0.5 text-[10px] font-medium capitalize ${
                 filterState.viewMode === mode

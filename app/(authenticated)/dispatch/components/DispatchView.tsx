@@ -949,199 +949,170 @@ export function DispatchView({
         )}
 
         <div className="flex min-h-0 flex-1 min-w-0">
-          {/* Left: narrow queue rail */}
+          {filterState.viewMode === "map" ? (
+            <>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
+                <DispatchMapPanel
+                  workOrders={optimisticWorkOrders}
+                  workforce={workforce}
+                  filterState={filterState}
+                  filterOptions={filterOptions}
+                  selectedTechnicianId={selectedMapTechnicianId}
+                  selectedWorkOrderId={selectedMapWorkOrderId}
+                  assignmentPending={mapAssigning}
+                  onSelectTechnician={setSelectedMapTechnicianId}
+                  onSelectWorkOrder={setSelectedMapWorkOrderId}
+                  onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                  onAssignFromMap={handleAssignFromMap}
+                  onPatchFilters={patchFilterState}
+                />
+              </div>
+              <aside className="hidden w-[280px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-[var(--card-border)] bg-[var(--background)]/30 p-2 xl:flex">
+                <DispatchWorkforcePanel
+                  workforce={workforce}
+                  insights={dispatchData.insights}
+                  onCreateWorkOrder={handleCreateWorkOrder}
+                  onAssignUnscheduled={handleAssignUnscheduled}
+                  onRebalance={handleRebalance}
+                />
+              </aside>
+            </>
+          ) : (
             <DndContext
-            sensors={sensors}
-            collisionDetection={pointerWithin}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
+              sensors={sensors}
+              collisionDetection={pointerWithin}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
             >
-            <DispatchSidebarQueue
-              unscheduled={dispatchData.unscheduled}
-              overdue={dispatchData.overdue}
-              ready={dispatchData.ready}
-              collapsed={queueCollapsed}
-              overDropId={overDropId}
-              isDraggingWorkOrder={Boolean(activeWo)}
-              onToggleCollapse={() => setQueueCollapsed((current) => !current)}
-              onOpenWorkOrder={handleOpenWorkOrder}
-            />
-            {/* Center: primary schedule grid */}
-            <main
-              className={`min-w-0 flex-1 bg-[var(--background)] ${
-                queueCollapsed ? "" : "border-l border-[var(--card-border)]"
-              }`}
-            >
-              <div className="flex h-full min-h-0 flex-col">
-                {filterState.viewMode === "day" ? (
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-1">
-                    <span className="text-[10px] font-medium text-[var(--muted)]">View:</span>
-                    <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setDispatchBoardMode("technicians")}
-                        className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                          dispatchBoardMode === "technicians"
-                            ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                            : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                        }`}
-                      >
-                        Technicians
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDispatchBoardMode("crews")}
-                        className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                          dispatchBoardMode === "crews"
-                            ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                            : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                        }`}
-                      >
-                        Crews
-                      </button>
-                    </div>
-                    {dispatchBoardMode === "technicians" &&
-                      initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
-                      <div className="flex items-center gap-1">
+              <DispatchSidebarQueue
+                unscheduled={dispatchData.unscheduled}
+                overdue={dispatchData.overdue}
+                ready={dispatchData.ready}
+                collapsed={queueCollapsed}
+                overDropId={overDropId}
+                isDraggingWorkOrder={Boolean(activeWo)}
+                onToggleCollapse={() => setQueueCollapsed((current) => !current)}
+                onOpenWorkOrder={handleOpenWorkOrder}
+              />
+              <main
+                className={`min-w-0 flex-1 bg-[var(--background)] ${
+                  queueCollapsed ? "" : "border-l border-[var(--card-border)]"
+                }`}
+              >
+                <div className="flex h-full min-h-0 flex-col">
+                  {filterState.viewMode === "day" ? (
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-1">
+                      <span className="text-[10px] font-medium text-[var(--muted)]">View:</span>
+                      <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
                         <button
                           type="button"
-                          onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
-                          disabled={technicianPage === 0}
-                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
-                          aria-label="Previous page"
+                          onClick={() => setDispatchBoardMode("technicians")}
+                          className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                            dispatchBoardMode === "technicians"
+                              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                              : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                          }`}
                         >
-                          ←
+                          Technicians
                         </button>
-                        <span className="text-[10px] text-[var(--muted)]">
-                          {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
-                          {Math.min((technicianPage + 1) * TECHNICIAN_PAGE_SIZE, initialData.workforce.technicians.length)} of {initialData.workforce.technicians.length}
-                        </span>
                         <button
                           type="button"
-                          onClick={() =>
-                            setTechnicianPage((p) =>
-                              Math.min(p + 1, Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1)
-                            )
-                          }
-                          disabled={
-                            technicianPage >=
-                            Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1
-                          }
-                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
-                          aria-label="Next page"
+                          onClick={() => setDispatchBoardMode("crews")}
+                          className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                            dispatchBoardMode === "crews"
+                              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                              : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                          }`}
                         >
-                          →
+                          Crews
                         </button>
                       </div>
-                    )}
-                  </div>
-                ) : null}
-                {filterState.viewMode === "day" &&
-                  dispatchBoardMode === "technicians" &&
-                  initialData.workforce.technicians.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-8">
-                    <p className="text-sm font-medium text-[var(--muted)]">
-                      No technicians available. Add technicians to begin scheduling.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="min-h-0 flex-1">
-                    <DispatchBoard
-                      lanes={boardLanes}
-                      workOrdersByLane={boardWorkOrdersByLane}
-                      selectedDate={filterState.selectedDate}
-                      overDropId={overDropId}
-                      isDraggingWorkOrder={Boolean(activeWo)}
-                      view={filterState.viewMode}
-                      workOrders={optimisticWorkOrders}
-                      routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}
-                      onSelectDate={handleSelectDate}
-                      onResizeEnd={handleResizeEnd}
-                      onOpenWorkOrder={handleOpenWorkOrder}
+                      {dispatchBoardMode === "technicians" &&
+                        initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
+                            disabled={technicianPage === 0}
+                            className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
+                            aria-label="Previous page"
+                          >
+                            ←
+                          </button>
+                          <span className="text-[10px] text-[var(--muted)]">
+                            {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
+                            {Math.min((technicianPage + 1) * TECHNICIAN_PAGE_SIZE, initialData.workforce.technicians.length)} of {initialData.workforce.technicians.length}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTechnicianPage((p) =>
+                                Math.min(p + 1, Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1)
+                              )
+                            }
+                            disabled={
+                              technicianPage >=
+                              Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1
+                            }
+                            className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
+                            aria-label="Next page"
+                          >
+                            →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                  {filterState.viewMode === "day" &&
+                    dispatchBoardMode === "technicians" &&
+                    initialData.workforce.technicians.length === 0 ? (
+                    <div className="flex flex-1 items-center justify-center border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-8">
+                      <p className="text-sm font-medium text-[var(--muted)]">
+                        No technicians available. Add technicians to begin scheduling.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="min-h-0 flex-1">
+                      <DispatchBoard
+                        lanes={boardLanes}
+                        workOrdersByLane={boardWorkOrdersByLane}
+                        selectedDate={filterState.selectedDate}
+                        overDropId={overDropId}
+                        isDraggingWorkOrder={Boolean(activeWo)}
+                        view={filterState.viewMode}
+                        workOrders={optimisticWorkOrders}
+                        routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}
+                        onSelectDate={handleSelectDate}
+                        onResizeEnd={handleResizeEnd}
+                        onOpenWorkOrder={handleOpenWorkOrder}
+                      />
+                    </div>
+                  )}
+                </div>
+              </main>
+              <DragOverlay
+                modifiers={[snapCenterToCursor]}
+                dropAnimation={{
+                  duration: 180,
+                  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {activeWo ? (
+                  <div className="min-w-[10rem] max-w-[14rem] cursor-grabbing opacity-95 shadow-xl">
+                    <DispatchWorkOrderCard
+                      workOrder={activeWo}
+                      variant="block"
+                      showScheduledTime
+                      isDragging
                     />
                   </div>
-                )}
-              </div>
-            </main>
-
-            <DragOverlay
-              modifiers={[snapCenterToCursor]}
-              dropAnimation={{
-                duration: 180,
-                easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
-            >
-              {activeWo ? (
-                <div className="min-w-[10rem] max-w-[14rem] cursor-grabbing opacity-95 shadow-xl">
-                  <DispatchWorkOrderCard
-                    workOrder={activeWo}
-                    variant="block"
-                    showScheduledTime
-                    isDragging
-                  />
-                </div>
-              ) : null}
-            </DragOverlay>
+                ) : null}
+              </DragOverlay>
             </DndContext>
-          </div>
-          {insightsCollapsed ? (
-            <aside className="hidden w-11 shrink-0 flex-col items-center justify-between border-l border-[var(--card-border)] bg-[var(--background)]/50 py-2 xl:flex">
-              <button
-                type="button"
-                onClick={() => setInsightsCollapsed(false)}
-                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-1 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
-                aria-label="Expand map & insights"
-              >
-                &lt;
-              </button>
-              <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted)] [writing-mode:vertical-rl]">
-                Map
-              </span>
-              <span />
-            </aside>
-          ) : (
-            <aside className="hidden w-[360px] shrink-0 flex-col overflow-hidden border-l border-[var(--card-border)] bg-[var(--background)]/30 xl:flex">
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
-                <div className="flex shrink-0 items-center justify-between gap-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    Intelligence
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setInsightsCollapsed(true)}
-                    className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
-                  >
-                    Collapse
-                  </button>
-                </div>
-                <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-                  <DispatchMapPanel
-                    workOrders={optimisticWorkOrders}
-                    workforce={workforce}
-                    filterState={filterState}
-                    filterOptions={filterOptions}
-                    selectedTechnicianId={selectedMapTechnicianId}
-                    selectedWorkOrderId={selectedMapWorkOrderId}
-                    assignmentPending={mapAssigning}
-                    onSelectTechnician={setSelectedMapTechnicianId}
-                    onSelectWorkOrder={setSelectedMapWorkOrderId}
-                    onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                    onAssignFromMap={handleAssignFromMap}
-                    onPatchFilters={patchFilterState}
-                  />
-                  <DispatchWorkforcePanel
-                    workforce={workforce}
-                    insights={dispatchData.insights}
-                    onCreateWorkOrder={handleCreateWorkOrder}
-                    onAssignUnscheduled={handleAssignUnscheduled}
-                    onRebalance={handleRebalance}
-                  />
-                </div>
-              </div>
-            </aside>
           )}
+        </div>
       </div>
 
       <WorkOrderAssignmentModal
