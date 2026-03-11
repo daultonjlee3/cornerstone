@@ -325,7 +325,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       updated_at,
       properties(property_name, name, latitude, longitude),
       buildings(building_name, name, latitude, longitude),
-      units(unit_name, name_or_number),
+      units(unit_name, name_or_number, latitude, longitude),
       assets!work_orders_asset_id_fkey(asset_name, name, latitude, longitude)
     `
     )
@@ -427,6 +427,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     workOrderLongitude: number | null,
     assetLatitude: number | null,
     assetLongitude: number | null,
+    unitLatitude: number | null,
+    unitLongitude: number | null,
     buildingLatitude: number | null,
     buildingLongitude: number | null,
     propertyLatitude: number | null,
@@ -442,6 +444,9 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     }
     if (assetLatitude != null && assetLongitude != null) {
       return { latitude: assetLatitude, longitude: assetLongitude, source: "asset", accuracy: "fallback" };
+    }
+    if (unitLatitude != null && unitLongitude != null) {
+      return { latitude: unitLatitude, longitude: unitLongitude, source: "unit", accuracy: "fallback" };
     }
     if (buildingLatitude != null && buildingLongitude != null) {
       return { latitude: buildingLatitude, longitude: buildingLongitude, source: "building", accuracy: "fallback" };
@@ -466,6 +471,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     const workOrderLongitude = toNumber(rest.longitude);
     const assetLatitude = a && typeof a === "object" ? toNumber(a.latitude) : null;
     const assetLongitude = a && typeof a === "object" ? toNumber(a.longitude) : null;
+    const unitLatitude = u && typeof u === "object" ? toNumber(u.latitude) : null;
+    const unitLongitude = u && typeof u === "object" ? toNumber(u.longitude) : null;
     const buildingLatitude = b && typeof b === "object" ? toNumber(b.latitude) : null;
     const buildingLongitude = b && typeof b === "object" ? toNumber(b.longitude) : null;
     const propertyLatitude = p && typeof p === "object" ? toNumber(p.latitude) : null;
@@ -475,6 +482,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       workOrderLongitude,
       assetLatitude,
       assetLongitude,
+      unitLatitude,
+      unitLongitude,
       buildingLatitude,
       buildingLongitude,
       propertyLatitude,

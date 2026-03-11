@@ -387,6 +387,9 @@ export async function saveWorkOrder(
     unitId,
   });
   if (hierarchyError) return { error: hierarchyError };
+  let resolvedPropertyId = propertyId;
+  let resolvedBuildingId = buildingId;
+  let resolvedUnitId = unitId;
   if (assetId) {
     const { data: ast } = await supabase
       .from("assets")
@@ -401,6 +404,38 @@ export async function saveWorkOrder(
       return { error: "Selected asset does not match the selected building." };
     if (unitId && ast.unit_id !== null && ast.unit_id !== unitId)
       return { error: "Selected asset does not match the selected unit." };
+    // Inherit location from asset when form did not set property/building/unit
+    resolvedPropertyId = resolvedPropertyId || ast.property_id ?? null;
+    resolvedBuildingId = resolvedBuildingId || ast.building_id ?? null;
+    resolvedUnitId = resolvedUnitId || ast.unit_id ?? null;
+  }
+  // Inherit building_id and property_id from unit when unit is selected but those are missing
+  if (resolvedUnitId && (!resolvedBuildingId || !resolvedPropertyId)) {
+    const { data: u } = await supabase
+      .from("units")
+      .select("building_id")
+      .eq("id", resolvedUnitId)
+      .maybeSingle();
+    if (u?.building_id) {
+      resolvedBuildingId = resolvedBuildingId || u.building_id;
+      if (!resolvedPropertyId) {
+        const { data: b } = await supabase
+          .from("buildings")
+          .select("property_id")
+          .eq("id", u.building_id)
+          .maybeSingle();
+        if (b?.property_id) resolvedPropertyId = b.property_id;
+      }
+    }
+  }
+  // Inherit property_id from building when building is selected but property is missing
+  if (resolvedBuildingId && !resolvedPropertyId) {
+    const { data: b } = await supabase
+      .from("buildings")
+      .select("property_id")
+      .eq("id", resolvedBuildingId)
+      .maybeSingle();
+    if (b?.property_id) resolvedPropertyId = b.property_id;
   }
   const assignedTechnicianId = (formData.get("assigned_technician_id") as string)?.trim() || null;
   const assignedCrewId = (formData.get("assigned_crew_id") as string)?.trim() || null;
@@ -448,9 +483,9 @@ export async function saveWorkOrder(
     tenant_id: tenantId,
     company_id: companyId,
     customer_id: customerIdForm || null,
-    property_id: propertyId || null,
-    building_id: buildingId || null,
-    unit_id: unitId || null,
+    property_id: resolvedPropertyId || null,
+    building_id: resolvedBuildingId || null,
+    unit_id: resolvedUnitId || null,
     asset_id: assetId || null,
     title,
     description: (formData.get("description") as string)?.trim() || null,
@@ -532,6 +567,29 @@ export async function saveWorkOrder(
       afterState,
       metadata: { source: "saveWorkOrder" },
     });
+    const locationInherited =
+      resolvedPropertyId !== propertyId ||
+      resolvedBuildingId !== buildingId ||
+      resolvedUnitId !== unitId;
+    if (locationInherited) {
+      await insertActivityLog(supabase, {
+        tenantId,
+        companyId: (afterState.company_id as string) ?? companyId,
+        entityType: "work_order",
+        entityId: id,
+        actionType: "work_order_location_resolved",
+        performedBy: actorId,
+        afterState: {
+          property_id: afterState.property_id,
+          building_id: afterState.building_id,
+          unit_id: afterState.unit_id,
+          asset_id: afterState.asset_id,
+          latitude: afterState.latitude,
+          longitude: afterState.longitude,
+        },
+        metadata: { source: "saveWorkOrder", inherited: true },
+      });
+    }
 
     if (
       toComparableStatus(beforeState.status as string | null) !==
@@ -584,6 +642,30 @@ export async function saveWorkOrder(
       afterState: inserted as Record<string, unknown>,
       metadata: { source: "saveWorkOrder" },
     });
+    const locationInherited =
+      resolvedPropertyId !== propertyId ||
+      resolvedBuildingId !== buildingId ||
+      resolvedUnitId !== unitId;
+    if (locationInherited) {
+      const insertedRecord = inserted as Record<string, unknown>;
+      await insertActivityLog(supabase, {
+        tenantId,
+        companyId,
+        entityType: "work_order",
+        entityId: (inserted as { id: string }).id,
+        actionType: "work_order_location_resolved",
+        performedBy: actorId,
+        afterState: {
+          property_id: insertedRecord.property_id,
+          building_id: insertedRecord.building_id,
+          unit_id: insertedRecord.unit_id,
+          asset_id: insertedRecord.asset_id,
+          latitude: insertedRecord.latitude,
+          longitude: insertedRecord.longitude,
+        },
+        metadata: { source: "saveWorkOrder", inherited: true },
+      });
+    }
   }
   revalidatePath("/work-orders");
   revalidatePath("/dispatch");

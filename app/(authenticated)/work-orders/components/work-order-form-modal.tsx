@@ -371,7 +371,17 @@ export function WorkOrderFormModal({
       : assets.filter((a) => a.company_id === companyId && a.unit_id === value);
     if (assetId && !nextAssets.some((a) => a.id === assetId)) setAssetId("");
   };
-  const handleAssetChange = (value: string) => setAssetId(value);
+  const handleAssetChange = (value: string) => {
+    setAssetId(value);
+    if (value) {
+      const asset = assets.find((a) => a.id === value);
+      if (asset) {
+        setPropertyId(asset.property_id ?? "");
+        setBuildingId(asset.building_id ?? "");
+        setUnitId(asset.unit_id ?? "");
+      }
+    }
+  };
   if (!open) return null;
 
   const wo = workOrder ?? emptyWorkOrder;
