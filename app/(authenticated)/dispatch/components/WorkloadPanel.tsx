@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { DataTable } from "@/src/components/ui/data-table";
 
 type WorkloadPanelProps = {
@@ -15,14 +14,12 @@ export function WorkloadPanel({
   children,
 }: WorkloadPanelProps) {
   return (
-    <Card className="shrink-0">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <DataTable className={`shadow-none ${tableClassName}`}>{children}</DataTable>
-      </CardContent>
-    </Card>
+    <section className="shrink-0 rounded-lg border border-[var(--card-border)]/80 bg-[var(--card)]/50 p-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+        {title}
+      </p>
+      <p className="mt-0.5 text-[10px] text-[var(--muted)]">{description}</p>
+      <DataTable className={`mt-2 shadow-none ${tableClassName}`}>{children}</DataTable>
+    </section>
   );
 }

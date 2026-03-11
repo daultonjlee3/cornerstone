@@ -61,31 +61,29 @@ export function QueueSection({
   const isScrollable = count > 6;
 
   return (
-    <section className={`mx-2 mb-3 overflow-hidden rounded-xl border ${styles.shell}`}>
+    <section className={`mx-1.5 mb-2 overflow-hidden rounded-lg border ${styles.shell}`}>
       <h3
-        className={`sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${styles.header}`}
+        className={`sticky top-0 z-10 flex items-center justify-between gap-1.5 border-b px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${styles.header}`}
       >
         <span className="min-w-0 truncate">
           {title} ({count})
         </span>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium hover:bg-black/5"
-            aria-label={collapsed ? "Expand section" : "Collapse section"}
-          >
-            {collapsed ? "Expand" : "Collapse"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium hover:bg-black/5"
+          aria-label={collapsed ? "Expand section" : "Collapse section"}
+        >
+          {collapsed ? "▼" : "▲"}
+        </button>
       </h3>
       {!collapsed && (
         <ul
-          className={`flex flex-col gap-2 p-2.5 ${isScrollable ? "overflow-y-auto overscroll-contain" : ""}`}
+          className={`flex flex-col gap-1.5 p-1.5 ${isScrollable ? "overflow-y-auto overscroll-contain" : ""}`}
           style={isScrollable ? { maxHeight: SECTION_LIST_MAX_HEIGHT } : undefined}
         >
           {count === 0 ? (
-            <li className="rounded-lg border border-dashed border-[var(--card-border)] bg-[var(--card)]/70 py-3 text-center text-xs text-[var(--muted)]">
+            <li className="rounded border border-dashed border-[var(--card-border)] bg-[var(--card)]/50 py-2 text-center text-[11px] text-[var(--muted)]">
               None
             </li>
           ) : (

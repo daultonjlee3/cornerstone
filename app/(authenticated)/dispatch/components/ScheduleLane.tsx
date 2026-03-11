@@ -43,9 +43,9 @@ function LaneSlot({
   return (
     <div
       ref={setNodeRef}
-      className={`relative min-h-[30px] flex-1 border-b border-slate-200/80 transition-colors ${
-        hourIndex % 2 === 0 ? "bg-slate-50/65" : "bg-white/45"
-      } ${isOver ? "bg-[var(--accent)]/16 ring-1 ring-inset ring-[var(--accent)]/30" : ""}`}
+      className={`relative min-h-[30px] flex-1 border-b border-[var(--card-border)]/80 transition-colors ${
+        hourIndex % 2 === 0 ? "bg-[var(--card)]/30" : "bg-[var(--background)]"
+      } ${isOver ? "bg-[var(--accent)]/12 ring-1 ring-inset ring-[var(--accent)]/25" : ""}`}
     >
       {showCurrentLine ? (
         <div
@@ -88,19 +88,17 @@ export function ScheduleLane({
   return (
     <div
       ref={setNodeRef}
-      className={`relative flex min-w-[15rem] flex-1 flex-col border-r border-[var(--card-border)] last:border-r-0 ${
+      className={`relative flex min-w-[14rem] flex-1 flex-col border-r border-[var(--card-border)] last:border-r-0 ${
         highlight
-          ? "bg-[var(--accent)]/10 ring-2 ring-inset ring-[var(--accent)]/25"
+          ? "bg-[var(--accent)]/8 ring-2 ring-inset ring-[var(--accent)]/20"
           : "bg-[var(--background)]"
       }`}
     >
-      <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--card-border)] bg-gradient-to-b from-[var(--card)] to-slate-50/70 px-3 py-2.5">
+      <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/90 px-3 py-2">
         <p className="truncate text-sm font-semibold text-[var(--foreground)]">{name}</p>
-        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-[var(--muted)]">
-          <span>{totalScheduledHours.toFixed(1)}h scheduled</span>
-          <span>{jobCount} jobs</span>
-          <span>{remaining.toFixed(1)}h remaining</span>
-        </div>
+        <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+          {totalScheduledHours.toFixed(1)}h · {jobCount} jobs · {remaining.toFixed(1)}h left
+        </p>
       </div>
       <div className="relative flex min-h-[360px] flex-1 flex-col">
         <div className="absolute inset-0 flex flex-col">
@@ -118,7 +116,7 @@ export function ScheduleLane({
           ))}
         </div>
         {isDraggingWorkOrder ? (
-          <div className="pointer-events-none absolute inset-0 border border-dashed border-[var(--accent)]/35" />
+          <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[var(--accent)]/30" />
         ) : null}
         <div className="pointer-events-none absolute inset-0">{children}</div>
       </div>

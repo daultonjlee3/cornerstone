@@ -401,9 +401,9 @@ export function DispatchBoard({
   }
 
   return (
-    <div ref={dayScrollRef} className="flex h-full flex-col overflow-auto">
-      <div className="flex shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]">
-        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-slate-100/70 px-1.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+    <div ref={dayScrollRef} className="flex h-full flex-col overflow-auto bg-[var(--background)]">
+      <div className="flex shrink-0 border-b-2 border-[var(--card-border)] bg-[var(--card)]">
+        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-[var(--background)] px-1.5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
           Time
         </div>
         {lanes.map((lane) => {
@@ -412,28 +412,27 @@ export function DispatchBoard({
           return (
             <div
               key={lane.id}
-              className="min-w-[15rem] flex-1 border-r border-[var(--card-border)] bg-gradient-to-b from-slate-100/70 to-slate-50/70 px-3 py-2 last:border-r-0"
+              className="min-w-[14rem] flex-1 border-r border-[var(--card-border)] bg-[var(--background)] px-3 py-2.5 last:border-r-0"
             >
-              <span className="text-xs font-semibold uppercase tracking-[0.07em] text-[var(--muted)]">
+              <p className="truncate text-sm font-semibold text-[var(--foreground)]">
                 {displayName}
-              </span>
-              <div className="text-xs text-[var(--muted)]">
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--muted)]">
                 {(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled
-                {hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h remaining` : ` · ${lane.job_count ?? 0} jobs`}
-              </div>
+                {hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h left` : ` · ${lane.job_count ?? 0} jobs`}
+              </p>
             </div>
           );
         })}
       </div>
       <div className="relative flex min-h-0 flex-1">
-        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full border border-red-200 bg-red-50/90 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-          Current time: {nowLabel}
+        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+          {nowLabel}
         </div>
-        <div className="flex w-14 shrink-0 flex-col border-r border-[var(--card-border)] bg-slate-100/70">
-          {/* Spacer so time labels align with lane slot rows (lanes have inner header above slots) */}
+        <div className="flex w-14 shrink-0 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
           <div
-            className="shrink-0 border-b border-slate-200/80 bg-slate-100/80"
-            style={{ height: "60px" }}
+            className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/80"
+            style={{ height: "56px" }}
             aria-hidden
           />
           {timeLabels.map(({ hour, label }, index) => {
@@ -441,15 +440,15 @@ export function DispatchBoard({
             return (
             <div
               key={hour}
-              className={`relative flex h-[40px] items-start justify-end border-b border-slate-200/80 pr-2 pt-0.5 text-xs text-[var(--muted)] ${
-                index % 2 === 0 ? "bg-slate-100/80" : "bg-slate-50/80"
-              } ${isCurrentHour ? "bg-red-50/70" : ""}`}
+              className={`relative flex h-[40px] items-start justify-end border-b border-[var(--card-border)] pr-2 pt-0.5 text-[11px] text-[var(--muted)] ${
+                index % 2 === 0 ? "bg-[var(--card)]/40" : "bg-[var(--background)]"
+              } ${isCurrentHour ? "bg-red-50/80" : ""}`}
               style={{ height: `${100 / timeLabels.length}%`, minHeight: "40px" }}
             >
               {label}
               {isCurrentHour ? (
                 <div
-                  className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500/90"
+                  className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
                   style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
                 />
               ) : null}
@@ -500,11 +499,7 @@ export function DispatchBoard({
         {nowPercent !== null ? (
           <div className="pointer-events-none absolute inset-x-0 z-30" style={{ top: `${nowPercent}%` }}>
             <div className="relative">
-              <div className="absolute -top-2 left-1 z-10 flex items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                {nowLabel}
-              </div>
-              <div className="h-0 border-t-[3px] border-red-500/95 shadow-[0_0_0_1px_rgba(248,113,113,0.14)]" />
+              <div className="h-0 border-t-2 border-red-500 shadow-sm" />
             </div>
           </div>
         ) : null}

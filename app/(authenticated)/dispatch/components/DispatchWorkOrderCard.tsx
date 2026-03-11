@@ -158,37 +158,37 @@ export function DispatchWorkOrderCard({
       <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         {workOrder.work_order_number ?? "Work order"}
       </p>
-      <p className="truncate text-base font-semibold leading-tight text-[var(--foreground)]">{title}</p>
+      <p className="truncate text-sm font-semibold leading-tight text-[var(--foreground)]">{title}</p>
 
       {(workOrder.asset_name || location) && (
-        <p className="mt-1 truncate text-sm text-[var(--muted-strong)]" title={location ?? undefined}>
+        <p className="mt-0.5 truncate text-[11px] text-[var(--muted-strong)]" title={location ?? undefined}>
           {[workOrder.asset_name, location].filter(Boolean).join(" • ")}
         </p>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
         <PriorityBadge priority={priority} />
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass}`}>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${typeBadgeClass}`}>
           {getJobTypeLabel(jobType)}
         </span>
         {workOrder.status ? <StatusBadge status={workOrder.status} /> : null}
         {overdue ? (
-          <span className="rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+          <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
             Overdue
           </span>
         ) : null}
         {travelEstimate ? (
-          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+          <span className="rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
             {travelEstimate}
           </span>
         ) : null}
       </div>
 
       {timeRange && (
-        <p className="mt-2 text-xs text-[var(--muted)]">{timeRange}</p>
+        <p className="mt-1 text-[11px] text-[var(--muted)]">{timeRange}</p>
       )}
 
-      {showCrew ? <p className={`mt-1.5 text-xs font-semibold ${assignment.tone}`}>{assignment.label}</p> : null}
+      {showCrew ? <p className={`mt-1 text-[11px] font-semibold ${assignment.tone}`}>{assignment.label}</p> : null}
       {showActions
         ? variant === "block"
           ? (

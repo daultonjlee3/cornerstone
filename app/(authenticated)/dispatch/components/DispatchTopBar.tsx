@@ -97,27 +97,27 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
   };
 
   return (
-    <div className="space-y-4 border-b border-[var(--card-border)] bg-[var(--card)] px-4 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
+    <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => shiftDate(-1)}
-              className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
+              className="rounded p-1.5 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
               aria-label="Previous day"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="min-w-[180px] text-sm font-medium text-[var(--foreground)]">
+            <span className="min-w-[160px] text-sm font-medium text-[var(--foreground)]">
               {formatDisplayDate(filterState.selectedDate)}
             </span>
             <button
               type="button"
               onClick={() => shiftDate(1)}
-              className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)]/50 hover:text-[var(--foreground)]"
+              className="rounded p-1.5 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
               aria-label="Next day"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,13 +125,13 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
               </svg>
             </button>
           </div>
-          <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
+          <div className="flex rounded-md border border-[var(--card-border)] bg-[var(--background)] p-0.5">
             {(["day", "week", "month"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setView(mode)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize ${
+                className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize ${
                   filterState.viewMode === mode
                     ? "bg-[var(--accent)] text-white"
                     : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -142,48 +142,48 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
             ))}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded border border-red-200/80 bg-red-50/80 px-1.5 py-0.5 text-[11px] text-red-700">
             Overdue: {insights.overdue}
           </span>
-          <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+          <span className="rounded border border-emerald-200/80 bg-emerald-50/80 px-1.5 py-0.5 text-[11px] text-emerald-700">
             Ready: {insights.ready}
           </span>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
-            Unscheduled: {insights.unscheduled}
+          <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-700">
+            Unsched: {insights.unscheduled}
           </span>
-          <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">
-            Scheduled today: {insights.scheduledToday}
+          <span className="rounded border border-blue-200/80 bg-blue-50/80 px-1.5 py-0.5 text-[11px] text-blue-700">
+            Today: {insights.scheduledToday}
           </span>
           {hasActiveFilters(filterState) ? (
-            <Button variant="secondary" size="sm" onClick={clearFilters}>
+            <Button variant="secondary" size="sm" className="h-7 text-[11px]" onClick={clearFilters}>
               Clear filters
             </Button>
           ) : null}
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-3">
-        <section className="space-y-2 rounded-xl border border-[var(--card-border)] bg-slate-50/70 p-3 xl:col-span-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+      <div className="mt-3 grid gap-2 xl:grid-cols-3">
+        <section className="space-y-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 p-2 xl:col-span-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
             Search & location
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <input
               type="search"
-              placeholder="Search WO #, title, description..."
+              placeholder="Search WO #, title..."
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") applySearch();
               }}
-              className="ui-input"
+              className="ui-input flex-1 min-h-0 py-1.5 text-sm"
             />
-            <Button variant="secondary" onClick={applySearch}>
+            <Button variant="secondary" size="sm" className="shrink-0" onClick={applySearch}>
               Apply
             </Button>
           </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-5">
             <select
               value={filterState.companyId}
               onChange={(event) => patchState({ companyId: event.target.value })}
@@ -251,11 +251,11 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           </div>
         </section>
 
-        <section className="space-y-2 rounded-xl border border-[var(--card-border)] bg-slate-50/70 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+        <section className="space-y-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 p-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
             Assignment
           </p>
-          <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-1">
+          <div className="grid gap-1.5 md:grid-cols-3 xl:grid-cols-1">
             <select
               value={filterState.assignmentType}
               onChange={(event) => patchState({ assignmentType: event.target.value })}
@@ -297,11 +297,11 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           </div>
         </section>
 
-        <section className="space-y-2 rounded-xl border border-[var(--card-border)] bg-slate-50/70 p-3 xl:col-span-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-            Work state
+        <section className="space-y-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 p-2 xl:col-span-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Status & priority
           </p>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
             <select
               value={filterState.status}
               onChange={(event) => patchState({ status: event.target.value })}

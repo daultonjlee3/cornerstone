@@ -91,15 +91,15 @@ export function DispatchWorkforcePanel({
   }, [crewRows, insights.overdue, insights.unscheduled]);
 
   return (
-    <div className="flex flex-col gap-5 pb-4">
+    <div className="flex flex-col gap-3 overflow-y-auto">
       <WorkloadPanel
-        title="Technician Capacity"
-        description="Use capacity bars to spot overloaded techs instantly."
-        tableClassName="max-h-[320px] overflow-auto"
+        title="Technician capacity"
+        description="Capacity bars for overloaded techs."
+        tableClassName="max-h-[260px] overflow-auto"
       >
-        <div className="space-y-2.5">
+        <div className="space-y-1.5">
           {technicianRows.map((technician) => (
-            <div key={technician.id} className="rounded-lg border border-[var(--card-border)] bg-[var(--background)]/65 p-2.5">
+            <div key={technician.id} className="rounded border border-[var(--card-border)]/60 bg-[var(--background)]/50 p-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-semibold text-[var(--foreground)]">
                   {technician.name}
@@ -126,13 +126,13 @@ export function DispatchWorkforcePanel({
       </WorkloadPanel>
 
       <WorkloadPanel
-        title="Crew Overview"
-        description="Crew-level capacity and assignment pressure."
-        tableClassName="max-h-[240px] overflow-auto"
+        title="Crew overview"
+        description="Crew capacity and assignments."
+        tableClassName="max-h-[200px] overflow-auto"
       >
-        <div className="space-y-2.5">
+        <div className="space-y-1.5">
           {crewRows.map((crew) => (
-            <div key={crew.id} className="rounded-lg border border-[var(--card-border)] bg-[var(--background)]/65 p-2.5">
+            <div key={crew.id} className="rounded border border-[var(--card-border)]/60 bg-[var(--background)]/50 p-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-semibold text-[var(--foreground)]">{crew.name}</p>
                 <p className={`text-xs font-semibold ${textTone(crew.utilization)}`}>
@@ -173,16 +173,16 @@ export function DispatchWorkforcePanel({
         </ul>
       </WorkloadPanel>
 
-      <WorkloadPanel title="Quick Actions" description="Common dispatch actions for faster board operations.">
-        <div className="grid gap-2">
-          <Button type="button" onClick={onCreateWorkOrder}>
-            + Create Work Order
+      <WorkloadPanel title="Quick actions" description="Common dispatch actions.">
+        <div className="flex flex-col gap-1.5">
+          <Button type="button" size="sm" className="w-full justify-center text-[11px]" onClick={onCreateWorkOrder}>
+            + New work order
           </Button>
-          <Button type="button" variant="secondary" onClick={onAssignUnscheduled}>
-            + Assign Unscheduled Jobs
+          <Button type="button" variant="secondary" size="sm" className="w-full justify-center text-[11px]" onClick={onAssignUnscheduled}>
+            Assign unscheduled
           </Button>
-          <Button type="button" variant="secondary" onClick={onRebalance}>
-            + Rebalance Workload
+          <Button type="button" variant="secondary" size="sm" className="w-full justify-center text-[11px]" onClick={onRebalance}>
+            Rebalance workload
           </Button>
         </div>
       </WorkloadPanel>

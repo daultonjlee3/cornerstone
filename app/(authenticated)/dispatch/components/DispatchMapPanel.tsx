@@ -229,92 +229,86 @@ export function DispatchMapPanel({
   );
 
   return (
-    <div className="flex h-full min-h-[500px] flex-col rounded-xl border border-[var(--card-border)] bg-[var(--card)]/90 p-3 shadow-[var(--shadow-soft)]">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-          Dispatch Map Intelligence
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex shrink-0 items-center justify-between gap-1.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+          Map
         </p>
-        <span className="rounded-full border border-[var(--card-border)] bg-[var(--background)] px-2 py-0.5 text-[11px] text-[var(--muted-strong)]">
-          {workOrderCoordinates.length} jobs · {technicianCoordinates.length} technicians
+        <span className="text-[10px] text-[var(--muted)]">
+          {workOrderCoordinates.length} jobs · {technicianCoordinates.length} techs
         </span>
       </div>
 
-      <section className="mb-2 grid gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/55 p-2">
-        <div className="grid gap-2 md:grid-cols-2">
-          <input
-            type="date"
-            className="ui-input"
-            value={filterState.selectedDate}
-            onChange={(event) => onPatchFilters({ selectedDate: event.target.value })}
-          />
-          <select
-            className="ui-select"
-            value={filterState.technicianId}
-            onChange={(event) => onPatchFilters({ technicianId: event.target.value })}
-          >
-            <option value="">All technicians</option>
-            {filterOptions.technicians.map((technician) => (
-              <option key={technician.id} value={technician.id}>
-                {technician.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          <select
-            className="ui-select"
-            value={filterState.priority}
-            onChange={(event) => onPatchFilters({ priority: event.target.value })}
-          >
+      <section className="grid shrink-0 grid-cols-2 gap-1.5">
+        <input
+          type="date"
+          className="ui-input col-span-2 min-h-0 py-1.5 text-sm"
+          value={filterState.selectedDate}
+          onChange={(event) => onPatchFilters({ selectedDate: event.target.value })}
+        />
+        <select
+          className="ui-select min-h-0 py-1.5 text-sm"
+          value={filterState.technicianId}
+          onChange={(event) => onPatchFilters({ technicianId: event.target.value })}
+        >
+          <option value="">All technicians</option>
+          {filterOptions.technicians.map((technician) => (
+            <option key={technician.id} value={technician.id}>
+              {technician.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="ui-select min-h-0 py-1.5 text-sm"
+          value={filterState.priority}
+          onChange={(event) => onPatchFilters({ priority: event.target.value })}
+        >
             <option value="">All priorities</option>
             {filterOptions.priorities.map((priority) => (
               <option key={priority.value} value={priority.value}>
                 {priority.label}
               </option>
             ))}
-          </select>
-          <select
-            className="ui-select"
-            value={filterState.status}
-            onChange={(event) => onPatchFilters({ status: event.target.value })}
-          >
-            <option value="">All statuses</option>
-            {filterOptions.statuses.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          <select
-            className="ui-select"
-            value={filterState.propertyId}
-            onChange={(event) => onPatchFilters({ propertyId: event.target.value })}
-          >
-            <option value="">All properties</option>
-            {propertyOptions.map((property) => (
-              <option key={property.id} value={property.id}>
-                {property.property_name ?? property.name ?? property.id}
-              </option>
-            ))}
-          </select>
-          <select
-            className="ui-select"
-            value={filterState.buildingId}
-            onChange={(event) => onPatchFilters({ buildingId: event.target.value })}
-          >
-            <option value="">All buildings</option>
-            {buildingOptions.map((building) => (
-              <option key={building.id} value={building.id}>
-                {building.building_name ?? building.name ?? building.id}
-              </option>
-            ))}
-          </select>
-        </div>
+        </select>
+        <select
+          className="ui-select min-h-0 py-1.5 text-sm"
+          value={filterState.status}
+          onChange={(event) => onPatchFilters({ status: event.target.value })}
+        >
+          <option value="">All statuses</option>
+          {filterOptions.statuses.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="ui-select min-h-0 py-1.5 text-sm"
+          value={filterState.propertyId}
+          onChange={(event) => onPatchFilters({ propertyId: event.target.value })}
+        >
+          <option value="">All properties</option>
+          {propertyOptions.map((property) => (
+            <option key={property.id} value={property.id}>
+              {property.property_name ?? property.name ?? property.id}
+            </option>
+          ))}
+        </select>
+        <select
+          className="ui-select min-h-0 py-1.5 text-sm"
+          value={filterState.buildingId}
+          onChange={(event) => onPatchFilters({ buildingId: event.target.value })}
+        >
+          <option value="">All buildings</option>
+          {buildingOptions.map((building) => (
+            <option key={building.id} value={building.id}>
+              {building.building_name ?? building.name ?? building.id}
+            </option>
+          ))}
+        </select>
       </section>
 
-      <div className="min-h-[300px] flex-1 overflow-hidden rounded-lg border border-[var(--card-border)]">
+      <div className="min-h-[320px] flex-1 overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]/50">
         <MapContainer
           center={[mapCenter.latitude, mapCenter.longitude]}
           zoom={zoomLevel}
@@ -456,16 +450,16 @@ export function DispatchMapPanel({
         </MapContainer>
       </div>
 
-      <section className="mt-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/55 p-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <section className="shrink-0 space-y-1.5 rounded-lg border border-[var(--card-border)]/80 bg-[var(--background)]/40 p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <select
-            className="ui-select"
+            className="ui-select min-h-0 flex-1 min-w-0 py-1.5 text-sm"
             value={selectedTechnicianId ?? ""}
             onChange={(event) =>
               onSelectTechnician(event.target.value ? event.target.value : null)
             }
           >
-            <option value="">Select technician route</option>
+            <option value="">Technician route</option>
             {workforce.technicians.map((technician) => (
               <option key={technician.id} value={technician.id}>
                 {technician.name}
@@ -473,13 +467,13 @@ export function DispatchMapPanel({
             ))}
           </select>
           <select
-            className="ui-select"
+            className="ui-select min-h-0 flex-1 min-w-0 py-1.5 text-sm"
             value={selectedWorkOrderId ?? ""}
             onChange={(event) =>
               onSelectWorkOrder(event.target.value ? event.target.value : null)
             }
           >
-            <option value="">Select work order</option>
+            <option value="">Work order</option>
             {workOrders.map((workOrder) => (
               <option key={workOrder.id} value={workOrder.id}>
                 {shortWorkOrderLabel(workOrder)} · {workOrder.priority ?? "medium"}
@@ -488,20 +482,22 @@ export function DispatchMapPanel({
           </select>
           <Button
             type="button"
+            size="sm"
+            className="shrink-0 text-[11px]"
             disabled={!canAssignFromMap || assignmentPending}
             onClick={() => {
               if (!selectedWorkOrder || !selectedTechnician) return;
               onAssignFromMap(selectedWorkOrder.id, selectedTechnician.id);
             }}
           >
-            {assignmentPending ? "Assigning…" : "Assign selected on map"}
+            {assignmentPending ? "…" : "Assign"}
           </Button>
         </div>
 
         {selectedRoute ? (
-          <div className="mt-2 max-h-32 space-y-1 overflow-auto">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--muted)]">
-              Route segments ({selectedRoute.technicianName})
+          <div className="max-h-24 space-y-0.5 overflow-auto">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              Route ({selectedRoute.technicianName})
             </p>
             {selectedRoute.segments.length === 0 ? (
               <p className="text-xs text-[var(--muted)]">No geo-located assignments for this technician.</p>

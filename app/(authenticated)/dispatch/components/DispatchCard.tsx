@@ -30,7 +30,7 @@ export function DispatchCard({
       } ${isDragging ? "opacity-90 shadow-lg" : ""} ${className}`}
     >
       <PriorityStripe priority={priority} />
-      <div className="p-3">{children}</div>
+      <div className="p-2.5">{children}</div>
     </article>
   );
 }

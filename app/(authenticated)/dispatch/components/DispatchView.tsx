@@ -26,7 +26,6 @@ import type { LoadDispatchResult } from "../dispatch-data";
 import type { DispatchFilterState } from "../filter-state";
 import { filterStateToParams } from "../filter-state";
 import { MetricCard } from "@/src/components/ui/metric-card";
-import { Card } from "@/src/components/ui/card";
 import { WorkOrderAssignmentModal } from "@/app/(authenticated)/work-orders/components/work-order-assignment-modal";
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import { RebalanceSuggestionsModal } from "./RebalanceSuggestionsModal";
@@ -920,7 +919,7 @@ export function DispatchView({
         </section>
       ) : null}
 
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
         <DispatchTopBar
           filterState={filterState}
           filterOptions={filterOptions}
@@ -928,18 +927,18 @@ export function DispatchView({
         />
 
         {error && (
-          <div className="border-b border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+          <div className="shrink-0 border-b border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
             {error}
           </div>
         )}
         {dropError && (
-          <div className="border-b border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-300">
+          <div className="shrink-0 border-b border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-300">
             {dropError}
           </div>
         )}
 
         {hasNoResults && (
-          <div className="border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-6 text-center">
+          <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--background)]/50 px-4 py-6 text-center">
             <p className="text-sm font-medium text-[var(--foreground)]">
               No work orders match current filters
             </p>
@@ -949,8 +948,8 @@ export function DispatchView({
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1">
+        <div className="flex min-h-0 flex-1 min-w-0">
+          {/* Left: narrow queue rail */}
             <DndContext
             sensors={sensors}
             collisionDetection={pointerWithin}
@@ -969,6 +968,7 @@ export function DispatchView({
               onToggleCollapse={() => setQueueCollapsed((current) => !current)}
               onOpenWorkOrder={handleOpenWorkOrder}
             />
+            {/* Center: primary schedule grid */}
             <main
               className={`min-w-0 flex-1 bg-[var(--background)] ${
                 queueCollapsed ? "" : "border-l border-[var(--card-border)]"
@@ -976,7 +976,7 @@ export function DispatchView({
             >
               <div className="flex h-full min-h-0 flex-col">
                 {filterState.viewMode === "day" ? (
-                  <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--card-border)] bg-[var(--card)]/50 px-3 py-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-3 py-2">
                     <span className="text-xs font-medium text-[var(--muted)]">Dispatch View:</span>
                     <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
                       <button
@@ -1088,36 +1088,36 @@ export function DispatchView({
             </DndContext>
           </div>
           {insightsCollapsed ? (
-            <aside className="hidden w-12 shrink-0 flex-col items-center justify-between border-l border-[var(--card-border)] bg-[var(--background)]/60 py-3 xl:flex">
+            <aside className="hidden w-11 shrink-0 flex-col items-center justify-between border-l border-[var(--card-border)] bg-[var(--background)]/50 py-2 xl:flex">
               <button
                 type="button"
                 onClick={() => setInsightsCollapsed(false)}
-                className="rounded-md border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-1 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card-border)]/35"
-                aria-label="Expand workload insights"
+                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-1 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+                aria-label="Expand map & insights"
               >
                 &lt;
               </button>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)] [writing-mode:vertical-rl]">
-                Map + Insights
+              <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted)] [writing-mode:vertical-rl]">
+                Map
               </span>
               <span />
             </aside>
           ) : (
-            <aside className="hidden w-[460px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
-              <div className="sticky top-3 flex h-[calc(100vh-7.75rem)] min-h-[700px] flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]/85 p-3 shadow-[var(--shadow-soft)]">
-                <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-                    Map Intelligence + Workload
-                  </p>
+            <aside className="hidden w-[380px] shrink-0 flex-col border-l border-[var(--card-border)] bg-[var(--background)]/30 xl:flex">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+                <div className="flex shrink-0 items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Map & workload
+                  </span>
                   <button
                     type="button"
                     onClick={() => setInsightsCollapsed(true)}
-                    className="rounded-md border border-[var(--card-border)] bg-[var(--background)] px-2 py-1 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/35"
+                    className="rounded border border-[var(--card-border)] bg-[var(--card)] px-2 py-1 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
                   >
                     Collapse
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
                   <DispatchMapPanel
                     workOrders={optimisticWorkOrders}
                     workforce={workforce}
@@ -1143,8 +1143,7 @@ export function DispatchView({
               </div>
             </aside>
           )}
-        </div>
-      </Card>
+      </div>
 
       <WorkOrderAssignmentModal
         open={Boolean(assignmentTarget)}
