@@ -24,6 +24,8 @@ export const navConfig: NavGroup[] = [
     label: "Operations",
     items: [
       { label: "Work Orders", href: "/work-orders" },
+      { label: "Work Requests", href: "/requests" },
+      { label: "Request Portal", href: "/request" },
       { label: "Assets", href: "/assets" },
       { label: "Asset Intelligence", href: "/assets/intelligence" },
       { label: "Technicians", href: "/technicians" },

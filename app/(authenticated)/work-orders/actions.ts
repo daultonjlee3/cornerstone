@@ -347,6 +347,10 @@ export async function saveWorkOrder(
   const buildingId = (formData.get("building_id") as string)?.trim() || null;
   const unitId = (formData.get("unit_id") as string)?.trim() || null;
   const assetId = (formData.get("asset_id") as string)?.trim() || null;
+  const hasRequestIdField = formData.has("request_id");
+  const requestId = hasRequestIdField
+    ? (formData.get("request_id") as string | null)?.trim() || null
+    : null;
   const customerIdForm = (formData.get("customer_id") as string)?.trim() || null;
 
   const supabase = await createClient();
@@ -359,6 +363,21 @@ export async function saveWorkOrder(
     if (!cust) return { error: "Selected customer was not found." };
     if ((cust as { company_id: string }).company_id !== companyId)
       return { error: "Selected customer does not belong to the selected company." };
+  }
+  if (hasRequestIdField && requestId) {
+    const { data: requestRow } = await supabase
+      .from("work_requests")
+      .select("id, tenant_id, company_id")
+      .eq("id", requestId)
+      .maybeSingle();
+    if (!requestRow) return { error: "Selected work request was not found." };
+    if ((requestRow as { tenant_id?: string | null }).tenant_id !== tenantId) {
+      return { error: "Selected work request is out of scope." };
+    }
+    const requestCompanyId = (requestRow as { company_id?: string | null }).company_id ?? null;
+    if (requestCompanyId && requestCompanyId !== companyId) {
+      return { error: "Selected work request belongs to a different company." };
+    }
   }
 
   const hierarchyError = await validateLocationHierarchy(supabase, {
@@ -454,6 +473,9 @@ export async function saveWorkOrder(
     billable,
     nte_amount: nteAmountRaw ? parseFloat(nteAmountRaw) : null,
   };
+  if (hasRequestIdField) {
+    payload.request_id = requestId;
+  }
   payload.created_by_user_id = actorId;
 
   const scheduleExists = Boolean(
