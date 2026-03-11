@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   updateWorkOrderStatus,
   uploadWorkOrderPhoto,
+  logWorkOrderLabor,
 } from "@/app/(authenticated)/work-orders/actions";
 import { WorkOrderCompletionModal } from "@/app/(authenticated)/work-orders/components/work-order-completion-modal";
 import { WorkOrderChecklistCard } from "@/app/(authenticated)/work-orders/components/work-order-checklist-card";
@@ -152,6 +153,13 @@ function formatDateOnly(value: string | null | undefined): string {
   return new Date(value).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
+function defaultLocalDateTimeValue(offsetMinutes = 0): string {
+  const date = new Date(Date.now() + offsetMinutes * 60_000);
+  date.setSeconds(0, 0);
+  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 16);
+}
+
 function healthTone(score: number | null): string {
   if (score == null) return "bg-slate-100 text-slate-700";
   if (score >= 90) return "bg-emerald-100 text-emerald-700";
@@ -191,6 +199,10 @@ export function TechnicianJobExecutionView({
   const [enforceChecklistCompletion, setEnforceChecklistCompletion] = useState(true);
   const [noteFocusSignal, setNoteFocusSignal] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [laborStart, setLaborStart] = useState(() => defaultLocalDateTimeValue(-60));
+  const [laborEnd, setLaborEnd] = useState(() => defaultLocalDateTimeValue(0));
+  const [laborHours, setLaborHours] = useState("");
+  const [laborNotes, setLaborNotes] = useState("");
   const photoSectionRef = useRef<HTMLElement | null>(null);
   const noteSectionRef = useRef<HTMLElement | null>(null);
 
@@ -281,6 +293,49 @@ export function TechnicianJobExecutionView({
     setCompletionOpen(true);
   };
 
+  const submitLaborLog = () => {
+    setMessage(null);
+    if (!laborStart || !laborEnd) {
+      setMessage({ type: "error", text: "Start and end time are required for labor logs." });
+      return;
+    }
+    const startDate = new Date(laborStart);
+    const endDate = new Date(laborEnd);
+    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
+      setMessage({ type: "error", text: "Labor start and end times are invalid." });
+      return;
+    }
+    if (endDate <= startDate) {
+      setMessage({ type: "error", text: "Labor end time must be after start time." });
+      return;
+    }
+    const parsedHours = laborHours.trim() ? Number(laborHours) : null;
+    if (parsedHours != null && (!Number.isFinite(parsedHours) || parsedHours <= 0)) {
+      setMessage({ type: "error", text: "Labor hours must be greater than zero." });
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await logWorkOrderLabor(workOrder.id, {
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        labor_hours: parsedHours,
+        notes: laborNotes.trim() || null,
+        technician_id: workOrder.technician_id_for_actor,
+      });
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
+      setMessage({ type: "success", text: "Labor log added." });
+      setLaborHours("");
+      setLaborNotes("");
+      setLaborStart(defaultLocalDateTimeValue(-60));
+      setLaborEnd(defaultLocalDateTimeValue(0));
+      router.refresh();
+    });
+  };
+
   const jumpToNotes = () => {
     setNoteFocusSignal((value) => value + 1);
     noteSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -348,6 +403,90 @@ export function TechnicianJobExecutionView({
           </p>
         </div>
       </header>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Labor tracking</h2>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="text-xs text-[var(--muted)]">
+            Start time
+            <input
+              type="datetime-local"
+              className="mt-1 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              value={laborStart}
+              onChange={(event) => setLaborStart(event.target.value)}
+              disabled={pending || isCompleted}
+            />
+          </label>
+          <label className="text-xs text-[var(--muted)]">
+            End time
+            <input
+              type="datetime-local"
+              className="mt-1 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              value={laborEnd}
+              onChange={(event) => setLaborEnd(event.target.value)}
+              disabled={pending || isCompleted}
+            />
+          </label>
+          <label className="text-xs text-[var(--muted)]">
+            Labor hours (optional override)
+            <input
+              type="number"
+              min="0"
+              step="0.25"
+              className="mt-1 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              value={laborHours}
+              onChange={(event) => setLaborHours(event.target.value)}
+              disabled={pending || isCompleted}
+            />
+          </label>
+          <label className="text-xs text-[var(--muted)]">
+            Notes
+            <input
+              type="text"
+              className="mt-1 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              value={laborNotes}
+              onChange={(event) => setLaborNotes(event.target.value)}
+              disabled={pending || isCompleted}
+            />
+          </label>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-11 w-full text-sm sm:w-auto"
+          onClick={submitLaborLog}
+          disabled={pending || isCompleted}
+        >
+          Log Labor
+        </Button>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Logged entries ({laborEntries.length})
+          </p>
+          {laborEntries.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">No labor entries yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {laborEntries.map((entry) => (
+                <li key={entry.id} className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+                  <p className="text-sm font-medium text-[var(--foreground)]">
+                    {formatDateTime(entry.started_at)} → {formatDateTime(entry.ended_at)}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {(entry.duration_minutes != null
+                      ? `${(entry.duration_minutes / 60).toFixed(2)}`
+                      : "0.00")}{" "}
+                    hours
+                  </p>
+                  {entry.notes ? (
+                    <p className="mt-1 text-xs text-[var(--muted-strong)]">{entry.notes}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
 
       {message ? (
         <p

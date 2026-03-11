@@ -198,8 +198,11 @@ export default async function InventoryPage() {
   const woPartReferenceIds = transactionRows
     .filter((row) => row.reference_type === "work_order_part_usage" && row.reference_id)
     .map((row) => row.reference_id as string);
+  const directWorkOrderReferenceIds = transactionRows
+    .filter((row) => row.reference_type === "work_order" && row.reference_id)
+    .map((row) => row.reference_id as string);
 
-  const [{ data: poLines }, { data: woPartRows }] = await Promise.all([
+  const [{ data: poLines }, { data: woPartRows }, { data: workOrders }] = await Promise.all([
     poLineReferenceIds.length
       ? scope.supabase
           .from("purchase_order_lines")
@@ -211,6 +214,12 @@ export default async function InventoryPage() {
           .from("work_order_part_usage")
           .select("id, work_order_id")
           .in("id", woPartReferenceIds)
+      : { data: [] as unknown[] },
+    directWorkOrderReferenceIds.length
+      ? scope.supabase
+          .from("work_orders")
+          .select("id")
+          .in("id", directWorkOrderReferenceIds)
       : { data: [] as unknown[] },
   ]);
 
@@ -226,6 +235,9 @@ export default async function InventoryPage() {
       (row as { work_order_id?: string | null }).work_order_id ?? null,
     ])
   );
+  const directWorkOrderIdSet = new Set(
+    (workOrders ?? []).map((row) => (row as { id: string }).id)
+  );
   const transactions = transactionRows.map((row) => ({
     ...row,
     reference_po_id:
@@ -233,7 +245,11 @@ export default async function InventoryPage() {
         ? poByLineId.get(row.reference_id) ?? null
         : null,
     reference_work_order_id:
-      row.reference_type === "work_order_part_usage" && row.reference_id
+      row.reference_type === "work_order" && row.reference_id
+        ? directWorkOrderIdSet.has(row.reference_id)
+          ? row.reference_id
+          : null
+        : row.reference_type === "work_order_part_usage" && row.reference_id
         ? workOrderByPartUsageId.get(row.reference_id) ?? null
         : null,
   }));

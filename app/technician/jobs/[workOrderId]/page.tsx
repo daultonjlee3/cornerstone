@@ -34,8 +34,8 @@ export default async function TechnicianJobExecutionPage({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
-        <Link href="/technician/jobs" className="hover:text-[var(--foreground)]">
-          My Jobs
+        <Link href="/technician/work" className="hover:text-[var(--foreground)]">
+          Workspace
         </Link>
         <span>/</span>
         <span className="text-[var(--foreground)]">

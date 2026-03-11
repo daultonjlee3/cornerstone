@@ -4,6 +4,8 @@ export type TechnicianPortalJob = {
   title: string;
   status: string;
   priority: string;
+  dueDate: string | null;
+  completedAt: string | null;
   scheduledDate: string | null;
   scheduledStart: string | null;
   scheduledEnd: string | null;
@@ -21,6 +23,7 @@ export type TechnicianPortalLaborEntry = {
   started_at: string;
   ended_at: string | null;
   duration_minutes: number | null;
+  notes?: string | null;
   is_active: boolean;
   created_at: string;
 };

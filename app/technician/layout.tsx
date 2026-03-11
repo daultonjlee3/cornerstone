@@ -41,10 +41,10 @@ export default async function TechnicianPortalLayout({
       <nav className="sticky bottom-0 z-30 border-t border-[var(--card-border)] bg-[var(--card)]/95 backdrop-blur">
         <div className="mx-auto grid w-full max-w-3xl grid-cols-2 gap-2 px-3 py-2 sm:px-4">
           <Link
-            href="/technician/jobs"
+            href="/technician/work"
             className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-center text-sm font-medium"
           >
-            My Jobs
+            Workspace
           </Link>
           <Link
             href="/dispatch"

@@ -71,7 +71,12 @@ export function TechnicianJobCard({ job }: TechnicianJobCardProps) {
       </div>
 
       <div className="mt-3 rounded-xl border border-[var(--card-border)] bg-[var(--background)]/65 px-3 py-2">
-        <p className="text-xs font-medium text-[var(--muted)]">{formatDate(job.scheduledDate)}</p>
+        <p className="text-xs font-medium text-[var(--muted)]">
+          Due: {formatDate(job.dueDate)}
+        </p>
+        <p className="text-xs font-medium text-[var(--muted)]">
+          Scheduled: {formatDate(job.scheduledDate)}
+        </p>
         <p className="text-sm font-semibold text-[var(--foreground)]">
           {formatTimeRange(job.scheduledStart, job.scheduledEnd)}
         </p>

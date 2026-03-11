@@ -87,6 +87,7 @@ type LaborEntry = {
   started_at: string;
   ended_at: string | null;
   duration_minutes: number | null;
+  notes?: string | null;
   is_active: boolean;
   created_at: string;
 };
@@ -282,7 +283,7 @@ export async function getTechnicianExecutionPayload(
         .order("created_at", { ascending: false }),
       supabase
         .from("work_order_labor_entries")
-        .select("id, technician_id, started_at, ended_at, duration_minutes, is_active, created_at")
+        .select("id, technician_id, started_at, ended_at, duration_minutes, notes, is_active, created_at")
         .eq("work_order_id", workOrderId)
         .order("started_at", { ascending: false }),
       supabase
@@ -299,14 +300,20 @@ export async function getTechnicianExecutionPayload(
           "work_order_scheduled",
           "work_order_status_changed",
           "job_started",
+          "work_order.started",
           "job_paused",
+          "work_order.paused",
           "job_completed",
+          "work_order.completed",
           "work_order_photo_uploaded",
           "work_order_note_added",
+          "note.added",
           "work_order_checklist_toggled",
           "work_order_checklist_item_added",
           "work_order_part_added",
+          "parts.consumed",
           "labor_logged",
+          "labor.logged",
           "completion_notes_added",
           "work_order_completed",
         ])
