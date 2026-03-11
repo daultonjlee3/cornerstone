@@ -728,6 +728,34 @@ export async function updateWorkOrderStatus(
   return { success: true };
 }
 
+/** Bulk update status for multiple work orders. Fails fast on first error. */
+export async function bulkUpdateWorkOrderStatus(
+  ids: string[],
+  newStatus: string
+): Promise<WorkOrderFormState> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  if (!isSupportedStatus(newStatus)) return { error: "Invalid status." };
+  const normalizedStatus = normalizeStatus(newStatus);
+  if (normalizedStatus === "completed") {
+    return { error: "Use Complete Work Order to mark work orders as completed." };
+  }
+  for (const id of ids) {
+    const result = await updateWorkOrderStatus(id, newStatus);
+    if (result.error) return result;
+  }
+  return { success: true };
+}
+
+/** Bulk delete work orders. Fails fast on first error. */
+export async function bulkDeleteWorkOrders(ids: string[]): Promise<WorkOrderFormState> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  for (const id of ids) {
+    const result = await deleteWorkOrder(id);
+    if (result.error) return result;
+  }
+  return { success: true };
+}
+
 /** Log a dispatch rebalance event (schedule optimization applied). */
 export async function logDispatchRebalance(
   movedJobIds: string[],
@@ -1655,4 +1683,66 @@ export async function addWorkOrderPartUsage(
   revalidatePath(`/technicians/work-queue/${workOrderId}`);
   revalidatePath(`/technician/jobs/${workOrderId}`);
   return { success: true };
+}
+
+/** Export work orders by IDs to CSV. Returns CSV string or error. Scoped to tenant. */
+export async function exportWorkOrdersCsv(
+  ids: string[]
+): Promise<{ data?: string; error?: string }> {
+  if (ids.length === 0) return { error: "No work orders to export." };
+  const tenantId = await getTenantId();
+  if (!tenantId) return { error: "Unauthorized." };
+  const supabase = await createClient();
+  const { data: companies } = await supabase
+    .from("companies")
+    .select("id")
+    .eq("tenant_id", tenantId);
+  const companyIds = (companies ?? []).map((c) => (c as { id: string }).id);
+  if (companyIds.length === 0) return { error: "No companies found." };
+  const { data: rows, error } = await supabase
+    .from("work_orders")
+    .select(
+      "id, work_order_number, title, status, priority, category, due_date, scheduled_date, source_type, created_at, updated_at, completed_at"
+    )
+    .in("id", ids)
+    .in("company_id", companyIds);
+  if (error) return { error: error.message };
+  const list = (rows ?? []) as Record<string, unknown>[];
+  const headers = [
+    "Work Order #",
+    "Title",
+    "Status",
+    "Priority",
+    "Category",
+    "Due Date",
+    "Scheduled Date",
+    "Source",
+    "Created",
+    "Updated",
+    "Completed",
+  ];
+  const escape = (v: unknown) => {
+    const s = String(v ?? "");
+    if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const lines = [
+    headers.join(","),
+    ...list.map((r) =>
+      [
+        escape(r.work_order_number),
+        escape(r.title),
+        escape(r.status),
+        escape(r.priority),
+        escape(r.category),
+        escape(r.due_date),
+        escape(r.scheduled_date),
+        escape(r.source_type),
+        escape(r.created_at),
+        escape(r.updated_at),
+        escape(r.completed_at),
+      ].join(",")
+    ),
+  ];
+  return { data: lines.join("\r\n") };
 }

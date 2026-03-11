@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Suspense } from "react";
 import { useTransition, useState, useEffect, useRef } from "react";
-import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus } from "../actions";
+import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus, bulkUpdateWorkOrderStatus, bulkDeleteWorkOrders, exportWorkOrdersCsv } from "../actions";
 import type { WorkOrder, WorkOrderPrefill } from "./work-order-form-modal";
 import { WorkOrderFormModal } from "./work-order-form-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
-import { WorkOrderStats } from "./work-order-stats";
+import { WorkOrderKpiBar, type WorkOrderKpiStats } from "./work-order-kpi-bar";
+import { WorkOrderSavedViews } from "./work-order-saved-views";
 import { WorkOrderStatusBadge } from "./work-order-status-badge";
 import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
+import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id: string };
@@ -27,12 +29,10 @@ type AssetOption = {
 };
 type TechnicianOption = { id: string; name: string };
 
-export type WorkOrderListStats = {
+export type WorkOrderListStats = WorkOrderKpiStats & {
   new: number;
   readyToSchedule: number;
   scheduled: number;
-  inProgress: number;
-  dueToday: number;
   completedThisWeek: number;
 };
 
@@ -118,8 +118,26 @@ export function WorkOrdersList({
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [assigningWorkOrder, setAssigningWorkOrder] = useState<WorkOrderListRow | null>(null);
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [detailDrawerRow, setDetailDrawerRow] = useState<WorkOrderListRow | null>(null);
+  const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === initialList.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(initialList.map((wo) => wo.id)));
+  };
+  const clearSelection = () => setSelectedIds(new Set());
 
   useEffect(() => {
     setPrefill(initialPrefill);
@@ -187,6 +205,52 @@ export function WorkOrdersList({
     });
   };
 
+  const handleBulkStatus = (newStatus: string) => {
+    setBulkStatusDropdown(false);
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      const result = await bulkUpdateWorkOrderStatus(ids, newStatus);
+      if (result.error) setMessage({ type: "error", text: result.error });
+      else {
+        setMessage({ type: "success", text: `Status updated for ${ids.length} work order(s).` });
+        setSelectedIds(new Set());
+        router.refresh();
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} work order(s)? This cannot be undone.`)) return;
+    startTransition(async () => {
+      const result = await bulkDeleteWorkOrders(ids);
+      if (result.error) setMessage({ type: "error", text: result.error });
+      else {
+        setMessage({ type: "success", text: `Deleted ${ids.length} work order(s).` });
+        setSelectedIds(new Set());
+        router.refresh();
+      }
+    });
+  };
+
+  const handleExport = async (ids: string[]) => {
+    const result = await exportWorkOrdersCsv(ids);
+    if (result.error) {
+      setMessage({ type: "error", text: result.error });
+      return;
+    }
+    const blob = new Blob([result.data!], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `work-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessage({ type: "success", text: "Export downloaded." });
+  };
+
   if (initialError) {
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center">
@@ -215,11 +279,61 @@ export function WorkOrdersList({
           <p className="text-sm text-[var(--muted)]">Create and track maintenance and service jobs</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setQuickActionsOpen((v) => !v)}
+              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              title="Quick actions"
+            >
+              Quick actions ▾
+            </button>
+            {quickActionsOpen && (
+              <>
+                <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => { openNew(); setQuickActionsOpen(false); }}
+                    className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+                  >
+                    Create work order
+                  </button>
+                  {selectedIds.size > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { handleBulkStatus("in_progress"); setQuickActionsOpen(false); }}
+                        disabled={isPending}
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
+                      >
+                        Mark selected in progress
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport(Array.from(selectedIds))}
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+                      >
+                        Export selected
+                      </button>
+                    </>
+                  )}
+                  <a
+                    href="/dispatch"
+                    className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+                    onClick={() => setQuickActionsOpen(false)}
+                  >
+                    Open dispatch board
+                  </a>
+                </div>
+                <div className="fixed inset-0 z-10" aria-hidden onClick={() => setQuickActionsOpen(false)} />
+              </>
+            )}
+          </div>
           <button
             type="button"
-            disabled
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--muted)] opacity-70"
-            title="Export (coming soon)"
+            onClick={() => handleExport(initialList.map((w) => w.id))}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            title="Export visible work orders to CSV"
           >
             Export
           </button>
@@ -233,18 +347,89 @@ export function WorkOrdersList({
         </div>
       </div>
 
-      <WorkOrderStats stats={stats} />
-
+      <WorkOrderKpiBar
+        stats={{
+          open: stats.open,
+          inProgress: stats.inProgress,
+          onHold: stats.onHold,
+          overdue: stats.overdue,
+          dueToday: stats.dueToday,
+          completedToday: stats.completedToday,
+        }}
+      />
+      <Suspense fallback={null}>
+        <WorkOrderSavedViews />
+      </Suspense>
       <Suspense fallback={<div className="h-12 animate-pulse rounded-lg bg-[var(--card-border)]/50" />}>
         <WorkOrderFilters
           options={{
             companies,
             properties,
+            buildings,
+            units,
+            assets,
             technicians,
             crews,
           }}
         />
       </Suspense>
+
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3">
+          <span className="text-sm font-medium text-[var(--foreground)]">
+            {selectedIds.size} selected
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setBulkStatusDropdown((v) => !v)}
+              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            >
+              Change status
+            </button>
+            {bulkStatusDropdown && (
+              <>
+                <div className="absolute left-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
+                  {STATUS_OPTIONS_QUICK.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleBulkStatus(s)}
+                      disabled={isPending}
+                      className="block w-full px-3 py-1.5 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
+                    >
+                      {s.replace(/_/g, " ")}
+                    </button>
+                  ))}
+                </div>
+                <div className="fixed inset-0 z-0" aria-hidden onClick={() => setBulkStatusDropdown(false)} />
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleExport(Array.from(selectedIds))}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+          >
+            Export selected
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={isPending}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            Delete selected
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {initialList.length === 0 ? (
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
@@ -263,6 +448,15 @@ export function WorkOrdersList({
             <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="w-10 px-2 py-3">
+                    <input
+                      type="checkbox"
+                      checked={initialList.length > 0 && selectedIds.size === initialList.length}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all"
+                      className="rounded border-[var(--card-border)]"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-semibold">Work Order #</th>
                   <th className="px-4 py-3 font-semibold">Title</th>
                   <th className="px-4 py-3 font-semibold">Company</th>
@@ -282,7 +476,7 @@ export function WorkOrdersList({
                 {initialList.map((wo) => (
                   <tr
                     key={wo.id}
-                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50 ${
+                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50 cursor-pointer ${
                       wo.status === "completed"
                         ? "bg-[var(--muted)]/5"
                         : ""
@@ -334,7 +528,7 @@ export function WorkOrdersList({
                     <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{assignedDisplay(wo)}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <Link
                           href={`/work-orders/${wo.id}`}
@@ -422,6 +616,22 @@ export function WorkOrdersList({
         technicians={technicians}
         crews={crews}
         saveAction={saveWorkOrder}
+      />
+
+      <WorkOrderDetailDrawer
+        workOrder={detailDrawerRow}
+        onClose={() => setDetailDrawerRow(null)}
+        onAssign={() => {
+          if (detailDrawerRow) setAssigningWorkOrder(detailDrawerRow);
+          setDetailDrawerRow(null);
+        }}
+        onEdit={() => {
+          if (detailDrawerRow) {
+            setEditingWorkOrder(detailDrawerRow as WorkOrder);
+            setModalOpen(true);
+          }
+          setDetailDrawerRow(null);
+        }}
       />
 
       {assigningWorkOrder && (

@@ -4,8 +4,8 @@ import type { WorkOrder } from "./components/work-order-form-modal";
 import { WorkOrdersList } from "./components/work-orders-list";
 
 export const metadata = {
-  title: "Work Orders | Cornerstone Tech",
-  description: "Manage work orders",
+  title: "Work Order Command Center | Cornerstone OS",
+  description: "Operational hub for triage, dispatch, and work order management",
 };
 
 type SearchParams = { [key: string]: string | string[] | undefined };
@@ -167,8 +167,17 @@ export default async function WorkOrdersPage({
   const filterCategory = typeof searchParams?.category === "string" ? searchParams.category : null;
   const filterCompany = typeof searchParams?.company_id === "string" ? searchParams.company_id : null;
   const filterProperty = typeof searchParams?.property_id === "string" ? searchParams.property_id : null;
+  const filterBuilding = typeof searchParams?.building_id === "string" ? searchParams.building_id : null;
+  const filterUnit = typeof searchParams?.unit_id === "string" ? searchParams.unit_id : null;
+  const filterAsset = typeof searchParams?.asset_id === "string" ? searchParams.asset_id : null;
   const filterTechnician = typeof searchParams?.technician_id === "string" ? searchParams.technician_id : null;
   const filterCrew = typeof searchParams?.crew_id === "string" ? searchParams.crew_id : null;
+  const filterSourceType = typeof searchParams?.source_type === "string" ? searchParams.source_type : null;
+  const filterOverdue = searchParams?.overdue === "1" || searchParams?.overdue === "true";
+  const filterUnassigned = searchParams?.unassigned === "1" || searchParams?.unassigned === "true";
+  const filterDueToday = searchParams?.due_today === "1" || searchParams?.due_today === "true";
+  const filterCompletedToday = searchParams?.completed_today === "1" || searchParams?.completed_today === "true";
+  const viewPreset = typeof searchParams?.view === "string" ? searchParams.view : null;
   const dateFrom = typeof searchParams?.date_from === "string" ? searchParams.date_from : null;
   const dateTo = typeof searchParams?.date_to === "string" ? searchParams.date_to : null;
   const filterCompletionStatus = typeof searchParams?.completion_status === "string" ? searchParams.completion_status : null;
@@ -178,6 +187,7 @@ export default async function WorkOrdersPage({
     ? searchParams.sort
     : "updated_at";
   const sortOrder = searchParams?.order === "asc" ? "asc" : "desc";
+  const today = new Date().toISOString().slice(0, 10);
 
   let query = supabase
     .from("work_orders")
@@ -208,13 +218,48 @@ export default async function WorkOrdersPage({
       `title.ilike.%${term}%,work_order_number.ilike.%${term}%,description.ilike.%${term}%,requested_by_name.ilike.%${term}%,requested_by_email.ilike.%${term}%`
     );
   }
-  if (filterStatus) query = query.eq("status", filterStatus);
+  if (viewPreset === "open") {
+    query = query.in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]);
+  } else if (viewPreset === "in_progress") {
+    query = query.eq("status", "in_progress");
+  } else if (viewPreset === "on_hold") {
+    query = query.eq("status", "on_hold");
+  } else if (viewPreset === "overdue") {
+    query = query.lt("due_date", today).not("status", "in", "(completed,cancelled)");
+  } else if (viewPreset === "due_today") {
+    query = query.eq("due_date", today);
+  } else if (viewPreset === "completed_today") {
+    query = query.eq("status", "completed").gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
+  } else if (viewPreset === "unassigned") {
+    query = query.is("assigned_technician_id", null).is("assigned_crew_id", null);
+  } else if (viewPreset === "pm") {
+    query = query.eq("source_type", "preventive_maintenance");
+  } else if (viewPreset === "high_priority") {
+    query = query.in("priority", ["high", "urgent", "emergency"]);
+  }
+  if (!viewPreset && filterStatus) query = query.eq("status", filterStatus);
   if (filterPriority) query = query.eq("priority", filterPriority);
   if (filterCategory) query = query.eq("category", filterCategory);
   if (filterCompany) query = query.eq("company_id", filterCompany);
   if (filterProperty) query = query.eq("property_id", filterProperty);
+  if (filterBuilding) query = query.eq("building_id", filterBuilding);
+  if (filterUnit) query = query.eq("unit_id", filterUnit);
+  if (filterAsset) query = query.eq("asset_id", filterAsset);
   if (filterTechnician) query = query.eq("assigned_technician_id", filterTechnician);
   if (filterCrew) query = query.eq("assigned_crew_id", filterCrew);
+  if (!viewPreset && filterSourceType) query = query.eq("source_type", filterSourceType);
+  if (!viewPreset && filterOverdue) {
+    query = query.lt("due_date", today);
+    query = query.not("status", "in", "(completed,cancelled)");
+  }
+  if (!viewPreset && filterUnassigned) {
+    query = query.is("assigned_technician_id", null).is("assigned_crew_id", null);
+  }
+  if (!viewPreset && filterDueToday) query = query.eq("due_date", today);
+  if (!viewPreset && filterCompletedToday) {
+    query = query.eq("status", "completed");
+    query = query.gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
+  }
   if (dateFrom) query = query.gte("scheduled_date", dateFrom);
   if (dateTo) query = query.lte("scheduled_date", dateTo);
   if (filterCompletionStatus) query = query.eq("completion_status", filterCompletionStatus);
@@ -224,7 +269,6 @@ export default async function WorkOrdersPage({
   const sortColumn = sortBy === "scheduled_date" ? "scheduled_date" : sortBy === "due_date" ? "due_date" : sortBy === "completed_at" ? "completed_at" : sortBy === "priority" ? "priority" : sortBy === "status" ? "status" : "updated_at";
   const { data: workOrdersRaw, error } = await query.order(sortColumn, { ascending: sortOrder === "asc" });
 
-  const today = new Date().toISOString().slice(0, 10);
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const weekAgoStr = oneWeekAgo.toISOString();
@@ -262,22 +306,43 @@ export default async function WorkOrdersPage({
   }) as (WorkOrder & { technician_name?: string; crew_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
 
   const stats = {
+    open: workOrders.filter(
+      (wo) =>
+        ["new", "open", "ready_to_schedule", "assigned", "scheduled"].includes(wo.status ?? "") &&
+        wo.status !== "completed" &&
+        wo.status !== "cancelled"
+    ).length,
+    inProgress: workOrders.filter((wo) => wo.status === "in_progress").length,
+    onHold: workOrders.filter((wo) => wo.status === "on_hold").length,
+    overdue: workOrders.filter(
+      (wo) =>
+        wo.due_date != null &&
+        wo.due_date < today &&
+        wo.status !== "completed" &&
+        wo.status !== "cancelled"
+    ).length,
+    dueToday: workOrders.filter(
+      (wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled"
+    ).length,
+    completedToday: workOrders.filter((wo) => {
+      if (wo.status !== "completed" || !wo.completed_at) return false;
+      const completedAt = String(wo.completed_at).slice(0, 10);
+      return completedAt === today;
+    }).length,
     new: workOrders.filter((wo) => wo.status === "new" || wo.status === "open").length,
     readyToSchedule: workOrders.filter((wo) => wo.status === "ready_to_schedule" || wo.status === "assigned").length,
     scheduled: workOrders.filter((wo) => wo.status === "scheduled").length,
-    inProgress: workOrders.filter((wo) => wo.status === "in_progress").length,
-    dueToday: workOrders.filter((wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled").length,
     completedThisWeek: workOrders.filter((wo) => wo.status === "completed" && wo.updated_at && String(wo.updated_at) >= weekAgoStr).length,
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Work Orders
+          Work Order Command Center
         </h1>
         <p className="mt-1 text-[var(--muted)]">
-          Create and track maintenance and repair work.
+          Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations.
         </p>
       </div>
       <WorkOrdersList
