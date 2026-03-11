@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   DndContext,
@@ -55,6 +55,11 @@ export function DispatchView({
   const [activeWo, setActiveWo] = useState<DispatchWorkOrder | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [assignmentTarget, setAssignmentTarget] = useState<DispatchWorkOrder | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -292,56 +297,77 @@ export function DispatchView({
         )}
 
         <div className="flex min-h-0 flex-1">
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-          >
-            <DispatchSidebarQueue
-              unscheduled={unscheduled}
-              overdue={overdue}
-              ready={ready}
-              onOpenWorkOrder={handleOpenWorkOrder}
-            />
-            <main className="min-w-0 flex-1 border-l border-[var(--card-border)] bg-[var(--background)]">
-              <div className="h-full min-h-0">
-                <DispatchBoard
-                  crews={crews}
-                  selectedDate={filterState.selectedDate}
-                  overCrewId={overCrewId}
-                  view={filterState.viewMode}
-                  workOrders={workOrders}
-                  onSelectDate={handleSelectDate}
-                  onResizeEnd={handleResizeEnd}
+          {!mounted ? (
+            <>
+              <div className="flex w-64 shrink-0 flex-col gap-2 border-r border-[var(--card-border)] bg-[var(--card)]/50 p-3">
+                <div className="h-6 w-24 animate-pulse rounded bg-[var(--card-border)]" />
+                <div className="h-10 animate-pulse rounded bg-[var(--card-border)]" />
+                <div className="h-10 animate-pulse rounded bg-[var(--card-border)]" />
+                <div className="h-10 animate-pulse rounded bg-[var(--card-border)]" />
+              </div>
+              <main className="min-w-0 flex-1 border-l border-[var(--card-border)] bg-[var(--background)]">
+                <div className="flex h-full min-h-[320px] items-center justify-center p-8">
+                  <p className="text-sm text-[var(--muted)]">Loading scheduling board…</p>
+                </div>
+              </main>
+              <aside className="hidden w-[420px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
+                <div className="h-32 animate-pulse rounded bg-[var(--card-border)]/50" />
+              </aside>
+            </>
+          ) : (
+            <>
+              <DndContext
+                sensors={sensors}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <DispatchSidebarQueue
+                  unscheduled={unscheduled}
+                  overdue={overdue}
+                  ready={ready}
                   onOpenWorkOrder={handleOpenWorkOrder}
                 />
-              </div>
-            </main>
+                <main className="min-w-0 flex-1 border-l border-[var(--card-border)] bg-[var(--background)]">
+                  <div className="h-full min-h-0">
+                    <DispatchBoard
+                      crews={crews}
+                      selectedDate={filterState.selectedDate}
+                      overCrewId={overCrewId}
+                      view={filterState.viewMode}
+                      workOrders={workOrders}
+                      onSelectDate={handleSelectDate}
+                      onResizeEnd={handleResizeEnd}
+                      onOpenWorkOrder={handleOpenWorkOrder}
+                    />
+                  </div>
+                </main>
 
-            <DragOverlay
-              dropAnimation={{
-                duration: 180,
-                easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
-            >
-              {activeWo ? (
-                <div className="min-w-[10rem] max-w-[14rem] cursor-grabbing opacity-95 shadow-xl">
-                  <DispatchWorkOrderCard
-                    workOrder={activeWo}
-                    variant="block"
-                    showScheduledTime
-                    isDragging
-                  />
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+                <DragOverlay
+                  dropAnimation={{
+                    duration: 180,
+                    easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  {activeWo ? (
+                    <div className="min-w-[10rem] max-w-[14rem] cursor-grabbing opacity-95 shadow-xl">
+                      <DispatchWorkOrderCard
+                        workOrder={activeWo}
+                        variant="block"
+                        showScheduledTime
+                        isDragging
+                      />
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
 
-          <aside className="hidden w-[420px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
-            <DispatchWorkforcePanel workforce={workforce} />
-          </aside>
+              <aside className="hidden w-[420px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
+                <DispatchWorkforcePanel workforce={workforce} />
+              </aside>
+            </>
+          )}
         </div>
       </Card>
 
