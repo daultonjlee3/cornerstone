@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Modal } from "@/src/components/ui/modal";
 import { FormField } from "@/src/components/ui/form-field";
 import { Button } from "@/src/components/ui/button";
+import { AddressAutocomplete, type AddressSuggestion } from "@/src/components/address-autocomplete";
 
 export type Building = {
   id: string;
@@ -11,6 +12,13 @@ export type Building = {
   name?: string;
   property_id: string;
   building_code: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   year_built: number | null;
   floors: number | null;
@@ -34,6 +42,13 @@ const emptyBuilding: Building = {
   building_name: "",
   property_id: "",
   building_code: null,
+  address: null,
+  city: null,
+  state: null,
+  postal_code: null,
+  country: null,
+  latitude: null,
+  longitude: null,
   status: "active",
   year_built: null,
   floors: null,
@@ -51,12 +66,42 @@ export function BuildingFormModal({
   const isEdit = !!building?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
 
+  const b = building ?? emptyBuilding;
+  const displayName = b.building_name ?? b.name ?? "";
+
+  const [address, setAddress] = useState(b.address ?? "");
+  const [city, setCity] = useState(b.city ?? "");
+  const [stateVal, setStateVal] = useState(b.state ?? "");
+  const [postalCode, setPostalCode] = useState(b.postal_code ?? "");
+  const [country, setCountry] = useState(b.country ?? "");
+  const [latitude, setLatitude] = useState(b.latitude != null ? String(b.latitude) : "");
+  const [longitude, setLongitude] = useState(b.longitude != null ? String(b.longitude) : "");
+
   useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  const b = building ?? emptyBuilding;
-  const displayName = b.building_name ?? b.name ?? "";
+  useEffect(() => {
+    if (!open) return;
+    const src = building ?? emptyBuilding;
+    setAddress(src.address ?? "");
+    setCity(src.city ?? "");
+    setStateVal(src.state ?? "");
+    setPostalCode(src.postal_code ?? "");
+    setCountry(src.country ?? "");
+    setLatitude(src.latitude != null ? String(src.latitude) : "");
+    setLongitude(src.longitude != null ? String(src.longitude) : "");
+  }, [open, building?.id, building?.address, building?.city, building?.state, building?.postal_code, building?.country, building?.latitude, building?.longitude]);
+
+  const handleAddressSelect = (s: AddressSuggestion) => {
+    setAddress(s.address_line1 ?? "");
+    setCity(s.city ?? "");
+    setStateVal(s.state ?? "");
+    setPostalCode(s.postal_code ?? "");
+    setCountry(s.country ?? "");
+    setLatitude(String(s.latitude));
+    setLongitude(String(s.longitude));
+  };
 
   return (
     <Modal
@@ -98,6 +143,93 @@ export function BuildingFormModal({
               ))}
             </select>
           </FormField>
+          <FormField label="Address search" htmlFor="building_address_autocomplete">
+            <AddressAutocomplete
+              onSelect={handleAddressSelect}
+              placeholder="Type to search for building address…"
+              className="ui-input"
+            />
+          </FormField>
+          <FormField label="Address" htmlFor="building_address">
+            <input
+              id="building_address"
+              name="address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street address"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="City" htmlFor="building_city">
+              <input
+                id="building_city"
+                name="city"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="State" htmlFor="building_state">
+              <input
+                id="building_state"
+                name="state"
+                type="text"
+                value={stateVal}
+                onChange={(e) => setStateVal(e.target.value)}
+                className="ui-input"
+              />
+            </FormField>
+          </div>
+          <FormField label="Postal code" htmlFor="postal_code">
+            <input
+              id="postal_code"
+              name="postal_code"
+              type="text"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              className="ui-input"
+            />
+          </FormField>
+          <FormField label="Country" htmlFor="building_country">
+            <input
+              id="building_country"
+              name="country"
+              type="text"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. USA"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Latitude" htmlFor="building_latitude">
+              <input
+                id="building_latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="e.g. 33.7490"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Longitude" htmlFor="building_longitude">
+              <input
+                id="building_longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="e.g. -84.3880"
+                className="ui-input"
+              />
+            </FormField>
+          </div>
           <FormField label="Building code" htmlFor="building_code">
             <input
               id="building_code"

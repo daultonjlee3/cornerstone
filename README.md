@@ -20,6 +20,15 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+### Address autocomplete & geocoding
+
+Property and building forms support address search and automatic coordinates via [Mapbox Geocoding API](https://docs.mapbox.com/api/search/geocoding/). Set one of:
+
+- `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` — for client-side address suggestions and server-side geocode-on-save
+- `MAPBOX_ACCESS_TOKEN` — server-only (used for geocode when saving without coordinates)
+
+Without a token, address fields remain manually editable and coordinates can be entered by hand.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

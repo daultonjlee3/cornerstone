@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Modal } from "@/src/components/ui/modal";
 import { FormField } from "@/src/components/ui/form-field";
 import { Button } from "@/src/components/ui/button";
+import { AddressAutocomplete, type AddressSuggestion } from "@/src/components/address-autocomplete";
 
 export type Property = {
   id: string;
@@ -14,6 +15,9 @@ export type Property = {
   city: string | null;
   state: string | null;
   zip: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   company?: { name: string } | null;
 };
@@ -37,6 +41,9 @@ const emptyProperty: Property = {
   city: null,
   state: null,
   zip: null,
+  country: null,
+  latitude: null,
+  longitude: null,
   status: "active",
 };
 
@@ -50,12 +57,44 @@ export function PropertyFormModal({
   const isEdit = !!property?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
 
+  const p = property ?? emptyProperty;
+  const displayName = p.property_name ?? (p as { name?: string }).name ?? "";
+
+  const [addressLine1, setAddressLine1] = useState(p.address_line1 ?? "");
+  const [addressLine2, setAddressLine2] = useState(p.address_line2 ?? "");
+  const [city, setCity] = useState(p.city ?? "");
+  const [stateVal, setStateVal] = useState(p.state ?? "");
+  const [zip, setZip] = useState(p.zip ?? "");
+  const [country, setCountry] = useState(p.country ?? "");
+  const [latitude, setLatitude] = useState(p.latitude != null ? String(p.latitude) : "");
+  const [longitude, setLongitude] = useState(p.longitude != null ? String(p.longitude) : "");
+
   useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  const p = property ?? emptyProperty;
-  const displayName = p.property_name ?? (p as { name?: string }).name ?? "";
+  useEffect(() => {
+    if (!open) return;
+    const src = property ?? emptyProperty;
+    setAddressLine1(src.address_line1 ?? "");
+    setAddressLine2(src.address_line2 ?? "");
+    setCity(src.city ?? "");
+    setStateVal(src.state ?? "");
+    setZip(src.zip ?? "");
+    setCountry(src.country ?? "");
+    setLatitude(src.latitude != null ? String(src.latitude) : "");
+    setLongitude(src.longitude != null ? String(src.longitude) : "");
+  }, [open, property?.id, property?.address_line1, property?.address_line2, property?.city, property?.state, property?.zip, property?.country, property?.latitude, property?.longitude]);
+
+  const handleAddressSelect = (s: AddressSuggestion) => {
+    setAddressLine1(s.address_line1 ?? "");
+    setCity(s.city ?? "");
+    setStateVal(s.state ?? "");
+    setZip(s.postal_code ?? "");
+    setCountry(s.country ?? "");
+    setLatitude(String(s.latitude));
+    setLongitude(String(s.longitude));
+  };
 
   return (
     <Modal
@@ -97,12 +136,20 @@ export function PropertyFormModal({
               ))}
             </select>
           </FormField>
+          <FormField label="Address search" htmlFor="address_autocomplete">
+            <AddressAutocomplete
+              onSelect={handleAddressSelect}
+              placeholder="Type to search for an address…"
+              className="ui-input"
+            />
+          </FormField>
           <FormField label="Address line 1" htmlFor="address_line1">
             <input
               id="address_line1"
               name="address_line1"
               type="text"
-              defaultValue={p.address_line1 ?? ""}
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
               className="ui-input"
             />
           </FormField>
@@ -111,7 +158,8 @@ export function PropertyFormModal({
               id="address_line2"
               name="address_line2"
               type="text"
-              defaultValue={p.address_line2 ?? ""}
+              value={addressLine2}
+              onChange={(e) => setAddressLine2(e.target.value)}
               className="ui-input"
             />
           </FormField>
@@ -121,7 +169,8 @@ export function PropertyFormModal({
                 id="city"
                 name="city"
                 type="text"
-                defaultValue={p.city ?? ""}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
                 className="ui-input"
               />
             </FormField>
@@ -130,7 +179,8 @@ export function PropertyFormModal({
                 id="state"
                 name="state"
                 type="text"
-                defaultValue={p.state ?? ""}
+                value={stateVal}
+                onChange={(e) => setStateVal(e.target.value)}
                 className="ui-input"
               />
             </FormField>
@@ -140,10 +190,48 @@ export function PropertyFormModal({
               id="zip"
               name="zip"
               type="text"
-              defaultValue={p.zip ?? ""}
+              value={zip}
+              onChange={(e) => setZip(e.target.value)}
               className="ui-input"
             />
           </FormField>
+          <FormField label="Country" htmlFor="country">
+            <input
+              id="country"
+              name="country"
+              type="text"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. USA"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Latitude" htmlFor="latitude">
+              <input
+                id="latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="e.g. 33.7490"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Longitude" htmlFor="longitude">
+              <input
+                id="longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="e.g. -84.3880"
+                className="ui-input"
+              />
+            </FormField>
+          </div>
           <FormField label="Status" htmlFor="status">
             <select
               id="status"

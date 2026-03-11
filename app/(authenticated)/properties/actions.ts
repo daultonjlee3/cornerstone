@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { geocodeAddress } from "@/src/lib/geocoding";
 
 export type PropertyFormState = { error?: string; success?: boolean };
 
@@ -49,15 +50,44 @@ export async function saveProperty(
   const allowed = await companyBelongsToTenant(companyId, tenantId);
   if (!allowed) return { error: "Invalid company." };
 
+  let addressLine1 = (formData.get("address_line1") as string)?.trim() || null;
+  let city = (formData.get("city") as string)?.trim() || null;
+  let state = (formData.get("state") as string)?.trim() || null;
+  let zip = (formData.get("zip") as string)?.trim() || null;
+  let country = (formData.get("country") as string)?.trim() || null;
+  let latRaw = (formData.get("latitude") as string)?.trim();
+  let lonRaw = (formData.get("longitude") as string)?.trim();
+  let lat = latRaw ? parseFloat(latRaw) : null;
+  let lon = lonRaw ? parseFloat(lonRaw) : null;
+
+  // On manual save without coordinates, attempt to geocode from address text
+  const hasAddressText = [addressLine1, city, state, zip, country].some(Boolean);
+  if (hasAddressText && (lat == null || !Number.isFinite(lat) || lon == null || !Number.isFinite(lon))) {
+    const parts = [addressLine1, city, state, zip, country].filter(Boolean);
+    const geocoded = await geocodeAddress(parts.join(", "));
+    if (geocoded?.latitude != null && geocoded?.longitude != null) {
+      lat = geocoded.latitude;
+      lon = geocoded.longitude;
+      if (geocoded.address_line1 && !addressLine1) addressLine1 = geocoded.address_line1;
+      if (geocoded.city && !city) city = geocoded.city;
+      if (geocoded.state && !state) state = geocoded.state;
+      if (geocoded.postal_code && !zip) zip = geocoded.postal_code;
+      if (geocoded.country && !country) country = geocoded.country;
+    }
+  }
+
   const payload = {
     name: propertyName,
     property_name: propertyName,
     company_id: companyId,
-    address_line1: (formData.get("address_line1") as string)?.trim() || null,
+    address_line1,
     address_line2: (formData.get("address_line2") as string)?.trim() || null,
-    city: (formData.get("city") as string)?.trim() || null,
-    state: (formData.get("state") as string)?.trim() || null,
-    zip: (formData.get("zip") as string)?.trim() || null,
+    city,
+    state,
+    zip,
+    country,
+    latitude: lat != null && Number.isFinite(lat) ? lat : null,
+    longitude: lon != null && Number.isFinite(lon) ? lon : null,
     status: (formData.get("status") as string) === "inactive" ? "inactive" : "active",
   };
 
