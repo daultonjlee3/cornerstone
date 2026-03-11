@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { DispatchWorkOrder } from "../types";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
@@ -14,7 +13,10 @@ export type DispatchWorkOrderCardProps = {
   isDragging?: boolean;
   /** When true, show hover quick actions (View, Reassign, Mark complete, Open). */
   showQuickActions?: boolean;
-  onOpenWorkOrder?: (id: string, action?: "view" | "reassign" | "complete" | "open") => void;
+  onOpenWorkOrder?: (
+    id: string,
+    action?: "view" | "reassign" | "complete" | "open" | "unschedule"
+  ) => void;
 };
 
 function formatTime(iso: string | null | undefined): string {
@@ -111,7 +113,6 @@ export function DispatchWorkOrderCard({
   showQuickActions = true,
   onOpenWorkOrder,
 }: DispatchWorkOrderCardProps) {
-  const [hover, setHover] = useState(false);
   const title = workOrder.title ?? "Untitled";
   const priority = workOrder.priority ?? "medium";
   const timeRange =
@@ -123,7 +124,10 @@ export function DispatchWorkOrderCard({
   const jobType = getJobType(workOrder);
   const typeBadgeClass = getTypeBadgeClass(jobType);
   const overdue = isOverdue(workOrder);
-  const showActions = showQuickActions && hover && !isDragging && onOpenWorkOrder;
+  const showActions = showQuickActions && !isDragging && onOpenWorkOrder;
+  const preventDragFromAction = (event: React.SyntheticEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+  };
 
   if (variant === "compact") {
     return (
@@ -147,9 +151,7 @@ export function DispatchWorkOrderCard({
       priority={priority}
       isOverdue={overdue}
       isDragging={isDragging}
-      className="cursor-grab active:cursor-grabbing"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="h-full cursor-grab active:cursor-grabbing"
     >
       <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         {workOrder.work_order_number ?? "Work order"}
@@ -181,54 +183,108 @@ export function DispatchWorkOrderCard({
 
       {showCrew ? <p className={`mt-1.5 text-xs font-semibold ${assignment.tone}`}>{assignment.label}</p> : null}
 
-      {showActions && (
-        <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-1 rounded-b-lg border-t border-[var(--card-border)] bg-[var(--card)]/95 px-2 py-1.5">
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpenWorkOrder?.(workOrder.id, "view");
-            }}
-          >
-            View
-          </button>
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpenWorkOrder?.(workOrder.id, "reassign");
-            }}
-          >
-            Reassign
-          </button>
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpenWorkOrder?.(workOrder.id, "complete");
-            }}
-          >
-            Mark complete
-          </button>
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpenWorkOrder?.(workOrder.id, "open");
-            }}
-          >
-            Open WO
-          </button>
-        </div>
-      )}
+      {showActions
+        ? variant === "block"
+          ? (
+            <div className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1">
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 hover:bg-amber-200/80"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "unschedule");
+                }}
+              >
+                Unschedule
+              </button>
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/35"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "open");
+                }}
+              >
+                Open
+              </button>
+            </div>
+          )
+          : (
+            <div className="mt-2 flex flex-wrap gap-1 border-t border-[var(--card-border)] pt-1.5">
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "view");
+                }}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "reassign");
+                }}
+              >
+                Reassign
+              </button>
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "complete");
+                }}
+              >
+                Mark complete
+              </button>
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded px-2 py-1 text-xs text-amber-700 hover:bg-amber-100/60"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "unschedule");
+                }}
+              >
+                Unschedule
+              </button>
+              <button
+                type="button"
+                data-dispatch-quick-action="1"
+                className="rounded px-2 py-1 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                onPointerDown={preventDragFromAction}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenWorkOrder?.(workOrder.id, "open");
+                }}
+              >
+                Open WO
+              </button>
+            </div>
+          )
+        : null}
     </DispatchCard>
   );
 }

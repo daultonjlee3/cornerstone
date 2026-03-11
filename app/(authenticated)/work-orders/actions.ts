@@ -477,12 +477,25 @@ export async function saveWorkOrder(
     );
     if (!allowedUpdate) return { error: "Unauthorized." };
     const beforeState = row as Record<string, unknown>;
-    const { data: updated, error } = await supabase
+    const updateWithSafety = await supabase
       .from("work_orders")
       .update(payload)
       .eq("id", id)
       .select("*")
       .single();
+    const { safety_notes: _ignoredSafetyNotes, ...payloadWithoutSafetyNotes } = payload;
+    const updateLegacy =
+      updateWithSafety.error &&
+      updateWithSafety.error.message.toLowerCase().includes("safety_notes")
+        ? await supabase
+            .from("work_orders")
+            .update(payloadWithoutSafetyNotes)
+            .eq("id", id)
+            .select("*")
+            .single()
+        : null;
+    const updated = updateLegacy?.data ?? updateWithSafety.data;
+    const error = updateLegacy?.error ?? updateWithSafety.error;
     if (error) return { error: error.message };
 
     const afterState = (updated as Record<string, unknown>) ?? {};
@@ -520,11 +533,23 @@ export async function saveWorkOrder(
       (await generateWorkOrderNumber(supabase, companyId));
     (payload as Record<string, unknown>).work_order_number = workOrderNumber || null;
     (payload as Record<string, unknown>).created_by_user_id = actorId;
-    const { data: inserted, error } = await supabase
+    const insertWithSafety = await supabase
       .from("work_orders")
       .insert(payload)
       .select("*")
       .single();
+    const { safety_notes: _ignoredSafetyNotes, ...payloadWithoutSafetyNotes } = payload;
+    const insertLegacy =
+      insertWithSafety.error &&
+      insertWithSafety.error.message.toLowerCase().includes("safety_notes")
+        ? await supabase
+            .from("work_orders")
+            .insert(payloadWithoutSafetyNotes)
+            .select("*")
+            .single()
+        : null;
+    const inserted = insertLegacy?.data ?? insertWithSafety.data;
+    const error = insertLegacy?.error ?? insertWithSafety.error;
     if (error) return { error: error.message };
 
     await insertActivityLog(supabase, {

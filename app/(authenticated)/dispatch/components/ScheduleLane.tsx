@@ -9,7 +9,8 @@ type ScheduleLaneProps = {
   selectedDate: string;
   totalScheduledHours: number;
   jobCount: number;
-  overCrewId: string | null;
+  overDropId: string | null;
+  isDraggingWorkOrder: boolean;
   timeLabels: { hour: number; label: string }[];
   currentTime?: { hour: number; minute: number } | null;
   children: React.ReactNode;
@@ -60,7 +61,8 @@ export function ScheduleLane({
   selectedDate,
   totalScheduledHours,
   jobCount,
-  overCrewId,
+  overDropId,
+  isDraggingWorkOrder,
   timeLabels,
   currentTime,
   children,
@@ -74,13 +76,16 @@ export function ScheduleLane({
     },
   });
   const remaining = Math.max(0, DEFAULT_AVAILABLE_HOURS - totalScheduledHours);
-  const highlight = isOver || (overCrewId != null && String(overCrewId).startsWith(`crew-${id}`));
+  const highlight =
+    isOver || (overDropId != null && String(overDropId).startsWith(`crew-${id}`));
 
   return (
     <div
       ref={setNodeRef}
-      className={`relative flex min-w-[13rem] flex-1 flex-col border-r border-[var(--card-border)] last:border-r-0 ${
-        highlight ? "bg-[var(--accent)]/8" : "bg-[var(--background)]"
+      className={`relative flex min-w-[15rem] flex-1 flex-col border-r border-[var(--card-border)] last:border-r-0 ${
+        highlight
+          ? "bg-[var(--accent)]/10 ring-2 ring-inset ring-[var(--accent)]/25"
+          : "bg-[var(--background)]"
       }`}
     >
       <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--card-border)] bg-gradient-to-b from-[var(--card)] to-slate-50/70 px-3 py-2.5">
@@ -100,12 +105,15 @@ export function ScheduleLane({
               hour={hour}
               hourIndex={hourIndex}
               selectedDate={selectedDate}
-              isOver={overCrewId === getSlotId(id, hour)}
+              isOver={overDropId === getSlotId(id, hour)}
               showCurrentLine={currentTime?.hour === hour}
               currentMinute={currentTime?.minute ?? 0}
             />
           ))}
         </div>
+        {isDraggingWorkOrder ? (
+          <div className="pointer-events-none absolute inset-0 border border-dashed border-[var(--accent)]/35" />
+        ) : null}
         <div className="pointer-events-none absolute inset-0">{children}</div>
       </div>
     </div>

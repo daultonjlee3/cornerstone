@@ -39,12 +39,16 @@ type BoardWorkOrder = {
 export type DispatchBoardProps = {
   crews: BoardCrew[];
   selectedDate: string;
-  overCrewId: string | null;
+  overDropId: string | null;
+  isDraggingWorkOrder: boolean;
   view: DispatchViewMode;
   workOrders: BoardWorkOrder[];
   onSelectDate: (date: string) => void;
   onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
-  onOpenWorkOrder?: (id: string, action?: "view" | "reassign" | "complete" | "open") => void;
+  onOpenWorkOrder?: (
+    id: string,
+    action?: "view" | "reassign" | "complete" | "open" | "unschedule"
+  ) => void;
 };
 
 function addDays(dateStr: string, delta: number): string {
@@ -186,7 +190,10 @@ function DraggableBoardCard({
   workOrder: BoardWorkOrder;
   selectedDate: string;
   onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
-  onOpenWorkOrder?: (id: string, action?: "view" | "reassign" | "complete" | "open") => void;
+  onOpenWorkOrder?: (
+    id: string,
+    action?: "view" | "reassign" | "complete" | "open" | "unschedule"
+  ) => void;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -210,6 +217,12 @@ function DraggableBoardCard({
           <div
             {...listeners}
             {...attributes}
+            onPointerDownCapture={(event) => {
+              const target = event.target as HTMLElement | null;
+              if (target?.closest("[data-dispatch-quick-action='1']")) {
+                event.stopPropagation();
+              }
+            }}
             className="h-full cursor-grab overflow-hidden rounded-lg transition-transform duration-150 active:cursor-grabbing"
           >
             <div className="h-full overflow-auto">
@@ -234,7 +247,8 @@ function DraggableBoardCard({
 export function DispatchBoard({
   crews,
   selectedDate,
-  overCrewId,
+  overDropId,
+  isDraggingWorkOrder,
   view,
   workOrders,
   onSelectDate,
@@ -245,7 +259,7 @@ export function DispatchBoard({
   const dayScrollRef = useRef<HTMLDivElement | null>(null);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(new Date()), 60_000);
+    const interval = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(interval);
   }, []);
   const nowPercent = useMemo(() => getCurrentTimePercent(now), [now]);
@@ -265,7 +279,7 @@ export function DispatchBoard({
   const lanes = useMemo(
     () => {
       const unassignedToday = workOrders.filter((wo) => {
-        const date = wo.scheduled_date ?? selectedDate;
+        const date = wo.scheduled_date ?? null;
         return date === selectedDate && !wo.assigned_crew_id;
       });
       const unassignedHours = unassignedToday.reduce(
@@ -291,7 +305,7 @@ export function DispatchBoard({
       map.set(c.id, []);
     }
     for (const wo of workOrders) {
-      const date = wo.scheduled_date ?? selectedDate;
+      const date = wo.scheduled_date ?? null;
       if (date !== selectedDate) continue;
       const laneId = wo.assigned_crew_id ?? UNASSIGNED_LANE_ID;
       if (map.has(laneId)) {
@@ -417,7 +431,7 @@ export function DispatchBoard({
         {lanes.map((crew) => (
           <div
             key={crew.id}
-            className="min-w-[13rem] flex-1 border-r border-[var(--card-border)] bg-gradient-to-b from-slate-100/70 to-slate-50/70 px-3 py-2 last:border-r-0"
+            className="min-w-[15rem] flex-1 border-r border-[var(--card-border)] bg-gradient-to-b from-slate-100/70 to-slate-50/70 px-3 py-2 last:border-r-0"
           >
             <span className="text-xs font-semibold uppercase tracking-[0.07em] text-[var(--muted)]">
               {crew.name ?? `Crew ${crew.id.slice(0, 8)}`}
@@ -454,7 +468,7 @@ export function DispatchBoard({
           );
           })}
         </div>
-        <div className="flex min-w-0 flex-1">
+        <div className="flex min-w-max flex-1">
           {lanes.map((crew) => (
             <ScheduleLane
               key={crew.id}
@@ -463,7 +477,8 @@ export function DispatchBoard({
               selectedDate={selectedDate}
               totalScheduledHours={crew.total_scheduled_hours ?? 0}
               jobCount={crew.job_count ?? 0}
-              overCrewId={overCrewId}
+              overDropId={overDropId}
+              isDraggingWorkOrder={isDraggingWorkOrder}
               timeLabels={timeLabels}
               currentTime={currentTime}
             >

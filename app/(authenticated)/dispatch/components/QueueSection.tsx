@@ -12,7 +12,10 @@ type QueueSectionProps = {
   items: QueueWorkOrder[];
   variant: "overdue" | "ready" | "unscheduled";
   DraggableWrapper: (props: { workOrder: QueueWorkOrder; children: React.ReactNode }) => React.ReactNode;
-  onOpenWorkOrder?: (id: string, action?: "view" | "reassign" | "complete" | "open") => void;
+  onOpenWorkOrder?: (
+    id: string,
+    action?: "view" | "reassign" | "complete" | "open" | "unschedule"
+  ) => void;
 };
 
 function stylesForVariant(variant: QueueSectionProps["variant"]) {
@@ -74,7 +77,7 @@ export function QueueSection({
                     variant="block"
                     showScheduledTime
                     showCrew={false}
-                    showQuickActions={!!onOpenWorkOrder}
+                    showQuickActions={false}
                     onOpenWorkOrder={onOpenWorkOrder}
                   />
                 ),
