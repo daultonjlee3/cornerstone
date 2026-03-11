@@ -19,8 +19,10 @@ type PartUsage = {
   id: string;
   product_id?: string | null;
   quantity_used: number;
+  unit_cost_snapshot?: number | null;
   unit_cost: number | null;
   total_cost: number | null;
+  notes?: string | null;
   created_at: string;
   part_name_snapshot: string | null;
   sku_snapshot: string | null;

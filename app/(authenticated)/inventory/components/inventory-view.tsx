@@ -34,6 +34,22 @@ type UnitOption = { id: string; name: string; building_id: string };
 
 type InventoryViewProps = {
   rows: InventoryBalanceRow[];
+  transactions: {
+    id: string;
+    transaction_type: string | null;
+    product_id: string | null;
+    product_name: string;
+    product_sku: string | null;
+    stock_location_name: string;
+    quantity_change: number;
+    unit_cost_snapshot: number | null;
+    reference_type: string | null;
+    reference_id: string | null;
+    reference_po_id: string | null;
+    reference_work_order_id: string | null;
+    created_at: string;
+    notes: string | null;
+  }[];
   locations: StockLocationRecord[];
   companies: CompanyOption[];
   properties: PropertyOption[];
@@ -45,6 +61,7 @@ const PAGE_SIZE = 20;
 
 export function InventoryView({
   rows,
+  transactions,
   locations,
   companies,
   properties,
@@ -377,6 +394,94 @@ export function InventoryView({
           </div>
         </div>
       ) : null}
+
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">Recent inventory transactions</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Audited movement history for receipts, work-order usage, and adjustments.
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[1180px] text-sm">
+            <thead>
+              <tr className="border-b border-[var(--card-border)] text-left text-xs uppercase tracking-wide text-[var(--muted)]">
+                <th className="px-2 py-2">Time</th>
+                <th className="px-2 py-2">Type</th>
+                <th className="px-2 py-2">Product</th>
+                <th className="px-2 py-2">Location</th>
+                <th className="px-2 py-2 text-right">Qty Delta</th>
+                <th className="px-2 py-2 text-right">Unit Cost Snapshot</th>
+                <th className="px-2 py-2">Reference</th>
+                <th className="px-2 py-2">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.length === 0 ? (
+                <tr>
+                  <td className="px-2 py-3 text-center text-[var(--muted)]" colSpan={8}>
+                    No inventory transactions yet.
+                  </td>
+                </tr>
+              ) : null}
+              {transactions.map((tx) => (
+                <tr key={tx.id} className="border-b border-[var(--card-border)] last:border-0">
+                  <td className="px-2 py-2 text-[var(--foreground)]">
+                    {new Date(tx.created_at).toLocaleString()}
+                  </td>
+                  <td className="px-2 py-2 text-[var(--muted)]">
+                    {tx.transaction_type?.replace(/_/g, " ") ?? "—"}
+                  </td>
+                  <td className="px-2 py-2">
+                    {tx.product_id ? (
+                      <Link href={`/products/${tx.product_id}`} className="text-[var(--accent)] hover:underline">
+                        {tx.product_name}
+                      </Link>
+                    ) : (
+                      tx.product_name
+                    )}
+                    {tx.product_sku ? (
+                      <p className="text-xs text-[var(--muted)]">{tx.product_sku}</p>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-2 text-[var(--foreground)]">{tx.stock_location_name}</td>
+                  <td
+                    className={`px-2 py-2 text-right font-semibold ${
+                      tx.quantity_change < 0 ? "text-red-600" : "text-emerald-700"
+                    }`}
+                  >
+                    {tx.quantity_change > 0 ? "+" : ""}
+                    {tx.quantity_change}
+                  </td>
+                  <td className="px-2 py-2 text-right text-[var(--foreground)]">
+                    {tx.unit_cost_snapshot != null
+                      ? `$${Number(tx.unit_cost_snapshot).toFixed(2)}`
+                      : "—"}
+                  </td>
+                  <td className="px-2 py-2 text-[var(--muted)]">
+                    {tx.reference_po_id ? (
+                      <Link
+                        href={`/purchase-orders/${tx.reference_po_id}`}
+                        className="text-[var(--accent)] hover:underline"
+                      >
+                        Purchase order
+                      </Link>
+                    ) : tx.reference_work_order_id ? (
+                      <Link
+                        href={`/work-orders/${tx.reference_work_order_id}`}
+                        className="text-[var(--accent)] hover:underline"
+                      >
+                        Work order
+                      </Link>
+                    ) : (
+                      tx.reference_type?.replace(/_/g, " ") ?? "Manual"
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-[var(--muted)]">{tx.notes ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

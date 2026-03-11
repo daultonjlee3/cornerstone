@@ -66,10 +66,13 @@ export interface InventoryTransaction extends BaseEntity {
   quantityChange: number;
   transactionType:
     | "purchase_received"
+    | "receipt_from_po"
     | "work_order_usage"
+    | "part_used_on_work_order"
     | "adjustment"
     | "transfer_in"
     | "transfer_out";
+  unitCostSnapshot?: number | null;
   referenceType?: string | null;
   referenceId?: string | null;
   notes?: string | null;
@@ -92,6 +95,7 @@ export interface PurchaseOrderLine extends BaseEntity {
   description: string;
   quantity: number;
   unitPrice?: number | null;
+  unitCostSnapshot?: number | null;
   lineTotal?: number | null;
   receivedQuantity: number;
 }
@@ -101,5 +105,6 @@ export interface WorkOrderPartUsed extends BaseEntity {
   productId?: string | null;
   stockLocationId?: string | null;
   quantityUsed: number;
+  unitCostSnapshot?: number | null;
   notes?: string | null;
 }

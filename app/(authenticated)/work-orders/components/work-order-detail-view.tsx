@@ -54,6 +54,7 @@ export type PartUsageForDetail = {
   id: string;
   product_id?: string | null;
   quantity_used: number;
+  unit_cost_snapshot?: number | null;
   unit_cost: number | null;
   total_cost: number | null;
   created_at: string;
@@ -62,6 +63,7 @@ export type PartUsageForDetail = {
   unit_of_measure: string | null;
   used_at: string | null;
   stock_location_name?: string | null;
+  notes?: string | null;
 };
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";

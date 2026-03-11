@@ -1614,11 +1614,10 @@ export async function addWorkOrderPartUsage(
     if (!partName) partName = inv.name;
     if (!sku) sku = inv.sku ?? null;
     if (!unitOfMeasure) unitOfMeasure = inv.unit ?? null;
-    if (payload.deduct_inventory && !resolvedProductId) {
-      const onHand = Number(inv.quantity ?? 0);
-      if (payload.quantity_used > onHand)
-        return { error: `Not enough stock. Quantity on hand: ${onHand}. Requested: ${payload.quantity_used}.` };
-    }
+  }
+
+  if (payload.deduct_inventory && !resolvedProductId) {
+    return { error: "Selected part is not mapped to a product record and cannot be deducted from inventory." };
   }
 
   if (resolvedStockLocationId) {
@@ -1653,6 +1652,7 @@ export async function addWorkOrderPartUsage(
       unit_of_measure: unitOfMeasure,
       quantity_used: payload.quantity_used,
       unit_cost: finalUnitCost,
+      unit_cost_snapshot: finalUnitCost,
       total_cost: totalCost,
       notes: payload.notes || null,
     })
@@ -1668,52 +1668,16 @@ export async function addWorkOrderPartUsage(
       p_product_id: resolvedProductId,
       p_stock_location_id: resolvedStockLocationId,
       p_quantity_change: -payload.quantity_used,
-      p_transaction_type: "work_order_usage",
+      p_transaction_type: "part_used_on_work_order",
       p_reference_type: "work_order_part_usage",
       p_reference_id: inserted.id,
       p_notes: payload.notes || `Work order ${workOrderId}`,
       p_idempotency_key: `wo-part:${inserted.id}`,
+      p_unit_cost_snapshot: finalUnitCost,
     });
     if (txError) {
       await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
       return { error: `Failed to deduct inventory: ${txError.message}` };
-    }
-  } else if (payload.inventory_item_id && payload.deduct_inventory) {
-    const { data: invRow, error: invReadError } = await supabase
-      .from("inventory_items")
-      .select("quantity")
-      .eq("id", payload.inventory_item_id)
-      .maybeSingle();
-    if (invReadError) {
-      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
-      return { error: `Failed to read inventory: ${invReadError.message}` };
-    }
-    if (!invRow) {
-      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
-      return { error: "Inventory item no longer found." };
-    }
-    const currentQty = Number((invRow as { quantity?: number })?.quantity ?? 0);
-    const newQty = Math.max(0, currentQty - payload.quantity_used);
-    const { error: updateError } = await supabase
-      .from("inventory_items")
-      .update({ quantity: newQty })
-      .eq("id", payload.inventory_item_id);
-    if (updateError) {
-      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
-      return { error: `Failed to update inventory: ${updateError.message}` };
-    }
-    const { error: txError } = await supabase.from("inventory_transactions").insert({
-      inventory_item_id: payload.inventory_item_id,
-      quantity_delta: -payload.quantity_used,
-      transaction_type: "issue",
-      reference_type: "work_order_part_usage",
-      reference_id: inserted.id,
-      notes: payload.notes || `Work order ${workOrderId}`,
-    });
-    if (txError) {
-      await supabase.from("inventory_items").update({ quantity: currentQty }).eq("id", payload.inventory_item_id);
-      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
-      return { error: `Failed to record inventory transaction: ${txError.message}` };
     }
   }
 
@@ -1734,6 +1698,22 @@ export async function addWorkOrderPartUsage(
       unit_cost: finalUnitCost,
       total_cost: totalCost,
       technician_id: (wo as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+    },
+  });
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId,
+    entityType: "work_order",
+    entityId: workOrderId,
+    actionType: "part_used_on_work_order",
+    performedBy: actorId,
+    metadata: {
+      part_usage_id: inserted.id,
+      product_id: resolvedProductId,
+      stock_location_id: resolvedStockLocationId,
+      quantity_used: payload.quantity_used,
+      unit_cost_snapshot: finalUnitCost,
+      total_cost: totalCost,
     },
   });
 

@@ -159,7 +159,7 @@ export default async function WorkOrderDetailPage({
   const { data: partUsage } = await supabase
     .from("work_order_part_usage")
     .select(
-      "id, product_id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
+      "id, product_id, quantity_used, unit_cost_snapshot, unit_cost, total_cost, notes, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
     )
     .eq("work_order_id", id)
     .order("created_at", { ascending: false });

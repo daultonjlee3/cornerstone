@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/src/components/ui/button";
 import {
   deletePurchaseOrderLine,
+  receivePurchaseOrderAllRemaining,
   receivePurchaseOrderLine,
   savePurchaseOrderLine,
 } from "../actions";
@@ -18,6 +19,7 @@ type PurchaseOrderLineRecord = {
   description: string;
   quantity: number;
   unit_price: number | null;
+  unit_cost_snapshot: number | null;
   line_total: number | null;
   received_quantity: number;
 };
@@ -30,6 +32,17 @@ type PurchaseOrderDetailViewProps = {
   lines: PurchaseOrderLineRecord[];
   products: ProductOption[];
   stockLocations: StockLocationOption[];
+  receivingHistory: {
+    id: string;
+    line_id: string;
+    line_description: string;
+    quantity_received: number;
+    unit_cost_snapshot: number | null;
+    stock_location_name: string;
+    created_at: string;
+    transaction_type: string | null;
+    notes: string | null;
+  }[];
 };
 
 export function PurchaseOrderDetailView({
@@ -37,6 +50,7 @@ export function PurchaseOrderDetailView({
   lines,
   products,
   stockLocations,
+  receivingHistory,
 }: PurchaseOrderDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -152,6 +166,27 @@ export function PurchaseOrderDetailView({
     });
   };
 
+  const submitFullReceipt = () => {
+    if (!receiptLocation) {
+      setMessage({ type: "error", text: "Select a stock location for receipt." });
+      return;
+    }
+    startTransition(async () => {
+      const result = await receivePurchaseOrderAllRemaining({
+        purchaseOrderId: purchaseOrder.id,
+        stockLocationId: receiptLocation,
+      });
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
+      setMessage({ type: "success", text: "All remaining PO quantities were received." });
+      setReceiptQty("");
+      setReceiptLineId("");
+      router.refresh();
+    });
+  };
+
   return (
     <div className="space-y-6">
       {message ? (
@@ -262,7 +297,8 @@ export function PurchaseOrderDetailView({
                   <th className="px-2 py-2">Product</th>
                   <th className="px-2 py-2 text-right">Qty</th>
                   <th className="px-2 py-2 text-right">Received</th>
-                  <th className="px-2 py-2 text-right">Unit Price</th>
+                  <th className="px-2 py-2 text-right">Remaining</th>
+                  <th className="px-2 py-2 text-right">Unit Cost Snapshot</th>
                   <th className="px-2 py-2 text-right">Line Total</th>
                   <th className="px-2 py-2">Actions</th>
                 </tr>
@@ -270,6 +306,10 @@ export function PurchaseOrderDetailView({
               <tbody>
                 {lines.map((line) => {
                   const product = line.product_id ? products.find((row) => row.id === line.product_id) : null;
+                  const remaining = Math.max(
+                    0,
+                    Number(line.quantity ?? 0) - Number(line.received_quantity ?? 0)
+                  );
                   return (
                     <tr key={line.id} className="border-b border-[var(--card-border)] last:border-0">
                       <td className="px-2 py-2 text-[var(--foreground)]">{line.description}</td>
@@ -285,7 +325,12 @@ export function PurchaseOrderDetailView({
                       <td className="px-2 py-2 text-right">{line.quantity}</td>
                       <td className="px-2 py-2 text-right">{line.received_quantity}</td>
                       <td className="px-2 py-2 text-right">
-                        {line.unit_price != null ? `$${Number(line.unit_price).toFixed(2)}` : "—"}
+                        {remaining}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {line.unit_cost_snapshot != null
+                          ? `$${Number(line.unit_cost_snapshot).toFixed(2)}`
+                          : "—"}
                       </td>
                       <td className="px-2 py-2 text-right font-medium">
                         ${Number(line.line_total ?? 0).toFixed(2)}
@@ -368,6 +413,61 @@ export function PurchaseOrderDetailView({
             </Button>
           </div>
         </div>
+        <div className="mt-3 flex justify-end">
+          <Button
+            variant="secondary"
+            onClick={submitFullReceipt}
+            disabled={isPending || stockLocations.length === 0}
+          >
+            Receive Full Remaining PO
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">Receiving history</h2>
+        {receivingHistory.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">No receipts recorded yet.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[860px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--card-border)] text-left text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-2 py-2">Received At</th>
+                  <th className="px-2 py-2">Line</th>
+                  <th className="px-2 py-2 text-right">Qty</th>
+                  <th className="px-2 py-2 text-right">Unit Cost Snapshot</th>
+                  <th className="px-2 py-2">Location</th>
+                  <th className="px-2 py-2">Type</th>
+                  <th className="px-2 py-2">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receivingHistory.map((receipt) => (
+                  <tr key={receipt.id} className="border-b border-[var(--card-border)] last:border-0">
+                    <td className="px-2 py-2 text-[var(--foreground)]">
+                      {new Date(receipt.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--foreground)]">{receipt.line_description}</td>
+                    <td className="px-2 py-2 text-right text-[var(--foreground)]">
+                      {receipt.quantity_received}
+                    </td>
+                    <td className="px-2 py-2 text-right text-[var(--foreground)]">
+                      {receipt.unit_cost_snapshot != null
+                        ? `$${Number(receipt.unit_cost_snapshot).toFixed(2)}`
+                        : "—"}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--foreground)]">{receipt.stock_location_name}</td>
+                    <td className="px-2 py-2 text-[var(--muted)]">
+                      {receipt.transaction_type?.replace(/_/g, " ") ?? "—"}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">{receipt.notes ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

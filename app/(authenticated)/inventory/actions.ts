@@ -2,8 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
+import { insertActivityLog } from "@/src/lib/activity-logs";
 
 export type InventoryFormState = { error?: string; success?: boolean };
+
+async function resolveActorUserId(
+  supabase: Awaited<ReturnType<typeof resolveProcurementScope>>["supabase"],
+  authUserId: string
+): Promise<string | null> {
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("id")
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+  return (userRow as { id?: string | null } | null)?.id ?? null;
+}
 
 export async function saveStockLocation(
   _prev: InventoryFormState,
@@ -71,6 +84,23 @@ export async function saveStockLocation(
     if (payload.is_default) {
       await ensureBalancesForDefaultLocation(id);
     }
+    const actorId = await resolveActorUserId(scope.supabase, scope.userId);
+    if (actorId) {
+      await insertActivityLog(scope.supabase, {
+        tenantId: scope.tenantId,
+        companyId,
+        entityType: "stock_location",
+        entityId: id,
+        actionType: "stock_location_updated",
+        performedBy: actorId,
+        metadata: {
+          name: payload.name,
+          location_type: payload.location_type,
+          active: payload.active,
+          is_default: payload.is_default,
+        },
+      });
+    }
   } else {
     const { data: inserted, error } = await scope.supabase
       .from("stock_locations")
@@ -80,6 +110,23 @@ export async function saveStockLocation(
     if (error) return { error: error.message };
     if (payload.is_default && inserted?.id) {
       await ensureBalancesForDefaultLocation((inserted as { id: string }).id);
+    }
+    const actorId = await resolveActorUserId(scope.supabase, scope.userId);
+    if (actorId && inserted?.id) {
+      await insertActivityLog(scope.supabase, {
+        tenantId: scope.tenantId,
+        companyId,
+        entityType: "stock_location",
+        entityId: (inserted as { id: string }).id,
+        actionType: "stock_location_created",
+        performedBy: actorId,
+        metadata: {
+          name: payload.name,
+          location_type: payload.location_type,
+          active: payload.active,
+          is_default: payload.is_default,
+        },
+      });
     }
   }
 
@@ -129,6 +176,24 @@ export async function recordInventoryAdjustment(
     p_idempotency_key: null,
   });
   if (error) return { error: error.message };
+
+  const actorId = await resolveActorUserId(scope.supabase, scope.userId);
+  if (actorId) {
+    await insertActivityLog(scope.supabase, {
+      tenantId: scope.tenantId,
+      companyId,
+      entityType: "inventory_balance",
+      entityId: payload.productId,
+      actionType: "inventory_adjusted",
+      performedBy: actorId,
+      metadata: {
+        product_id: payload.productId,
+        stock_location_id: payload.stockLocationId,
+        quantity_change: payload.quantityChange,
+        notes: payload.notes ?? null,
+      },
+    });
+  }
 
   revalidatePath("/inventory");
   revalidatePath("/products");

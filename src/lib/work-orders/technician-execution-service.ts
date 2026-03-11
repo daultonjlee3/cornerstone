@@ -47,8 +47,10 @@ type PartUsage = {
   id: string;
   product_id?: string | null;
   quantity_used: number;
+  unit_cost_snapshot?: number | null;
   unit_cost: number | null;
   total_cost: number | null;
+  notes?: string | null;
   created_at: string;
   part_name_snapshot: string | null;
   sku_snapshot: string | null;
@@ -251,7 +253,7 @@ export async function getTechnicianExecutionPayload(
       supabase
         .from("work_order_part_usage")
         .select(
-          "id, product_id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
+          "id, product_id, quantity_used, unit_cost_snapshot, unit_cost, total_cost, notes, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
         )
         .eq("work_order_id", workOrderId)
         .order("created_at", { ascending: false }),

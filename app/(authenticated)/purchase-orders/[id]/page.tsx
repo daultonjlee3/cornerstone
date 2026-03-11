@@ -33,7 +33,9 @@ export default async function PurchaseOrderDetailPage({
   const [linesResult, productsResult, locationsResult] = await Promise.all([
     scope.supabase
       .from("purchase_order_lines")
-      .select("id, purchase_order_id, product_id, description, quantity, unit_price, line_total, received_quantity")
+      .select(
+        "id, purchase_order_id, product_id, description, quantity, unit_price, unit_cost_snapshot, line_total, received_quantity"
+      )
       .eq("purchase_order_id", id)
       .order("created_at", { ascending: true }),
     scope.supabase
@@ -87,9 +89,50 @@ export default async function PurchaseOrderDetailPage({
     description: (row as { description?: string }).description ?? "",
     quantity: Number((row as { quantity?: number }).quantity ?? 0),
     unit_price: (row as { unit_price?: number | null }).unit_price ?? null,
+    unit_cost_snapshot:
+      (row as { unit_cost_snapshot?: number | null }).unit_cost_snapshot ??
+      (row as { unit_price?: number | null }).unit_price ??
+      null,
     line_total: (row as { line_total?: number | null }).line_total ?? null,
     received_quantity: Number((row as { received_quantity?: number }).received_quantity ?? 0),
   }));
+
+  const poLineIds = lines.map((line) => line.id);
+  const { data: receiptRows } = poLineIds.length
+    ? await scope.supabase
+        .from("inventory_transactions")
+        .select(
+          "id, reference_id, quantity_change, unit_cost_snapshot, created_at, stock_location_id, stock_locations(name), transaction_type, notes"
+        )
+        .eq("reference_type", "purchase_order_line")
+        .in("reference_id", poLineIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as unknown[] };
+
+  const lineById = new Map(lines.map((line) => [line.id, line]));
+  const receivingHistory = (receiptRows ?? []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const stockLocation = Array.isArray(record.stock_locations)
+      ? (record.stock_locations as unknown[])[0]
+      : record.stock_locations;
+    const line = lineById.get((record.reference_id as string) ?? "");
+    return {
+      id: (record.id as string) ?? "",
+      line_id: (record.reference_id as string) ?? "",
+      line_description: line?.description ?? "PO line",
+      quantity_received: Number(record.quantity_change ?? 0),
+      unit_cost_snapshot: (record.unit_cost_snapshot as number | null) ?? null,
+      created_at: (record.created_at as string) ?? new Date().toISOString(),
+      stock_location_name:
+        stockLocation &&
+        typeof stockLocation === "object" &&
+        "name" in (stockLocation as Record<string, unknown>)
+          ? ((stockLocation as { name?: string }).name ?? "Location")
+          : "Location",
+      transaction_type: (record.transaction_type as string | null) ?? null,
+      notes: (record.notes as string | null) ?? null,
+    };
+  });
 
   const products = (productsResult.data ?? []).map((row) => ({
     id: (row as { id: string }).id,
@@ -131,6 +174,7 @@ export default async function PurchaseOrderDetailPage({
         lines={lines}
         products={products}
         stockLocations={stockLocations}
+        receivingHistory={receivingHistory}
       />
     </div>
   );

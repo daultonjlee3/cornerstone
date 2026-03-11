@@ -39,6 +39,14 @@ export default async function InventoryPage() {
         .in("company_id", scope.companyIds)
         .order("property_name", { ascending: true }),
     ]);
+  const { data: transactionRowsRaw } = await scope.supabase
+    .from("inventory_transactions")
+    .select(
+      "id, transaction_type, product_id, stock_location_id, quantity_change, reference_type, reference_id, unit_cost_snapshot, created_at, notes, products(name, sku), stock_locations(name)"
+    )
+    .in("company_id", scope.companyIds)
+    .order("created_at", { ascending: false })
+    .limit(120);
 
   const scopedPropertyIds = (propertiesResult.data ?? []).map((row) => (row as { id: string }).id);
   const { data: buildingsData } = scopedPropertyIds.length
@@ -152,6 +160,84 @@ export default async function InventoryPage() {
     building_id: (row as { building_id: string }).building_id,
   }));
 
+  const transactionRows = (transactionRowsRaw ?? []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const product = Array.isArray(record.products) ? record.products[0] : record.products;
+    const location = Array.isArray(record.stock_locations)
+      ? record.stock_locations[0]
+      : record.stock_locations;
+    return {
+      id: (record.id as string) ?? "",
+      transaction_type: (record.transaction_type as string | null) ?? null,
+      product_id: (record.product_id as string | null) ?? null,
+      stock_location_id: (record.stock_location_id as string | null) ?? null,
+      quantity_change: Number(record.quantity_change ?? 0),
+      reference_type: (record.reference_type as string | null) ?? null,
+      reference_id: (record.reference_id as string | null) ?? null,
+      unit_cost_snapshot: (record.unit_cost_snapshot as number | null) ?? null,
+      created_at: (record.created_at as string) ?? new Date().toISOString(),
+      notes: (record.notes as string | null) ?? null,
+      product_name:
+        product && typeof product === "object" && "name" in (product as Record<string, unknown>)
+          ? ((product as { name?: string }).name ?? "Product")
+          : "Product",
+      product_sku:
+        product && typeof product === "object" && "sku" in (product as Record<string, unknown>)
+          ? ((product as { sku?: string | null }).sku ?? null)
+          : null,
+      stock_location_name:
+        location && typeof location === "object" && "name" in (location as Record<string, unknown>)
+          ? ((location as { name?: string }).name ?? "Location")
+          : "Location",
+    };
+  });
+
+  const poLineReferenceIds = transactionRows
+    .filter((row) => row.reference_type === "purchase_order_line" && row.reference_id)
+    .map((row) => row.reference_id as string);
+  const woPartReferenceIds = transactionRows
+    .filter((row) => row.reference_type === "work_order_part_usage" && row.reference_id)
+    .map((row) => row.reference_id as string);
+
+  const [{ data: poLines }, { data: woPartRows }] = await Promise.all([
+    poLineReferenceIds.length
+      ? scope.supabase
+          .from("purchase_order_lines")
+          .select("id, purchase_order_id")
+          .in("id", poLineReferenceIds)
+      : { data: [] as unknown[] },
+    woPartReferenceIds.length
+      ? scope.supabase
+          .from("work_order_part_usage")
+          .select("id, work_order_id")
+          .in("id", woPartReferenceIds)
+      : { data: [] as unknown[] },
+  ]);
+
+  const poByLineId = new Map(
+    (poLines ?? []).map((row) => [
+      (row as { id: string }).id,
+      (row as { purchase_order_id?: string | null }).purchase_order_id ?? null,
+    ])
+  );
+  const workOrderByPartUsageId = new Map(
+    (woPartRows ?? []).map((row) => [
+      (row as { id: string }).id,
+      (row as { work_order_id?: string | null }).work_order_id ?? null,
+    ])
+  );
+  const transactions = transactionRows.map((row) => ({
+    ...row,
+    reference_po_id:
+      row.reference_type === "purchase_order_line" && row.reference_id
+        ? poByLineId.get(row.reference_id) ?? null
+        : null,
+    reference_work_order_id:
+      row.reference_type === "work_order_part_usage" && row.reference_id
+        ? workOrderByPartUsageId.get(row.reference_id) ?? null
+        : null,
+  }));
+
   return (
     <div className="space-y-6">
       <div>
@@ -162,6 +248,7 @@ export default async function InventoryPage() {
       </div>
       <InventoryView
         rows={rows}
+        transactions={transactions}
         locations={locations}
         companies={scope.companies}
         properties={properties}

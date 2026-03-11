@@ -14,6 +14,7 @@ type PartUsageRow = {
   id: string;
   product_id?: string | null;
   quantity_used: number;
+  unit_cost_snapshot?: number | null;
   unit_cost: number | null;
   total_cost: number | null;
   created_at: string;
@@ -22,6 +23,7 @@ type PartUsageRow = {
   unit_of_measure: string | null;
   used_at: string | null;
   stock_location_name?: string | null;
+  notes?: string | null;
 };
 
 type InventoryItemOption = {
@@ -157,7 +159,11 @@ export function WorkOrderPartsCard({
                   <td className="py-2 text-right text-[var(--foreground)]">{p.quantity_used}</td>
                   <td className="py-2 text-[var(--muted)]">{p.unit_of_measure ?? "—"}</td>
                   <td className="py-2 text-right text-[var(--foreground)]">
-                    {p.unit_cost != null ? `$${Number(p.unit_cost).toFixed(2)}` : "—"}
+                    {p.unit_cost_snapshot != null
+                      ? `$${Number(p.unit_cost_snapshot).toFixed(2)}`
+                      : p.unit_cost != null
+                      ? `$${Number(p.unit_cost).toFixed(2)}`
+                      : "—"}
                   </td>
                   <td className="py-2 text-right text-[var(--foreground)]">
                     {p.total_cost != null ? `$${Number(p.total_cost).toFixed(2)}` : "—"}
