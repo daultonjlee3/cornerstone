@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition, useEffect } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   updateWorkOrderStatus,
@@ -15,6 +16,7 @@ import { WorkOrderPriorityBadge } from "@/app/(authenticated)/work-orders/compon
 import { PhotoUploader } from "@/src/components/ui/photo-uploader";
 import { Button } from "@/src/components/ui/button";
 import { NotesTimeline } from "./notes-timeline";
+import type { AssetInsightSeverity } from "@/src/lib/assets/intelligence-types";
 import type {
   TechnicianPortalAttachment,
   TechnicianPortalLaborEntry,
@@ -44,16 +46,22 @@ type TechnicianOption = { id: string; name: string };
 
 type ExecutionWorkOrder = {
   id: string;
+  company_id: string;
   work_order_number: string | null;
   title: string;
   status: string;
   priority: string;
   category: string | null;
+  source_type: string | null;
+  due_date: string | null;
   description: string | null;
   instructions: string | null;
-  source_type: string | null;
+  safety_notes: string | null;
+  assigned_crew_id: string | null;
   asset_name: string | null;
+  asset_id: string | null;
   location: string | null;
+  location_segments: string[];
   assigned_technician_id: string | null;
   assigned_technician_name: string | null;
   assigned_crew_name: string | null;
@@ -76,12 +84,26 @@ type ExecutionWorkOrder = {
     performed_at: string;
     metadata: Record<string, unknown> | null;
   }[];
-  asset_summary: {
-    manufacturer: string | null;
-    model: string | null;
-    serial_number: string | null;
-    status: string | null;
-    condition: string | null;
+  asset_context: {
+    id: string | null;
+    name: string | null;
+    asset_type: string | null;
+    health_score: number | null;
+    failure_risk: number | null;
+    last_maintenance_at: string | null;
+    recurring_issues: Array<{
+      id: string;
+      pattern_type: string;
+      frequency: number;
+      severity: AssetInsightSeverity;
+      recommendation: string;
+    }>;
+  };
+  checklist_progress: {
+    total: number;
+    completed: number;
+    percent: number;
+    remaining: number;
   };
 };
 
@@ -118,6 +140,34 @@ function formatDateTime(value: string | null | undefined): string {
   return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function formatDateOnly(value: string | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+function healthTone(score: number | null): string {
+  if (score == null) return "bg-slate-100 text-slate-700";
+  if (score >= 90) return "bg-emerald-100 text-emerald-700";
+  if (score >= 70) return "bg-blue-100 text-blue-700";
+  if (score >= 50) return "bg-amber-100 text-amber-700";
+  if (score >= 30) return "bg-orange-100 text-orange-700";
+  return "bg-red-100 text-red-700";
+}
+
+function severityTone(severity: AssetInsightSeverity): string {
+  if (severity === "critical") return "border-red-300 bg-red-50 text-red-700";
+  if (severity === "high") return "border-orange-300 bg-orange-50 text-orange-700";
+  if (severity === "medium") return "border-amber-300 bg-amber-50 text-amber-700";
+  return "border-blue-300 bg-blue-50 text-blue-700";
+}
+
+function patternLabel(patternType: string): string {
+  if (patternType.startsWith("recurring_failure:")) {
+    return patternType.replace("recurring_failure:", "").replace(/_/g, " ");
+  }
+  return patternType.replace(/_/g, " ");
+}
+
 export function TechnicianJobExecutionView({
   workOrder,
   checklistItems,
@@ -131,11 +181,16 @@ export function TechnicianJobExecutionView({
   const [pending, startTransition] = useTransition();
   const [completionOpen, setCompletionOpen] = useState(false);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [enforceChecklistCompletion, setEnforceChecklistCompletion] = useState(true);
+  const [noteFocusSignal, setNoteFocusSignal] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const photoSectionRef = useRef<HTMLElement | null>(null);
+  const noteSectionRef = useRef<HTMLElement | null>(null);
 
   const isCompleted = workOrder.status === "completed";
   const isInProgress = workOrder.status === "in_progress";
   const isOnHold = workOrder.status === "on_hold";
+  const checklistProgress = workOrder.checklist_progress;
 
   const activeEntry = useMemo(
     () =>
@@ -208,8 +263,28 @@ export function TechnicianJobExecutionView({
     });
   };
 
+  const openCompletionFlow = () => {
+    if (enforceChecklistCompletion && checklistProgress.remaining > 0) {
+      setMessage({
+        type: "error",
+        text: `Complete all required checklist items before finishing this job (${checklistProgress.remaining} remaining).`,
+      });
+      return;
+    }
+    setCompletionOpen(true);
+  };
+
+  const jumpToNotes = () => {
+    setNoteFocusSignal((value) => value + 1);
+    noteSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const jumpToPhotos = () => {
+    photoSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4 pb-10">
       <header className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           {workOrder.work_order_number ?? "Work order"}
@@ -217,9 +292,6 @@ export function TechnicianJobExecutionView({
         <h1 className="text-xl font-semibold leading-tight text-[var(--foreground)]">
           {workOrder.title}
         </h1>
-        <p className="text-sm text-[var(--muted-strong)]">
-          {[workOrder.asset_name, workOrder.location].filter(Boolean).join(" • ") || "No asset/location"}
-        </p>
         <div className="flex flex-wrap items-center gap-2">
           <WorkOrderStatusBadge status={workOrder.status} />
           <WorkOrderPriorityBadge priority={workOrder.priority} />
@@ -230,6 +302,34 @@ export function TechnicianJobExecutionView({
               : "Reactive"}
           </span>
         </div>
+        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+            <dt className="text-xs text-[var(--muted)]">Due date</dt>
+            <dd className="font-medium text-[var(--foreground)]">{formatDateOnly(workOrder.due_date)}</dd>
+          </div>
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+            <dt className="text-xs text-[var(--muted)]">Asset</dt>
+            <dd className="font-medium text-[var(--foreground)]">{workOrder.asset_name ?? "Unassigned asset"}</dd>
+          </div>
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+            <dt className="text-xs text-[var(--muted)]">Location</dt>
+            <dd className="font-medium text-[var(--foreground)]">
+              {workOrder.location_segments.join(" → ") || "No location"}
+            </dd>
+          </div>
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+            <dt className="text-xs text-[var(--muted)]">Assigned</dt>
+            <dd className="font-medium text-[var(--foreground)]">
+              {workOrder.assigned_technician_name ?? workOrder.assigned_crew_name ?? "Unassigned"}
+            </dd>
+          </div>
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2 sm:col-span-2">
+            <dt className="text-xs text-[var(--muted)]">Estimated duration</dt>
+            <dd className="font-medium text-[var(--foreground)]">
+              {workOrder.estimated_hours != null ? `${workOrder.estimated_hours}h` : "Not set"}
+            </dd>
+          </div>
+        </dl>
         <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/70 px-3 py-2">
           <p className="text-xs text-[var(--muted)]">Labor logged</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">
@@ -253,6 +353,193 @@ export function TechnicianJobExecutionView({
           {message.text}
         </p>
       ) : null}
+
+      <section className="sticky bottom-20 z-20 rounded-xl border border-[var(--card-border)] bg-[var(--card)]/95 p-2 shadow-[var(--shadow-soft)] backdrop-blur sm:bottom-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {!isCompleted && !isInProgress ? (
+            <Button
+              type="button"
+              className="h-11 text-sm"
+              onClick={() => runStatusUpdate("in_progress")}
+              disabled={pending}
+            >
+              {isOnHold ? "Resume" : "Start Job"}
+            </Button>
+          ) : !isCompleted ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-11 text-sm"
+              onClick={() => runStatusUpdate("on_hold")}
+              disabled={pending}
+            >
+              Pause Job
+            </Button>
+          ) : (
+            <Button type="button" variant="secondary" className="h-11 text-sm" disabled>
+              Complete
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-11 text-sm"
+            onClick={jumpToNotes}
+            disabled={pending}
+          >
+            Add Note
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-11 text-sm"
+            onClick={jumpToPhotos}
+            disabled={pending}
+          >
+            Add Photo
+          </Button>
+          {!isCompleted ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-11 text-sm col-span-2 sm:col-span-2"
+              onClick={openCompletionFlow}
+              disabled={pending}
+            >
+              Complete Job
+            </Button>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Asset Context</h2>
+          {workOrder.asset_id ? (
+            <Link href={`/assets/${workOrder.asset_id}`} className="text-xs font-medium text-[var(--accent)] hover:underline">
+              Open asset history
+            </Link>
+          ) : null}
+        </div>
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+            <p className="text-xs text-[var(--muted)]">Asset</p>
+            <p className="font-medium text-[var(--foreground)]">{workOrder.asset_context.name ?? "No asset linked"}</p>
+            <p className="text-xs text-[var(--muted)]">{workOrder.asset_context.asset_type ?? "Type not set"}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2">
+            <p className="text-xs text-[var(--muted)]">Health score</p>
+            <p className={`inline-flex rounded-full px-2 py-0.5 text-sm font-semibold ${healthTone(workOrder.asset_context.health_score)}`}>
+              {workOrder.asset_context.health_score != null
+                ? `${Number(workOrder.asset_context.health_score).toFixed(0)}`
+                : "—"}
+            </p>
+            <p className="text-xs text-[var(--muted)]">
+              Failure risk:{" "}
+              {workOrder.asset_context.failure_risk != null
+                ? `${Number(workOrder.asset_context.failure_risk).toFixed(0)} / 100`
+                : "—"}
+            </p>
+          </div>
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-2 sm:col-span-2">
+            <p className="text-xs text-[var(--muted)]">Last maintenance</p>
+            <p className="font-medium text-[var(--foreground)]">
+              {formatDateTime(workOrder.asset_context.last_maintenance_at)}
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Recurring issues</p>
+          {workOrder.asset_context.recurring_issues.length === 0 ? (
+            <p className="mt-1 text-sm text-[var(--muted)]">No recurring issues detected.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {workOrder.asset_context.recurring_issues.map((issue) => (
+                <li key={issue.id} className={`rounded-lg border p-2 text-xs ${severityTone(issue.severity)}`}>
+                  <p className="font-semibold">
+                    {patternLabel(issue.pattern_type)} • {issue.frequency} occurrence(s)
+                  </p>
+                  <p>{issue.recommendation}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Work Instructions</h2>
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Problem description</p>
+          <p className="mt-1 text-sm text-[var(--muted-strong)]">
+            {workOrder.description ?? "No problem description provided."}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Instructions</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--muted-strong)]">
+            {workOrder.instructions ?? "No specific instructions provided."}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Safety notes</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--muted-strong)]">
+            {workOrder.safety_notes ?? "No safety notes recorded."}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--background)]/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Attachments ({attachments.length})
+          </p>
+          {attachments.length === 0 ? (
+            <p className="mt-1 text-sm text-[var(--muted)]">No instruction attachments uploaded.</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {attachments.map((attachment) => (
+                <li key={attachment.id}>
+                  <a
+                    href={attachment.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-[var(--accent)] hover:underline"
+                  >
+                    {attachment.caption ?? attachment.file_name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Checklist Progress</h2>
+          <span className="text-xs font-medium text-[var(--muted)]">
+            {checklistProgress.completed}/{checklistProgress.total} complete
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-[var(--background)]">
+          <div
+            className="h-full rounded-full bg-[var(--accent)]"
+            style={{ width: `${checklistProgress.percent}%` }}
+          />
+        </div>
+        <p className="text-xs text-[var(--muted)]">
+          {checklistProgress.remaining > 0
+            ? `${checklistProgress.remaining} item(s) remaining.`
+            : "Checklist complete."}
+        </p>
+        <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+          <input
+            type="checkbox"
+            checked={enforceChecklistCompletion}
+            onChange={(event) => setEnforceChecklistCompletion(event.target.checked)}
+            className="rounded border-[var(--card-border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+          />
+          Require checklist completion before job completion
+        </label>
+      </section>
 
       <section className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {!isCompleted && !isInProgress ? (
@@ -281,7 +568,7 @@ export function TechnicianJobExecutionView({
             type="button"
             variant="secondary"
             className="h-12 text-base sm:col-span-2"
-            onClick={() => setCompletionOpen(true)}
+            onClick={openCompletionFlow}
             disabled={pending}
           >
             Complete Work Order
@@ -289,17 +576,17 @@ export function TechnicianJobExecutionView({
         ) : null}
       </section>
 
-      <section className="space-y-2 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
-        <h2 className="text-sm font-semibold text-[var(--foreground)]">Job details</h2>
-        <p className="text-sm text-[var(--muted-strong)]">{workOrder.description ?? "No description provided."}</p>
-        <p className="text-sm text-[var(--muted)]">{workOrder.instructions ?? "No instructions provided."}</p>
-        <p className="text-xs text-[var(--muted)]">
-          Technician: {workOrder.assigned_technician_name ?? "—"} • Crew:{" "}
-          {workOrder.assigned_crew_name ?? "—"}
-        </p>
+      <section
+        ref={photoSectionRef}
+        id="technician-photo-upload-section"
+        className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]"
+      >
+        <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">Photo Capture</h2>
+        <PhotoUploader
+          onUpload={uploadPhoto}
+          disabled={pending || isCompleted}
+        />
       </section>
-
-      <PhotoUploader onUpload={uploadPhoto} disabled={pending || isCompleted} className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]" />
 
       <section className="space-y-2 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
         <h2 className="text-sm font-semibold text-[var(--foreground)]">Uploaded photos</h2>
@@ -345,13 +632,17 @@ export function TechnicianJobExecutionView({
         />
       </div>
 
-      <NotesTimeline
-        workOrderId={workOrder.id}
-        technicianId={workOrder.technician_id_for_actor}
-        notes={workOrder.notesTimeline}
-        events={workOrder.activityTimeline}
-        onChanged={() => router.refresh()}
-      />
+      <section ref={noteSectionRef} id="technician-notes-section">
+        <NotesTimeline
+          workOrderId={workOrder.id}
+          technicianId={workOrder.technician_id_for_actor}
+          notes={workOrder.notesTimeline}
+          events={workOrder.activityTimeline}
+          onChanged={() => router.refresh()}
+          composerId="technician-note-input"
+          focusSignal={noteFocusSignal}
+        />
+      </section>
 
       {completionOpen ? (
         <WorkOrderCompletionModal
@@ -360,6 +651,7 @@ export function TechnicianJobExecutionView({
           technicians={technicians}
           assignedTechnicianId={workOrder.assigned_technician_id}
           estimatedHours={workOrder.estimated_hours}
+          enforceChecklistCompletion={enforceChecklistCompletion}
           onClose={() => setCompletionOpen(false)}
           onSuccess={() => router.refresh()}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { addWorkOrderNote } from "@/app/(authenticated)/work-orders/actions";
 import { Button } from "@/src/components/ui/button";
 
@@ -25,6 +25,8 @@ type NotesTimelineProps = {
   notes: TimelineNote[];
   events: TimelineEvent[];
   onChanged: () => void;
+  composerId?: string;
+  focusSignal?: number;
 };
 
 function formatDateTime(value: string): string {
@@ -36,12 +38,24 @@ function formatDateTime(value: string): string {
 
 function formatEventLabel(event: TimelineEvent): string {
   const key = event.action_type;
+  if (key === "work_order_created") return "Work order created";
+  if (key === "work_order_assigned") return "Assignment updated";
+  if (key === "dispatch_reassigned") return "Reassigned";
+  if (key === "dispatch_rescheduled") return "Rescheduled";
+  if (key === "dispatch_unscheduled") return "Unscheduled";
+  if (key === "work_order_scheduled") return "Scheduled";
+  if (key === "work_order_status_changed") return "Status changed";
   if (key === "job_started") return "Work started";
   if (key === "job_paused") return "Work paused";
   if (key === "job_completed") return "Work completed";
   if (key === "work_order_photo_uploaded") return "Photo uploaded";
   if (key === "labor_logged") return "Labor logged";
   if (key === "work_order_note_added") return "Note added";
+  if (key === "work_order_checklist_toggled") return "Checklist updated";
+  if (key === "work_order_checklist_item_added") return "Checklist item added";
+  if (key === "work_order_part_added") return "Part logged";
+  if (key === "completion_notes_added") return "Completion notes added";
+  if (key === "work_order_completed") return "Work order completed";
   return key.replace(/_/g, " ");
 }
 
@@ -51,10 +65,13 @@ export function NotesTimeline({
   notes,
   events,
   onChanged,
+  composerId = "technician-note-input",
+  focusSignal = 0,
 }: NotesTimelineProps) {
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const noteRef = useRef<HTMLTextAreaElement | null>(null);
 
   const entries = useMemo(() => {
     const noteEntries = notes.map((note) => ({
@@ -81,6 +98,12 @@ export function NotesTimeline({
     );
   }, [notes, events]);
 
+  useEffect(() => {
+    if (!focusSignal) return;
+    noteRef.current?.focus();
+    noteRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusSignal]);
+
   const handleAddNote = () => {
     const body = draft.trim();
     if (!body) return;
@@ -101,6 +124,8 @@ export function NotesTimeline({
       <h2 className="text-sm font-semibold text-[var(--foreground)]">Job timeline & notes</h2>
       <div className="space-y-2">
         <textarea
+          id={composerId}
+          ref={noteRef}
           rows={3}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}

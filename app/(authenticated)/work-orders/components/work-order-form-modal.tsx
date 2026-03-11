@@ -14,6 +14,7 @@ export type WorkOrder = {
   unit_id: string | null;
   asset_id: string | null;
   description: string | null;
+  safety_notes?: string | null;
   category: string | null;
   priority: string;
   status: string;
@@ -158,6 +159,7 @@ const emptyWorkOrder: WorkOrder = {
   unit_id: null,
   asset_id: null,
   description: null,
+  safety_notes: null,
   category: null,
   priority: "medium",
   status: "new",
@@ -420,6 +422,17 @@ export function WorkOrderFormModal({
               <div>
                 <label htmlFor="description" className={labelClass}>Description</label>
                 <textarea id="description" name="description" rows={2} defaultValue={descriptionDefault} className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="safety_notes" className={labelClass}>Safety Notes</label>
+                <textarea
+                  id="safety_notes"
+                  name="safety_notes"
+                  rows={2}
+                  defaultValue={wo.safety_notes ?? ""}
+                  placeholder="Lockout/tagout, PPE requirements, hazard warnings..."
+                  className={inputClass}
+                />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>

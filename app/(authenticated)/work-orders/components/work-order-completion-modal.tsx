@@ -19,6 +19,7 @@ type WorkOrderCompletionModalProps = {
   technicians: TechnicianOption[];
   assignedTechnicianId: string | null;
   estimatedHours: number | null;
+  enforceChecklistCompletion?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -41,6 +42,7 @@ export function WorkOrderCompletionModal({
   technicians,
   assignedTechnicianId,
   estimatedHours,
+  enforceChecklistCompletion = false,
   onClose,
   onSuccess,
 }: WorkOrderCompletionModalProps) {
@@ -81,6 +83,7 @@ export function WorkOrderCompletionModal({
         internal_completion_notes: internalCompletionNotes.trim() || null,
         completed_by_technician_id: completedByTechnicianId || null,
         completion_status: completionStatus || null,
+        enforce_checklist_completion: enforceChecklistCompletion,
       };
       const result = await completeWorkOrder(workOrderId, payload);
       if (result.error) {
@@ -107,6 +110,11 @@ export function WorkOrderCompletionModal({
           <p className="mt-0.5 text-sm text-[var(--muted)]">{workOrderTitle}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6 p-6">
+          {enforceChecklistCompletion ? (
+            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+              All required checklist items must be completed before this work order can be closed.
+            </p>
+          ) : null}
           {error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {error}

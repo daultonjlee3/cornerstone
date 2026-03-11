@@ -435,6 +435,7 @@ export async function saveWorkOrder(
     asset_id: assetId || null,
     title,
     description: (formData.get("description") as string)?.trim() || null,
+    safety_notes: (formData.get("safety_notes") as string)?.trim() || null,
     category: validCategory,
     priority: validPriority,
     status: validStatus,
@@ -908,6 +909,7 @@ export type WorkOrderCompletionPayload = {
   internal_completion_notes?: string | null;
   completed_by_technician_id?: string | null;
   completion_status?: string | null;
+  enforce_checklist_completion?: boolean;
 };
 
 const VALID_COMPLETION_STATUSES = ["successful", "partially_completed", "deferred", "unable_to_complete"] as const;
@@ -941,6 +943,18 @@ export async function completeWorkOrder(
   }
   if (!beforeState.started_at) {
     return { error: "Work order must be started before it can be completed." };
+  }
+  if (payload.enforce_checklist_completion) {
+    const { count } = await supabase
+      .from("work_order_checklist_items")
+      .select("id", { count: "exact", head: true })
+      .eq("work_order_id", id)
+      .eq("completed", false);
+    if (Number(count ?? 0) > 0) {
+      return {
+        error: `Complete required checklist items before closing this job. ${count} item(s) remaining.`,
+      };
+    }
   }
 
   const completedAt = payload.completed_at
@@ -1349,9 +1363,10 @@ export async function toggleWorkOrderChecklistItem(
   const tenantId = await getTenantId();
   if (!tenantId) return { error: "Unauthorized." };
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: item } = await supabase
     .from("work_order_checklist_items")
-    .select("work_order_id")
+    .select("work_order_id, label, completed")
     .eq("id", itemId)
     .maybeSingle();
   if (!item) return { error: "Checklist item not found." };
@@ -1368,7 +1383,23 @@ export async function toggleWorkOrderChecklistItem(
     .update({ completed })
     .eq("id", itemId);
   if (error) return { error: error.message };
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: (wo as { company_id: string }).company_id,
+    entityType: "work_order",
+    entityId: item.work_order_id,
+    actionType: "work_order_checklist_toggled",
+    performedBy: actorId,
+    metadata: {
+      checklist_item_id: itemId,
+      label: (item as { label?: string | null }).label ?? null,
+      completed,
+      previous_completed: (item as { completed?: boolean | null }).completed ?? null,
+    },
+  });
   revalidatePath(`/work-orders/${item.work_order_id}`);
+  revalidatePath(`/technicians/work-queue/${item.work_order_id}`);
+  revalidatePath(`/technician/jobs/${item.work_order_id}`);
   return { success: true };
 }
 
@@ -1381,6 +1412,7 @@ export async function addWorkOrderChecklistItem(
   const trimmed = (label ?? "").trim();
   if (!trimmed) return { error: "Label is required." };
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: wo } = await supabase
     .from("work_orders")
     .select("company_id")
@@ -1404,7 +1436,21 @@ export async function addWorkOrderChecklistItem(
     sort_order: sortOrder,
   });
   if (error) return { error: error.message };
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: (wo as { company_id: string }).company_id,
+    entityType: "work_order",
+    entityId: workOrderId,
+    actionType: "work_order_checklist_item_added",
+    performedBy: actorId,
+    metadata: {
+      label: trimmed,
+      sort_order: sortOrder,
+    },
+  });
   revalidatePath(`/work-orders/${workOrderId}`);
+  revalidatePath(`/technicians/work-queue/${workOrderId}`);
+  revalidatePath(`/technician/jobs/${workOrderId}`);
   return { success: true };
 }
 
@@ -1428,9 +1474,10 @@ export async function addWorkOrderPartUsage(
   if (payload.quantity_used <= 0) return { error: "Quantity must be greater than zero." };
 
   const supabase = await createClient();
+  const actorId = await getActorId(supabase);
   const { data: wo } = await supabase
     .from("work_orders")
-    .select("company_id, status, asset_id")
+    .select("company_id, status, asset_id, assigned_technician_id")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!wo) return { error: "Work order not found." };
@@ -1524,6 +1571,24 @@ export async function addWorkOrderPartUsage(
     }
   }
 
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId,
+    entityType: "work_order",
+    entityId: workOrderId,
+    actionType: "work_order_part_added",
+    performedBy: actorId,
+    metadata: {
+      part_usage_id: inserted.id,
+      inventory_item_id: payload.inventory_item_id ?? null,
+      part_name_snapshot: partName,
+      quantity_used: payload.quantity_used,
+      unit_cost: finalUnitCost,
+      total_cost: totalCost,
+      technician_id: (wo as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+    },
+  });
+
   const assetId = (wo as { asset_id?: string | null }).asset_id ?? null;
   if (assetId) {
     try {
@@ -1536,5 +1601,7 @@ export async function addWorkOrderPartUsage(
   }
 
   revalidatePath(`/work-orders/${workOrderId}`);
+  revalidatePath(`/technicians/work-queue/${workOrderId}`);
+  revalidatePath(`/technician/jobs/${workOrderId}`);
   return { success: true };
 }
