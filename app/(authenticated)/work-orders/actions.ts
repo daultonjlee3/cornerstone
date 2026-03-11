@@ -728,6 +728,32 @@ export async function updateWorkOrderStatus(
   return { success: true };
 }
 
+/** Log a dispatch rebalance event (schedule optimization applied). */
+export async function logDispatchRebalance(
+  movedJobIds: string[],
+  selectedDate: string,
+  companyId: string | null
+): Promise<{ error?: string }> {
+  const tenantId = await getTenantId();
+  if (!tenantId) return { error: "Unauthorized." };
+  const supabase = await createClient();
+  const actorId = await getActorId(supabase);
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: companyId ?? undefined,
+    entityType: "dispatch",
+    entityId: `rebalance-${selectedDate}`,
+    actionType: "schedule_rebalanced",
+    performedBy: actorId,
+    metadata: {
+      message: "Schedule rebalanced by dispatcher",
+      movedJobIds,
+      selectedDate,
+    },
+  });
+  return {};
+}
+
 export type WorkOrderAssignmentPayload = {
   assigned_technician_id: string | null;
   assigned_crew_id: string | null;

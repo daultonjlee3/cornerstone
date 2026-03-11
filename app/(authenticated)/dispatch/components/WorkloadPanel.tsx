@@ -15,7 +15,7 @@ export function WorkloadPanel({
   children,
 }: WorkloadPanelProps) {
   return (
-    <Card className="min-h-0 flex-1">
+    <Card className="shrink-0">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>

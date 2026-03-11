@@ -6,16 +6,18 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { updateWorkOrderAssignment } from "@/app/(authenticated)/work-orders/actions";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
+import { updateWorkOrderAssignment, saveWorkOrder, logDispatchRebalance } from "@/app/(authenticated)/work-orders/actions";
 import { parseSlotId } from "./dispatch-board-utils";
 import { DispatchTopBar } from "./DispatchTopBar";
 import { DispatchSidebarQueue } from "./DispatchSidebarQueue";
-import { DispatchBoard } from "./DispatchBoard";
+import { DispatchBoard, type BoardLane } from "./DispatchBoard";
 import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
 import { DispatchWorkforcePanel } from "./DispatchWorkforcePanel";
 import type { DispatchWorkOrder } from "../types";
@@ -25,6 +27,9 @@ import { filterStateToParams } from "../filter-state";
 import { MetricCard } from "@/src/components/ui/metric-card";
 import { Card } from "@/src/components/ui/card";
 import { WorkOrderAssignmentModal } from "@/app/(authenticated)/work-orders/components/work-order-assignment-modal";
+import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
+import { RebalanceSuggestionsModal } from "./RebalanceSuggestionsModal";
+import { computeRebalanceSuggestions } from "../rebalance-utils";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
 
@@ -46,6 +51,16 @@ function normalizeStatus(value: string | null | undefined): string {
   if (value === "assigned") return "ready_to_schedule";
   if (value === "closed") return "completed";
   return value;
+}
+
+function queuePriorityRank(p: string | null | undefined): number {
+  const v = (p ?? "").toLowerCase();
+  if (v === "emergency") return 0;
+  if (v === "urgent") return 1;
+  if (v === "high") return 2;
+  if (v === "medium") return 3;
+  if (v === "low") return 4;
+  return 5;
 }
 
 function parseScheduledHours(workOrder: DispatchWorkOrder): number {
@@ -76,8 +91,14 @@ export function DispatchView({
   const [activeWo, setActiveWo] = useState<DispatchWorkOrder | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [assignmentTarget, setAssignmentTarget] = useState<DispatchWorkOrder | null>(null);
+  const [createWorkOrderModalOpen, setCreateWorkOrderModalOpen] = useState(false);
+  const [rebalanceModalOpen, setRebalanceModalOpen] = useState(false);
+  const [rebalanceApplying, setRebalanceApplying] = useState(false);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
+  const [dispatchBoardMode, setDispatchBoardMode] = useState<"technicians" | "crews">("technicians");
+  const [technicianPage, setTechnicianPage] = useState(0);
+  const TECHNICIAN_PAGE_SIZE = 8;
   const [optimisticWorkOrders, setOptimisticWorkOrders] = useState<DispatchWorkOrder[]>(
     initialData.workOrders
   );
@@ -138,7 +159,6 @@ export function DispatchView({
       const comparableStatus = normalizeStatus(wo.status ?? "");
       const isTerminal = comparableStatus === "completed" || comparableStatus === "cancelled";
       const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
-      const isQueueStatus = ["new", "ready_to_schedule"].includes(comparableStatus);
 
       if (!hasAssignment && !isTerminal) unassignedWorkOrders += 1;
       if (comparableStatus === "in_progress") inProgressToday += 1;
@@ -154,20 +174,37 @@ export function DispatchView({
       ) {
         highPriorityOpen.add(wo.id);
       }
-      if (due && due < today && !isTerminal) {
-        overdue.push(wo);
-      }
       if (scheduled === today && hasAssignment) {
         scheduledToday.push(wo);
       }
-      if (isQueueStatus && !hasAssignment && !scheduled && comparableStatus === "ready_to_schedule") {
+
+      if (scheduled) continue;
+      if (isTerminal) continue;
+
+      const isOverdue = due && due < today;
+      if (isOverdue) {
+        overdue.push(wo);
+        continue;
+      }
+      if (comparableStatus === "ready_to_schedule") {
         ready.push(wo);
         continue;
       }
-      if (isQueueStatus && !hasAssignment && !scheduled) {
+      if (["new", "ready_to_schedule"].includes(comparableStatus)) {
         unscheduled.push(wo);
       }
     }
+
+    const sortByPriorityThenDue = (a: DispatchWorkOrder, b: DispatchWorkOrder) => {
+      const pr = queuePriorityRank(a.priority) - queuePriorityRank(b.priority);
+      if (pr !== 0) return pr;
+      const da = a.due_date ?? "";
+      const db = b.due_date ?? "";
+      return da.localeCompare(db);
+    };
+    overdue.sort(sortByPriorityThenDue);
+    ready.sort(sortByPriorityThenDue);
+    unscheduled.sort(sortByPriorityThenDue);
 
     return {
       overdue,
@@ -210,12 +247,105 @@ export function DispatchView({
     });
   }, [dispatchData.scheduledToday, initialData.crews]);
 
+  const { lanes: boardLanes, workOrdersByLane: boardWorkOrdersByLane } = useMemo(() => {
+    const selectedDate = filterState.selectedDate;
+    const scheduledTodayForDate = optimisticWorkOrders.filter((wo) => (wo.scheduled_date ?? null) === selectedDate);
+    const unassignedLaneId = "__unassigned__";
+    const { technicians, crews: workforceCrews } = initialData.workforce;
+
+    if (dispatchBoardMode === "technicians") {
+      const start = technicianPage * TECHNICIAN_PAGE_SIZE;
+      const pageTechnicians = technicians.slice(start, start + TECHNICIAN_PAGE_SIZE);
+      const unassignedTech = scheduledTodayForDate.filter((wo) => !wo.assigned_technician_id);
+      const unassignedHours = unassignedTech.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
+      const lanes: BoardLane[] = [
+        {
+          id: unassignedLaneId,
+          name: "Individual / Unassigned",
+          total_scheduled_hours: Math.round(unassignedHours * 10) / 10,
+          job_count: unassignedTech.length,
+        },
+        ...pageTechnicians.map((t) => ({
+          id: `tech-${t.id}`,
+          name: t.name,
+          total_scheduled_hours: Math.round((t.workloadHoursToday ?? 0) * 10) / 10,
+          job_count: t.scheduledToday ?? 0,
+          remainingHours: t.availableCapacityHours ?? Math.max(0, (t.dailyCapacityHours ?? 8) - (t.workloadHoursToday ?? 0)),
+        })),
+      ];
+      const workOrdersByLane = new Map<string, typeof optimisticWorkOrders>();
+      lanes.forEach((l) => workOrdersByLane.set(l.id, []));
+      scheduledTodayForDate.forEach((wo) => {
+        const laneId = wo.assigned_technician_id ? `tech-${wo.assigned_technician_id}` : unassignedLaneId;
+        if (workOrdersByLane.has(laneId)) {
+          workOrdersByLane.get(laneId)!.push(wo);
+        }
+      });
+      return { lanes, workOrdersByLane };
+    }
+
+    const crewWorkloadById = new Map(workforceCrews.map((c) => [c.id, c]));
+    const unassignedCrew = scheduledTodayForDate.filter((wo) => !wo.assigned_crew_id);
+    const unassignedHours = unassignedCrew.reduce((sum, wo) => sum + parseScheduledHours(wo), 0);
+    const lanes: BoardLane[] = [
+      {
+        id: unassignedLaneId,
+        name: "Individual / Unassigned",
+        total_scheduled_hours: Math.round(unassignedHours * 10) / 10,
+        job_count: unassignedCrew.length,
+      },
+      ...boardCrews.map((crew) => {
+        const workload = crewWorkloadById.get(crew.id);
+        const remaining = workload?.availableCapacityHours ?? Math.max(0, (workload?.dailyCapacityHours ?? 8) - (crew.total_scheduled_hours ?? 0));
+        return {
+          id: crew.id,
+          name: crew.name ?? undefined,
+          total_scheduled_hours: crew.total_scheduled_hours ?? 0,
+          job_count: crew.job_count ?? 0,
+          remainingHours: remaining,
+        };
+      }),
+    ];
+    const workOrdersByLane = new Map<string, typeof optimisticWorkOrders>();
+    lanes.forEach((l) => workOrdersByLane.set(l.id, []));
+    scheduledTodayForDate.forEach((wo) => {
+      const laneId = wo.assigned_crew_id ?? unassignedLaneId;
+      if (workOrdersByLane.has(laneId)) {
+        workOrdersByLane.get(laneId)!.push(wo);
+      }
+    });
+    return { lanes, workOrdersByLane };
+  }, [
+    dispatchBoardMode,
+    technicianPage,
+    filterState.selectedDate,
+    optimisticWorkOrders,
+    initialData.workforce,
+    boardCrews,
+  ]);
+
   const hasNoResults =
     optimisticWorkOrders.length === 0 &&
     dispatchData.unscheduled.length === 0 &&
     dispatchData.overdue.length === 0 &&
     dispatchData.ready.length === 0 &&
     boardCrews.every((crew) => (crew.scheduled_today?.length ?? 0) === 0);
+
+  const rebalanceSuggestions = useMemo(() => {
+    const scheduledCrewOnly = dispatchData.scheduledToday.filter(
+      (wo) => wo.assigned_crew_id != null
+    );
+    return computeRebalanceSuggestions({
+      scheduledWorkOrders: scheduledCrewOnly,
+      crewWorkloads: initialData.workforce.crews,
+      selectedDate: filterState.selectedDate,
+      maxSuggestions: 10,
+    });
+  }, [
+    dispatchData.scheduledToday,
+    initialData.workforce.crews,
+    filterState.selectedDate,
+  ]);
 
   const applyOptimisticAssignment = useCallback(
     async (
@@ -356,21 +486,31 @@ export function DispatchView({
       const startISO = toSlotISO(dropDate, defaultHour);
       const hours = workOrder.estimated_hours ?? 1;
       const endISO = addHours(startISO, hours);
-      const assignedCrewId = crewId === "__unassigned__" ? null : crewId;
+      const isTechnicianDrop = crewId.startsWith("tech-");
+      const assignedTechnicianId = isTechnicianDrop ? crewId.slice(5) : null;
+      const assignedCrewId = crewId === "__unassigned__" || isTechnicianDrop ? null : crewId;
+      const techName =
+        assignedTechnicianId != null
+          ? initialData.workforce.technicians.find((t) => t.id === assignedTechnicianId)?.name ?? null
+          : null;
+      const crewName =
+        assignedCrewId != null ? initialData.crews.find((c) => c.id === assignedCrewId)?.name ?? null : null;
 
       await applyOptimisticAssignment(
         workOrder,
         {
-          assigned_technician_id: null,
+          assigned_technician_id: assignedTechnicianId,
           assigned_crew_id: assignedCrewId,
           scheduled_date: dropDate,
           scheduled_start: startISO,
           scheduled_end: endISO,
         },
         {
-          assigned_technician_id: null,
+          assigned_technician_id: assignedTechnicianId,
           assigned_crew_id: assignedCrewId,
-          assignment_type: assignedCrewId ? "crew" : "unassigned",
+          assigned_technician_name: techName ?? undefined,
+          assigned_crew_name: crewName ?? undefined,
+          assignment_type: assignedTechnicianId ? "technician" : assignedCrewId ? "crew" : "unassigned",
           scheduled_date: dropDate,
           scheduled_start: startISO,
           scheduled_end: endISO,
@@ -378,7 +518,7 @@ export function DispatchView({
         }
       );
     },
-    [applyOptimisticAssignment, filterState.selectedDate]
+    [applyOptimisticAssignment, filterState.selectedDate, initialData.workforce.technicians, initialData.crews]
   );
 
   const handleDragCancel = useCallback(() => {
@@ -397,7 +537,13 @@ export function DispatchView({
 
   const handleResizeEnd = useCallback(
     async (
-      workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null },
+      workOrder: {
+        id: string;
+        assigned_crew_id?: string | null;
+        assigned_technician_id?: string | null;
+        scheduled_date?: string | null;
+        scheduled_start?: string | null;
+      },
       newEndISO: string
     ) => {
       const match = optimisticWorkOrders.find((row) => row.id === workOrder.id);
@@ -405,8 +551,8 @@ export function DispatchView({
       await applyOptimisticAssignment(
         match,
         {
-          assigned_technician_id: null,
-          assigned_crew_id: workOrder.assigned_crew_id ?? null,
+          assigned_technician_id: match.assigned_technician_id ?? null,
+          assigned_crew_id: match.assigned_crew_id ?? null,
           scheduled_date: workOrder.scheduled_date ?? null,
           scheduled_start: workOrder.scheduled_start ?? null,
           scheduled_end: newEndISO,
@@ -466,25 +612,93 @@ export function DispatchView({
 
   const { filterOptions, error, workforce } = initialData;
 
+  const createFormOptions = useMemo(() => {
+    return {
+      companies: filterOptions.companies,
+      customers: [] as { id: string; name: string; company_id: string }[],
+      properties: filterOptions.properties.map((p) => ({
+        id: p.id,
+        name: (p.property_name ?? p.name ?? p.id) as string,
+        company_id: p.company_id,
+      })),
+      buildings: [] as { id: string; name: string; property_id: string }[],
+      units: [] as { id: string; name: string; building_id: string }[],
+      assets: filterOptions.assets
+        .filter((a) => a.company_id != null)
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          company_id: a.company_id as string,
+          property_id: (a as { property_id?: string | null }).property_id ?? null,
+          building_id: (a as { building_id?: string | null }).building_id ?? null,
+          unit_id: (a as { unit_id?: string | null }).unit_id ?? null,
+        })),
+      technicians: filterOptions.technicians,
+      crews: filterOptions.crews.map((c) => ({
+        id: c.id,
+        name: c.name,
+        company_id: (c.company_id ?? null) as string | null,
+      })),
+    };
+  }, [filterOptions]);
+
   const handleCreateWorkOrder = useCallback(() => {
-    router.push("/work-orders");
-  }, [router]);
+    setCreateWorkOrderModalOpen(true);
+  }, []);
 
   const handleAssignUnscheduled = useCallback(() => {
     setQueueCollapsed(false);
-  }, []);
+    const first =
+      dispatchData.overdue[0] ??
+      dispatchData.ready[0] ??
+      dispatchData.unscheduled[0] ??
+      null;
+    if (first) setAssignmentTarget(first);
+  }, [dispatchData.overdue, dispatchData.ready, dispatchData.unscheduled]);
 
   const handleRebalance = useCallback(() => {
-    const next: DispatchFilterState = {
-      ...filterState,
-      crewId: "",
-      technicianId: "",
-      assignmentType: "",
-      status: "",
-    };
-    const params = filterStateToParams(next);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [filterState, pathname, router]);
+    setRebalanceModalOpen(true);
+  }, []);
+
+  const handleRebalanceApply = useCallback(async () => {
+    if (rebalanceSuggestions.length === 0) return;
+    setRebalanceApplying(true);
+    setDropError(null);
+    const movedIds: string[] = [];
+    let companyId: string | null = null;
+    for (const s of rebalanceSuggestions) {
+      const wo = optimisticWorkOrders.find((row) => row.id === s.workOrderId);
+      if (wo) companyId = wo.company_id ?? null;
+      const result = await updateWorkOrderAssignment(s.workOrderId, {
+        assigned_technician_id: null,
+        assigned_crew_id: s.toCrewId,
+        scheduled_date: s.scheduledDate,
+        scheduled_start: s.scheduledStart,
+        scheduled_end: s.scheduledEnd,
+      });
+      if (result?.error) {
+        setDropError(result.error);
+        setRebalanceApplying(false);
+        return;
+      }
+      movedIds.push(s.workOrderId);
+    }
+    if (movedIds.length > 0) {
+      await logDispatchRebalance(
+        movedIds,
+        filterState.selectedDate,
+        companyId
+      );
+    }
+    setRebalanceApplying(false);
+    setRebalanceModalOpen(false);
+    router.refresh();
+  }, [
+    rebalanceSuggestions,
+    optimisticWorkOrders,
+    filterState.selectedDate,
+    router,
+  ]);
 
   return (
     <div className={`flex h-full min-h-0 flex-col ${isFullScreen ? "gap-2" : "gap-4"}`}>
@@ -604,6 +818,7 @@ export function DispatchView({
         <div className="flex min-h-0 flex-1">
           <DndContext
             sensors={sensors}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
@@ -624,22 +839,100 @@ export function DispatchView({
                 queueCollapsed ? "" : "border-l border-[var(--card-border)]"
               }`}
             >
-              <div className="h-full min-h-0">
-                <DispatchBoard
-                  crews={boardCrews}
-                  selectedDate={filterState.selectedDate}
-                  overDropId={overDropId}
-                  isDraggingWorkOrder={Boolean(activeWo)}
-                  view={filterState.viewMode}
-                  workOrders={optimisticWorkOrders}
-                  onSelectDate={handleSelectDate}
-                  onResizeEnd={handleResizeEnd}
-                  onOpenWorkOrder={handleOpenWorkOrder}
-                />
+              <div className="flex h-full min-h-0 flex-col">
+                {filterState.viewMode === "day" ? (
+                  <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--card-border)] bg-[var(--card)]/50 px-3 py-2">
+                    <span className="text-xs font-medium text-[var(--muted)]">Dispatch View:</span>
+                    <div className="flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setDispatchBoardMode("technicians")}
+                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                          dispatchBoardMode === "technicians"
+                            ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                            : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                        }`}
+                      >
+                        Technicians
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDispatchBoardMode("crews")}
+                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                          dispatchBoardMode === "crews"
+                            ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                            : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                        }`}
+                      >
+                        Crews
+                      </button>
+                    </div>
+                    {dispatchBoardMode === "technicians" &&
+                      initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
+                          disabled={technicianPage === 0}
+                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-2 py-1 text-sm font-medium text-[var(--foreground)] disabled:opacity-50"
+                          aria-label="Previous page"
+                        >
+                          ←
+                        </button>
+                        <span className="text-xs text-[var(--muted)]">
+                          Technicians {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
+                          {Math.min((technicianPage + 1) * TECHNICIAN_PAGE_SIZE, initialData.workforce.technicians.length)} of{" "}
+                          {initialData.workforce.technicians.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTechnicianPage((p) =>
+                              Math.min(p + 1, Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1)
+                            )
+                          }
+                          disabled={
+                            technicianPage >=
+                            Math.ceil(initialData.workforce.technicians.length / TECHNICIAN_PAGE_SIZE) - 1
+                          }
+                          className="rounded border border-[var(--card-border)] bg-[var(--card)] px-2 py-1 text-sm font-medium text-[var(--foreground)] disabled:opacity-50"
+                          aria-label="Next page"
+                        >
+                          →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                {filterState.viewMode === "day" &&
+                  dispatchBoardMode === "technicians" &&
+                  initialData.workforce.technicians.length === 0 ? (
+                  <div className="flex flex-1 items-center justify-center border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-8">
+                    <p className="text-sm font-medium text-[var(--muted)]">
+                      No technicians available. Add technicians to begin scheduling.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="min-h-0 flex-1">
+                    <DispatchBoard
+                      lanes={boardLanes}
+                      workOrdersByLane={boardWorkOrdersByLane}
+                      selectedDate={filterState.selectedDate}
+                      overDropId={overDropId}
+                      isDraggingWorkOrder={Boolean(activeWo)}
+                      view={filterState.viewMode}
+                      workOrders={optimisticWorkOrders}
+                      onSelectDate={handleSelectDate}
+                      onResizeEnd={handleResizeEnd}
+                      onOpenWorkOrder={handleOpenWorkOrder}
+                    />
+                  </div>
+                )}
               </div>
             </main>
 
             <DragOverlay
+              modifiers={[snapCenterToCursor]}
               dropAnimation={{
                 duration: 180,
                 easing: "cubic-bezier(0.22, 1, 0.36, 1)",
@@ -675,7 +968,7 @@ export function DispatchView({
           ) : (
             <aside className="hidden w-[380px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
               <div className="sticky top-3 flex h-[calc(100vh-7.75rem)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]/85 p-3 shadow-[var(--shadow-soft)]">
-                <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
                     Workload Insights
                   </p>
@@ -687,13 +980,15 @@ export function DispatchView({
                     Collapse
                   </button>
                 </div>
-                <DispatchWorkforcePanel
-                  workforce={workforce}
-                  insights={dispatchData.insights}
-                  onCreateWorkOrder={handleCreateWorkOrder}
-                  onAssignUnscheduled={handleAssignUnscheduled}
-                  onRebalance={handleRebalance}
-                />
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <DispatchWorkforcePanel
+                    workforce={workforce}
+                    insights={dispatchData.insights}
+                    onCreateWorkOrder={handleCreateWorkOrder}
+                    onAssignUnscheduled={handleAssignUnscheduled}
+                    onRebalance={handleRebalance}
+                  />
+                </div>
               </div>
             </aside>
           )}
@@ -725,6 +1020,33 @@ export function DispatchView({
           company_id: crew.company_id ?? null,
         }))}
         onSuccess={() => router.refresh()}
+      />
+
+      <WorkOrderFormModal
+        open={createWorkOrderModalOpen}
+        onClose={() => {
+          setCreateWorkOrderModalOpen(false);
+          router.refresh();
+        }}
+        workOrder={null}
+        prefill={null}
+        companies={createFormOptions.companies}
+        customers={createFormOptions.customers}
+        properties={createFormOptions.properties}
+        buildings={createFormOptions.buildings}
+        units={createFormOptions.units}
+        assets={createFormOptions.assets}
+        technicians={createFormOptions.technicians}
+        crews={createFormOptions.crews}
+        saveAction={saveWorkOrder}
+      />
+
+      <RebalanceSuggestionsModal
+        open={rebalanceModalOpen}
+        onClose={() => setRebalanceModalOpen(false)}
+        suggestions={rebalanceSuggestions}
+        onApply={handleRebalanceApply}
+        isApplying={rebalanceApplying}
       />
     </div>
   );

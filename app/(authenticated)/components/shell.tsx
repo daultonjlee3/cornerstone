@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
+
+const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
 type ShellProps = {
   children: React.ReactNode;
@@ -13,20 +15,39 @@ type ShellProps = {
 
 export function Shell({ children, tenantName, companyName }: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDispatchFullscreen =
     pathname === "/dispatch" && searchParams.get("dispatch_fullscreen") === "1";
 
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    setSidebarCollapsed(stored === "1");
+  }, []);
+
+  const handleToggleCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       {!isDispatchFullscreen ? (
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
       ) : null}
       {/* Main panel: fills remaining width, column layout, scrollable content */}
       <div
         className={`flex min-h-0 flex-1 flex-col ${
-          isDispatchFullscreen ? "" : "lg:pl-64"
+          isDispatchFullscreen ? "" : sidebarCollapsed ? "lg:pl-16" : "lg:pl-64"
         }`}
       >
         {!isDispatchFullscreen ? (

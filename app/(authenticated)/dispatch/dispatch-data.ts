@@ -16,9 +16,9 @@ export type LoadDispatchResult = {
 export type DispatchFilterOptions = {
   companies: { id: string; name: string }[];
   properties: { id: string; property_name?: string; name?: string; company_id: string }[];
-  crews: { id: string; name: string }[];
+  crews: { id: string; name: string; company_id?: string | null }[];
   technicians: { id: string; name: string }[];
-  assets: { id: string; name: string }[];
+  assets: { id: string; name: string; company_id?: string | null }[];
   assignmentTypes: { value: string; label: string }[];
   priorities: { value: string; label: string }[];
   statuses: { value: string; label: string }[];
@@ -204,8 +204,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       .order("name"),
     supabase
       .from("assets")
-      .select("id, asset_name, name")
-      .in("company_id", companyIds)
+.select("id, asset_name, name, company_id, property_id, building_id, unit_id")
+    .in("company_id", companyIds)
       .order("asset_name")
       .order("name"),
   ]);
@@ -225,7 +225,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   }>;
   const crewList = allCrews
     .filter((row) => row.is_active !== false)
-    .map((row) => ({ id: row.id, name: row.name }));
+    .map((row) => ({ id: row.id, name: row.name, company_id: row.company_id ?? null }));
   const crewCompanyById = new Map(
     allCrews.map((row) => [row.id, row.company_id ?? null] as const)
   );
@@ -247,6 +247,10 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       (a as { asset_name?: string | null; name?: string | null }).asset_name ??
       (a as { name?: string | null }).name ??
       "Unnamed asset",
+    company_id: (a as { company_id?: string | null }).company_id ?? null,
+    property_id: (a as { property_id?: string | null }).property_id ?? null,
+    building_id: (a as { building_id?: string | null }).building_id ?? null,
+    unit_id: (a as { unit_id?: string | null }).unit_id ?? null,
   }));
 
   const technicianNameById = new Map(allTechnicians.map((t) => [t.id, t.name]));
@@ -419,13 +423,22 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   let inProgressToday = 0;
   let unassignedWorkOrders = 0;
 
+  const priorityRank = (p: string | null | undefined): number => {
+    const v = (p ?? "").toLowerCase();
+    if (v === "emergency") return 0;
+    if (v === "urgent") return 1;
+    if (v === "high") return 2;
+    if (v === "medium") return 3;
+    if (v === "low") return 4;
+    return 5;
+  };
+
   for (const wo of all) {
     const scheduled = wo.scheduled_date ?? null;
     const due = wo.due_date ?? null;
     const comparableStatus = toComparableStatus(wo.status ?? "");
     const isTerminal = comparableStatus === "completed" || comparableStatus === "cancelled";
     const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
-    const isQueueStatus = ["new", "ready_to_schedule"].includes(comparableStatus);
 
     if (!hasAssignment && !isTerminal) unassignedWorkOrders += 1;
     if (comparableStatus === "in_progress") inProgressToday += 1;
@@ -441,20 +454,49 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     ) {
       highPriorityOpen.add(wo.id);
     }
-    if (due && due < today && !isTerminal) {
-      overdue.push(wo);
-    }
     if (scheduled === today && hasAssignment) {
       scheduledToday.push(wo);
     }
-    if (isQueueStatus && !hasAssignment && !scheduled && comparableStatus === "ready_to_schedule") {
+
+    // Queue: only work orders not yet scheduled (no scheduled_date)
+    if (scheduled) continue;
+    if (isTerminal) continue;
+
+    const isOverdue = due && due < today;
+    if (isOverdue) {
+      overdue.push(wo);
+      continue;
+    }
+    if (comparableStatus === "ready_to_schedule") {
       ready.push(wo);
       continue;
     }
-    if (isQueueStatus && !hasAssignment && !scheduled) {
+    if (["new", "ready_to_schedule"].includes(comparableStatus)) {
       unscheduled.push(wo);
     }
   }
+
+  overdue.sort((a, b) => {
+    const pr = priorityRank(a.priority) - priorityRank(b.priority);
+    if (pr !== 0) return pr;
+    const da = a.due_date ?? "";
+    const db = b.due_date ?? "";
+    return da.localeCompare(db);
+  });
+  ready.sort((a, b) => {
+    const pr = priorityRank(a.priority) - priorityRank(b.priority);
+    if (pr !== 0) return pr;
+    const da = a.due_date ?? "";
+    const db = b.due_date ?? "";
+    return da.localeCompare(db);
+  });
+  unscheduled.sort((a, b) => {
+    const pr = priorityRank(a.priority) - priorityRank(b.priority);
+    if (pr !== 0) return pr;
+    const da = a.due_date ?? "";
+    const db = b.due_date ?? "";
+    return da.localeCompare(db);
+  });
 
   const crews: DispatchCrew[] = crewList.map((c) => {
     const crewWos = scheduledToday.filter((wo) => wo.assigned_crew_id === c.id);

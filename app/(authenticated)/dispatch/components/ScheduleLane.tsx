@@ -9,6 +9,8 @@ type ScheduleLaneProps = {
   selectedDate: string;
   totalScheduledHours: number;
   jobCount: number;
+  /** When provided, used instead of DEFAULT_AVAILABLE_HOURS - totalScheduledHours for remaining. */
+  remainingHours?: number;
   overDropId: string | null;
   isDraggingWorkOrder: boolean;
   timeLabels: { hour: number; label: string }[];
@@ -61,6 +63,7 @@ export function ScheduleLane({
   selectedDate,
   totalScheduledHours,
   jobCount,
+  remainingHours: remainingHoursProp,
   overDropId,
   isDraggingWorkOrder,
   timeLabels,
@@ -75,7 +78,10 @@ export function ScheduleLane({
       defaultHour: DAY_START_HOUR,
     },
   });
-  const remaining = Math.max(0, DEFAULT_AVAILABLE_HOURS - totalScheduledHours);
+  const remaining =
+    remainingHoursProp !== undefined
+      ? Math.max(0, remainingHoursProp)
+      : Math.max(0, DEFAULT_AVAILABLE_HOURS - totalScheduledHours);
   const highlight =
     isOver || (overDropId != null && String(overDropId).startsWith(`crew-${id}`));
 

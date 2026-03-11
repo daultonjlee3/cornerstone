@@ -7,10 +7,14 @@ type QueueWorkOrder = {
   [key: string]: unknown;
 };
 
+const SECTION_LIST_MAX_HEIGHT = 280;
+
 type QueueSectionProps = {
   title: string;
   items: QueueWorkOrder[];
   variant: "overdue" | "ready" | "unscheduled";
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   DraggableWrapper: (props: { workOrder: QueueWorkOrder; children: React.ReactNode }) => React.ReactNode;
   onOpenWorkOrder?: (
     id: string,
@@ -47,45 +51,64 @@ export function QueueSection({
   title,
   items,
   variant,
+  collapsed,
+  onToggleCollapse,
   DraggableWrapper,
   onOpenWorkOrder,
 }: QueueSectionProps) {
   const styles = stylesForVariant(variant);
+  const count = items.length;
+  const isScrollable = count > 6;
+
   return (
     <section className={`mx-2 mb-3 overflow-hidden rounded-xl border ${styles.shell}`}>
       <h3
-        className={`sticky top-0 z-10 flex items-center justify-between border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${styles.header}`}
+        className={`sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${styles.header}`}
       >
-        <span>{title}</span>
-        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${styles.count}`}>
-          {items.length}
+        <span className="min-w-0 truncate">
+          {title} ({count})
         </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="rounded px-1.5 py-0.5 text-[10px] font-medium hover:bg-black/5"
+            aria-label={collapsed ? "Expand section" : "Collapse section"}
+          >
+            {collapsed ? "Expand" : "Collapse"}
+          </button>
+        </div>
       </h3>
-      <ul className="flex flex-col gap-2 p-2.5">
-        {items.length === 0 ? (
-          <li className="rounded-lg border border-dashed border-[var(--card-border)] bg-[var(--card)]/70 py-3 text-center text-xs text-[var(--muted)]">
-            None
-          </li>
-        ) : (
-          items.map((wo) => (
-            <li key={wo.id}>
-              {DraggableWrapper({
-                workOrder: wo,
-                children: (
-                  <DispatchWorkOrderCard
-                    workOrder={wo}
-                    variant="block"
-                    showScheduledTime
-                    showCrew={false}
-                    showQuickActions={false}
-                    onOpenWorkOrder={onOpenWorkOrder}
-                  />
-                ),
-              })}
+      {!collapsed && (
+        <ul
+          className={`flex flex-col gap-2 p-2.5 ${isScrollable ? "overflow-y-auto overscroll-contain" : ""}`}
+          style={isScrollable ? { maxHeight: SECTION_LIST_MAX_HEIGHT } : undefined}
+        >
+          {count === 0 ? (
+            <li className="rounded-lg border border-dashed border-[var(--card-border)] bg-[var(--card)]/70 py-3 text-center text-xs text-[var(--muted)]">
+              None
             </li>
-          ))
-        )}
-      </ul>
+          ) : (
+            items.map((wo) => (
+              <li key={wo.id}>
+                {DraggableWrapper({
+                  workOrder: wo,
+                  children: (
+                    <DispatchWorkOrderCard
+                      workOrder={wo}
+                      variant="block"
+                      showScheduledTime
+                      showCrew={false}
+                      showQuickActions={false}
+                      onOpenWorkOrder={onOpenWorkOrder}
+                    />
+                  ),
+                })}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
     </section>
   );
 }

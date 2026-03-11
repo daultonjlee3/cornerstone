@@ -16,13 +16,14 @@ import { ScheduleLane } from "./ScheduleLane";
 
 const UNASSIGNED_LANE_ID = "__unassigned__";
 
-/** Minimal crew shape for the board (from LoadDispatchResult.crews). */
-type BoardCrew = {
+/** Lane shown as a column (technician or crew). */
+export type BoardLane = {
   id: string;
   name?: string | null;
-  scheduled_today?: unknown[];
   total_scheduled_hours?: number;
   job_count?: number;
+  /** When set, shown in header as "Xh remaining" and passed to ScheduleLane. */
+  remainingHours?: number;
 };
 
 /** Work order shape used by the board and getWorkOrderPosition. */
@@ -33,18 +34,31 @@ type BoardWorkOrder = {
   estimated_hours?: number | null;
   scheduled_date?: string | null;
   assigned_crew_id?: string | null;
+  assigned_technician_id?: string | null;
   [key: string]: unknown;
 };
 
 export type DispatchBoardProps = {
-  crews: BoardCrew[];
+  /** Lanes to show (unassigned first, then technicians or crews). */
+  lanes: BoardLane[];
+  /** Work orders per lane id for the selected date (day view). */
+  workOrdersByLane: Map<string, BoardWorkOrder[]>;
   selectedDate: string;
   overDropId: string | null;
   isDraggingWorkOrder: boolean;
   view: DispatchViewMode;
   workOrders: BoardWorkOrder[];
   onSelectDate: (date: string) => void;
-  onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
+  onResizeEnd?: (
+    workOrder: {
+      id: string;
+      assigned_crew_id?: string | null;
+      assigned_technician_id?: string | null;
+      scheduled_date?: string | null;
+      scheduled_start?: string | null;
+    },
+    newEndISO: string
+  ) => void;
   onOpenWorkOrder?: (
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
@@ -189,7 +203,7 @@ function DraggableBoardCard({
 }: {
   workOrder: BoardWorkOrder;
   selectedDate: string;
-  onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
+  onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; assigned_technician_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
   onOpenWorkOrder?: (
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
@@ -245,7 +259,8 @@ function DraggableBoardCard({
 }
 
 export function DispatchBoard({
-  crews,
+  lanes,
+  workOrdersByLane,
   selectedDate,
   overDropId,
   isDraggingWorkOrder,
@@ -276,46 +291,6 @@ export function DispatchBoard({
     const targetTop = (nowPercent / 100) * el.scrollHeight - el.clientHeight * 0.35;
     el.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
   }, [selectedDate, view, nowPercent]);
-  const lanes = useMemo(
-    () => {
-      const unassignedToday = workOrders.filter((wo) => {
-        const date = wo.scheduled_date ?? null;
-        return date === selectedDate && !wo.assigned_crew_id;
-      });
-      const unassignedHours = unassignedToday.reduce(
-        (sum, wo) => sum + getDurationHours(wo),
-        0
-      );
-      return [
-        {
-          id: UNASSIGNED_LANE_ID,
-          name: "Individual / Unassigned",
-          total_scheduled_hours: Math.round(unassignedHours * 10) / 10,
-          job_count: unassignedToday.length,
-        },
-        ...crews,
-      ];
-    },
-    [crews, workOrders, selectedDate]
-  );
-
-  const workOrdersByCrew = useMemo(() => {
-    const map = new Map<string, BoardWorkOrder[]>();
-    for (const c of lanes) {
-      map.set(c.id, []);
-    }
-    for (const wo of workOrders) {
-      const date = wo.scheduled_date ?? null;
-      if (date !== selectedDate) continue;
-      const laneId = wo.assigned_crew_id ?? UNASSIGNED_LANE_ID;
-      if (map.has(laneId)) {
-        const list = map.get(laneId) ?? [];
-        list.push(wo);
-        map.set(laneId, list);
-      }
-    }
-    return map;
-  }, [lanes, workOrders, selectedDate]);
 
   if (view === "week") {
     const weekStart = startOfWeek(selectedDate);
@@ -428,25 +403,36 @@ export function DispatchBoard({
         <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-slate-100/70 px-1.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
           Time
         </div>
-        {lanes.map((crew) => (
-          <div
-            key={crew.id}
-            className="min-w-[15rem] flex-1 border-r border-[var(--card-border)] bg-gradient-to-b from-slate-100/70 to-slate-50/70 px-3 py-2 last:border-r-0"
-          >
-            <span className="text-xs font-semibold uppercase tracking-[0.07em] text-[var(--muted)]">
-              {crew.name ?? `Crew ${crew.id.slice(0, 8)}`}
-            </span>
-            <div className="text-xs text-[var(--muted)]">
-              {(crew.total_scheduled_hours ?? 0).toFixed(1)}h · {crew.job_count ?? 0} jobs
+        {lanes.map((lane) => {
+          const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Unassigned" : lane.id.slice(0, 8));
+          const hasRemaining = lane.remainingHours !== undefined;
+          return (
+            <div
+              key={lane.id}
+              className="min-w-[15rem] flex-1 border-r border-[var(--card-border)] bg-gradient-to-b from-slate-100/70 to-slate-50/70 px-3 py-2 last:border-r-0"
+            >
+              <span className="text-xs font-semibold uppercase tracking-[0.07em] text-[var(--muted)]">
+                {displayName}
+              </span>
+              <div className="text-xs text-[var(--muted)]">
+                {(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled
+                {hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h remaining` : ` · ${lane.job_count ?? 0} jobs`}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="relative flex min-h-0 flex-1">
         <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full border border-red-200 bg-red-50/90 px-2 py-0.5 text-[11px] font-semibold text-red-700">
           Current time: {nowLabel}
         </div>
-        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-slate-100/70">
+        <div className="flex w-14 shrink-0 flex-col border-r border-[var(--card-border)] bg-slate-100/70">
+          {/* Spacer so time labels align with lane slot rows (lanes have inner header above slots) */}
+          <div
+            className="shrink-0 border-b border-slate-200/80 bg-slate-100/80"
+            style={{ height: "60px" }}
+            aria-hidden
+          />
           {timeLabels.map(({ hour, label }, index) => {
             const isCurrentHour = currentTime?.hour === hour;
             return (
@@ -469,20 +455,23 @@ export function DispatchBoard({
           })}
         </div>
         <div className="flex min-w-max flex-1">
-          {lanes.map((crew) => (
+          {lanes.map((lane) => {
+            const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Individual / Unassigned" : lane.id.slice(0, 8));
+            return (
             <ScheduleLane
-              key={crew.id}
-              id={crew.id}
-              name={crew.name ?? `Crew ${crew.id.slice(0, 8)}`}
+              key={lane.id}
+              id={lane.id}
+              name={displayName}
               selectedDate={selectedDate}
-              totalScheduledHours={crew.total_scheduled_hours ?? 0}
-              jobCount={crew.job_count ?? 0}
+              totalScheduledHours={lane.total_scheduled_hours ?? 0}
+              jobCount={lane.job_count ?? 0}
+              remainingHours={lane.remainingHours}
               overDropId={overDropId}
               isDraggingWorkOrder={isDraggingWorkOrder}
               timeLabels={timeLabels}
               currentTime={currentTime}
             >
-              {(workOrdersByCrew.get(crew.id) ?? []).map((wo) => (
+              {(workOrdersByLane.get(lane.id) ?? []).map((wo) => (
                 <DraggableBoardCard
                   key={wo.id}
                   workOrder={wo}
@@ -501,7 +490,8 @@ export function DispatchBoard({
                 </DraggableBoardCard>
               ))}
             </ScheduleLane>
-          ))}
+          );
+          })}
         </div>
         {nowPercent !== null ? (
           <div className="pointer-events-none absolute inset-x-0 z-30" style={{ top: `${nowPercent}%` }}>

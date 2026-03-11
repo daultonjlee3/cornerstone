@@ -1,7 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { QueueSection } from "./QueueSection";
+
+const STORAGE_KEY_OVERDUE = "dispatch.queue.section.overdue";
+const STORAGE_KEY_READY = "dispatch.queue.section.ready";
+const STORAGE_KEY_UNSCHEDULED = "dispatch.queue.section.unscheduled";
 
 /** Work order shape for queue items (compatible with LoadDispatchResult lists). */
 type QueueWorkOrder = {
@@ -45,6 +50,33 @@ export function DispatchSidebarQueue({
   onToggleCollapse,
   onOpenWorkOrder,
 }: DispatchSidebarQueueProps) {
+  const [overdueSectionCollapsed, setOverdueSectionCollapsed] = useState(false);
+  const [readySectionCollapsed, setReadySectionCollapsed] = useState(false);
+  const [unscheduledSectionCollapsed, setUnscheduledSectionCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const o = window.sessionStorage.getItem(STORAGE_KEY_OVERDUE);
+    const r = window.sessionStorage.getItem(STORAGE_KEY_READY);
+    const u = window.sessionStorage.getItem(STORAGE_KEY_UNSCHEDULED);
+    if (o != null) setOverdueSectionCollapsed(o === "1");
+    if (r != null) setReadySectionCollapsed(r === "1");
+    if (u != null) setUnscheduledSectionCollapsed(u === "1");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(STORAGE_KEY_OVERDUE, overdueSectionCollapsed ? "1" : "0");
+  }, [overdueSectionCollapsed]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(STORAGE_KEY_READY, readySectionCollapsed ? "1" : "0");
+  }, [readySectionCollapsed]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(STORAGE_KEY_UNSCHEDULED, unscheduledSectionCollapsed ? "1" : "0");
+  }, [unscheduledSectionCollapsed]);
+
   const totalJobs = overdue.length + ready.length + unscheduled.length;
   const { setNodeRef, isOver } = useDroppable({
     id: "queue-drop-unschedule",
@@ -117,6 +149,8 @@ export function DispatchSidebarQueue({
           title="Overdue"
           items={overdue}
           variant="overdue"
+          collapsed={overdueSectionCollapsed}
+          onToggleCollapse={() => setOverdueSectionCollapsed((c) => !c)}
           DraggableWrapper={({ workOrder, children }) => (
             <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
           )}
@@ -126,6 +160,8 @@ export function DispatchSidebarQueue({
           title="Ready"
           items={ready}
           variant="ready"
+          collapsed={readySectionCollapsed}
+          onToggleCollapse={() => setReadySectionCollapsed((c) => !c)}
           DraggableWrapper={({ workOrder, children }) => (
             <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
           )}
@@ -135,6 +171,8 @@ export function DispatchSidebarQueue({
           title="Unscheduled"
           items={unscheduled}
           variant="unscheduled"
+          collapsed={unscheduledSectionCollapsed}
+          onToggleCollapse={() => setUnscheduledSectionCollapsed((c) => !c)}
           DraggableWrapper={({ workOrder, children }) => (
             <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
           )}

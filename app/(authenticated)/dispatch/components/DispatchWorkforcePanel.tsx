@@ -91,7 +91,7 @@ export function DispatchWorkforcePanel({
   }, [crewRows, insights.overdue, insights.unscheduled]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <div className="flex flex-col gap-5 pb-4">
       <WorkloadPanel
         title="Technician Capacity"
         description="Use capacity bars to spot overloaded techs instantly."
