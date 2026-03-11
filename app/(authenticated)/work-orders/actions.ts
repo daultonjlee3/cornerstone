@@ -1535,6 +1535,8 @@ export async function addWorkOrderChecklistItem(
 
 export type AddPartUsagePayload = {
   inventory_item_id?: string | null;
+  product_id?: string | null;
+  stock_location_id?: string | null;
   part_name_snapshot?: string | null;
   sku_snapshot?: string | null;
   unit_of_measure?: string | null;
@@ -1568,25 +1570,72 @@ export async function addWorkOrderPartUsage(
   let partName = payload.part_name_snapshot ?? null;
   let sku = payload.sku_snapshot ?? null;
   let unitOfMeasure = payload.unit_of_measure ?? null;
+  let resolvedProductId = payload.product_id ?? null;
+  const resolvedStockLocationId = payload.stock_location_id ?? null;
 
-  if (payload.inventory_item_id) {
+  if (resolvedProductId) {
+    const { data: product } = await supabase
+      .from("products")
+      .select("id, company_id, name, sku, unit_of_measure, default_cost")
+      .eq("id", resolvedProductId)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (!product) return { error: "Product not found or access denied." };
+    const productRow = product as {
+      name?: string | null;
+      sku?: string | null;
+      unit_of_measure?: string | null;
+      default_cost?: number | null;
+    };
+    if (unitCost == null && productRow.default_cost != null) unitCost = Number(productRow.default_cost);
+    if (!partName) partName = productRow.name ?? null;
+    if (!sku) sku = productRow.sku ?? null;
+    if (!unitOfMeasure) unitOfMeasure = productRow.unit_of_measure ?? null;
+  }
+
+  if (payload.inventory_item_id && !resolvedProductId) {
     const { data: item } = await supabase
       .from("inventory_items")
-      .select("id, name, sku, unit, cost, quantity")
+      .select("id, product_id, name, sku, unit, cost, quantity")
       .eq("id", payload.inventory_item_id)
       .eq("company_id", companyId)
       .maybeSingle();
     if (!item) return { error: "Inventory item not found or access denied." };
-    const inv = item as { name: string; sku?: string | null; unit?: string | null; cost?: number | null; quantity?: number };
+    const inv = item as {
+      product_id?: string | null;
+      name: string;
+      sku?: string | null;
+      unit?: string | null;
+      cost?: number | null;
+      quantity?: number;
+    };
+    if (inv.product_id) resolvedProductId = inv.product_id;
     if (unitCost == null && inv.cost != null) unitCost = inv.cost;
     if (!partName) partName = inv.name;
     if (!sku) sku = inv.sku ?? null;
     if (!unitOfMeasure) unitOfMeasure = inv.unit ?? null;
-    if (payload.deduct_inventory) {
+    if (payload.deduct_inventory && !resolvedProductId) {
       const onHand = Number(inv.quantity ?? 0);
       if (payload.quantity_used > onHand)
         return { error: `Not enough stock. Quantity on hand: ${onHand}. Requested: ${payload.quantity_used}.` };
     }
+  }
+
+  if (resolvedStockLocationId) {
+    const { data: stockLocation } = await supabase
+      .from("stock_locations")
+      .select("id, company_id, active")
+      .eq("id", resolvedStockLocationId)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (!stockLocation) return { error: "Stock location not found or access denied." };
+    if ((stockLocation as { active?: boolean | null }).active === false) {
+      return { error: "Stock location is inactive." };
+    }
+  }
+
+  if (payload.deduct_inventory && resolvedProductId && !resolvedStockLocationId) {
+    return { error: "Select a stock location before deducting inventory." };
   }
 
   const finalUnitCost = unitCost ?? 0;
@@ -1597,6 +1646,8 @@ export async function addWorkOrderPartUsage(
     .insert({
       work_order_id: workOrderId,
       inventory_item_id: payload.inventory_item_id || null,
+      product_id: resolvedProductId,
+      stock_location_id: resolvedStockLocationId,
       part_name_snapshot: partName,
       sku_snapshot: sku,
       unit_of_measure: unitOfMeasure,
@@ -1611,7 +1662,23 @@ export async function addWorkOrderPartUsage(
   if (insertError) return { error: insertError.message };
   if (!inserted?.id) return { error: "Failed to create part usage." };
 
-  if (payload.inventory_item_id && payload.deduct_inventory) {
+  if (payload.deduct_inventory && resolvedProductId && resolvedStockLocationId) {
+    const { error: txError } = await supabase.rpc("record_inventory_transaction", {
+      p_company_id: companyId,
+      p_product_id: resolvedProductId,
+      p_stock_location_id: resolvedStockLocationId,
+      p_quantity_change: -payload.quantity_used,
+      p_transaction_type: "work_order_usage",
+      p_reference_type: "work_order_part_usage",
+      p_reference_id: inserted.id,
+      p_notes: payload.notes || `Work order ${workOrderId}`,
+      p_idempotency_key: `wo-part:${inserted.id}`,
+    });
+    if (txError) {
+      await supabase.from("work_order_part_usage").delete().eq("id", inserted.id);
+      return { error: `Failed to deduct inventory: ${txError.message}` };
+    }
+  } else if (payload.inventory_item_id && payload.deduct_inventory) {
     const { data: invRow, error: invReadError } = await supabase
       .from("inventory_items")
       .select("quantity")
@@ -1660,6 +1727,8 @@ export async function addWorkOrderPartUsage(
     metadata: {
       part_usage_id: inserted.id,
       inventory_item_id: payload.inventory_item_id ?? null,
+      product_id: resolvedProductId,
+      stock_location_id: resolvedStockLocationId,
       part_name_snapshot: partName,
       quantity_used: payload.quantity_used,
       unit_cost: finalUnitCost,

@@ -120,15 +120,25 @@ export default async function TechnicianExecutionPage({
   const { data: partUsage } = await supabase
     .from("work_order_part_usage")
     .select(
-      "id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at"
+      "id, product_id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
     )
     .eq("work_order_id", id)
     .order("created_at", { ascending: false });
-  const { data: inventoryItems } = await supabase
-    .from("inventory_items")
-    .select("id, name, sku, unit, cost, quantity")
+  const { data: stockLocationRows } = await supabase
+    .from("stock_locations")
+    .select("id")
     .eq("company_id", companyId)
-    .order("name");
+    .eq("active", true);
+  const stockLocationIds = (stockLocationRows ?? []).map((row) => (row as { id: string }).id);
+  const { data: inventoryItems } = stockLocationIds.length
+    ? await supabase
+        .from("inventory_balances")
+        .select(
+          "id, product_id, stock_location_id, quantity_on_hand, products(name, sku, unit_of_measure, default_cost), stock_locations(name)"
+        )
+        .in("stock_location_id", stockLocationIds)
+        .order("updated_at", { ascending: false })
+    : { data: [] as unknown[] };
 
   const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
   const building = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
@@ -252,8 +262,22 @@ export default async function TechnicianExecutionPage({
           }[]
         }
         partUsage={
-          (partUsage ?? []) as {
+          ((partUsage ?? []).map((row) => {
+            const stockLocation = Array.isArray((row as Record<string, unknown>).stock_locations)
+              ? ((row as Record<string, unknown>).stock_locations as unknown[])[0]
+              : (row as Record<string, unknown>).stock_locations;
+            return {
+              ...(row as Record<string, unknown>),
+              stock_location_name:
+                stockLocation &&
+                typeof stockLocation === "object" &&
+                "name" in (stockLocation as Record<string, unknown>)
+                  ? ((stockLocation as { name?: string }).name ?? null)
+                  : null,
+            };
+          }) as unknown) as {
             id: string;
+            product_id?: string | null;
             quantity_used: number;
             unit_cost: number | null;
             total_cost: number | null;
@@ -262,12 +286,50 @@ export default async function TechnicianExecutionPage({
             sku_snapshot: string | null;
             unit_of_measure: string | null;
             used_at: string | null;
+            stock_location_name?: string | null;
           }[]
         }
         inventoryItems={
-          (inventoryItems ?? []) as {
+          ((inventoryItems ?? []).map((row) => {
+            const record = row as Record<string, unknown>;
+            const product = Array.isArray(record.products) ? record.products[0] : record.products;
+            const location = Array.isArray(record.stock_locations)
+              ? record.stock_locations[0]
+              : record.stock_locations;
+            return {
+              id: record.id as string,
+              product_id: (record.product_id as string) ?? "",
+              stock_location_id: (record.stock_location_id as string) ?? "",
+              name:
+                product && typeof product === "object" && "name" in (product as Record<string, unknown>)
+                  ? ((product as { name?: string }).name ?? "Product")
+                  : "Product",
+              location_name:
+                location && typeof location === "object" && "name" in (location as Record<string, unknown>)
+                  ? ((location as { name?: string }).name ?? "Location")
+                  : "Location",
+              sku:
+                product && typeof product === "object" && "sku" in (product as Record<string, unknown>)
+                  ? ((product as { sku?: string | null }).sku ?? null)
+                  : null,
+              unit:
+                product &&
+                typeof product === "object" &&
+                "unit_of_measure" in (product as Record<string, unknown>)
+                  ? ((product as { unit_of_measure?: string | null }).unit_of_measure ?? null)
+                  : null,
+              cost:
+                product && typeof product === "object" && "default_cost" in (product as Record<string, unknown>)
+                  ? ((product as { default_cost?: number | null }).default_cost ?? null)
+                  : null,
+              quantity: Number(record.quantity_on_hand ?? 0),
+            };
+          }) as unknown) as {
             id: string;
+            product_id: string;
+            stock_location_id: string;
             name: string;
+            location_name: string;
             sku: string | null;
             unit: string | null;
             cost: number | null;

@@ -45,6 +45,7 @@ type ChecklistItem = {
 
 type PartUsage = {
   id: string;
+  product_id?: string | null;
   quantity_used: number;
   unit_cost: number | null;
   total_cost: number | null;
@@ -53,11 +54,15 @@ type PartUsage = {
   sku_snapshot: string | null;
   unit_of_measure: string | null;
   used_at: string | null;
+  stock_location_name?: string | null;
 };
 
 type InventoryItem = {
   id: string;
+  product_id: string;
+  stock_location_id: string;
   name: string;
+  location_name: string;
   sku: string | null;
   unit: string | null;
   cost: number | null;
@@ -246,15 +251,28 @@ export async function getTechnicianExecutionPayload(
       supabase
         .from("work_order_part_usage")
         .select(
-          "id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at"
+          "id, product_id, quantity_used, unit_cost, total_cost, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
         )
         .eq("work_order_id", workOrderId)
         .order("created_at", { ascending: false }),
-      supabase
-        .from("inventory_items")
-        .select("id, name, sku, unit, cost, quantity")
-        .eq("company_id", companyId)
-        .order("name"),
+      (async () => {
+        const { data: locationRows } = await supabase
+          .from("stock_locations")
+          .select("id")
+          .eq("company_id", companyId)
+          .eq("active", true);
+        const locationIds = (locationRows ?? []).map((row) => (row as { id: string }).id);
+        if (!locationIds.length) {
+          return { data: [] as unknown[] };
+        }
+        return supabase
+          .from("inventory_balances")
+          .select(
+            "id, product_id, stock_location_id, quantity_on_hand, products(name, sku, unit_of_measure, default_cost), stock_locations(name)"
+          )
+          .in("stock_location_id", locationIds)
+          .order("updated_at", { ascending: false });
+      })(),
       supabase
         .from("work_order_attachments")
         .select("id, file_name, file_url, file_type, caption, technician_id, created_at")
@@ -489,8 +507,56 @@ export async function getTechnicianExecutionPayload(
   return {
     workOrder,
     checklistItems,
-    partUsage: (partUsageRaw.data ?? []) as PartUsage[],
-    inventoryItems: (inventoryItemsRaw.data ?? []) as InventoryItem[],
+    partUsage: (partUsageRaw.data ?? []).map((row) => {
+      const record = row as Record<string, unknown>;
+      const stockLocation = Array.isArray(record.stock_locations)
+        ? (record.stock_locations as unknown[])[0]
+        : record.stock_locations;
+      return {
+        ...record,
+        stock_location_name:
+          stockLocation &&
+          typeof stockLocation === "object" &&
+          "name" in (stockLocation as Record<string, unknown>)
+            ? ((stockLocation as { name?: string }).name ?? null)
+            : null,
+      } as PartUsage;
+    }),
+    inventoryItems: (inventoryItemsRaw.data ?? []).map((row) => {
+      const record = row as Record<string, unknown>;
+      const product = Array.isArray(record.products) ? (record.products as unknown[])[0] : record.products;
+      const location = Array.isArray(record.stock_locations)
+        ? (record.stock_locations as unknown[])[0]
+        : record.stock_locations;
+      return {
+        id: record.id as string,
+        product_id: (record.product_id as string) ?? "",
+        stock_location_id: (record.stock_location_id as string) ?? "",
+        name:
+          product && typeof product === "object" && "name" in (product as Record<string, unknown>)
+            ? ((product as { name?: string }).name ?? "Product")
+            : "Product",
+        location_name:
+          location && typeof location === "object" && "name" in (location as Record<string, unknown>)
+            ? ((location as { name?: string }).name ?? "Location")
+            : "Location",
+        sku:
+          product && typeof product === "object" && "sku" in (product as Record<string, unknown>)
+            ? ((product as { sku?: string | null }).sku ?? null)
+            : null,
+        unit:
+          product &&
+          typeof product === "object" &&
+          "unit_of_measure" in (product as Record<string, unknown>)
+            ? ((product as { unit_of_measure?: string | null }).unit_of_measure ?? null)
+            : null,
+        cost:
+          product && typeof product === "object" && "default_cost" in (product as Record<string, unknown>)
+            ? ((product as { default_cost?: number | null }).default_cost ?? null)
+            : null,
+        quantity: Number(record.quantity_on_hand ?? 0),
+      } as InventoryItem;
+    }),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
     laborEntries: (laborEntriesRaw.data ?? []) as LaborEntry[],
     attachments: (attachmentsRaw.data ?? []) as Attachment[],

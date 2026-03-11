@@ -182,6 +182,33 @@ export default async function DashboardPage() {
                 </ul>
               )}
             </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Low stock inventory
+              </p>
+              {operations.alerts.lowStock.length === 0 ? (
+                <p className="mt-1 text-sm text-[var(--muted)]">No low-stock alerts.</p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {operations.alerts.lowStock.slice(0, 4).map((row) => (
+                    <li
+                      key={row.balance_id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <Link href="/inventory" className="truncate text-sm font-medium text-[var(--accent)] hover:underline">
+                          {row.product_name}
+                        </Link>
+                        <p className="truncate text-xs text-[var(--muted)]">{row.location_name}</p>
+                      </div>
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        {row.quantity_on_hand} / {row.reorder_point}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </CardContent>
         </Card>
       </section>

@@ -38,7 +38,7 @@ export const navConfig: NavGroup[] = [
     label: "Business",
     items: [
       { label: "Customers", href: "/customers" },
-      { label: "Vendors", href: "/dashboard/vendors" },
+      { label: "Vendors", href: "/vendors" },
       { label: "Products", href: "/products" },
       { label: "Inventory", href: "/inventory" },
       { label: "Purchase Orders", href: "/purchase-orders" },

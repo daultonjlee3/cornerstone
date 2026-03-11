@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { updateWorkOrderStatus, toggleWorkOrderChecklistItem } from "../actions";
@@ -38,11 +37,22 @@ type WorkOrderDetailViewProps = {
   attachments: { id: string; file_name: string; file_url: string; file_type: string | null; created_at: string }[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
-  inventoryItems: { id: string; name: string; sku: string | null; unit: string | null; cost: number | null; quantity: number }[];
+  inventoryItems: {
+    id: string;
+    product_id: string;
+    stock_location_id: string;
+    name: string;
+    location_name: string;
+    sku: string | null;
+    unit: string | null;
+    cost: number | null;
+    quantity: number;
+  }[];
 };
 
 export type PartUsageForDetail = {
   id: string;
+  product_id?: string | null;
   quantity_used: number;
   unit_cost: number | null;
   total_cost: number | null;
@@ -51,6 +61,7 @@ export type PartUsageForDetail = {
   sku_snapshot: string | null;
   unit_of_measure: string | null;
   used_at: string | null;
+  stock_location_name?: string | null;
 };
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";

@@ -17,6 +17,7 @@ type Note = { id: string; body: string; note_type: string | null; created_at: st
 type ChecklistItem = { id: string; label: string; completed: boolean; sort_order: number };
 type PartUsage = {
   id: string;
+  product_id?: string | null;
   quantity_used: number;
   unit_cost: number | null;
   total_cost: number | null;
@@ -25,10 +26,14 @@ type PartUsage = {
   sku_snapshot: string | null;
   unit_of_measure: string | null;
   used_at: string | null;
+  stock_location_name?: string | null;
 };
 type InventoryItem = {
   id: string;
+  product_id: string;
+  stock_location_id: string;
   name: string;
+  location_name: string;
   sku: string | null;
   unit: string | null;
   cost: number | null;

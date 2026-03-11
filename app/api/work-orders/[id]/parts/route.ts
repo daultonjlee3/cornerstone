@@ -24,6 +24,8 @@ export async function POST(
 
   const payload: AddPartUsagePayload = {
     inventory_item_id: body.inventory_item_id ?? null,
+    product_id: body.product_id ?? null,
+    stock_location_id: body.stock_location_id ?? null,
     part_name_snapshot: body.part_name_snapshot ?? null,
     sku_snapshot: body.sku_snapshot ?? null,
     unit_of_measure: body.unit_of_measure ?? null,

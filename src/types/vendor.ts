@@ -11,6 +11,8 @@ export interface Vendor extends BaseEntity {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  website?: string | null;
+  preferredVendor?: boolean;
   serviceTypes?: string[] | null;
   notes?: string | null;
 }

@@ -1,4 +1,4 @@
-import { ComingSoon } from "../components/coming-soon";
+import { redirect } from "next/navigation";
 
 export const metadata = {
   title: "Vendors | Cornerstone Tech",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function VendorsPage() {
-  return <ComingSoon moduleName="Vendors" />;
+  redirect("/vendors");
 }

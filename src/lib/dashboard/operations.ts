@@ -43,6 +43,14 @@ export type OperationsDashboardData = {
       next_run_date: string | null;
       asset_name: string | null;
     }[];
+    lowStock: {
+      balance_id: string;
+      product_name: string;
+      sku: string | null;
+      location_name: string;
+      quantity_on_hand: number;
+      reorder_point: number;
+    }[];
     repeatedFailures: {
       asset_id: string;
       asset_name: string;
@@ -103,6 +111,7 @@ export async function loadOperationsDashboardData({
         overdueWorkOrders: [],
         highPriorityNotStarted: [],
         pmDueSoon: [],
+        lowStock: [],
         repeatedFailures: [],
       },
       assetHealth: {
@@ -322,6 +331,49 @@ export async function loadOperationsDashboardData({
     };
   });
 
+  const { data: stockLocationRows } = await supabase
+    .from("stock_locations")
+    .select("id, name")
+    .in("company_id", companyIds)
+    .eq("active", true);
+  const stockLocationIds = (stockLocationRows ?? []).map((row) => (row as { id: string }).id);
+  const locationNameById = new Map(
+    (stockLocationRows ?? []).map((row) => [(row as { id: string }).id, (row as { name: string }).name])
+  );
+  const { data: lowStockRawRows } = stockLocationIds.length
+    ? await supabase
+        .from("inventory_balances")
+        .select("id, stock_location_id, quantity_on_hand, reorder_point, products(name, sku)")
+        .in("stock_location_id", stockLocationIds)
+        .not("reorder_point", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(200)
+    : { data: [] as unknown[] };
+  const lowStock = (lowStockRawRows ?? [])
+    .map((row) => {
+      const record = row as Record<string, unknown>;
+      const product = Array.isArray(record.products) ? (record.products as unknown[])[0] : record.products;
+      const quantity = Number((record.quantity_on_hand as number | null) ?? 0);
+      const reorder = Number((record.reorder_point as number | null) ?? 0);
+      return {
+        balance_id: record.id as string,
+        product_name:
+          product && typeof product === "object" && "name" in (product as Record<string, unknown>)
+            ? ((product as { name?: string }).name ?? "Product")
+            : "Product",
+        sku:
+          product && typeof product === "object" && "sku" in (product as Record<string, unknown>)
+            ? ((product as { sku?: string | null }).sku ?? null)
+            : null,
+        location_name: locationNameById.get((record.stock_location_id as string) ?? "") ?? "Location",
+        quantity_on_hand: quantity,
+        reorder_point: reorder,
+      };
+    })
+    .filter((row) => row.reorder_point > 0 && row.quantity_on_hand < row.reorder_point)
+    .sort((a, b) => a.quantity_on_hand - b.quantity_on_hand)
+    .slice(0, 8);
+
   const staleAssets = (staleAssetsRows.data ?? []).filter((row) => {
     const lastServiced = (row as { last_serviced_at?: string | null }).last_serviced_at;
     if (!lastServiced) return true;
@@ -421,6 +473,7 @@ export async function loadOperationsDashboardData({
         scheduled_date: string | null;
       }[],
       pmDueSoon,
+      lowStock,
       repeatedFailures,
     },
     assetHealth: {
