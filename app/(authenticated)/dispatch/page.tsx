@@ -53,6 +53,7 @@ export default async function DispatchPage({
     q: filterState.search || null,
     company_id: filterState.companyId || null,
     property_id: filterState.propertyId || null,
+    building_id: filterState.buildingId || null,
     priority: filterState.priority || null,
     status: filterState.status || null,
     crew_id: filterState.crewId || null,

@@ -294,8 +294,11 @@ export async function getTechnicianExecutionPayload(
         .in("action_type", [
           "work_order_created",
           "work_order_assigned",
+          "work_order.assigned",
+          "work_order.reassigned",
           "dispatch_reassigned",
           "dispatch_rescheduled",
+          "dispatch.route_updated",
           "dispatch_unscheduled",
           "work_order_scheduled",
           "work_order_status_changed",

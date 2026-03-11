@@ -63,6 +63,7 @@ export type DispatchBoardProps = {
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
   ) => void;
+  routeTravelByWorkOrderId?: Map<string, string>;
 };
 
 function addDays(dateStr: string, delta: number): string {
@@ -269,6 +270,7 @@ export function DispatchBoard({
   onSelectDate,
   onResizeEnd,
   onOpenWorkOrder,
+  routeTravelByWorkOrderId,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
   const dayScrollRef = useRef<HTMLDivElement | null>(null);
@@ -336,6 +338,7 @@ export function DispatchBoard({
                     variant="compact"
                     showScheduledTime
                     showQuickActions
+                    travelEstimate={routeTravelByWorkOrderId?.get(wo.id) ?? null}
                     onOpenWorkOrder={onOpenWorkOrder}
                   />
                 ))}
@@ -485,6 +488,7 @@ export function DispatchBoard({
                     showScheduledTime
                     showCrew
                     showQuickActions
+                    travelEstimate={routeTravelByWorkOrderId?.get(wo.id) ?? null}
                     onOpenWorkOrder={onOpenWorkOrder}
                   />
                 </DraggableBoardCard>

@@ -16,6 +16,13 @@ export type LoadDispatchResult = {
 export type DispatchFilterOptions = {
   companies: { id: string; name: string }[];
   properties: { id: string; property_name?: string; name?: string; company_id: string }[];
+  buildings: {
+    id: string;
+    building_name?: string | null;
+    name?: string | null;
+    property_id: string;
+    company_id: string;
+  }[];
   crews: { id: string; name: string; company_id?: string | null }[];
   technicians: { id: string; name: string }[];
   assets: { id: string; name: string; company_id?: string | null }[];
@@ -49,6 +56,11 @@ export type DispatchTechnicianWorkload = {
   dailyCapacityHours: number;
   availableCapacityHours: number;
   crewMemberships: string[];
+  latitude: number | null;
+  longitude: number | null;
+  locationSource: "technician" | "assigned_work_orders" | null;
+  lastLocationAt: string | null;
+  assignedWorkOrderIds: string[];
 };
 
 export type DispatchCrewWorkload = {
@@ -98,6 +110,7 @@ type LoadDispatchParams = {
   q: string | null;
   company_id: string | null;
   property_id: string | null;
+  building_id: string | null;
   priority: string | null;
   status: string | null;
   crew_id: string | null;
@@ -134,6 +147,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     q,
     company_id,
     property_id,
+    building_id,
     priority,
     status,
     crew_id,
@@ -153,6 +167,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       filterOptions: {
         companies: [],
         properties: [],
+        buildings: [],
         crews: [],
         technicians: [],
         assets: [],
@@ -181,6 +196,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   const [
     { data: companies },
     { data: properties },
+    { data: buildings },
     { data: crewsData },
     { data: techniciansData },
     { data: assetsData },
@@ -192,19 +208,25 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       .in("company_id", companyIds)
       .order("property_name"),
     supabase
+      .from("buildings")
+      .select("id, building_name, name, property_id, company_id")
+      .in("company_id", companyIds)
+      .order("building_name")
+      .order("name"),
+    supabase
       .from("crews")
       .select("id, name, is_active, company_id")
       .eq("tenant_id", tenantId)
       .order("name"),
     supabase
       .from("technicians")
-      .select("id, technician_name, name, status, company_id")
+      .select("id, technician_name, name, status, company_id, current_latitude, current_longitude, last_location_at")
       .in("company_id", companyIds)
       .order("technician_name")
       .order("name"),
     supabase
       .from("assets")
-.select("id, asset_name, name, company_id, property_id, building_id, unit_id")
+      .select("id, asset_name, name, company_id, property_id, building_id, unit_id")
     .in("company_id", companyIds)
       .order("asset_name")
       .order("name"),
@@ -217,6 +239,13 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     name?: string;
     company_id: string;
   }[];
+  const buildingList = (buildings ?? []) as Array<{
+    id: string;
+    building_name?: string | null;
+    name?: string | null;
+    property_id: string;
+    company_id: string;
+  }>;
   const allCrews = (crewsData ?? []) as Array<{
     id: string;
     name: string;
@@ -237,6 +266,15 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       "Unknown",
     status: (t as { status?: string | null }).status ?? "active",
     company_id: (t as { company_id?: string | null }).company_id ?? null,
+    current_latitude:
+      (t as { current_latitude?: number | string | null }).current_latitude == null
+        ? null
+        : Number((t as { current_latitude?: number | string | null }).current_latitude),
+    current_longitude:
+      (t as { current_longitude?: number | string | null }).current_longitude == null
+        ? null
+        : Number((t as { current_longitude?: number | string | null }).current_longitude),
+    last_location_at: (t as { last_location_at?: string | null }).last_location_at ?? null,
   }));
   const technicianList = allTechnicians
     .filter((t) => t.status === "active")
@@ -278,17 +316,17 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     .from("work_orders")
     .select(
       `
-      id, title, status, priority, category,
+      id, title, status, priority, category, latitude, longitude,
       scheduled_date, scheduled_start, scheduled_end, due_date,
       assigned_crew_id, assigned_technician_id, estimated_hours,
       company_id, property_id, building_id, unit_id,
       work_order_number, asset_id,
       source_type, preventive_maintenance_plan_id,
       updated_at,
-      properties(property_name, name),
-      buildings(building_name, name),
+      properties(property_name, name, latitude, longitude),
+      buildings(building_name, name, latitude, longitude),
       units(unit_name, name_or_number),
-      assets!work_orders_asset_id_fkey(asset_name, name)
+      assets!work_orders_asset_id_fkey(asset_name, name, latitude, longitude)
     `
     )
     .in("company_id", companyIds)
@@ -309,6 +347,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   }
   if (company_id) query = query.eq("company_id", company_id);
   if (property_id) query = query.eq("property_id", property_id);
+  if (building_id) query = query.eq("building_id", building_id);
   if (priority) query = query.eq("priority", priority);
   if (status) query = query.eq("status", status);
   if (crew_id) query = query.eq("assigned_crew_id", crew_id);
@@ -335,6 +374,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       filterOptions: {
         companies: companyList,
         properties: propertyList,
+        buildings: buildingList,
         crews: crewList,
         technicians: technicianList,
         assets: assetList,
@@ -367,6 +407,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     unit_name?: string;
     name_or_number?: string;
     asset_name?: string;
+    latitude?: number | string | null;
+    longitude?: number | string | null;
   } | null;
   type Row = Record<string, unknown> & {
     properties?: Rel | Rel[];
@@ -375,6 +417,40 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     assets?: Rel | Rel[];
   };
   const first = (v: Rel | Rel[] | undefined): Rel => (Array.isArray(v) ? v[0] : v ?? null);
+  const toNumber = (value: unknown): number | null => {
+    if (value == null || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const resolveCoordinates = (
+    workOrderLatitude: number | null,
+    workOrderLongitude: number | null,
+    assetLatitude: number | null,
+    assetLongitude: number | null,
+    buildingLatitude: number | null,
+    buildingLongitude: number | null,
+    propertyLatitude: number | null,
+    propertyLongitude: number | null
+  ): {
+    latitude: number | null;
+    longitude: number | null;
+    source: DispatchWorkOrder["location_coordinate_source"];
+    accuracy: DispatchWorkOrder["location_coordinate_accuracy"];
+  } => {
+    if (workOrderLatitude != null && workOrderLongitude != null) {
+      return { latitude: workOrderLatitude, longitude: workOrderLongitude, source: "work_order", accuracy: "exact" };
+    }
+    if (assetLatitude != null && assetLongitude != null) {
+      return { latitude: assetLatitude, longitude: assetLongitude, source: "asset", accuracy: "fallback" };
+    }
+    if (buildingLatitude != null && buildingLongitude != null) {
+      return { latitude: buildingLatitude, longitude: buildingLongitude, source: "building", accuracy: "fallback" };
+    }
+    if (propertyLatitude != null && propertyLongitude != null) {
+      return { latitude: propertyLatitude, longitude: propertyLongitude, source: "property", accuracy: "fallback" };
+    }
+    return { latitude: null, longitude: null, source: null, accuracy: null };
+  };
   const categorySet = new Set<string>();
   const all: DispatchWorkOrder[] = (workOrdersRaw ?? []).map((row: Row) => {
     const { properties: propRel, buildings: bldRel, units: unitRel, assets: assetRel, ...rest } = row;
@@ -386,6 +462,24 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     const buildingName = b && typeof b === "object" ? (b.building_name ?? b.name ?? null) : null;
     const unitName = u && typeof u === "object" ? (u.unit_name ?? u.name_or_number ?? null) : null;
     const assetName = a && typeof a === "object" ? (a.asset_name ?? a.name ?? null) : null;
+    const workOrderLatitude = toNumber(rest.latitude);
+    const workOrderLongitude = toNumber(rest.longitude);
+    const assetLatitude = a && typeof a === "object" ? toNumber(a.latitude) : null;
+    const assetLongitude = a && typeof a === "object" ? toNumber(a.longitude) : null;
+    const buildingLatitude = b && typeof b === "object" ? toNumber(b.latitude) : null;
+    const buildingLongitude = b && typeof b === "object" ? toNumber(b.longitude) : null;
+    const propertyLatitude = p && typeof p === "object" ? toNumber(p.latitude) : null;
+    const propertyLongitude = p && typeof p === "object" ? toNumber(p.longitude) : null;
+    const resolvedCoordinates = resolveCoordinates(
+      workOrderLatitude,
+      workOrderLongitude,
+      assetLatitude,
+      assetLongitude,
+      buildingLatitude,
+      buildingLongitude,
+      propertyLatitude,
+      propertyLongitude
+    );
     const crewId = rest.assigned_crew_id as string | null | undefined;
     const technicianId = rest.assigned_technician_id as string | null | undefined;
     const assigned_crew_name = crewId ? crewNameById.get(crewId) ?? null : null;
@@ -405,6 +499,10 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       building_name: buildingName,
       unit_name: unitName,
       asset_name: assetName,
+      latitude: resolvedCoordinates.latitude,
+      longitude: resolvedCoordinates.longitude,
+      location_coordinate_source: resolvedCoordinates.source,
+      location_coordinate_accuracy: resolvedCoordinates.accuracy,
       assigned_technician_name,
       assigned_crew_name: assigned_crew_name ?? undefined,
       assignment_type,
@@ -520,6 +618,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     string,
     { currentAssignments: number; scheduledToday: number; inProgress: number; workloadHoursToday: number }
   >();
+  const assignedWorkOrderIdsByTechnician = new Map<string, string[]>();
+  const assignedCoordinatesByTechnician = new Map<string, Array<{ latitude: number; longitude: number }>>();
   const crewStats = new Map<
     string,
     { currentAssignments: number; scheduledToday: number; activeJobs: number; workloadHoursToday: number }
@@ -544,6 +644,14 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       }
       if (comparableStatus === "in_progress") current.inProgress += 1;
       technicianStats.set(key, current);
+      const assignedIds = assignedWorkOrderIdsByTechnician.get(key) ?? [];
+      assignedIds.push(wo.id);
+      assignedWorkOrderIdsByTechnician.set(key, assignedIds);
+      if (wo.latitude != null && wo.longitude != null) {
+        const coordinates = assignedCoordinatesByTechnician.get(key) ?? [];
+        coordinates.push({ latitude: wo.latitude, longitude: wo.longitude });
+        assignedCoordinatesByTechnician.set(key, coordinates);
+      }
     }
 
     if (wo.assigned_crew_id) {
@@ -576,6 +684,19 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       .map((crew) => crew.name);
     const dailyCapacityHours = 8;
     const workloadHoursToday = Math.round(stats.workloadHoursToday * 10) / 10;
+    const assignedCoordinates = assignedCoordinatesByTechnician.get(tech.id) ?? [];
+    const fallbackLatitude =
+      assignedCoordinates.length > 0
+        ? assignedCoordinates.reduce((sum, point) => sum + point.latitude, 0) / assignedCoordinates.length
+        : null;
+    const fallbackLongitude =
+      assignedCoordinates.length > 0
+        ? assignedCoordinates.reduce((sum, point) => sum + point.longitude, 0) / assignedCoordinates.length
+        : null;
+    const techLatitude = toNumber(tech.current_latitude);
+    const techLongitude = toNumber(tech.current_longitude);
+    const latitude = techLatitude ?? fallbackLatitude;
+    const longitude = techLongitude ?? fallbackLongitude;
     return {
       id: tech.id,
       name: tech.name,
@@ -587,6 +708,16 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       dailyCapacityHours,
       availableCapacityHours: Math.round((dailyCapacityHours - workloadHoursToday) * 10) / 10,
       crewMemberships,
+      latitude,
+      longitude,
+      locationSource:
+        techLatitude != null && techLongitude != null
+          ? "technician"
+          : latitude != null && longitude != null
+            ? "assigned_work_orders"
+            : null,
+      lastLocationAt: tech.last_location_at ?? null,
+      assignedWorkOrderIds: assignedWorkOrderIdsByTechnician.get(tech.id) ?? [],
     };
   });
 
@@ -635,6 +766,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     filterOptions: {
       companies: companyList,
       properties: propertyList,
+      buildings: buildingList,
       crews: crewList,
       technicians: technicianList,
       assets: assetList,

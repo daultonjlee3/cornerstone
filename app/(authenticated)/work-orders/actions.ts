@@ -931,6 +931,23 @@ export async function updateWorkOrderAssignment(
       },
       metadata: { source: "updateWorkOrderAssignment" },
     });
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "work_order",
+      entityId: id,
+      actionType: beforeHadAssignment ? "work_order.reassigned" : "work_order.assigned",
+      performedBy: actorId,
+      beforeState: {
+        assigned_technician_id: beforeState.assigned_technician_id as string | null,
+        assigned_crew_id: beforeState.assigned_crew_id as string | null,
+      },
+      afterState: {
+        assigned_technician_id: nextTechnicianId,
+        assigned_crew_id: nextCrewId,
+      },
+      metadata: { source: "updateWorkOrderAssignment", transport: "dispatch" },
+    });
   }
   if (scheduleChanged && hasSchedule) {
     await insertActivityLog(supabase, {
@@ -951,6 +968,25 @@ export async function updateWorkOrderAssignment(
         scheduled_end: nextScheduledEnd,
       },
       metadata: { source: "updateWorkOrderAssignment" },
+    });
+    await insertActivityLog(supabase, {
+      tenantId,
+      companyId,
+      entityType: "work_order",
+      entityId: id,
+      actionType: "dispatch.route_updated",
+      performedBy: actorId,
+      beforeState: {
+        scheduled_date: beforeState.scheduled_date as string | null,
+        scheduled_start: beforeState.scheduled_start as string | null,
+        scheduled_end: beforeState.scheduled_end as string | null,
+      },
+      afterState: {
+        scheduled_date: nextScheduledDate,
+        scheduled_start: nextScheduledStart,
+        scheduled_end: nextScheduledEnd,
+      },
+      metadata: { source: "updateWorkOrderAssignment", route_update: true },
     });
   }
   if (!hasSchedule && !hasAssignment && (beforeHadSchedule || beforeHadAssignment)) {

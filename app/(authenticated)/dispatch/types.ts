@@ -25,6 +25,10 @@ export type DispatchWorkOrder = {
   asset_id?: string | null;
   asset_name?: string | null;
   location?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_coordinate_source?: "work_order" | "asset" | "building" | "property" | null;
+  location_coordinate_accuracy?: "exact" | "fallback" | null;
   assignment_type?: "technician" | "crew" | "unassigned";
   /** Resolved display: "Property / Building / Unit" */
   property_name?: string | null;

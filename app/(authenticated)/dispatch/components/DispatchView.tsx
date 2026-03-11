@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   DndContext,
   DragOverlay,
@@ -30,8 +31,21 @@ import { WorkOrderAssignmentModal } from "@/app/(authenticated)/work-orders/comp
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import { RebalanceSuggestionsModal } from "./RebalanceSuggestionsModal";
 import { computeRebalanceSuggestions } from "../rebalance-utils";
+import { buildTechnicianRoute } from "../dispatch-map-utils";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
+
+const DispatchMapPanel = dynamic(
+  () => import("./DispatchMapPanel").then((module) => module.DispatchMapPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-[500px] items-center justify-center rounded-xl border border-[var(--card-border)] bg-[var(--card)]/70 text-sm text-[var(--muted)]">
+        Loading dispatch map…
+      </div>
+    ),
+  }
+);
 
 function toSlotISO(dateStr: string, hour: number): string {
   const d = new Date(dateStr + "T12:00:00");
@@ -96,6 +110,11 @@ export function DispatchView({
   const [rebalanceApplying, setRebalanceApplying] = useState(false);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
+  const [selectedMapTechnicianId, setSelectedMapTechnicianId] = useState<string | null>(
+    filterState.technicianId || null
+  );
+  const [selectedMapWorkOrderId, setSelectedMapWorkOrderId] = useState<string | null>(null);
+  const [mapAssigning, setMapAssigning] = useState(false);
   const [dispatchBoardMode, setDispatchBoardMode] = useState<"technicians" | "crews">("technicians");
   const [technicianPage, setTechnicianPage] = useState(0);
   const TECHNICIAN_PAGE_SIZE = 8;
@@ -106,6 +125,10 @@ export function DispatchView({
   useEffect(() => {
     setOptimisticWorkOrders(initialData.workOrders);
   }, [initialData.workOrders]);
+
+  useEffect(() => {
+    setSelectedMapTechnicianId(filterState.technicianId || null);
+  }, [filterState.technicianId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -131,6 +154,16 @@ export function DispatchView({
     })
   );
 
+  const pushFilterState = useCallback(
+    (nextState: DispatchFilterState) => {
+      const next = filterStateToParams(nextState);
+      const fullscreen = searchParams.get("dispatch_fullscreen");
+      if (fullscreen === "1") next.set("dispatch_fullscreen", "1");
+      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
   const setFullScreen = useCallback(
     (enabled: boolean) => {
       const next = new URLSearchParams(searchParams.toString());
@@ -139,6 +172,30 @@ export function DispatchView({
       router.push(`${pathname}?${next.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams]
+  );
+
+  const patchFilterState = useCallback(
+    (patch: Partial<DispatchFilterState>) => {
+      const next: DispatchFilterState = {
+        ...filterState,
+        ...patch,
+      };
+      if (
+        patch.companyId !== undefined &&
+        patch.companyId !== filterState.companyId
+      ) {
+        next.propertyId = "";
+        next.buildingId = "";
+      }
+      if (
+        patch.propertyId !== undefined &&
+        patch.propertyId !== filterState.propertyId
+      ) {
+        next.buildingId = "";
+      }
+      pushFilterState(next);
+    },
+    [filterState, pushFilterState]
   );
 
   const dispatchData = useMemo(() => {
@@ -330,6 +387,23 @@ export function DispatchView({
     dispatchData.overdue.length === 0 &&
     dispatchData.ready.length === 0 &&
     boardCrews.every((crew) => (crew.scheduled_today?.length ?? 0) === 0);
+
+  const selectedMapTechnician = useMemo(
+    () =>
+      initialData.workforce.technicians.find(
+        (technician) => technician.id === selectedMapTechnicianId
+      ) ?? null,
+    [initialData.workforce.technicians, selectedMapTechnicianId]
+  );
+
+  const selectedRoute = useMemo(() => {
+    if (!selectedMapTechnician) return null;
+    return buildTechnicianRoute(
+      selectedMapTechnician,
+      optimisticWorkOrders,
+      filterState.selectedDate
+    );
+  }, [filterState.selectedDate, optimisticWorkOrders, selectedMapTechnician]);
 
   const rebalanceSuggestions = useMemo(() => {
     const scheduledCrewOnly = dispatchData.scheduledToday.filter(
@@ -529,10 +603,9 @@ export function DispatchView({
   const handleSelectDate = useCallback(
     (date: string) => {
       const next: DispatchFilterState = { ...filterState, selectedDate: date, viewMode: "day" };
-      const params = filterStateToParams(next);
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      pushFilterState(next);
     },
-    [pathname, router, filterState]
+    [filterState, pushFilterState]
   );
 
   const handleResizeEnd = useCallback(
@@ -655,6 +728,67 @@ export function DispatchView({
       null;
     if (first) setAssignmentTarget(first);
   }, [dispatchData.overdue, dispatchData.ready, dispatchData.unscheduled]);
+
+  const handleAssignFromMap = useCallback(
+    async (workOrderId: string, technicianId: string) => {
+      const workOrder = optimisticWorkOrders.find((row) => row.id === workOrderId);
+      if (!workOrder) return;
+      const technician = initialData.workforce.technicians.find((row) => row.id === technicianId);
+      if (!technician) return;
+
+      const scheduledForTechnician = optimisticWorkOrders
+        .filter(
+          (row) =>
+            row.assigned_technician_id === technicianId &&
+            row.scheduled_date === filterState.selectedDate
+        )
+        .sort((a, b) => (a.scheduled_start ?? "").localeCompare(b.scheduled_start ?? ""));
+      const latestEndHour = scheduledForTechnician.reduce((latest, row) => {
+        if (!row.scheduled_end) return latest;
+        const hour = new Date(row.scheduled_end).getHours();
+        return Number.isFinite(hour) ? Math.max(latest, hour) : latest;
+      }, 7);
+      const startHour = Math.max(8, Math.min(17, latestEndHour + 1));
+      const startISO = toSlotISO(filterState.selectedDate, startHour);
+      const hours = workOrder.estimated_hours ?? 1;
+      const endISO = addHours(startISO, hours);
+
+      setMapAssigning(true);
+      try {
+        await applyOptimisticAssignment(
+          workOrder,
+          {
+            assigned_technician_id: technicianId,
+            assigned_crew_id: null,
+            scheduled_date: filterState.selectedDate,
+            scheduled_start: startISO,
+            scheduled_end: endISO,
+          },
+          {
+            assigned_technician_id: technicianId,
+            assigned_crew_id: null,
+            assigned_technician_name: technician.name,
+            assigned_crew_name: null,
+            assignment_type: "technician",
+            scheduled_date: filterState.selectedDate,
+            scheduled_start: startISO,
+            scheduled_end: endISO,
+            status: "scheduled",
+          }
+        );
+        setSelectedMapTechnicianId(technicianId);
+        setSelectedMapWorkOrderId(workOrderId);
+      } finally {
+        setMapAssigning(false);
+      }
+    },
+    [
+      applyOptimisticAssignment,
+      filterState.selectedDate,
+      initialData.workforce.technicians,
+      optimisticWorkOrders,
+    ]
+  );
 
   const handleRebalance = useCallback(() => {
     setRebalanceModalOpen(true);
@@ -816,14 +950,15 @@ export function DispatchView({
         )}
 
         <div className="flex min-h-0 flex-1">
-          <DndContext
+          <div className="min-w-0 flex-1">
+            <DndContext
             sensors={sensors}
             collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
-          >
+            >
             <DispatchSidebarQueue
               unscheduled={dispatchData.unscheduled}
               overdue={dispatchData.overdue}
@@ -922,6 +1057,7 @@ export function DispatchView({
                       isDraggingWorkOrder={Boolean(activeWo)}
                       view={filterState.viewMode}
                       workOrders={optimisticWorkOrders}
+                      routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}
                       onSelectDate={handleSelectDate}
                       onResizeEnd={handleResizeEnd}
                       onOpenWorkOrder={handleOpenWorkOrder}
@@ -949,7 +1085,8 @@ export function DispatchView({
                 </div>
               ) : null}
             </DragOverlay>
-          </DndContext>
+            </DndContext>
+          </div>
           {insightsCollapsed ? (
             <aside className="hidden w-12 shrink-0 flex-col items-center justify-between border-l border-[var(--card-border)] bg-[var(--background)]/60 py-3 xl:flex">
               <button
@@ -961,16 +1098,16 @@ export function DispatchView({
                 &lt;
               </button>
               <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)] [writing-mode:vertical-rl]">
-                Insights
+                Map + Insights
               </span>
               <span />
             </aside>
           ) : (
-            <aside className="hidden w-[380px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
-              <div className="sticky top-3 flex h-[calc(100vh-7.75rem)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]/85 p-3 shadow-[var(--shadow-soft)]">
+            <aside className="hidden w-[460px] shrink-0 border-l border-[var(--card-border)] bg-[var(--background)]/40 p-3 xl:block">
+              <div className="sticky top-3 flex h-[calc(100vh-7.75rem)] min-h-[700px] flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]/85 p-3 shadow-[var(--shadow-soft)]">
                 <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-                    Workload Insights
+                    Map Intelligence + Workload
                   </p>
                   <button
                     type="button"
@@ -980,7 +1117,21 @@ export function DispatchView({
                     Collapse
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                  <DispatchMapPanel
+                    workOrders={optimisticWorkOrders}
+                    workforce={workforce}
+                    filterState={filterState}
+                    filterOptions={filterOptions}
+                    selectedTechnicianId={selectedMapTechnicianId}
+                    selectedWorkOrderId={selectedMapWorkOrderId}
+                    assignmentPending={mapAssigning}
+                    onSelectTechnician={setSelectedMapTechnicianId}
+                    onSelectWorkOrder={setSelectedMapWorkOrderId}
+                    onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                    onAssignFromMap={handleAssignFromMap}
+                    onPatchFilters={patchFilterState}
+                  />
                   <DispatchWorkforcePanel
                     workforce={workforce}
                     insights={dispatchData.insights}

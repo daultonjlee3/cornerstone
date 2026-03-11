@@ -27,6 +27,13 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
     if (!filterState.companyId) return filterOptions.properties;
     return filterOptions.properties.filter((row) => row.company_id === filterState.companyId);
   }, [filterOptions.properties, filterState.companyId]);
+  const buildingOptions = useMemo(() => {
+    const scopedByCompany = filterState.companyId
+      ? filterOptions.buildings.filter((row) => row.company_id === filterState.companyId)
+      : filterOptions.buildings;
+    if (!filterState.propertyId) return scopedByCompany;
+    return scopedByCompany.filter((row) => row.property_id === filterState.propertyId);
+  }, [filterOptions.buildings, filterState.companyId, filterState.propertyId]);
 
   const pushState = (next: DispatchFilterState) => {
     const params = filterStateToParams(next);
@@ -43,6 +50,13 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
       patch.companyId !== filterState.companyId
     ) {
       next.propertyId = "";
+      next.buildingId = "";
+    }
+    if (
+      patch.propertyId !== undefined &&
+      patch.propertyId !== filterState.propertyId
+    ) {
+      next.buildingId = "";
     }
     pushState(next);
   };
@@ -71,6 +85,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
       search: "",
       companyId: "",
       propertyId: "",
+      buildingId: "",
       priority: "",
       status: "",
       crewId: "",
@@ -168,7 +183,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
               Apply
             </Button>
           </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
             <select
               value={filterState.companyId}
               onChange={(event) => patchState({ companyId: event.target.value })}
@@ -191,6 +206,19 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
               {propertyOptions.map((property) => (
                 <option key={property.id} value={property.id}>
                   {property.property_name ?? property.name ?? property.id}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterState.buildingId}
+              onChange={(event) => patchState({ buildingId: event.target.value })}
+              className="ui-select"
+            >
+              <option value="">All buildings</option>
+              {buildingOptions.map((building) => (
+                <option key={building.id} value={building.id}>
+                  {building.building_name ?? building.name ?? building.id}
                 </option>
               ))}
             </select>

@@ -13,6 +13,7 @@ export type DispatchWorkOrderCardProps = {
   isDragging?: boolean;
   /** When true, show hover quick actions (View, Reassign, Mark complete, Open). */
   showQuickActions?: boolean;
+  travelEstimate?: string | null;
   onOpenWorkOrder?: (
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
@@ -111,6 +112,7 @@ export function DispatchWorkOrderCard({
   showCrew = true,
   isDragging = false,
   showQuickActions = true,
+  travelEstimate = null,
   onOpenWorkOrder,
 }: DispatchWorkOrderCardProps) {
   const title = workOrder.title ?? "Untitled";
@@ -175,6 +177,11 @@ export function DispatchWorkOrderCard({
             Overdue
           </span>
         ) : null}
+        {travelEstimate ? (
+          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+            {travelEstimate}
+          </span>
+        ) : null}
       </div>
 
       {timeRange && (
@@ -182,7 +189,6 @@ export function DispatchWorkOrderCard({
       )}
 
       {showCrew ? <p className={`mt-1.5 text-xs font-semibold ${assignment.tone}`}>{assignment.label}</p> : null}
-
       {showActions
         ? variant === "block"
           ? (

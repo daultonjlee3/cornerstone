@@ -40,8 +40,11 @@ function formatEventLabel(event: TimelineEvent): string {
   const key = event.action_type;
   if (key === "work_order_created") return "Work order created";
   if (key === "work_order_assigned") return "Assignment updated";
+  if (key === "work_order.assigned") return "Assigned";
+  if (key === "work_order.reassigned") return "Reassigned";
   if (key === "dispatch_reassigned") return "Reassigned";
   if (key === "dispatch_rescheduled") return "Rescheduled";
+  if (key === "dispatch.route_updated") return "Route updated";
   if (key === "dispatch_unscheduled") return "Unscheduled";
   if (key === "work_order_scheduled") return "Scheduled";
   if (key === "work_order_status_changed") return "Status changed";

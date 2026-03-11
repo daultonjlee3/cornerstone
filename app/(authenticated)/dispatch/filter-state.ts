@@ -9,6 +9,7 @@ export type DispatchFilterState = {
   search: string;
   companyId: string;
   propertyId: string;
+  buildingId: string;
   priority: string;
   status: string;
   crewId: string;
@@ -24,6 +25,7 @@ const DEFAULT_FILTER_STATE: DispatchFilterState = {
   search: "",
   companyId: "",
   propertyId: "",
+  buildingId: "",
   priority: "",
   status: "",
   crewId: "",
@@ -76,6 +78,7 @@ export function parseFilterStateFromParams(
     search: get("q"),
     companyId: get("company_id"),
     propertyId: get("property_id"),
+    buildingId: get("building_id"),
     priority: get("priority"),
     status: get("status"),
     crewId: get("crew_id"),
@@ -96,6 +99,7 @@ export function filterStateToParams(state: DispatchFilterState): URLSearchParams
   if (state.search) params.set("q", state.search);
   if (state.companyId) params.set("company_id", state.companyId);
   if (state.propertyId) params.set("property_id", state.propertyId);
+  if (state.buildingId) params.set("building_id", state.buildingId);
   if (state.priority) params.set("priority", state.priority);
   if (state.status) params.set("status", state.status);
   if (state.crewId) params.set("crew_id", state.crewId);
@@ -121,6 +125,7 @@ export function hasActiveFilters(state: DispatchFilterState): boolean {
     state.search ||
     state.companyId ||
     state.propertyId ||
+    state.buildingId ||
     state.priority ||
     state.status ||
     state.crewId ||
