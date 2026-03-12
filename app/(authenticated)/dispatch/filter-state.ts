@@ -3,7 +3,7 @@
  * Parsed from URL search params (server + client) and serialized back for navigation.
  */
 
-export type DispatchViewMode = "day" | "week" | "month" | "map";
+export type DispatchViewMode = "day" | "week" | "month" | "map" | "combined";
 
 export type DispatchFilterState = {
   search: string;
@@ -69,7 +69,10 @@ export function parseFilterStateFromParams(
 
   const viewParam = get("view");
   const viewMode: DispatchViewMode =
-    viewParam === "week" || viewParam === "month" || viewParam === "map"
+    viewParam === "week" ||
+    viewParam === "month" ||
+    viewParam === "map" ||
+    viewParam === "combined"
       ? viewParam
       : "day";
 

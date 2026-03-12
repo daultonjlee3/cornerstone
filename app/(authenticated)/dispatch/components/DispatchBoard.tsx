@@ -64,6 +64,9 @@ export type DispatchBoardProps = {
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
   ) => void;
   routeTravelByWorkOrderId?: Map<string, string>;
+  selectedWorkOrderId?: string | null;
+  hoveredWorkOrderId?: string | null;
+  onHoverWorkOrder?: (workOrderId: string | null) => void;
 };
 
 function addDays(dateStr: string, delta: number): string {
@@ -89,17 +92,6 @@ function startOfWeek(dateStr: string): string {
 function formatDayLabel(dateStr: string): string {
   const d = new Date(`${dateStr}T12:00:00`);
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-}
-
-function getDurationHours(workOrder: BoardWorkOrder): number {
-  if (workOrder.scheduled_start && workOrder.scheduled_end) {
-    const start = new Date(workOrder.scheduled_start).getTime();
-    const end = new Date(workOrder.scheduled_end).getTime();
-    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
-      return (end - start) / (60 * 60 * 1000);
-    }
-  }
-  return workOrder.estimated_hours ?? 1;
 }
 
 function getCurrentTimePercent(now: Date): number | null {
@@ -189,6 +181,9 @@ function ResizeHandle({
       onPointerLeave={handlePointerUp}
       role="slider"
       aria-label="Resize job duration"
+      aria-valuemin={4}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(currentHeightPercent)}
     >
       <span className="rounded bg-[var(--card-border)] opacity-0 group-hover:opacity-100 h-1 w-8 transition-opacity" />
     </div>
@@ -199,16 +194,15 @@ function DraggableBoardCard({
   workOrder,
   selectedDate,
   onResizeEnd,
-  onOpenWorkOrder,
+  isHighlighted,
+  onHoverWorkOrder,
   children,
 }: {
   workOrder: BoardWorkOrder;
   selectedDate: string;
   onResizeEnd?: (workOrder: { id: string; assigned_crew_id?: string | null; assigned_technician_id?: string | null; scheduled_date?: string | null; scheduled_start?: string | null }, newEndISO: string) => void;
-  onOpenWorkOrder?: (
-    id: string,
-    action?: "view" | "reassign" | "complete" | "open" | "unschedule"
-  ) => void;
+  isHighlighted?: boolean;
+  onHoverWorkOrder?: (workOrderId: string | null) => void;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -219,8 +213,12 @@ function DraggableBoardCard({
 
   return (
     <div
+      id={`dispatch-board-card-${workOrder.id}`}
+      data-dispatch-work-order-id={workOrder.id}
       ref={setNodeRef}
-      className="absolute left-1 right-1 z-20 pointer-events-auto"
+      className={`absolute left-1 right-1 z-20 pointer-events-auto ${
+        isHighlighted ? "drop-shadow-[0_0_0.45rem_rgba(15,151,173,0.35)]" : ""
+      }`}
       style={{
         top: `${leftPercent}%`,
         height: `${Math.max(widthPercent, 4)}%`,
@@ -239,6 +237,8 @@ function DraggableBoardCard({
               }
             }}
             className="h-full cursor-grab overflow-hidden rounded-lg transition-transform duration-150 active:cursor-grabbing"
+            onMouseEnter={() => onHoverWorkOrder?.(workOrder.id)}
+            onMouseLeave={() => onHoverWorkOrder?.(null)}
           >
             <div className="h-full overflow-auto">
               {children}
@@ -271,6 +271,9 @@ export function DispatchBoard({
   onResizeEnd,
   onOpenWorkOrder,
   routeTravelByWorkOrderId,
+  selectedWorkOrderId = null,
+  hoveredWorkOrderId = null,
+  onHoverWorkOrder,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
   const dayScrollRef = useRef<HTMLDivElement | null>(null);
@@ -338,6 +341,9 @@ export function DispatchBoard({
                     variant="compact"
                     showScheduledTime
                     showQuickActions
+                    isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
+                    onMouseEnter={() => onHoverWorkOrder?.(wo.id)}
+                    onMouseLeave={() => onHoverWorkOrder?.(null)}
                     travelEstimate={routeTravelByWorkOrderId?.get(wo.id) ?? null}
                     onOpenWorkOrder={onOpenWorkOrder}
                   />
@@ -479,7 +485,8 @@ export function DispatchBoard({
                   workOrder={wo}
                   selectedDate={selectedDate}
                   onResizeEnd={onResizeEnd}
-                  onOpenWorkOrder={onOpenWorkOrder}
+                  isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
+                  onHoverWorkOrder={onHoverWorkOrder}
                 >
                   <DispatchWorkOrderCard
                     workOrder={wo}
@@ -487,6 +494,9 @@ export function DispatchBoard({
                     showScheduledTime
                     showCrew
                     showQuickActions
+                    isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
+                    onMouseEnter={() => onHoverWorkOrder?.(wo.id)}
+                    onMouseLeave={() => onHoverWorkOrder?.(null)}
                     travelEstimate={routeTravelByWorkOrderId?.get(wo.id) ?? null}
                     onOpenWorkOrder={onOpenWorkOrder}
                   />

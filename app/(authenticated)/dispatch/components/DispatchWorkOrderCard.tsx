@@ -14,6 +14,9 @@ export type DispatchWorkOrderCardProps = {
   /** When true, show hover quick actions (View, Reassign, Mark complete, Open). */
   showQuickActions?: boolean;
   travelEstimate?: string | null;
+  isHighlighted?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   onOpenWorkOrder?: (
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
@@ -116,6 +119,9 @@ export function DispatchWorkOrderCard({
   isDragging = false,
   showQuickActions = true,
   travelEstimate = null,
+  isHighlighted = false,
+  onMouseEnter,
+  onMouseLeave,
   onOpenWorkOrder,
 }: DispatchWorkOrderCardProps) {
   const title = workOrder.title ?? "Untitled";
@@ -140,6 +146,10 @@ export function DispatchWorkOrderCard({
       <DispatchCard
         priority={priority}
         isOverdue={overdue}
+        isDragging={isDragging}
+        className={`text-sm ${isHighlighted ? "ring-2 ring-[var(--accent)]/30" : ""}`}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         isSlaBreached={slaBreached}
         isDragging={isDragging}
         className="text-sm"
@@ -164,7 +174,11 @@ export function DispatchWorkOrderCard({
       isOverdue={overdue}
         isSlaBreached={slaBreached}
       isDragging={isDragging}
-      className="h-full cursor-grab active:cursor-grabbing"
+      className={`h-full cursor-grab active:cursor-grabbing ${
+        isHighlighted ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : ""
+      }`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         {workOrder.work_order_number ?? "Work order"}
