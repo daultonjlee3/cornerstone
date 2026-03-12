@@ -55,8 +55,8 @@ export async function saveProperty(
   let state = (formData.get("state") as string)?.trim() || null;
   let zip = (formData.get("zip") as string)?.trim() || null;
   let country = (formData.get("country") as string)?.trim() || null;
-  let latRaw = (formData.get("latitude") as string)?.trim();
-  let lonRaw = (formData.get("longitude") as string)?.trim();
+  const latRaw = (formData.get("latitude") as string)?.trim();
+  const lonRaw = (formData.get("longitude") as string)?.trim();
   let lat = latRaw ? parseFloat(latRaw) : null;
   let lon = lonRaw ? parseFloat(lonRaw) : null;
 
@@ -80,7 +80,7 @@ export async function saveProperty(
     name: propertyName,
     property_name: propertyName,
     company_id: companyId,
-    address_line1,
+    address_line1: addressLine1,
     address_line2: (formData.get("address_line2") as string)?.trim() || null,
     city,
     state,

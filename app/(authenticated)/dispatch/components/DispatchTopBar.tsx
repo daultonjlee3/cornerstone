@@ -61,7 +61,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
     pushState(next);
   };
 
-  const setView = (viewMode: "day" | "week" | "month" | "map") => {
+  const setView = (viewMode: "day" | "week" | "month" | "map" | "combined") => {
     patchState({ viewMode });
   };
 
@@ -128,7 +128,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           </button>
         </div>
         <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5" role="tablist" aria-label="Dispatch view">
-          {(["day", "week", "month", "map"] as const).map((mode) => (
+          {(["day", "week", "month", "map", "combined"] as const).map((mode) => (
             <button
               key={mode}
               type="button"
@@ -141,7 +141,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              {mode}
+              {mode === "combined" ? "Combined" : mode}
             </button>
           ))}
         </div>

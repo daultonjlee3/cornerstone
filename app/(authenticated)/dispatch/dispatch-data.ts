@@ -34,6 +34,7 @@ export type DispatchFilterOptions = {
 
 export type DispatchInsights = {
   total: number;
+  dueToday: number;
   overdue: number;
   ready: number;
   unscheduled: number;
@@ -178,6 +179,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       },
       insights: {
         total: 0,
+        dueToday: 0,
         overdue: 0,
         ready: 0,
         unscheduled: 0,
@@ -385,6 +387,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       },
       insights: {
         total: 0,
+        dueToday: 0,
         overdue: 0,
         ready: 0,
         unscheduled: 0,
@@ -528,6 +531,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   const techniciansWorkingToday = new Set<string>();
   const crewsWorkingToday = new Set<string>();
   let inProgressToday = 0;
+  let dueToday = 0;
   let unassignedWorkOrders = 0;
 
   const priorityRank = (p: string | null | undefined): number => {
@@ -548,6 +552,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
 
     if (!hasAssignment && !isTerminal) unassignedWorkOrders += 1;
+    if (!isTerminal && due === today) dueToday += 1;
     if (comparableStatus === "in_progress") inProgressToday += 1;
     if (scheduled === today && wo.assigned_technician_id) {
       techniciansWorkingToday.add(wo.assigned_technician_id);
@@ -786,6 +791,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     },
     insights: {
       total: all.length,
+      dueToday,
       overdue: overdue.length,
       ready: ready.length,
       unscheduled: unscheduled.length,

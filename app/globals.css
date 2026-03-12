@@ -156,6 +156,17 @@ body {
   background: #bfdbfe;
 }
 
+.dispatch-map-pin-hovered {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25), 0 4px 14px rgba(15, 23, 42, 0.28);
+}
+
+.dispatch-map-pin-selected {
+  transform: scale(1.14);
+  border-color: #0f97ad;
+  box-shadow: 0 0 0 4px rgba(15, 151, 173, 0.28), 0 6px 16px rgba(15, 23, 42, 0.32);
+}
+
 .dispatch-map-pin-cluster {
   border-color: #4338ca;
   background: #c7d2fe;
