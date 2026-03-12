@@ -69,7 +69,8 @@ export async function geocodeAddress(addressQuery: string): Promise<GeocodedAddr
 
   const [longitude, latitude] = feature.center;
   const ctx = parseContext(feature.context);
-  const addressLine1 = [feature.address, feature.text].filter(Boolean).join(" ").trim() || feature.place_name?.split(",")[0]?.trim() ?? null;
+  const addressLine1 =
+    ([feature.address, feature.text].filter(Boolean).join(" ").trim() || feature.place_name?.split(",")[0]?.trim()) ?? null;
 
   return {
     address_line1: addressLine1 || null,

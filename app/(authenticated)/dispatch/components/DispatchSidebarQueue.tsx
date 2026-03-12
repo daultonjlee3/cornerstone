@@ -50,19 +50,21 @@ export function DispatchSidebarQueue({
   onToggleCollapse,
   onOpenWorkOrder,
 }: DispatchSidebarQueueProps) {
+  const [mounted, setMounted] = useState(false);
   const [overdueSectionCollapsed, setOverdueSectionCollapsed] = useState(false);
   const [readySectionCollapsed, setReadySectionCollapsed] = useState(false);
   const [unscheduledSectionCollapsed, setUnscheduledSectionCollapsed] = useState(false);
 
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!mounted || typeof window === "undefined") return;
     const o = window.sessionStorage.getItem(STORAGE_KEY_OVERDUE);
     const r = window.sessionStorage.getItem(STORAGE_KEY_READY);
     const u = window.sessionStorage.getItem(STORAGE_KEY_UNSCHEDULED);
     if (o != null) setOverdueSectionCollapsed(o === "1");
     if (r != null) setReadySectionCollapsed(r === "1");
     if (u != null) setUnscheduledSectionCollapsed(u === "1");
-  }, []);
+  }, [mounted]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -143,39 +145,45 @@ export function DispatchSidebarQueue({
         ) : null}
       </div>
       <div className="flex-1 overflow-y-auto py-2">
-        <QueueSection
-          title="Overdue"
-          items={overdue}
-          variant="overdue"
-          collapsed={overdueSectionCollapsed}
-          onToggleCollapse={() => setOverdueSectionCollapsed((c) => !c)}
-          DraggableWrapper={({ workOrder, children }) => (
-            <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
-          )}
-          onOpenWorkOrder={onOpenWorkOrder}
-        />
-        <QueueSection
-          title="Ready"
-          items={ready}
-          variant="ready"
-          collapsed={readySectionCollapsed}
-          onToggleCollapse={() => setReadySectionCollapsed((c) => !c)}
-          DraggableWrapper={({ workOrder, children }) => (
-            <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
-          )}
-          onOpenWorkOrder={onOpenWorkOrder}
-        />
-        <QueueSection
-          title="Unscheduled"
-          items={unscheduled}
-          variant="unscheduled"
-          collapsed={unscheduledSectionCollapsed}
-          onToggleCollapse={() => setUnscheduledSectionCollapsed((c) => !c)}
-          DraggableWrapper={({ workOrder, children }) => (
-            <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
-          )}
-          onOpenWorkOrder={onOpenWorkOrder}
-        />
+        {!mounted ? (
+          <p className="px-2 text-[10px] text-[var(--muted)]">Loading queue…</p>
+        ) : (
+          <>
+            <QueueSection
+              title="Overdue"
+              items={overdue}
+              variant="overdue"
+              collapsed={overdueSectionCollapsed}
+              onToggleCollapse={() => setOverdueSectionCollapsed((c) => !c)}
+              DraggableWrapper={({ workOrder, children }) => (
+                <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
+              )}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+            <QueueSection
+              title="Ready"
+              items={ready}
+              variant="ready"
+              collapsed={readySectionCollapsed}
+              onToggleCollapse={() => setReadySectionCollapsed((c) => !c)}
+              DraggableWrapper={({ workOrder, children }) => (
+                <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
+              )}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+            <QueueSection
+              title="Unscheduled"
+              items={unscheduled}
+              variant="unscheduled"
+              collapsed={unscheduledSectionCollapsed}
+              onToggleCollapse={() => setUnscheduledSectionCollapsed((c) => !c)}
+              DraggableWrapper={({ workOrder, children }) => (
+                <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
+              )}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </>
+        )}
       </div>
     </aside>
   );

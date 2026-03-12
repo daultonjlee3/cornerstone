@@ -61,12 +61,19 @@ export async function saveUnit(
   if (!allowed) return { error: "Invalid building." };
 
   const squareFeetRaw = (formData.get("square_feet") as string)?.trim();
+  const latRaw = (formData.get("latitude") as string)?.trim();
+  const lonRaw = (formData.get("longitude") as string)?.trim();
+  const lat = latRaw ? parseFloat(latRaw) : null;
+  const lon = lonRaw ? parseFloat(lonRaw) : null;
 
   const payload = {
     unit_name: unitName,
     name_or_number: unitName,
     building_id: buildingId,
     tenant_id: tenantId,
+    address: (formData.get("address") as string)?.trim() || null,
+    latitude: lat != null && Number.isFinite(lat) ? lat : null,
+    longitude: lon != null && Number.isFinite(lon) ? lon : null,
     unit_code: (formData.get("unit_code") as string)?.trim() || null,
     floor: (formData.get("floor") as string)?.trim() || null,
     square_feet: squareFeetRaw ? parseFloat(squareFeetRaw) : null,

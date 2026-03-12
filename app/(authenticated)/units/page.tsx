@@ -86,7 +86,7 @@ export default async function UnitsPage() {
 
   const { data: units, error } = await supabase
     .from("units")
-    .select("id, unit_name, name_or_number, building_id, unit_code, floor, square_feet, square_footage, occupancy_type, status, notes, buildings(building_name, name, property_id, properties(company_id))")
+    .select("id, unit_name, name_or_number, building_id, unit_code, floor, square_feet, square_footage, occupancy_type, status, notes, address, latitude, longitude, buildings(building_name, name, property_id, properties(company_id))")
     .in("building_id", buildingIds)
     .order("unit_name")
     .order("name_or_number");

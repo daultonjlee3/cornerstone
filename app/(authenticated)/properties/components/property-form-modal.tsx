@@ -30,6 +30,7 @@ type PropertyFormModalProps = {
   property: Property | null;
   companies: CompanyOption[];
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  mapboxToken?: string | null;
 };
 
 const emptyProperty: Property = {
@@ -53,6 +54,7 @@ export function PropertyFormModal({
   property,
   companies,
   saveAction,
+  mapboxToken,
 }: PropertyFormModalProps) {
   const isEdit = !!property?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
@@ -141,6 +143,7 @@ export function PropertyFormModal({
               onSelect={handleAddressSelect}
               placeholder="Type to search for an address…"
               className="ui-input"
+              mapboxToken={mapboxToken ?? undefined}
             />
           </FormField>
           <FormField label="Address line 1" htmlFor="address_line1">

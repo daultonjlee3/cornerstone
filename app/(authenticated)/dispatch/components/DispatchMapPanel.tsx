@@ -139,6 +139,8 @@ export function DispatchMapPanel({
   }
 
   const [zoomLevel, setZoomLevel] = useState(11);
+  const [mapMounted, setMapMounted] = useState(false);
+  useEffect(() => setMapMounted(true), []);
 
   const propertyOptions = useMemo(() => {
     if (!filterState.companyId) return filterOptions.properties;
@@ -275,6 +277,11 @@ export function DispatchMapPanel({
         </select>
       </div>
       <div className="min-h-[350px] flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50">
+        {!mapMounted ? (
+          <div className="flex h-full min-h-[350px] items-center justify-center text-[11px] text-[var(--muted)]">
+            Loading map…
+          </div>
+        ) : (
         <MapContainer
           center={[mapCenter.latitude, mapCenter.longitude]}
           zoom={zoomLevel}
@@ -414,6 +421,7 @@ export function DispatchMapPanel({
             />
           ) : null}
         </MapContainer>
+        )}
       </div>
 
       <section className="shrink-0 space-y-1.5 rounded-lg border border-[var(--card-border)]/80 bg-[var(--background)]/40 p-2">

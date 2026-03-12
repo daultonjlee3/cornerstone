@@ -867,57 +867,55 @@ export function DispatchView({
         </div>
       </header>
 
-      {!isFullScreen ? (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            title="Unassigned Work Orders"
-            value={dispatchData.insights.unassignedWorkOrders}
-            description="Needs technician or crew assignment"
-          />
-          <MetricCard
-            title="Scheduled Today"
-            value={dispatchData.insights.scheduledToday}
-            description="With assignment and schedule"
-          />
-          <MetricCard
-            title="In Progress Today"
-            value={dispatchData.insights.inProgressToday}
-            description="Active execution jobs"
-          />
-          <MetricCard
-            title="Overdue Work Orders"
-            value={dispatchData.insights.overdue}
-            description="Past due without completion"
-            className="border-red-200/80 bg-red-50/50"
-            trend={
-              dispatchData.insights.overdue > 0
-                ? { label: "Requires immediate attention", tone: "bad" }
-                : { label: "No overdue jobs", tone: "good" }
-            }
-          />
-          <MetricCard
-            title="High Priority Open Jobs"
-            value={dispatchData.insights.highPriorityOpenJobs}
-            description="High, urgent, and emergency work"
-            className="border-amber-200/80 bg-amber-50/40"
-            trend={
-              dispatchData.insights.highPriorityOpenJobs > 0
-                ? { label: "Prioritize dispatch now", tone: "bad" }
-                : { label: "Priority backlog controlled", tone: "good" }
-            }
-          />
-          <MetricCard
-            title="Technicians Working Today"
-            value={dispatchData.insights.techniciansWorkingToday}
-            description="Unique technicians scheduled today"
-          />
-          <MetricCard
-            title="Crews Working Today"
-            value={dispatchData.insights.crewsWorkingToday}
-            description="Unique crews scheduled today"
-          />
-        </section>
-      ) : null}
+      <section className="grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Dispatch insights">
+        <MetricCard
+          title="Unassigned Work Orders"
+          value={dispatchData.insights.unassignedWorkOrders}
+          description="Needs technician or crew assignment"
+        />
+        <MetricCard
+          title="Scheduled Today"
+          value={dispatchData.insights.scheduledToday}
+          description="With assignment and schedule"
+        />
+        <MetricCard
+          title="In Progress Today"
+          value={dispatchData.insights.inProgressToday}
+          description="Active execution jobs"
+        />
+        <MetricCard
+          title="Overdue Work Orders"
+          value={dispatchData.insights.overdue}
+          description="Past due without completion"
+          className="border-red-200/80 bg-red-50/50"
+          trend={
+            dispatchData.insights.overdue > 0
+              ? { label: "Requires immediate attention", tone: "bad" }
+              : { label: "No overdue jobs", tone: "good" }
+          }
+        />
+        <MetricCard
+          title="High Priority Open Jobs"
+          value={dispatchData.insights.highPriorityOpenJobs}
+          description="High, urgent, and emergency work"
+          className="border-amber-200/80 bg-amber-50/40"
+          trend={
+            dispatchData.insights.highPriorityOpenJobs > 0
+              ? { label: "Prioritize dispatch now", tone: "bad" }
+              : { label: "Priority backlog controlled", tone: "good" }
+          }
+        />
+        <MetricCard
+          title="Technicians Working Today"
+          value={dispatchData.insights.techniciansWorkingToday}
+          description="Unique technicians scheduled today"
+        />
+        <MetricCard
+          title="Crews Working Today"
+          value={dispatchData.insights.crewsWorkingToday}
+          description="Unique crews scheduled today"
+        />
+      </section>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
         <DispatchTopBar

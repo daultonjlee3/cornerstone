@@ -35,6 +35,7 @@ type BuildingFormModalProps = {
   building: Building | null;
   properties: PropertyOption[];
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  mapboxToken?: string | null;
 };
 
 const emptyBuilding: Building = {
@@ -62,6 +63,7 @@ export function BuildingFormModal({
   building,
   properties,
   saveAction,
+  mapboxToken,
 }: BuildingFormModalProps) {
   const isEdit = !!building?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
@@ -148,6 +150,7 @@ export function BuildingFormModal({
               onSelect={handleAddressSelect}
               placeholder="Type to search for building address…"
               className="ui-input"
+              mapboxToken={mapboxToken ?? undefined}
             />
           </FormField>
           <FormField label="Address" htmlFor="building_address">

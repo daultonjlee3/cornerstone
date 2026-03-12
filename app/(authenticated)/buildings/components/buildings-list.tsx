@@ -25,6 +25,7 @@ type BuildingsListProps = {
   buildings: Building[];
   properties: PropertyOption[];
   error?: string | null;
+  mapboxToken?: string | null;
 };
 
 function buildingDisplayName(b: Building): string {
@@ -35,6 +36,7 @@ export function BuildingsList({
   buildings: initialBuildings,
   properties,
   error: initialError,
+  mapboxToken,
 }: BuildingsListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -163,6 +165,7 @@ export function BuildingsList({
         building={editingBuilding}
         properties={properties}
         saveAction={saveBuilding}
+        mapboxToken={mapboxToken}
       />
     </div>
   );

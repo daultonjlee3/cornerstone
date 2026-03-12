@@ -96,7 +96,8 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
     });
   };
 
-  const selectClass = "ui-select h-7 min-h-0 w-auto min-w-0 border-[var(--card-border)] py-0 pl-2 pr-6 text-[11px]";
+  const selectBase =
+    "h-7 min-h-0 w-auto max-w-[10rem] shrink-0 rounded border border-[var(--card-border)] bg-[var(--card)] py-0 pl-2 pr-6 text-[11px] text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
   return (
     <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-2 py-1">
       {/* Row 1: Date navigation + view tabs */}
@@ -153,22 +154,22 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && applySearch()}
-          className="ui-input h-7 min-h-0 flex-1 min-w-0 py-0 text-[11px]"
+          className="ui-input h-7 min-h-0 flex-1 min-w-0 rounded py-0 text-[11px]"
         />
         <button
           type="button"
           onClick={applySearch}
-          className="shrink-0 rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-0.5 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/40"
+          className="shrink-0 rounded border border-[var(--card-border)] bg-[var(--background)] px-2.5 py-1 text-[11px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
         >
           Search
         </button>
       </div>
-      {/* Row 3: Inline dropdown filters */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* Row 3: Inline dropdown filters — compact toolbar strip */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-md border border-[var(--card-border)]/80 bg-[var(--background)]/60 px-2 py-1.5">
         <select
           value={filterState.companyId}
           onChange={(e) => patchState({ companyId: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Company"
         >
           <option value="">Company</option>
@@ -179,7 +180,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.propertyId}
           onChange={(e) => patchState({ propertyId: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Property"
         >
           <option value="">Property</option>
@@ -190,7 +191,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.buildingId}
           onChange={(e) => patchState({ buildingId: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Building"
         >
           <option value="">Building</option>
@@ -201,7 +202,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.assetId}
           onChange={(e) => patchState({ assetId: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Asset"
         >
           <option value="">Asset</option>
@@ -212,7 +213,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.priority}
           onChange={(e) => patchState({ priority: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Priority"
         >
           <option value="">Priority</option>
@@ -223,7 +224,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.status}
           onChange={(e) => patchState({ status: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Status"
         >
           <option value="">Status</option>
@@ -234,7 +235,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.technicianId}
           onChange={(e) => patchState({ technicianId: e.target.value })}
-          className={`${selectClass} max-w-[110px]`}
+          className={`${selectBase} max-w-[7.5rem]`}
           title="Technician"
         >
           <option value="">Technician</option>
@@ -245,7 +246,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.crewId}
           onChange={(e) => patchState({ crewId: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Crew"
         >
           <option value="">Crew</option>
@@ -256,7 +257,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         <select
           value={filterState.assignmentType}
           onChange={(e) => patchState({ assignmentType: e.target.value })}
-          className={selectClass}
+          className={selectBase}
           title="Assignment type"
         >
           <option value="">Assignment</option>
@@ -264,14 +265,14 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
-        <span className="shrink-0 border-l border-[var(--card-border)] pl-2" />
-        <span className="rounded border border-red-200/80 bg-red-50/80 px-1 py-0.5 text-[10px] text-red-700">O: {insights.overdue}</span>
-        <span className="rounded border border-emerald-200/80 bg-emerald-50/80 px-1 py-0.5 text-[10px] text-emerald-700">R: {insights.ready}</span>
-        <span className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] text-slate-700">U: {insights.unscheduled}</span>
-        <span className="rounded border border-blue-200/80 bg-blue-50/80 px-1 py-0.5 text-[10px] text-blue-700">Today: {insights.scheduledToday}</span>
+        <span className="mx-0.5 shrink-0 border-l border-[var(--card-border)]" aria-hidden />
+        <span className="rounded border border-red-200/80 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700">O: {insights.overdue}</span>
+        <span className="rounded border border-emerald-200/80 bg-emerald-50/80 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">R: {insights.ready}</span>
+        <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">U: {insights.unscheduled}</span>
+        <span className="rounded border border-blue-200/80 bg-blue-50/80 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">Today: {insights.scheduledToday}</span>
         {hasActiveFilters(filterState) ? (
-          <Button variant="secondary" size="sm" className="h-6 shrink-0 px-1.5 text-[10px]" onClick={clearFilters}>
-            Clear
+          <Button variant="secondary" size="sm" className="h-6 shrink-0 px-2 text-[10px]" onClick={clearFilters}>
+            Clear filters
           </Button>
         ) : null}
       </div>

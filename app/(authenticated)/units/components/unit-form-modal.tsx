@@ -17,6 +17,9 @@ export type Unit = {
   occupancy_type: string | null;
   status: string;
   notes: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   building?: { building_name?: string; name?: string } | null;
 };
 
@@ -40,6 +43,9 @@ const emptyUnit: Unit = {
   occupancy_type: null,
   status: "active",
   notes: null,
+  address: null,
+  latitude: null,
+  longitude: null,
 };
 
 export function UnitFormModal({
@@ -99,6 +105,40 @@ export function UnitFormModal({
               ))}
             </select>
           </FormField>
+          <FormField label="Address" htmlFor="unit_address">
+            <input
+              id="unit_address"
+              name="address"
+              type="text"
+              defaultValue={u.address ?? ""}
+              placeholder="Suite, floor, or unit address"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Latitude" htmlFor="unit_latitude">
+              <input
+                id="unit_latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                defaultValue={u.latitude ?? ""}
+                placeholder="e.g. 33.7490"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Longitude" htmlFor="unit_longitude">
+              <input
+                id="unit_longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                defaultValue={u.longitude ?? ""}
+                placeholder="e.g. -84.3880"
+                className="ui-input"
+              />
+            </FormField>
+          </div>
           <FormField label="Unit code" htmlFor="unit_code">
             <input
               id="unit_code"

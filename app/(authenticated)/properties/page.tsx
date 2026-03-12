@@ -50,7 +50,7 @@ export default async function PropertiesPage() {
 
   const { data: properties, error } = await supabase
     .from("properties")
-    .select("id, property_name, name, company_id, address_line1, address_line2, city, state, zip, status, companies(name)")
+    .select("id, property_name, name, company_id, address_line1, address_line2, city, state, zip, country, latitude, longitude, status, companies(name)")
     .in("company_id", companyIds)
     .order("name");
 
@@ -62,6 +62,9 @@ export default async function PropertiesPage() {
       company: companyData ? { name: companyData.name } : null,
     };
   });
+
+  const mapboxToken =
+    (process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim() || null;
 
   return (
     <div className="space-y-8">
@@ -77,6 +80,7 @@ export default async function PropertiesPage() {
         properties={normalized}
         companies={companies ?? []}
         error={error?.message ?? null}
+        mapboxToken={mapboxToken}
       />
     </div>
   );

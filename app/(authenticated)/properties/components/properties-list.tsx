@@ -25,6 +25,7 @@ type PropertiesListProps = {
   properties: Property[];
   companies: CompanyOption[];
   error?: string | null;
+  mapboxToken?: string | null;
 };
 
 function propertyDisplayName(p: Property): string {
@@ -35,6 +36,7 @@ export function PropertiesList({
   properties: initialProperties,
   companies,
   error: initialError,
+  mapboxToken,
 }: PropertiesListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -163,6 +165,7 @@ export function PropertiesList({
         property={editingProperty}
         companies={companies}
         saveAction={saveProperty}
+        mapboxToken={mapboxToken}
       />
     </div>
   );

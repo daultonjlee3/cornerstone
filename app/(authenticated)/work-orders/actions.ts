@@ -405,9 +405,9 @@ export async function saveWorkOrder(
     if (unitId && ast.unit_id !== null && ast.unit_id !== unitId)
       return { error: "Selected asset does not match the selected unit." };
     // Inherit location from asset when form did not set property/building/unit
-    resolvedPropertyId = resolvedPropertyId || ast.property_id ?? null;
-    resolvedBuildingId = resolvedBuildingId || ast.building_id ?? null;
-    resolvedUnitId = resolvedUnitId || ast.unit_id ?? null;
+    resolvedPropertyId = resolvedPropertyId || (ast.property_id ?? null);
+    resolvedBuildingId = resolvedBuildingId || (ast.building_id ?? null);
+    resolvedUnitId = resolvedUnitId || (ast.unit_id ?? null);
   }
   // Inherit building_id and property_id from unit when unit is selected but those are missing
   if (resolvedUnitId && (!resolvedBuildingId || !resolvedPropertyId)) {

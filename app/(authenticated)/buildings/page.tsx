@@ -79,7 +79,7 @@ export default async function BuildingsPage() {
 
   const { data: buildings, error } = await supabase
     .from("buildings")
-    .select("id, building_name, name, property_id, building_code, status, year_built, floors, square_feet, notes, properties(name, property_name, company_id)")
+    .select("id, building_name, name, property_id, building_code, address, city, state, postal_code, country, latitude, longitude, status, year_built, floors, square_feet, notes, properties(name, property_name, company_id)")
     .in("property_id", propertyIds)
     .order("building_name")
     .order("name");
@@ -95,6 +95,9 @@ export default async function BuildingsPage() {
     };
   });
 
+  const mapboxToken =
+    (process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim() || null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -109,6 +112,7 @@ export default async function BuildingsPage() {
         buildings={normalized}
         properties={propertyOptions}
         error={error?.message ?? null}
+        mapboxToken={mapboxToken}
       />
     </div>
   );
