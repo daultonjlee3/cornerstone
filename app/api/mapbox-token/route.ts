@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
+import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
 
 export const runtime = "nodejs";
 
-/** Mapbox public tokens start with this prefix; secret tokens start with sk. */
-const PUBLIC_TOKEN_PREFIX = "pk.";
-
 /**
- * Returns the Mapbox access token from server env (.env.local).
- * Uses NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN only. Returns null if the value is missing
- * or does not look like a public token (pk.*), so the client never receives a
- * secret token or a bad value that could overwrite a valid one.
+ * Returns a public Mapbox token from env.
+ * Checks common variable names and only returns pk.* values.
  */
 export async function GET() {
-  const raw = (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim();
-  const token = raw && raw.startsWith(PUBLIC_TOKEN_PREFIX) ? raw : null;
+  const token = resolveMapboxPublicTokenFromEnv();
   return NextResponse.json({ token });
 }

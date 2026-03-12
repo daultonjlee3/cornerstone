@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BuildingsList } from "./components/buildings-list";
+import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
 
 export const metadata = {
   title: "Buildings | Cornerstone Tech",
@@ -95,8 +96,7 @@ export default async function BuildingsPage() {
     };
   });
 
-  const mapboxToken =
-    (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim() || null;
+  const mapboxToken = resolveMapboxPublicTokenFromEnv();
 
   return (
     <div className="space-y-8">

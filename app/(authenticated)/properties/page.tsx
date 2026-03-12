@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { PropertiesList } from "./components/properties-list";
+import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
 
 export const metadata = {
   title: "Properties | Cornerstone Tech",
@@ -63,8 +64,7 @@ export default async function PropertiesPage() {
     };
   });
 
-  const mapboxToken =
-    (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim() || null;
+  const mapboxToken = resolveMapboxPublicTokenFromEnv();
 
   return (
     <div className="space-y-8">

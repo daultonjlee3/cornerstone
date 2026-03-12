@@ -59,6 +59,28 @@ function parseFeature(f: MapboxFeature): AddressSuggestion | null {
 
 const MIN_QUERY_LENGTH = 3;
 
+function normalizePublicToken(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!trimmed.startsWith("pk.")) return null;
+  if (/\s/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function tokenDebugMeta(raw: string | null | undefined, normalized: string | null) {
+  const source = typeof raw === "string" ? raw : "";
+  return {
+    prefix: normalized ? `${normalized.slice(0, 10)}…` : null,
+    length: normalized?.length ?? 0,
+    startsWithPk: normalized ? normalized.startsWith("pk.") : false,
+    hasWhitespace: /\s/.test(source),
+    hasNewline: /[\r\n]/.test(source),
+    hasLeadingOrTrailingWhitespace: source.length > 0 && source !== source.trim(),
+    validPublicToken: Boolean(normalized),
+  };
+}
+
 async function fetchSuggestions(query: string, token: string): Promise<AddressSuggestion[]> {
   const q = query.trim();
   if (!q || q.length < MIN_QUERY_LENGTH) return [];
@@ -100,15 +122,14 @@ type AddressAutocompleteProps = {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-  /** When provided (e.g. from server), token is used as fallback; client prefers NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN. */
+  /** When provided from server, this is preferred over client-inlined NEXT_PUBLIC values. */
   mapboxToken?: string | null;
 };
 
-// Client-side: use only NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (inlined at build). No MAPBOX_ACCESS_TOKEN on client.
+// Client-side value can be stale if NEXT_PUBLIC_* changed without restart, so it is never treated as authoritative.
 function getClientMapboxToken(): string | null {
   if (typeof window === "undefined") return null;
-  const t = (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim();
-  return t || null;
+  return normalizePublicToken(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "");
 }
 
 export function AddressAutocomplete({
@@ -122,12 +143,14 @@ export function AddressAutocomplete({
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const envTokenRaw = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "";
   const tokenFromEnv = getClientMapboxToken();
-  const tokenFromProp = (mapboxTokenProp ?? "").trim() || null;
-  const initialToken = tokenFromEnv ?? tokenFromProp ?? null;
+  const propTokenRaw = mapboxTokenProp ?? "";
+  const tokenFromProp = normalizePublicToken(propTokenRaw);
+  const initialToken = tokenFromProp ?? tokenFromEnv ?? null;
   const [token, setToken] = useState<string | null>(() => initialToken);
   const tokenRef = useRef<string>(initialToken ?? "");
-  const tokenChecked = useRef(false);
+  const tokenDiagnosticsLogged = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -135,20 +158,35 @@ export function AddressAutocomplete({
 
   tokenRef.current = token ?? "";
 
-  // Temporary dev log: token prefix and length (never the full token)
-  const tokenLoggedRef = useRef(false);
+  // Dev-only diagnostics: compare env/prop/api tokens without logging full secret values.
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
-    const t = tokenRef.current;
-    if (!t) {
-      tokenLoggedRef.current = false;
-      return;
-    }
-    if (tokenLoggedRef.current) return;
-    tokenLoggedRef.current = true;
-    const prefix = t.length > 12 ? t.substring(0, 12) + "…" : t.substring(0, 12);
-    console.log("[AddressAutocomplete] token (dev): prefix=%s, length=%d", prefix, t.length);
-  }, [token]);
+    if (tokenDiagnosticsLogged.current) return;
+    tokenDiagnosticsLogged.current = true;
+    fetch("/api/mapbox-token", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { token: null }))
+      .then((data: { token?: string | null }) => {
+        const apiTokenRaw = typeof data?.token === "string" ? data.token : "";
+        const apiToken = normalizePublicToken(apiTokenRaw);
+        const activeToken = normalizePublicToken(tokenRef.current);
+        const envMeta = tokenDebugMeta(envTokenRaw, tokenFromEnv);
+        const propMeta = tokenDebugMeta(propTokenRaw, tokenFromProp);
+        const apiMeta = tokenDebugMeta(apiTokenRaw, apiToken);
+        const activeMeta = tokenDebugMeta(tokenRef.current, activeToken);
+        console.log("[AddressAutocomplete] token diagnostics", {
+          env: envMeta,
+          prop: propMeta,
+          api: apiMeta,
+          active: activeMeta,
+          clientEnvMatchesApi: Boolean(tokenFromEnv && apiToken && tokenFromEnv === apiToken),
+          propMatchesApi: Boolean(tokenFromProp && apiToken && tokenFromProp === apiToken),
+          activeMatchesApi: Boolean(activeToken && apiToken && activeToken === apiToken),
+        });
+      })
+      .catch((err) => {
+        console.warn("[AddressAutocomplete] token diagnostics failed:", err);
+      });
+  }, [envTokenRaw, tokenFromEnv, propTokenRaw, tokenFromProp]);
 
   // Position dropdown under the input (for portal); use viewport coords for position:fixed
   useLayoutEffect(() => {
@@ -166,34 +204,20 @@ export function AddressAutocomplete({
     });
   }, [open, suggestions.length]);
 
-  // Prefer NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (env), then server-passed prop; skip API when we have either
+  // Prefer server-passed token first. Client NEXT_PUBLIC token can be stale due inlining.
   useEffect(() => {
-    if (tokenFromEnv) {
-      setToken(tokenFromEnv);
-      tokenRef.current = tokenFromEnv;
-      tokenChecked.current = true;
-      return;
-    }
-    if (tokenFromProp) {
-      setToken(tokenFromProp);
-      tokenRef.current = tokenFromProp;
-      tokenChecked.current = true;
-      return;
-    }
+    const preferred = tokenFromProp ?? tokenFromEnv;
+    if (!preferred) return;
+    if (tokenRef.current === preferred) return;
+    setToken(preferred);
+    tokenRef.current = preferred;
   }, [tokenFromEnv, tokenFromProp]);
 
-  // Fallback: load token from API route only when we have no token; never overwrite a valid pk. token
+  // Runtime sync: when prop token is absent, API token is authoritative and can replace stale inlined values.
   useEffect(() => {
-    if (tokenChecked.current) return;
-    const current = tokenRef.current;
-    if (current && current.startsWith("pk.")) {
-      tokenChecked.current = true;
-      return;
-    }
-    tokenChecked.current = true;
-    const apiUrl =
-      (typeof window !== "undefined" ? window.location.origin : "") + "/api/mapbox-token";
-    fetch(apiUrl)
+    if (tokenFromProp) return;
+    let cancelled = false;
+    fetch("/api/mapbox-token", { cache: "no-store" })
       .then((r) => {
         if (!r.ok) {
           console.warn("[AddressAutocomplete] mapbox-token API status:", r.status, r.statusText);
@@ -202,18 +226,21 @@ export function AddressAutocomplete({
         return r.json();
       })
       .then((data: { token?: string | null }) => {
-        const value = typeof data?.token === "string" ? data.token.trim() : "";
-        const isPublicToken = value.length > 0 && value.startsWith("pk.");
-        if (!isPublicToken) return;
-        const existing = tokenRef.current;
-        if (existing && existing.startsWith("pk.")) return;
+        if (cancelled) return;
+        const value = normalizePublicToken(data?.token);
+        if (!value) return;
+        const existing = normalizePublicToken(tokenRef.current);
+        if (existing === value) return;
         setToken(value);
         tokenRef.current = value;
       })
       .catch((err) => {
         console.warn("[AddressAutocomplete] mapbox-token fetch failed:", err);
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [tokenFromProp]);
 
   const loadSuggestions = useCallback(async (q: string) => {
     const trimmed = q.trim();

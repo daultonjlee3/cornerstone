@@ -1,3 +1,5 @@
+import { resolveMapboxServerTokenFromEnv } from "@/src/lib/mapbox-token";
+
 /**
  * Server-side geocoding via Mapbox Geocoding API.
  * Used to resolve address text to coordinates on save when user didn't select a suggestion.
@@ -45,10 +47,10 @@ function parseContext(context: Array<{ id: string; text: string }> | undefined):
 
 /**
  * Forward-geocode an address string and return the first result's components and coordinates.
- * Uses NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN only (same as address autocomplete).
+ * Uses server token resolution across MAPBOX_* and NEXT_PUBLIC_MAPBOX_* vars.
  */
 export async function geocodeAddress(addressQuery: string): Promise<GeocodedAddress | null> {
-  const token = (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim();
+  const token = resolveMapboxServerTokenFromEnv();
   if (!token) return null;
 
   const query = addressQuery.trim();
