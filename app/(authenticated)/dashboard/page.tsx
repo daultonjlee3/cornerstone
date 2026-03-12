@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { loadOperationsDashboardData } from "@/src/lib/dashboard/operations";
+import { loadOperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { MetricCard } from "@/src/components/ui/metric-card";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
@@ -45,6 +46,10 @@ export default async function DashboardPage() {
     supabase,
     companyIds,
   });
+  const intelligence = await loadOperationsIntelligenceData({
+    supabase,
+    companyIds,
+  });
 
   return (
     <div className="space-y-6">
@@ -58,6 +63,9 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/reports">
+            <Button variant="secondary">Operations Reports</Button>
+          </Link>
           <Link href="/dispatch">
             <Button variant="secondary">Open Dispatch</Button>
           </Link>
@@ -74,6 +82,101 @@ export default async function DashboardPage() {
         <MetricCard title="Overdue Work Orders" value={operations.kpis.overdueWorkOrders} description="Due date has passed without completion" trend={operations.kpis.overdueWorkOrders > 0 ? { label: "Needs immediate attention", tone: "bad" } : { label: "No overdue jobs", tone: "good" }} />
         <MetricCard title="Scheduled Today" value={operations.kpis.scheduledToday} description="Jobs scheduled for today" />
         <MetricCard title="Active Technicians" value={operations.kpis.activeTechnicians} description="Technicians with active status" />
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">PM Compliance Engine</h2>
+          <p className="text-sm text-[var(--muted)]">
+            On-time, late, and missed PM execution with upcoming/overdue schedule visibility.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            title="Completed On-Time"
+            value={intelligence.pmCompliance.completedOnTime}
+            description="Completed by scheduled PM date"
+          />
+          <MetricCard
+            title="Completed Late"
+            value={intelligence.pmCompliance.completedLate}
+            description="Completed after scheduled PM date"
+          />
+          <MetricCard
+            title="Missed PM"
+            value={intelligence.pmCompliance.missed}
+            description="Past due without completion"
+          />
+          <MetricCard
+            title="Compliance %"
+            value={`${intelligence.pmCompliance.compliancePercentage.toFixed(2)}%`}
+            description="On-time / due PM runs"
+          />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming PM Tasks</CardTitle>
+              <CardDescription>Next 30 days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {intelligence.pmCompliance.upcomingTasks.length === 0 ? (
+                <p className="text-sm text-[var(--muted)]">No upcoming PM tasks.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {intelligence.pmCompliance.upcomingTasks.slice(0, 6).map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/preventive-maintenance/${row.id}`}
+                          className="truncate text-sm font-medium text-[var(--accent)] hover:underline"
+                        >
+                          {row.name}
+                        </Link>
+                        <p className="truncate text-xs text-[var(--muted)]">{row.asset_name ?? "No linked asset"}</p>
+                      </div>
+                      <span className="text-xs text-[var(--muted)]">{formatDate(row.next_run_date)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Overdue PM Tasks</CardTitle>
+              <CardDescription>Active plans that missed next run date</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {intelligence.pmCompliance.overdueTasks.length === 0 ? (
+                <p className="text-sm text-[var(--muted)]">No overdue PM tasks.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {intelligence.pmCompliance.overdueTasks.slice(0, 6).map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex items-center justify-between rounded-lg border border-red-200/70 bg-red-50/40 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/preventive-maintenance/${row.id}`}
+                          className="truncate text-sm font-medium text-[var(--accent)] hover:underline"
+                        >
+                          {row.name}
+                        </Link>
+                        <p className="truncate text-xs text-[var(--muted)]">{row.asset_name ?? "No linked asset"}</p>
+                      </div>
+                      <span className="text-xs font-medium text-red-700">{formatDate(row.next_run_date)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">

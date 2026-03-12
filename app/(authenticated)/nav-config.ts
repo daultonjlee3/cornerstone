@@ -34,6 +34,7 @@ export const navConfig: NavGroup[] = [
       { label: "Crews", href: "/crews" },
       { label: "Dispatch", href: "/dispatch" },
       { label: "Preventive Maintenance", href: "/preventive-maintenance" },
+      { label: "Reports", href: "/reports" },
     ],
   },
   {
