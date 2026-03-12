@@ -45,12 +45,11 @@ function parseContext(context: Array<{ id: string; text: string }> | undefined):
 
 /**
  * Forward-geocode an address string and return the first result's components and coordinates.
- * Uses MAPBOX_ACCESS_TOKEN or NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (server can read both).
+ * Uses NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN only (same as address autocomplete).
  */
 export async function geocodeAddress(addressQuery: string): Promise<GeocodedAddress | null> {
-  const token =
-    process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-  if (!token?.trim()) return null;
+  const token = (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim();
+  if (!token) return null;
 
   const query = addressQuery.trim();
   if (!query) return null;

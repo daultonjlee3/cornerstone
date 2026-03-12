@@ -64,7 +64,7 @@ export default async function PropertiesPage() {
   });
 
   const mapboxToken =
-    (process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim() || null;
+    (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim() || null;
 
   return (
     <div className="space-y-8">

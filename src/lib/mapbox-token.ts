@@ -6,7 +6,6 @@
  * (which can be stale with Turbopack/dev server cache).
  */
 export async function getMapboxAccessToken(): Promise<string | null> {
-  const token =
-    (process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim();
+  const token = (process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "").trim();
   return token || null;
 }
