@@ -11,6 +11,8 @@ export type DispatchTopBarProps = {
   filterState: DispatchFilterState;
   filterOptions: DispatchFilterOptions;
   insights: DispatchInsights;
+  /** When true (full-screen Combined view), use denser operational layout. */
+  opsMode?: boolean;
 };
 
 function formatDisplayDate(dateStr: string): string {
@@ -18,7 +20,7 @@ function formatDisplayDate(dateStr: string): string {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
-export function DispatchTopBar({ filterState, filterOptions, insights }: DispatchTopBarProps) {
+export function DispatchTopBar({ filterState, filterOptions, insights, opsMode = false }: DispatchTopBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [searchText, setSearchText] = useState(filterState.search);
@@ -147,7 +149,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         </div>
       </div>
       {/* Row 2: Search bar */}
-      <div className="mt-1 flex items-center gap-1.5">
+      <div className={`flex items-center gap-1.5 ${opsMode ? "mt-0.5" : "mt-1"}`}>
         <input
           type="search"
           placeholder="Search work orders by #, title…"
@@ -165,7 +167,11 @@ export function DispatchTopBar({ filterState, filterOptions, insights }: Dispatc
         </button>
       </div>
       {/* Row 3: Inline dropdown filters — compact toolbar strip */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-md border border-[var(--card-border)]/80 bg-[var(--background)]/60 px-2 py-1.5">
+      <div
+        className={`flex flex-wrap items-center rounded-md border border-[var(--card-border)]/80 bg-[var(--background)]/60 ${
+          opsMode ? "mt-0.5 gap-x-1.5 gap-y-1 px-1.5 py-1" : "mt-1 gap-x-2 gap-y-1.5 px-2 py-1.5"
+        }`}
+      >
         <select
           value={filterState.companyId}
           onChange={(e) => patchState({ companyId: e.target.value })}

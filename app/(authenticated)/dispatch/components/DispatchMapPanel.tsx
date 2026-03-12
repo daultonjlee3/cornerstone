@@ -63,6 +63,7 @@ function workOrderPinIcon(
   selected: boolean,
   hovered: boolean
 ) {
+  const label = shortWorkOrderLabel(workOrder).replace(/^WO-?/i, "").slice(0, 8) || "WO";
   const stateClass = selected
     ? "dispatch-map-pin-selected"
     : hovered
@@ -70,9 +71,9 @@ function workOrderPinIcon(
       : "";
   return divIcon({
     className: "dispatch-map-pin-shell",
-    html: `<span class="dispatch-map-pin ${priorityClass(workOrder.priority)} ${stateClass}">WO</span>`,
-    iconSize: selected ? [32, 32] : [26, 26],
-    iconAnchor: selected ? [16, 16] : [13, 13],
+    html: `<span class="dispatch-map-pin ${priorityClass(workOrder.priority)} ${stateClass}">${label}</span>`,
+    iconSize: selected ? [36, 36] : [30, 30],
+    iconAnchor: selected ? [18, 18] : [15, 15],
   });
 }
 
@@ -128,6 +129,35 @@ export function DispatchMapPanel({
     useEffect(() => {
       setZoomLevel(map.getZoom());
     }, [map]);
+    return null;
+  }
+
+  /** After mount, tell Leaflet to re-measure the container (fixes blank map in combined view / dynamic layout). */
+  function MapResizeOnMount() {
+    const map = useMap();
+    useEffect(() => {
+      const t = setTimeout(() => {
+        map.invalidateSize();
+      }, 100);
+      return () => clearTimeout(t);
+    }, [map]);
+    return null;
+  }
+
+  /** Pan map to selected work order when selection changes from list or map. */
+  function PanToSelectedWorkOrder() {
+    const map = useMap();
+    const selected = selectedWorkOrderId
+      ? workOrderCoordinates.find((wo) => wo.id === selectedWorkOrderId)
+      : null;
+    useEffect(() => {
+      if (!selected?.latitude || !selected?.longitude) return;
+      map.setView(
+        [selected.latitude as number, selected.longitude as number],
+        Math.max(map.getZoom(), 14),
+        { animate: true, duration: 0.35 }
+      );
+    }, [selected?.id, map]);
     return null;
   }
 
@@ -284,7 +314,7 @@ export function DispatchMapPanel({
           ))}
         </select>
       </div>
-      <div className="min-h-[350px] flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50">
+      <div className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50" style={{ minHeight: 350 }}>
         {!mapMounted ? (
           <div className="flex h-full min-h-[350px] items-center justify-center text-[11px] text-[var(--muted)]">
             Loading map…
@@ -299,6 +329,8 @@ export function DispatchMapPanel({
           className="h-full w-full"
         >
           <MapZoomWatcher />
+          <MapResizeOnMount />
+          <PanToSelectedWorkOrder />
           <FitBoundsToDispatchPoints points={fitBoundsPoints} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -497,19 +529,26 @@ export function DispatchMapPanel({
         </div>
 
         {selectedRoute ? (
-          <div className="max-h-24 space-y-0.5 overflow-auto">
+          <div className="max-h-32 space-y-1 overflow-auto">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-              Route ({selectedRoute.technicianName})
+              Technician Route
             </p>
-            {selectedRoute.segments.length === 0 ? (
+            {selectedRoute.orderedJobs.length === 0 ? (
               <p className="text-xs text-[var(--muted)]">No geo-located assignments for this technician.</p>
             ) : (
-              selectedRoute.segments.map((segment) => (
-                <p key={`${segment.toWorkOrderId}-${segment.fromLabel}`} className="text-xs text-[var(--foreground)]">
-                  {segment.fromLabel} → {segment.toWorkOrderNumber}: {segment.travelMinutes} min ·{" "}
-                  {segment.distanceMiles.toFixed(1)} mi
-                </p>
-              ))
+              <ul className="space-y-0.5">
+                {selectedRoute.orderedJobs.map((wo) => {
+                  const timeStr = wo.scheduled_start
+                    ? new Date(wo.scheduled_start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
+                    : "—";
+                  const title = wo.title ?? wo.work_order_number ?? "Work order";
+                  return (
+                    <li key={wo.id} className="text-xs text-[var(--foreground)]">
+                      {timeStr} – {title}
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         ) : null}

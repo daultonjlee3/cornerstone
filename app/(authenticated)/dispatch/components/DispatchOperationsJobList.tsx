@@ -1,10 +1,15 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import type { DispatchWorkOrder } from "../types";
+
+export type WorkOrderTravelInfo = {
+  distanceMiles: number;
+  travelMinutes: number;
+};
 
 type DispatchOperationsJobListProps = {
   workOrders: DispatchWorkOrder[];
@@ -13,6 +18,8 @@ type DispatchOperationsJobListProps = {
   onSelectWorkOrder: (workOrderId: string) => void;
   onHoverWorkOrder: (workOrderId: string | null) => void;
   onOpenWorkOrder: (workOrderId: string) => void;
+  /** Optional travel from reference point (e.g. selected technician) to each work order. */
+  travelByWorkOrderId?: Map<string, WorkOrderTravelInfo> | null;
 };
 
 function formatWindow(workOrder: DispatchWorkOrder): string {
@@ -39,6 +46,7 @@ const DispatchOperationsJobRow = memo(function DispatchOperationsJobRow({
   workOrder,
   selected,
   hovered,
+  travelInfo,
   onSelectWorkOrder,
   onHoverWorkOrder,
   onOpenWorkOrder,
@@ -46,6 +54,7 @@ const DispatchOperationsJobRow = memo(function DispatchOperationsJobRow({
   workOrder: DispatchWorkOrder;
   selected: boolean;
   hovered: boolean;
+  travelInfo?: WorkOrderTravelInfo | null;
   onSelectWorkOrder: (workOrderId: string) => void;
   onHoverWorkOrder: (workOrderId: string | null) => void;
   onOpenWorkOrder: (workOrderId: string) => void;
@@ -61,9 +70,9 @@ const DispatchOperationsJobRow = memo(function DispatchOperationsJobRow({
       data-dispatch-work-order-row-id={workOrder.id}
       {...attributes}
       {...listeners}
-      className={`rounded-lg border bg-[var(--card)] p-2 shadow-[var(--shadow-soft)] transition ${
+      className={`rounded-lg border bg-[var(--card)] p-2.5 shadow-[var(--shadow-soft)] transition ${
         selected
-          ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/25"
+          ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40 bg-[var(--accent)]/5"
           : hovered
             ? "border-blue-300 bg-blue-50/40"
             : "border-[var(--card-border)] hover:border-[var(--accent)]/45"
@@ -91,6 +100,12 @@ const DispatchOperationsJobRow = memo(function DispatchOperationsJobRow({
             {workOrder.title ?? "Untitled work order"}
           </p>
           <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">{formatProperty(workOrder)}</p>
+          {travelInfo && (
+            <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--muted-strong)]">
+              <span>📍 {travelInfo.distanceMiles.toFixed(1)} mi</span>
+              <span>🚗 {travelInfo.travelMinutes} min</span>
+            </p>
+          )}
         </button>
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -124,14 +139,27 @@ export function DispatchOperationsJobList({
   onSelectWorkOrder,
   onHoverWorkOrder,
   onOpenWorkOrder,
+  travelByWorkOrderId,
 }: DispatchOperationsJobListProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedWorkOrderId || !listRef.current) return;
+    const row = listRef.current.querySelector(
+      `[data-dispatch-work-order-row-id="${selectedWorkOrderId}"]`
+    ) as HTMLElement | null;
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [selectedWorkOrderId]);
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
       <div className="flex items-center justify-between border-b border-[var(--card-border)] px-3 py-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Work order list</p>
         <span className="text-[11px] text-[var(--muted)]">{workOrders.length} jobs</span>
       </div>
-      <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
+      <div ref={listRef} className="flex-1 space-y-1.5 overflow-y-auto p-2">
         {workOrders.length === 0 ? (
           <p className="rounded border border-dashed border-[var(--card-border)] bg-[var(--background)]/60 p-3 text-center text-xs text-[var(--muted)]">
             No jobs for current filters.
@@ -143,6 +171,7 @@ export function DispatchOperationsJobList({
               workOrder={workOrder}
               selected={selectedWorkOrderId === workOrder.id}
               hovered={hoveredWorkOrderId === workOrder.id}
+              travelInfo={travelByWorkOrderId?.get(workOrder.id)}
               onSelectWorkOrder={onSelectWorkOrder}
               onHoverWorkOrder={onHoverWorkOrder}
               onOpenWorkOrder={onOpenWorkOrder}

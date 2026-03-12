@@ -8,6 +8,8 @@ import { DispatchCard } from "./DispatchCard";
 export type DispatchWorkOrderCardProps = {
   workOrder: DispatchWorkOrder;
   variant?: "block" | "compact";
+  /** When "queue", uses more padding and stronger work order ID hierarchy for queue drag-and-drop. */
+  size?: "default" | "queue";
   showScheduledTime?: boolean;
   showCrew?: boolean;
   isDragging?: boolean;
@@ -114,6 +116,7 @@ function isOverdue(wo: DispatchWorkOrder): boolean {
 export function DispatchWorkOrderCard({
   workOrder,
   variant = "block",
+  size = "default",
   showScheduledTime = false,
   showCrew = true,
   isDragging = false,
@@ -168,22 +171,26 @@ export function DispatchWorkOrderCard({
     );
   }
 
+  const isQueueSize = size === "queue";
   return (
     <DispatchCard
       priority={priority}
       isOverdue={overdue}
-        isSlaBreached={slaBreached}
+      isSlaBreached={slaBreached}
       isDragging={isDragging}
+      contentClassName={isQueueSize ? "p-3" : undefined}
       className={`h-full cursor-grab active:cursor-grabbing ${
         isHighlighted ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : ""
-      }`}
+      } ${isQueueSize ? "min-h-[4.5rem]" : ""}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+      <p className={`truncate font-semibold uppercase tracking-wide ${
+        isQueueSize ? "text-xs text-[var(--foreground)]" : "text-[11px] text-[var(--muted)]"
+      }`}>
         {workOrder.work_order_number ?? "Work order"}
       </p>
-      <p className="truncate text-sm font-semibold leading-tight text-[var(--foreground)]">{title}</p>
+      <p className={`truncate font-semibold leading-tight text-[var(--foreground)] ${isQueueSize ? "text-sm mt-0.5" : "text-sm"}`}>{title}</p>
 
       {(workOrder.asset_name || location) && (
         <p className="mt-0.5 truncate text-[11px] text-[var(--muted-strong)]" title={location ?? undefined}>

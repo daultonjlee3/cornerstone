@@ -24,6 +24,10 @@ export type BoardLane = {
   job_count?: number;
   /** When set, shown in header as "Xh remaining" and passed to ScheduleLane. */
   remainingHours?: number;
+  /** Total capacity hours for capacity bar (e.g. dailyCapacityHours). When set, lane shows X / Y hrs and bar. */
+  capacityHours?: number;
+  /** When set, shown in lane header as "Next opening: 9:30 AM". */
+  nextOpeningFormatted?: string | null;
 };
 
 /** Work order shape used by the board and getWorkOrderPosition. */
@@ -67,6 +71,8 @@ export type DispatchBoardProps = {
   selectedWorkOrderId?: string | null;
   hoveredWorkOrderId?: string | null;
   onHoverWorkOrder?: (workOrderId: string | null) => void;
+  /** When set, the matching technician lane (tech-{id}) is visually highlighted. */
+  selectedTechnicianId?: string | null;
 };
 
 function addDays(dateStr: string, delta: number): string {
@@ -274,6 +280,7 @@ export function DispatchBoard({
   selectedWorkOrderId = null,
   hoveredWorkOrderId = null,
   onHoverWorkOrder,
+  selectedTechnicianId = null,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
   const dayScrollRef = useRef<HTMLDivElement | null>(null);
@@ -415,6 +422,7 @@ export function DispatchBoard({
         {lanes.map((lane) => {
           const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Unassigned" : lane.id.slice(0, 8));
           const hasRemaining = lane.remainingHours !== undefined;
+          const cap = lane.capacityHours ?? 0;
           return (
             <div
               key={lane.id}
@@ -424,8 +432,9 @@ export function DispatchBoard({
                 {displayName}
               </p>
               <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-                {(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled
-                {hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h left` : ` · ${lane.job_count ?? 0} jobs`}
+                {cap > 0
+                  ? `${(lane.total_scheduled_hours ?? 0).toFixed(1)} / ${cap.toFixed(0)} hrs`
+                  : `${(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled${hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h left` : ` · ${lane.job_count ?? 0} jobs`}`}
               </p>
             </div>
           );
@@ -474,6 +483,9 @@ export function DispatchBoard({
               totalScheduledHours={lane.total_scheduled_hours ?? 0}
               jobCount={lane.job_count ?? 0}
               remainingHours={lane.remainingHours}
+              capacityHours={lane.capacityHours}
+              nextOpeningFormatted={lane.nextOpeningFormatted}
+              isSelected={selectedTechnicianId != null && lane.id === `tech-${selectedTechnicianId}`}
               overDropId={overDropId}
               isDraggingWorkOrder={isDraggingWorkOrder}
               timeLabels={timeLabels}

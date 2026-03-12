@@ -33,7 +33,10 @@ import { WorkOrderAssignmentModal } from "@/app/(authenticated)/work-orders/comp
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import { RebalanceSuggestionsModal } from "./RebalanceSuggestionsModal";
 import { computeRebalanceSuggestions } from "../rebalance-utils";
-import { buildTechnicianRoute } from "../dispatch-map-utils";
+import { buildTechnicianRoute, haversineMiles, estimateTravelMinutes, hasCoordinate } from "../dispatch-map-utils";
+import { SuggestedTechniciansPanel } from "./SuggestedTechniciansPanel";
+import { DispatchSpeedActions } from "./DispatchSpeedActions";
+import type { WorkOrderTravelInfo } from "./DispatchOperationsJobList";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
 
@@ -120,6 +123,9 @@ export function DispatchView({
   const [drawerWorkOrderId, setDrawerWorkOrderId] = useState<string | null>(null);
   const [mapAssigning, setMapAssigning] = useState(false);
   const [dispatchBoardMode, setDispatchBoardMode] = useState<"technicians" | "crews">("technicians");
+  const [hideFullyScheduledTechnicians, setHideFullyScheduledTechnicians] = useState(false);
+  const [showOnlyAvailableTechnicians, setShowOnlyAvailableTechnicians] = useState(false);
+  const [sortTechniciansByDistance, setSortTechniciansByDistance] = useState(false);
   const [technicianPage, setTechnicianPage] = useState(0);
   const TECHNICIAN_PAGE_SIZE = 8;
   const [optimisticWorkOrders, setOptimisticWorkOrders] = useState<DispatchWorkOrder[]>(
@@ -337,13 +343,26 @@ export function DispatchView({
           total_scheduled_hours: Math.round(unassignedHours * 10) / 10,
           job_count: unassignedTech.length,
         },
-        ...pageTechnicians.map((t) => ({
-          id: `tech-${t.id}`,
-          name: t.name,
-          total_scheduled_hours: Math.round((t.workloadHoursToday ?? 0) * 10) / 10,
-          job_count: t.scheduledToday ?? 0,
-          remainingHours: t.availableCapacityHours ?? Math.max(0, (t.dailyCapacityHours ?? 8) - (t.workloadHoursToday ?? 0)),
-        })),
+        ...pageTechnicians.map((t) => {
+          const techJobs = scheduledTodayForDate.filter((wo) => wo.assigned_technician_id === t.id);
+          const sortedEnds = techJobs
+            .map((wo) => wo.scheduled_end)
+            .filter(Boolean) as string[];
+          sortedEnds.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+          const lastEnd = sortedEnds[0];
+          const nextOpeningFormatted = lastEnd
+            ? new Date(lastEnd).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
+            : "8:00 AM";
+          return {
+            id: `tech-${t.id}`,
+            name: t.name,
+            total_scheduled_hours: Math.round((t.workloadHoursToday ?? 0) * 10) / 10,
+            job_count: t.scheduledToday ?? 0,
+            remainingHours: t.availableCapacityHours ?? Math.max(0, (t.dailyCapacityHours ?? 8) - (t.workloadHoursToday ?? 0)),
+            capacityHours: t.dailyCapacityHours ?? 8,
+            nextOpeningFormatted: techJobs.length > 0 ? nextOpeningFormatted : "8:00 AM",
+          };
+        }),
       ];
       const workOrdersByLane = new Map<string, typeof optimisticWorkOrders>();
       lanes.forEach((l) => workOrdersByLane.set(l.id, []));
@@ -368,13 +387,15 @@ export function DispatchView({
       },
       ...boardCrews.map((crew) => {
         const workload = crewWorkloadById.get(crew.id);
-        const remaining = workload?.availableCapacityHours ?? Math.max(0, (workload?.dailyCapacityHours ?? 8) - (crew.total_scheduled_hours ?? 0));
+        const cap = workload?.dailyCapacityHours ?? 8;
+        const remaining = workload?.availableCapacityHours ?? Math.max(0, cap - (crew.total_scheduled_hours ?? 0));
         return {
           id: crew.id,
           name: crew.name ?? undefined,
           total_scheduled_hours: crew.total_scheduled_hours ?? 0,
           job_count: crew.job_count ?? 0,
           remainingHours: remaining,
+          capacityHours: cap,
         };
       }),
     ];
@@ -394,6 +415,34 @@ export function DispatchView({
     optimisticWorkOrders,
     initialData.workforce,
     boardCrews,
+    sortTechniciansByDistance,
+    selectedMapWorkOrderId,
+  ]);
+
+  const { filteredLanes, filteredWorkOrdersByLane } = useMemo(() => {
+    const unassignedId = "__unassigned__";
+    const shouldFilter =
+      dispatchBoardMode === "technicians" &&
+      (hideFullyScheduledTechnicians || showOnlyAvailableTechnicians);
+    if (!shouldFilter)
+      return { filteredLanes: boardLanes, filteredWorkOrdersByLane: boardWorkOrdersByLane };
+    const kept = boardLanes.filter(
+      (l) =>
+        l.id === unassignedId || (l.remainingHours ?? 0) > 0
+    );
+    const keptIds = new Set(kept.map((l) => l.id));
+    const filteredMap = new Map<string, typeof optimisticWorkOrders>();
+    keptIds.forEach((id) => {
+      const list = boardWorkOrdersByLane.get(id);
+      if (list) filteredMap.set(id, list);
+    });
+    return { filteredLanes: kept, filteredWorkOrdersByLane: filteredMap };
+  }, [
+    boardLanes,
+    boardWorkOrdersByLane,
+    dispatchBoardMode,
+    hideFullyScheduledTechnicians,
+    showOnlyAvailableTechnicians,
   ]);
 
   const hasNoResults =
@@ -439,6 +488,32 @@ export function DispatchView({
       return (a.work_order_number ?? "").localeCompare(b.work_order_number ?? "");
     });
   }, [filterState.selectedDate, optimisticWorkOrders]);
+
+  const operationsListTravelByWorkOrderId = useMemo((): Map<string, WorkOrderTravelInfo> | null => {
+    const list = operationsListWorkOrders;
+    const technicians = initialData.workforce.technicians.filter((t) => hasCoordinate(t.latitude, t.longitude));
+    if (technicians.length === 0) return null;
+    const map = new Map<string, WorkOrderTravelInfo>();
+    list.forEach((wo) => {
+      if (!hasCoordinate(wo.latitude, wo.longitude)) return;
+      const point = { latitude: wo.latitude as number, longitude: wo.longitude as number };
+      if (selectedMapTechnician && hasCoordinate(selectedMapTechnician.latitude, selectedMapTechnician.longitude)) {
+        const ref = { latitude: selectedMapTechnician.latitude as number, longitude: selectedMapTechnician.longitude as number };
+        const distanceMiles = haversineMiles(ref, point);
+        map.set(wo.id, { distanceMiles, travelMinutes: estimateTravelMinutes(distanceMiles) });
+      } else {
+        let bestMiles = Infinity;
+        technicians.forEach((t) => {
+          const ref = { latitude: t.latitude as number, longitude: t.longitude as number };
+          const d = haversineMiles(ref, point);
+          if (d < bestMiles) bestMiles = d;
+        });
+        if (Number.isFinite(bestMiles))
+          map.set(wo.id, { distanceMiles: bestMiles, travelMinutes: estimateTravelMinutes(bestMiles) });
+      }
+    });
+    return map;
+  }, [operationsListWorkOrders, selectedMapTechnician, initialData.workforce.technicians]);
 
   const drawerWorkOrder = useMemo(
     () => optimisticWorkOrders.find((workOrder) => workOrder.id === drawerWorkOrderId) ?? null,
@@ -935,69 +1010,98 @@ export function DispatchView({
     router,
   ]);
 
+  const opsMode = isFullScreen && filterState.viewMode === "combined";
+
   return (
-    <div className={`flex h-full min-h-0 flex-col ${isFullScreen ? "gap-2" : "gap-4"}`}>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Dispatch Operations Board
-          </h1>
-          {!isFullScreen ? (
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Assign to technicians or crews, schedule by day/week/month, and balance workload.
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Full screen command center mode enabled.
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {!isFullScreen ? (
-            <>
-              <Link href="/work-orders">
-                <Button variant="secondary">Open Work Orders</Button>
-              </Link>
-              <Link href="/technicians/work-queue">
-                <Button>Technician Queue</Button>
-              </Link>
-            </>
-          ) : null}
-          <Button variant={isFullScreen ? "secondary" : "primary"} onClick={() => setFullScreen(!isFullScreen)}>
-            {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        opsMode ? "gap-0" : isFullScreen ? "gap-2" : "gap-4"
+      }`}
+    >
+      {opsMode ? (
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--card-border)] bg-[var(--card)] px-2 py-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Dispatch · Ops
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 shrink-0 px-2 text-xs"
+            onClick={() => setFullScreen(false)}
+          >
+            Exit Full Screen
           </Button>
-        </div>
-      </header>
+        </header>
+      ) : (
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
+              Dispatch Operations Board
+            </h1>
+            {!isFullScreen ? (
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Assign to technicians or crews, schedule by day/week/month, and balance workload.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Full screen command center mode enabled.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!isFullScreen ? (
+              <>
+                <Link href="/work-orders">
+                  <Button variant="secondary">Open Work Orders</Button>
+                </Link>
+                <Link href="/technicians/work-queue">
+                  <Button>Technician Queue</Button>
+                </Link>
+              </>
+            ) : null}
+            <Button variant={isFullScreen ? "secondary" : "primary"} onClick={() => setFullScreen(!isFullScreen)}>
+              {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
+            </Button>
+          </div>
+        </header>
+      )}
 
-      <section className="grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Dispatch insights">
-        <MetricCard
-          title="Open Work Orders"
-          value={dispatchData.insights.total}
-          description="Active jobs in selected scope"
-        />
-        <MetricCard
-          title="Due Today"
-          value={dispatchData.insights.dueToday}
-          description="Jobs with due date today"
-        />
-        <MetricCard
-          title="In Progress"
-          value={dispatchData.insights.inProgressToday}
-          description="Currently in execution"
-        />
-        <MetricCard
-          title="Unassigned"
-          value={dispatchData.insights.unassignedWorkOrders}
-          description="Needs technician or crew assignment"
-          className="border-amber-200/80 bg-amber-50/35"
-        />
-      </section>
+      {!opsMode && (
+        <section className="grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Dispatch insights">
+          <MetricCard
+            title="Open Work Orders"
+            value={dispatchData.insights.total}
+            description="Active jobs in selected scope"
+          />
+          <MetricCard
+            title="Due Today"
+            value={dispatchData.insights.dueToday}
+            description="Jobs with due date today"
+          />
+          <MetricCard
+            title="In Progress"
+            value={dispatchData.insights.inProgressToday}
+            description="Currently in execution"
+          />
+          <MetricCard
+            title="Unassigned"
+            value={dispatchData.insights.unassignedWorkOrders}
+            description="Needs technician or crew assignment"
+            className="border-amber-200/80 bg-amber-50/35"
+          />
+        </section>
+      )}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
+      <div
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-[var(--card-border)] bg-[var(--card)] ${
+          opsMode ? "rounded-lg" : "rounded-xl"
+        }`}
+      >
         <DispatchTopBar
           filterState={filterState}
           filterOptions={filterOptions}
           insights={dispatchData.insights}
+          opsMode={opsMode}
         />
 
         {error && (
@@ -1065,7 +1169,7 @@ export function DispatchView({
             >
               <div className="flex min-h-0 flex-1 flex-col">
                 <section className="grid shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)]">
-                  <div className="min-h-[320px]">
+                  <div className="flex h-[480px] min-h-[320px] shrink-0 flex-col">
                     <DispatchMapPanel
                       workOrders={optimisticWorkOrders}
                       workforce={workforce}
@@ -1084,14 +1188,39 @@ export function DispatchView({
                       onPatchFilters={patchFilterState}
                     />
                   </div>
-                  <div className="min-h-[320px]">
-                    <DispatchOperationsJobList
-                      workOrders={operationsListWorkOrders}
-                      selectedWorkOrderId={selectedMapWorkOrderId}
-                      hoveredWorkOrderId={hoveredWorkOrderId}
-                      onSelectWorkOrder={handleSelectFromOperationsList}
-                      onHoverWorkOrder={setHoveredWorkOrderId}
-                      onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                  <div className="flex min-h-[320px] min-h-0 flex-1 flex-col gap-2">
+                    <DispatchSpeedActions
+                      selectedWorkOrder={
+                        selectedMapWorkOrderId
+                          ? optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
+                          : null
+                      }
+                      technicians={initialData.workforce.technicians}
+                      onAssign={(workOrderId, technicianId) => void handleAssignFromMap(workOrderId, technicianId)}
+                      assigning={mapAssigning}
+                    />
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <DispatchOperationsJobList
+                        workOrders={operationsListWorkOrders}
+                        selectedWorkOrderId={selectedMapWorkOrderId}
+                        hoveredWorkOrderId={hoveredWorkOrderId}
+                        onSelectWorkOrder={handleSelectFromOperationsList}
+                        onHoverWorkOrder={setHoveredWorkOrderId}
+                        onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                        travelByWorkOrderId={operationsListTravelByWorkOrderId}
+                      />
+                    </div>
+                    <SuggestedTechniciansPanel
+                      selectedWorkOrder={
+                        selectedMapWorkOrderId
+                          ? optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
+                          : null
+                      }
+                      technicians={initialData.workforce.technicians}
+                      workOrders={optimisticWorkOrders}
+                      selectedDate={filterState.selectedDate}
+                      onAssign={(workOrderId, technicianId) => void handleAssignFromMap(workOrderId, technicianId)}
+                      assigning={mapAssigning}
                     />
                   </div>
                 </section>
@@ -1186,6 +1315,37 @@ export function DispatchView({
                               </button>
                             </div>
                           )}
+                          {dispatchBoardMode === "technicians" && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                                <input
+                                  type="checkbox"
+                                  checked={hideFullyScheduledTechnicians}
+                                  onChange={(e) => setHideFullyScheduledTechnicians(e.target.checked)}
+                                  className="rounded border-[var(--card-border)]"
+                                />
+                                Hide fully scheduled
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                                <input
+                                  type="checkbox"
+                                  checked={showOnlyAvailableTechnicians}
+                                  onChange={(e) => setShowOnlyAvailableTechnicians(e.target.checked)}
+                                  className="rounded border-[var(--card-border)]"
+                                />
+                                Show only available
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                                <input
+                                  type="checkbox"
+                                  checked={sortTechniciansByDistance}
+                                  onChange={(e) => setSortTechniciansByDistance(e.target.checked)}
+                                  className="rounded border-[var(--card-border)]"
+                                />
+                                Sort by distance
+                              </label>
+                            </div>
+                          )}
                         </div>
                         {dispatchBoardMode === "technicians" &&
                         initialData.workforce.technicians.length === 0 ? (
@@ -1197,8 +1357,8 @@ export function DispatchView({
                         ) : (
                           <div className="min-h-0 flex-1">
                             <DispatchBoard
-                              lanes={boardLanes}
-                              workOrdersByLane={boardWorkOrdersByLane}
+                              lanes={filteredLanes}
+                              workOrdersByLane={filteredWorkOrdersByLane}
                               selectedDate={filterState.selectedDate}
                               overDropId={overDropId}
                               isDraggingWorkOrder={Boolean(activeWo)}
@@ -1208,6 +1368,7 @@ export function DispatchView({
                               selectedWorkOrderId={selectedMapWorkOrderId}
                               hoveredWorkOrderId={hoveredWorkOrderId}
                               onHoverWorkOrder={setHoveredWorkOrderId}
+                              selectedTechnicianId={selectedMapTechnicianId}
                               onSelectDate={handleSelectDate}
                               onResizeEnd={handleResizeEnd}
                               onOpenWorkOrder={handleOpenWorkOrder}
@@ -1350,8 +1511,8 @@ export function DispatchView({
                   ) : (
                     <div className="min-h-0 flex-1">
                       <DispatchBoard
-                        lanes={boardLanes}
-                        workOrdersByLane={boardWorkOrdersByLane}
+                        lanes={filteredLanes}
+                        workOrdersByLane={filteredWorkOrdersByLane}
                         selectedDate={filterState.selectedDate}
                         overDropId={overDropId}
                         isDraggingWorkOrder={Boolean(activeWo)}
@@ -1361,6 +1522,7 @@ export function DispatchView({
                         selectedWorkOrderId={selectedMapWorkOrderId}
                         hoveredWorkOrderId={hoveredWorkOrderId}
                         onHoverWorkOrder={setHoveredWorkOrderId}
+                        selectedTechnicianId={selectedMapTechnicianId}
                         onSelectDate={handleSelectDate}
                         onResizeEnd={handleResizeEnd}
                         onOpenWorkOrder={handleOpenWorkOrder}
