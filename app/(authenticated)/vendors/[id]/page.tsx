@@ -19,7 +19,7 @@ export default async function VendorDetailPage({
 
   const { data: vendorRow } = await scope.supabase
     .from("vendors")
-    .select("id, company_id, name, contact_name, email, phone, address, website, notes, preferred_vendor, created_at, updated_at, companies(name)")
+    .select("id, company_id, name, service_type, contact_name, email, phone, address, website, notes, preferred_vendor, created_at, updated_at, companies(name)")
     .eq("id", id)
     .maybeSingle();
   if (!vendorRow) notFound();
@@ -27,7 +27,7 @@ export default async function VendorDetailPage({
   const vendorCompanyId = (vendorRow as { company_id?: string | null }).company_id ?? null;
   if (!vendorCompanyId || !scope.companyIds.includes(vendorCompanyId)) notFound();
 
-  const [productsResult, purchaseOrdersResult] = await Promise.all([
+  const [productsResult, purchaseOrdersResult, vendorWorkOrdersResult] = await Promise.all([
     scope.supabase
       .from("products")
       .select("id, name, sku, active")
@@ -40,7 +40,49 @@ export default async function VendorDetailPage({
       .eq("vendor_id", id)
       .order("created_at", { ascending: false })
       .limit(10),
+    scope.supabase
+      .from("work_orders")
+      .select("status, response_time_minutes, vendor_cost")
+      .eq("vendor_id", id),
   ]);
+
+  const vendorMetrics = (vendorWorkOrdersResult.data ?? []).reduce(
+    (acc, row) => {
+      const record = row as {
+        status?: string | null;
+        response_time_minutes?: number | null;
+        vendor_cost?: number | null;
+      };
+      if (record.status === "completed") {
+        acc.jobsCompleted += 1;
+        if (typeof record.response_time_minutes === "number" && Number.isFinite(record.response_time_minutes)) {
+          acc.responseMinutes += Math.max(0, record.response_time_minutes);
+          acc.responseCount += 1;
+        }
+        if (typeof record.vendor_cost === "number" && Number.isFinite(record.vendor_cost)) {
+          acc.totalVendorCost += Math.max(0, record.vendor_cost);
+        }
+      }
+      return acc;
+    },
+    {
+      jobsCompleted: 0,
+      responseMinutes: 0,
+      responseCount: 0,
+      totalVendorCost: 0,
+    }
+  );
+  const averageResponseMinutes =
+    vendorMetrics.responseCount > 0
+      ? Math.round(vendorMetrics.responseMinutes / vendorMetrics.responseCount)
+      : null;
+  const formatMinutes = (minutes: number | null) => {
+    if (minutes == null) return "—";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours <= 0) return `${mins}m`;
+    return `${hours}h ${String(mins).padStart(2, "0")}m`;
+  };
 
   const companyObj = Array.isArray((vendorRow as Record<string, unknown>).companies)
     ? ((vendorRow as Record<string, unknown>).companies as unknown[])[0]
@@ -81,6 +123,12 @@ export default async function VendorDetailPage({
                 <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Contact</p>
                 <p className="mt-1 text-[var(--foreground)]">
                   {(vendorRow as { contact_name?: string | null }).contact_name ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Service type</p>
+                <p className="mt-1 text-[var(--foreground)]">
+                  {(vendorRow as { service_type?: string | null }).service_type ?? "—"}
                 </p>
               </div>
               <div>
@@ -130,6 +178,24 @@ export default async function VendorDetailPage({
               <p className="text-xs text-[var(--muted)]">Products linked</p>
               <p className="text-lg font-semibold text-[var(--foreground)]">
                 {productsResult.data?.length ?? 0}
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--card-border)] px-3 py-2">
+              <p className="text-xs text-[var(--muted)]">Jobs completed</p>
+              <p className="text-lg font-semibold text-[var(--foreground)]">
+                {vendorMetrics.jobsCompleted}
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--card-border)] px-3 py-2">
+              <p className="text-xs text-[var(--muted)]">Avg response time</p>
+              <p className="text-lg font-semibold text-[var(--foreground)]">
+                {formatMinutes(averageResponseMinutes)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--card-border)] px-3 py-2">
+              <p className="text-xs text-[var(--muted)]">Total vendor cost</p>
+              <p className="text-lg font-semibold text-[var(--foreground)]">
+                ${vendorMetrics.totalVendorCost.toFixed(2)}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--card-border)] px-3 py-2">

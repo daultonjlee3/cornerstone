@@ -30,6 +30,7 @@ export type DispatchFilterOptions = {
   }[];
   crews: { id: string; name: string; company_id?: string | null }[];
   technicians: { id: string; name: string }[];
+  vendors: { id: string; name: string; company_id: string; service_type?: string | null }[];
   assets: { id: string; name: string; company_id?: string | null }[];
   assignmentTypes: { value: string; label: string }[];
   priorities: { value: string; label: string }[];
@@ -106,6 +107,7 @@ const ASSIGNMENT_TYPE_OPTIONS = [
   { value: "unassigned", label: "Unassigned" },
   { value: "technician", label: "Technician" },
   { value: "crew", label: "Crew" },
+  { value: "vendor", label: "Vendor" },
 ];
 
 type LoadDispatchParams = {
@@ -175,6 +177,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
         buildings: [],
         crews: [],
         technicians: [],
+        vendors: [],
         assets: [],
         assignmentTypes: ASSIGNMENT_TYPE_OPTIONS,
         priorities: PRIORITY_OPTIONS,
@@ -204,6 +207,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     { data: buildings },
     { data: crewsData },
     { data: techniciansData },
+    { data: vendorsData },
     { data: assetsData },
     { data: slaPoliciesData },
   ] = await Promise.all([
@@ -229,6 +233,11 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       .select("id, technician_name, name, status, company_id, current_latitude, current_longitude, last_location_at")
       .in("company_id", companyIds)
       .order("technician_name")
+      .order("name"),
+    supabase
+      .from("vendors")
+      .select("id, name, company_id, service_type")
+      .in("company_id", companyIds)
       .order("name"),
     supabase
       .from("assets")
@@ -289,6 +298,12 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   const technicianList = allTechnicians
     .filter((t) => t.status === "active")
     .map((t) => ({ id: t.id, name: t.name }));
+  const vendorList = (vendorsData ?? []).map((vendor) => ({
+    id: (vendor as { id: string }).id,
+    name: (vendor as { name?: string | null }).name ?? "Vendor",
+    company_id: (vendor as { company_id: string }).company_id,
+    service_type: (vendor as { service_type?: string | null }).service_type ?? null,
+  }));
   const assetList = (assetsData ?? []).map((a) => ({
     id: (a as { id: string }).id,
     name:
@@ -332,7 +347,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       id, title, status, priority, category, latitude, longitude,
       created_at, first_response_at, completed_at, response_time_minutes, resolution_time_minutes,
       scheduled_date, scheduled_start, scheduled_end, due_date,
-      assigned_crew_id, assigned_technician_id, estimated_hours,
+      assigned_crew_id, assigned_technician_id, vendor_id, estimated_hours,
       company_id, property_id, building_id, unit_id,
       work_order_number, asset_id,
       source_type, preventive_maintenance_plan_id,
@@ -340,7 +355,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       properties(property_name, name, latitude, longitude),
       buildings(building_name, name, latitude, longitude),
       units(unit_name, name_or_number, latitude, longitude),
-      assets!work_orders_asset_id_fkey(asset_name, name, latitude, longitude)
+      assets!work_orders_asset_id_fkey(asset_name, name, latitude, longitude),
+      vendors(name)
     `
     )
     .in("company_id", companyIds)
@@ -367,11 +383,16 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   if (crew_id) query = query.eq("assigned_crew_id", crew_id);
   if (technician_id) query = query.eq("assigned_technician_id", technician_id);
   if (params.assignment_type === "unassigned") {
-    query = query.is("assigned_technician_id", null).is("assigned_crew_id", null);
+    query = query
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
   } else if (params.assignment_type === "technician") {
     query = query.not("assigned_technician_id", "is", null);
   } else if (params.assignment_type === "crew") {
     query = query.not("assigned_crew_id", "is", null);
+  } else if (params.assignment_type === "vendor") {
+    query = query.not("vendor_id", "is", null);
   }
   if (params.asset_id) query = query.eq("asset_id", params.asset_id);
   if (category) query = query.eq("category", category);
@@ -391,6 +412,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
         buildings: buildingList,
         crews: crewList,
         technicians: technicianList,
+        vendors: vendorList,
         assets: assetList,
         assignmentTypes: ASSIGNMENT_TYPE_OPTIONS,
         priorities: PRIORITY_OPTIONS,
@@ -472,7 +494,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   };
   const categorySet = new Set<string>();
   const all: DispatchWorkOrder[] = (workOrdersRaw ?? []).map((row: Row) => {
-    const { properties: propRel, buildings: bldRel, units: unitRel, assets: assetRel, ...rest } = row;
+    const { properties: propRel, buildings: bldRel, units: unitRel, assets: assetRel, vendors: vendorRel, ...rest } = row;
     const p = first(propRel);
     const b = first(bldRel);
     const u = first(unitRel);
@@ -509,10 +531,18 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     const assigned_technician_name = technicianId
       ? technicianNameById.get(technicianId) ?? null
       : null;
+    const vendorObj = Array.isArray(vendorRel) ? vendorRel[0] : vendorRel;
+    const vendorName =
+      vendorObj && typeof vendorObj === "object" && "name" in (vendorObj as Record<string, unknown>)
+        ? ((vendorObj as { name?: string | null }).name ?? null)
+        : null;
+    const vendorId = (rest.vendor_id as string | null | undefined) ?? null;
     const assignment_type: DispatchWorkOrder["assignment_type"] = technicianId
       ? "technician"
       : crewId
         ? "crew"
+        : vendorId
+          ? "vendor"
         : "unassigned";
     const categoryValue = (rest.category as string | null | undefined) ?? null;
     if (categoryValue) categorySet.add(categoryValue);
@@ -540,6 +570,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       location_coordinate_accuracy: resolvedCoordinates.accuracy,
       assigned_technician_name,
       assigned_crew_name: assigned_crew_name ?? undefined,
+      vendor_name: vendorName ?? undefined,
       assignment_type,
       sla_response_due_at: sla.responseDueAt,
       sla_response_breached: sla.responseBreached,
@@ -576,7 +607,9 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     const due = wo.due_date ?? null;
     const comparableStatus = toComparableStatus(wo.status ?? "");
     const isTerminal = comparableStatus === "completed" || comparableStatus === "cancelled";
-    const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
+    const hasAssignment = Boolean(
+      wo.assigned_crew_id || wo.assigned_technician_id || wo.vendor_id
+    );
 
     if (!hasAssignment && !isTerminal) unassignedWorkOrders += 1;
     if (comparableStatus === "in_progress") inProgressToday += 1;
@@ -809,6 +842,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       buildings: buildingList,
       crews: crewList,
       technicians: technicianList,
+      vendors: vendorList,
       assets: assetList,
       assignmentTypes: ASSIGNMENT_TYPE_OPTIONS,
       priorities: PRIORITY_OPTIONS,

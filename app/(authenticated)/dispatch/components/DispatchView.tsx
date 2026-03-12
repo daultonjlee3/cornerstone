@@ -426,6 +426,7 @@ export function DispatchView({
       payload: {
         assigned_technician_id: string | null;
         assigned_crew_id: string | null;
+        assigned_vendor_id?: string | null;
         scheduled_date: string | null;
         scheduled_start: string | null;
         scheduled_end: string | null;
@@ -535,6 +536,7 @@ export function DispatchView({
           {
             assigned_technician_id: null,
             assigned_crew_id: null,
+            assigned_vendor_id: null,
             scheduled_date: null,
             scheduled_start: null,
             scheduled_end: null,
@@ -542,8 +544,10 @@ export function DispatchView({
           {
             assigned_technician_id: null,
             assigned_crew_id: null,
+            vendor_id: null,
             assigned_technician_name: null,
             assigned_crew_name: null,
+            vendor_name: null,
             assignment_type: "unassigned",
             scheduled_date: null,
             scheduled_start: null,
@@ -574,6 +578,7 @@ export function DispatchView({
         {
           assigned_technician_id: assignedTechnicianId,
           assigned_crew_id: assignedCrewId,
+          assigned_vendor_id: null,
           scheduled_date: dropDate,
           scheduled_start: startISO,
           scheduled_end: endISO,
@@ -581,8 +586,10 @@ export function DispatchView({
         {
           assigned_technician_id: assignedTechnicianId,
           assigned_crew_id: assignedCrewId,
+          vendor_id: null,
           assigned_technician_name: techName ?? undefined,
           assigned_crew_name: crewName ?? undefined,
+          vendor_name: null,
           assignment_type: assignedTechnicianId ? "technician" : assignedCrewId ? "crew" : "unassigned",
           scheduled_date: dropDate,
           scheduled_start: startISO,
@@ -625,6 +632,7 @@ export function DispatchView({
         {
           assigned_technician_id: match.assigned_technician_id ?? null,
           assigned_crew_id: match.assigned_crew_id ?? null,
+          assigned_vendor_id: (match.vendor_id as string | null | undefined) ?? null,
           scheduled_date: workOrder.scheduled_date ?? null,
           scheduled_start: workOrder.scheduled_start ?? null,
           scheduled_end: newEndISO,
@@ -655,6 +663,7 @@ export function DispatchView({
           {
             assigned_technician_id: null,
             assigned_crew_id: null,
+            assigned_vendor_id: null,
             scheduled_date: null,
             scheduled_start: null,
             scheduled_end: null,
@@ -662,8 +671,10 @@ export function DispatchView({
           {
             assigned_technician_id: null,
             assigned_crew_id: null,
+            vendor_id: null,
             assigned_technician_name: null,
             assigned_crew_name: null,
+            vendor_name: null,
             assignment_type: "unassigned",
             scheduled_date: null,
             scheduled_start: null,
@@ -710,6 +721,12 @@ export function DispatchView({
         id: c.id,
         name: c.name,
         company_id: (c.company_id ?? null) as string | null,
+      })),
+      vendors: filterOptions.vendors.map((vendor) => ({
+        id: vendor.id,
+        name: vendor.name,
+        company_id: vendor.company_id,
+        service_type: vendor.service_type ?? null,
       })),
     };
   }, [filterOptions]);
@@ -759,6 +776,7 @@ export function DispatchView({
           {
             assigned_technician_id: technicianId,
             assigned_crew_id: null,
+          assigned_vendor_id: null,
             scheduled_date: filterState.selectedDate,
             scheduled_start: startISO,
             scheduled_end: endISO,
@@ -766,8 +784,10 @@ export function DispatchView({
           {
             assigned_technician_id: technicianId,
             assigned_crew_id: null,
+          vendor_id: null,
             assigned_technician_name: technician.name,
             assigned_crew_name: null,
+          vendor_name: null,
             assignment_type: "technician",
             scheduled_date: filterState.selectedDate,
             scheduled_start: startISO,
@@ -805,6 +825,7 @@ export function DispatchView({
       const result = await updateWorkOrderAssignment(s.workOrderId, {
         assigned_technician_id: null,
         assigned_crew_id: s.toCrewId,
+        assigned_vendor_id: null,
         scheduled_date: s.scheduledDate,
         scheduled_start: s.scheduledStart,
         scheduled_end: s.scheduledEnd,
@@ -1113,51 +1134,60 @@ export function DispatchView({
         </div>
       </div>
 
-      <WorkOrderAssignmentModal
-        open={Boolean(assignmentTarget)}
-        onClose={() => setAssignmentTarget(null)}
-        workOrderId={assignmentTarget?.id ?? ""}
-        workOrderStatus={(assignmentTarget?.status as string | undefined) ?? undefined}
-        companyId={(assignmentTarget?.company_id as string | null | undefined) ?? null}
-        initial={{
-          assigned_technician_id:
-            (assignmentTarget?.assigned_technician_id as string | null | undefined) ?? null,
-          assigned_crew_id:
-            (assignmentTarget?.assigned_crew_id as string | null | undefined) ?? null,
-          scheduled_date:
-            (assignmentTarget?.scheduled_date as string | null | undefined) ?? null,
-          scheduled_start:
-            (assignmentTarget?.scheduled_start as string | null | undefined) ?? null,
-          scheduled_end:
-            (assignmentTarget?.scheduled_end as string | null | undefined) ?? null,
-        }}
-        technicians={filterOptions.technicians}
-        crews={boardCrews.map((crew) => ({
-          id: crew.id,
-          name: crew.name ?? "Unnamed crew",
-          company_id: crew.company_id ?? null,
-        }))}
-        onSuccess={() => router.refresh()}
-      />
+      {assignmentTarget ? (
+        <WorkOrderAssignmentModal
+          key={assignmentTarget.id}
+          open={Boolean(assignmentTarget)}
+          onClose={() => setAssignmentTarget(null)}
+          workOrderId={assignmentTarget.id}
+          workOrderStatus={(assignmentTarget.status as string | undefined) ?? undefined}
+          companyId={(assignmentTarget.company_id as string | null | undefined) ?? null}
+          initial={{
+            assigned_technician_id:
+              (assignmentTarget.assigned_technician_id as string | null | undefined) ?? null,
+            assigned_crew_id:
+              (assignmentTarget.assigned_crew_id as string | null | undefined) ?? null,
+            assigned_vendor_id:
+              (assignmentTarget.vendor_id as string | null | undefined) ?? null,
+            scheduled_date:
+              (assignmentTarget.scheduled_date as string | null | undefined) ?? null,
+            scheduled_start:
+              (assignmentTarget.scheduled_start as string | null | undefined) ?? null,
+            scheduled_end:
+              (assignmentTarget.scheduled_end as string | null | undefined) ?? null,
+          }}
+          technicians={filterOptions.technicians}
+          crews={boardCrews.map((crew) => ({
+            id: crew.id,
+            name: crew.name ?? "Unnamed crew",
+            company_id: crew.company_id ?? null,
+          }))}
+          vendors={filterOptions.vendors}
+          onSuccess={() => router.refresh()}
+        />
+      ) : null}
 
-      <WorkOrderFormModal
-        open={createWorkOrderModalOpen}
-        onClose={() => {
-          setCreateWorkOrderModalOpen(false);
-          router.refresh();
-        }}
-        workOrder={null}
-        prefill={null}
-        companies={createFormOptions.companies}
-        customers={createFormOptions.customers}
-        properties={createFormOptions.properties}
-        buildings={createFormOptions.buildings}
-        units={createFormOptions.units}
-        assets={createFormOptions.assets}
-        technicians={createFormOptions.technicians}
-        crews={createFormOptions.crews}
-        saveAction={saveWorkOrder}
-      />
+      {createWorkOrderModalOpen ? (
+        <WorkOrderFormModal
+          open={createWorkOrderModalOpen}
+          onClose={() => {
+            setCreateWorkOrderModalOpen(false);
+            router.refresh();
+          }}
+          workOrder={null}
+          prefill={null}
+          companies={createFormOptions.companies}
+          customers={createFormOptions.customers}
+          properties={createFormOptions.properties}
+          buildings={createFormOptions.buildings}
+          units={createFormOptions.units}
+          assets={createFormOptions.assets}
+          technicians={createFormOptions.technicians}
+          crews={createFormOptions.crews}
+          vendors={createFormOptions.vendors}
+          saveAction={saveWorkOrder}
+        />
+      ) : null}
 
       <RebalanceSuggestionsModal
         open={rebalanceModalOpen}

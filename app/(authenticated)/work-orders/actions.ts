@@ -132,15 +132,18 @@ async function validateAssignmentTargets(
     companyId,
     technicianId,
     crewId,
+    vendorId,
   }: {
     tenantId: string;
     companyId: string;
     technicianId: string | null;
     crewId: string | null;
+    vendorId: string | null;
   }
 ): Promise<string | null> {
-  if (technicianId && crewId) {
-    return "Assign either a technician or a crew, not both.";
+  const selectedTargets = [technicianId, crewId, vendorId].filter(Boolean).length;
+  if (selectedTargets > 1) {
+    return "Assign to one target only: technician, crew, or external vendor.";
   }
 
   if (technicianId) {
@@ -174,6 +177,18 @@ async function validateAssignmentTargets(
     }
     if ((crew as { is_active?: boolean | null }).is_active === false) {
       return "Selected crew is inactive.";
+    }
+  }
+
+  if (vendorId) {
+    const { data: vendor } = await supabase
+      .from("vendors")
+      .select("id, company_id")
+      .eq("id", vendorId)
+      .maybeSingle();
+    if (!vendor) return "Selected vendor was not found.";
+    if ((vendor as { company_id?: string | null }).company_id !== companyId) {
+      return "Selected vendor does not belong to the selected company.";
     }
   }
 
@@ -464,8 +479,10 @@ export async function saveWorkOrder(
       .maybeSingle();
     if (b?.property_id) resolvedPropertyId = b.property_id;
   }
-  const assignedTechnicianId = (formData.get("assigned_technician_id") as string)?.trim() || null;
+  const assignedTechnicianId =
+    (formData.get("assigned_technician_id") as string)?.trim() || null;
   const assignedCrewId = (formData.get("assigned_crew_id") as string)?.trim() || null;
+  const assignedVendorId = (formData.get("assigned_vendor_id") as string)?.trim() || null;
   const dueDateRaw = (formData.get("due_date") as string)?.trim();
   const priority = (formData.get("priority") as string)?.trim();
   const status = (formData.get("status") as string)?.trim();
@@ -503,6 +520,7 @@ export async function saveWorkOrder(
     companyId,
     technicianId: assignedTechnicianId,
     crewId: assignedCrewId,
+    vendorId: assignedVendorId,
   });
   if (assignmentValidationError) return { error: assignmentValidationError };
 
@@ -530,6 +548,7 @@ export async function saveWorkOrder(
     due_date: dueDateRaw || null,
     assigned_technician_id: assignedTechnicianId,
     assigned_crew_id: assignedCrewId || null,
+    vendor_id: assignedVendorId,
     estimated_hours: estimatedHoursRaw ? parseFloat(estimatedHoursRaw) : null,
     estimated_technicians: estimatedTechniciansRaw ? parseInt(estimatedTechniciansRaw, 10) : null,
     billable,
@@ -543,7 +562,9 @@ export async function saveWorkOrder(
   const scheduleExists = Boolean(
     payload.scheduled_date || payload.scheduled_start || payload.scheduled_end
   );
-  const assignmentExists = Boolean(payload.assigned_technician_id || payload.assigned_crew_id);
+  const assignmentExists = Boolean(
+    payload.assigned_technician_id || payload.assigned_crew_id || payload.vendor_id
+  );
   if (validStatus === "new" && (scheduleExists || assignmentExists)) {
     payload.status = scheduleExists ? "scheduled" : "ready_to_schedule";
   }
@@ -999,6 +1020,7 @@ export async function upsertWorkOrderSlaPolicies(
 export type WorkOrderAssignmentPayload = {
   assigned_technician_id: string | null;
   assigned_crew_id: string | null;
+  assigned_vendor_id?: string | null;
   scheduled_date?: string | null;
   scheduled_start?: string | null;
   scheduled_end?: string | null;
@@ -1032,11 +1054,13 @@ export async function updateWorkOrderAssignment(
 
   const nextTechnicianId = payload.assigned_technician_id || null;
   const nextCrewId = payload.assigned_crew_id || null;
+  const nextVendorId = payload.assigned_vendor_id || null;
   const assignmentValidationError = await validateAssignmentTargets(supabase, {
     tenantId,
     companyId: (beforeState.company_id as string) ?? "",
     technicianId: nextTechnicianId,
     crewId: nextCrewId,
+    vendorId: nextVendorId,
   });
   if (assignmentValidationError) return { error: assignmentValidationError };
   const nextScheduledDate =
@@ -1057,7 +1081,7 @@ export async function updateWorkOrderAssignment(
       : ((beforeState.scheduled_end as string | null) ?? null);
 
   const hasSchedule = Boolean(nextScheduledDate || nextScheduledStart || nextScheduledEnd);
-  const hasAssignment = Boolean(nextTechnicianId || nextCrewId);
+  const hasAssignment = Boolean(nextTechnicianId || nextCrewId || nextVendorId);
   const statusComparable = toComparableStatus(status);
   let nextStatus = normalizeStatus(status);
   if (["new", "ready_to_schedule", "scheduled", "draft"].includes(statusComparable)) {
@@ -1068,6 +1092,7 @@ export async function updateWorkOrderAssignment(
   const update: Record<string, unknown> = {
     assigned_technician_id: nextTechnicianId,
     assigned_crew_id: nextCrewId,
+    vendor_id: nextVendorId,
     status: nextStatus,
     created_by_user_id: actorId,
   };
@@ -1085,14 +1110,17 @@ export async function updateWorkOrderAssignment(
 
   const afterState = (updated as Record<string, unknown>) ?? {};
   const beforeHadAssignment = Boolean(
-    beforeState.assigned_technician_id || beforeState.assigned_crew_id
+    beforeState.assigned_technician_id ||
+      beforeState.assigned_crew_id ||
+      beforeState.vendor_id
   );
   const beforeHadSchedule = Boolean(
     beforeState.scheduled_date || beforeState.scheduled_start || beforeState.scheduled_end
   );
   const assignmentChanged =
     (beforeState.assigned_technician_id as string | null) !== nextTechnicianId ||
-    (beforeState.assigned_crew_id as string | null) !== nextCrewId;
+    (beforeState.assigned_crew_id as string | null) !== nextCrewId ||
+    (beforeState.vendor_id as string | null) !== nextVendorId;
   const scheduleChanged =
     (beforeState.scheduled_date as string | null) !== nextScheduledDate ||
     (beforeState.scheduled_start as string | null) !== nextScheduledStart ||
@@ -1113,10 +1141,12 @@ export async function updateWorkOrderAssignment(
       beforeState: {
         assigned_technician_id: beforeState.assigned_technician_id as string | null,
         assigned_crew_id: beforeState.assigned_crew_id as string | null,
+        vendor_id: beforeState.vendor_id as string | null,
       },
       afterState: {
         assigned_technician_id: nextTechnicianId,
         assigned_crew_id: nextCrewId,
+        vendor_id: nextVendorId,
       },
       metadata: { source: "updateWorkOrderAssignment" },
     });
@@ -1130,10 +1160,12 @@ export async function updateWorkOrderAssignment(
       beforeState: {
         assigned_technician_id: beforeState.assigned_technician_id as string | null,
         assigned_crew_id: beforeState.assigned_crew_id as string | null,
+        vendor_id: beforeState.vendor_id as string | null,
       },
       afterState: {
         assigned_technician_id: nextTechnicianId,
         assigned_crew_id: nextCrewId,
+        vendor_id: nextVendorId,
       },
       metadata: { source: "updateWorkOrderAssignment", transport: "dispatch" },
     });
@@ -1189,6 +1221,7 @@ export async function updateWorkOrderAssignment(
       beforeState: {
         assigned_technician_id: beforeState.assigned_technician_id as string | null,
         assigned_crew_id: beforeState.assigned_crew_id as string | null,
+        vendor_id: beforeState.vendor_id as string | null,
         scheduled_date: beforeState.scheduled_date as string | null,
         scheduled_start: beforeState.scheduled_start as string | null,
         scheduled_end: beforeState.scheduled_end as string | null,
@@ -1196,6 +1229,7 @@ export async function updateWorkOrderAssignment(
       afterState: {
         assigned_technician_id: null,
         assigned_crew_id: null,
+        vendor_id: null,
         scheduled_date: null,
         scheduled_start: null,
         scheduled_end: null,
@@ -1234,6 +1268,7 @@ export type WorkOrderCompletionPayload = {
   parts_used_summary?: string | null;
   root_cause?: string | null;
   actual_hours?: number | null;
+  vendor_cost?: number | null;
   follow_up_required?: boolean;
   customer_visible_summary?: string | null;
   internal_completion_notes?: string | null;
@@ -1308,6 +1343,7 @@ export async function completeWorkOrder(
     completion_notes: completionNotes,
     root_cause: (payload.root_cause ?? "").trim() || null,
     actual_hours: payload.actual_hours ?? null,
+    vendor_cost: payload.vendor_cost ?? null,
     follow_up_required: payload.follow_up_required ?? false,
     customer_visible_summary: (payload.customer_visible_summary ?? "").trim() || null,
     internal_completion_notes: (payload.internal_completion_notes ?? "").trim() || null,
@@ -1370,6 +1406,7 @@ export async function completeWorkOrder(
     metadata: {
       completed_at: completedAt,
       actual_hours: finalActualHours,
+      vendor_cost: payload.vendor_cost ?? null,
       completion_status: completionStatus,
     },
   });
@@ -1383,6 +1420,7 @@ export async function completeWorkOrder(
     metadata: {
       completed_at: completedAt,
       actual_hours: finalActualHours,
+      vendor_cost: payload.vendor_cost ?? null,
       completion_status: completionStatus,
     },
   });

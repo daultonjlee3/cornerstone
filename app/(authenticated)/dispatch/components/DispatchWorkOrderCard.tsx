@@ -49,6 +49,9 @@ function getAssignmentLine(wo: DispatchWorkOrder): { label: string; tone: string
   if (wo.assigned_crew_name) {
     return { label: `Assigned to ${wo.assigned_crew_name}`, tone: "text-teal-700" };
   }
+  if (wo.vendor_name) {
+    return { label: `Vendor ${wo.vendor_name}`, tone: "text-purple-700" };
+  }
   return { label: "Unassigned", tone: "text-amber-700" };
 }
 

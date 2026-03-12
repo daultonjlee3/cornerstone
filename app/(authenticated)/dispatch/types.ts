@@ -17,6 +17,8 @@ export type DispatchWorkOrder = {
   assigned_crew_name?: string | null;
   assigned_technician_id?: string | null;
   assigned_technician_name?: string | null;
+  vendor_id?: string | null;
+  vendor_name?: string | null;
   estimated_hours?: number | null;
   company_id?: string | null;
   property_id?: string | null;
@@ -29,7 +31,7 @@ export type DispatchWorkOrder = {
   longitude?: number | null;
   location_coordinate_source?: "work_order" | "asset" | "unit" | "building" | "property" | null;
   location_coordinate_accuracy?: "exact" | "fallback" | null;
-  assignment_type?: "technician" | "crew" | "unassigned";
+  assignment_type?: "technician" | "crew" | "vendor" | "unassigned";
   /** Resolved display: "Property / Building / Unit" */
   property_name?: string | null;
   building_name?: string | null;

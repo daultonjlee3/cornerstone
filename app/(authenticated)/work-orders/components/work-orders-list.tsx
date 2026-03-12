@@ -29,6 +29,12 @@ type AssetOption = {
   unit_id: string | null;
 };
 type TechnicianOption = { id: string; name: string };
+type VendorOption = {
+  id: string;
+  name: string;
+  company_id: string;
+  service_type?: string | null;
+};
 
 export type WorkOrderListStats = WorkOrderKpiStats & {
   new: number;
@@ -40,6 +46,7 @@ export type WorkOrderListStats = WorkOrderKpiStats & {
 type WorkOrderListRow = WorkOrder & {
   technician_name?: string;
   crew_name?: string;
+  vendor_name?: string;
   company_name?: string;
   customer_name?: string;
   location?: string;
@@ -74,6 +81,7 @@ type WorkOrdersListProps = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors: VendorOption[];
   slaPolicies: SlaPolicyOption[];
   initialPrefill?: WorkOrderPrefill | null;
   autoOpenNew?: boolean;
@@ -84,9 +92,13 @@ type WorkOrdersListProps = {
 function assignedDisplay(wo: WorkOrderListRow): string {
   const tech = wo.technician_name;
   const crew = wo.crew_name;
+  const vendor = wo.vendor_name;
   if (tech && crew) return `${tech} / ${crew}`;
+  if (tech && vendor) return `${tech} / ${vendor}`;
+  if (crew && vendor) return `${crew} / ${vendor}`;
   if (tech) return tech;
   if (crew) return crew;
+  if (vendor) return vendor;
   return "—";
 }
 
@@ -111,6 +123,7 @@ export function WorkOrdersList({
   assets,
   technicians,
   crews,
+  vendors,
   slaPolicies,
   initialPrefill = null,
   autoOpenNew = false,
@@ -619,21 +632,25 @@ export function WorkOrdersList({
         </div>
       )}
 
-      <WorkOrderFormModal
-        open={modalOpen}
-        onClose={closeModal}
-        workOrder={editingWorkOrder}
-        prefill={editingWorkOrder ? null : prefill}
-        companies={companies}
-        customers={customers}
-        properties={properties}
-        buildings={buildings}
-        units={units}
-        assets={assets}
-        technicians={technicians}
-        crews={crews}
-        saveAction={saveWorkOrder}
-      />
+      {modalOpen ? (
+        <WorkOrderFormModal
+          key={editingWorkOrder?.id ?? "new-work-order"}
+          open={modalOpen}
+          onClose={closeModal}
+          workOrder={editingWorkOrder}
+          prefill={editingWorkOrder ? null : prefill}
+          companies={companies}
+          customers={customers}
+          properties={properties}
+          buildings={buildings}
+          units={units}
+          assets={assets}
+          technicians={technicians}
+          crews={crews}
+          vendors={vendors}
+          saveAction={saveWorkOrder}
+        />
+      ) : null}
 
       <WorkOrderDetailDrawer
         workOrder={detailDrawerRow}
@@ -661,12 +678,14 @@ export function WorkOrdersList({
           initial={{
             assigned_technician_id: assigningWorkOrder.assigned_technician_id ?? null,
             assigned_crew_id: assigningWorkOrder.assigned_crew_id ?? null,
+            assigned_vendor_id: assigningWorkOrder.vendor_id ?? null,
             scheduled_date: assigningWorkOrder.scheduled_date ?? null,
             scheduled_start: assigningWorkOrder.scheduled_start ?? null,
             scheduled_end: assigningWorkOrder.scheduled_end ?? null,
           }}
           technicians={technicians}
           crews={crews}
+          vendors={vendors}
           onSuccess={() => {
             setAssigningWorkOrder(null);
             router.refresh();

@@ -38,13 +38,14 @@ export default async function WorkOrderDetailPage({
     .select(
       `
       id, work_order_number, title, description, category, priority, status,
-      company_id, customer_id, property_id, building_id, unit_id, asset_id,
+      company_id, customer_id, property_id, building_id, unit_id, asset_id, vendor_id,
       source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date, completed_at,
       first_response_at, response_time_minutes, resolution_time_minutes,
       completion_date, resolution_summary, completion_notes, root_cause,
       follow_up_required, customer_visible_summary, internal_completion_notes,
       completed_by_technician_id, completion_status,
+      vendor_cost,
       requested_by_name, requested_by_email, requested_by_phone,
       assigned_technician_id, assigned_crew_id,
       estimated_hours, estimated_technicians, actual_hours,
@@ -56,7 +57,8 @@ export default async function WorkOrderDetailPage({
       units(unit_name, name_or_number),
       assets!work_orders_asset_id_fkey(asset_name, name),
       technicians!assigned_technician_id(technician_name, name),
-      crews(name)
+      crews(name),
+      vendors(name, service_type)
     `
     )
     .eq("id", id)
@@ -86,6 +88,7 @@ export default async function WorkOrderDetailPage({
   const bld = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
   const un = Array.isArray(row.units) ? row.units[0] : row.units;
   const ast = Array.isArray(row.assets) ? row.assets[0] : row.assets;
+  const ven = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
   const tech = Array.isArray(row.technicians) ? row.technicians[0] : row.technicians;
   const crew = Array.isArray(row.crews) ? row.crews[0] : row.crews;
 
@@ -149,6 +152,10 @@ export default async function WorkOrderDetailPage({
     building_name: bld && typeof bld === "object" ? (bld as { building_name?: string }).building_name ?? (bld as { name?: string }).name : null,
     unit_name: un && typeof un === "object" ? (un as { unit_name?: string }).unit_name ?? (un as { name_or_number?: string }).name_or_number : null,
     asset_name: ast && typeof ast === "object" ? (ast as { asset_name?: string }).asset_name ?? (ast as { name?: string }).name : null,
+    vendor_name:
+      ven && typeof ven === "object" && "name" in ven
+        ? (ven as { name?: string }).name ?? null
+        : null,
     technician_name: tech && typeof tech === "object" ? (tech as { technician_name?: string }).technician_name ?? (tech as { name?: string }).name : null,
     crew_name: crew && typeof crew === "object" && "name" in crew ? (crew as { name?: string }).name : null,
     crew_lead_name: crewLeadName,
@@ -219,6 +226,11 @@ export default async function WorkOrderDetailPage({
     .eq("work_order_id", id)
     .order("created_at", { ascending: false });
 
+  const { data: laborEntries } = await supabase
+    .from("work_order_labor_entries")
+    .select("started_at, ended_at, duration_minutes")
+    .eq("work_order_id", id);
+
   const { data: techniciansData } = await supabase
     .from("technicians")
     .select("id, technician_name, name")
@@ -233,6 +245,11 @@ export default async function WorkOrderDetailPage({
     .eq("tenant_id", membership.tenant_id)
     .eq("is_active", true)
     .order("name");
+  const { data: vendorsData } = await supabase
+    .from("vendors")
+    .select("id, name, company_id, service_type")
+    .eq("company_id", companyId)
+    .order("name");
 
   const technicianOptions = (techniciansData ?? []).map((t) => ({
     id: (t as { id: string }).id,
@@ -243,6 +260,30 @@ export default async function WorkOrderDetailPage({
     name: (c as { name: string }).name,
     company_id: (c as { company_id?: string }).company_id ?? null,
   }));
+  const vendorOptions = (vendorsData ?? []).map((vendor) => ({
+    id: (vendor as { id: string }).id,
+    name: (vendor as { name: string }).name,
+    company_id: (vendor as { company_id: string }).company_id,
+    service_type: (vendor as { service_type?: string | null }).service_type ?? null,
+  }));
+  const laborMinutes = (laborEntries ?? []).reduce((sum, entry) => {
+    const row = entry as {
+      started_at?: string | null;
+      ended_at?: string | null;
+      duration_minutes?: number | null;
+    };
+    if (typeof row.duration_minutes === "number" && Number.isFinite(row.duration_minutes)) {
+      return sum + Math.max(0, row.duration_minutes);
+    }
+    if (row.started_at && row.ended_at) {
+      const start = new Date(row.started_at).getTime();
+      const end = new Date(row.ended_at).getTime();
+      if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+        return sum + Math.floor((end - start) / 60000);
+      }
+    }
+    return sum;
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -287,7 +328,9 @@ export default async function WorkOrderDetailPage({
         }
         technicians={technicianOptions}
         crews={crewOptions}
+        vendors={vendorOptions}
         sla={sla}
+        laborMinutes={laborMinutes}
         inventoryItems={((inventoryItems ?? []).map((row) => {
           const record = row as Record<string, unknown>;
           const product = Array.isArray(record.products) ? record.products[0] : record.products;

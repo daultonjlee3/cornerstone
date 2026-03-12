@@ -105,6 +105,12 @@ export default async function WorkOrdersPage({
     .in("company_id", companyIds)
     .order("name");
 
+  const { data: vendorsData } = await supabase
+    .from("vendors")
+    .select("id, name, company_id, service_type")
+    .in("company_id", companyIds)
+    .order("name");
+
   const { data: crewsData } = await supabase
     .from("crews")
     .select("id, name, company_id")
@@ -122,6 +128,12 @@ export default async function WorkOrdersPage({
     id: (c as { id: string }).id,
     name: (c as { name: string }).name,
     company_id: (c as { company_id?: string }).company_id ?? null,
+  }));
+  const vendorOptions = (vendorsData ?? []).map((v) => ({
+    id: (v as { id: string }).id,
+    name: (v as { name: string }).name,
+    company_id: (v as { company_id: string }).company_id,
+    service_type: (v as { service_type?: string | null }).service_type ?? null,
   }));
   const propertyOptions = (properties ?? []).map((p) => ({
     id: p.id,
@@ -212,7 +224,7 @@ export default async function WorkOrdersPage({
   let query = supabase
     .from("work_orders")
     .select(`
-      id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id,
+      id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id, vendor_id,
       description, category, priority, status,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date,
       requested_by_name, requested_by_email, requested_by_phone,
@@ -228,7 +240,8 @@ export default async function WorkOrdersPage({
       units(unit_name, name_or_number),
       assets!work_orders_asset_id_fkey(asset_name, name),
       technicians!assigned_technician_id(technician_name, name),
-      crews!assigned_crew_id(name)
+      crews!assigned_crew_id(name),
+      vendors(name)
     `)
     .in("company_id", companyIds);
 
@@ -251,7 +264,10 @@ export default async function WorkOrdersPage({
   } else if (viewPreset === "completed_today") {
     query = query.eq("status", "completed").gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
   } else if (viewPreset === "unassigned") {
-    query = query.is("assigned_technician_id", null).is("assigned_crew_id", null);
+    query = query
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
   } else if (viewPreset === "pm") {
     query = query.eq("source_type", "preventive_maintenance");
   } else if (viewPreset === "high_priority") {
@@ -273,7 +289,10 @@ export default async function WorkOrdersPage({
     query = query.not("status", "in", "(completed,cancelled)");
   }
   if (!viewPreset && filterUnassigned) {
-    query = query.is("assigned_technician_id", null).is("assigned_crew_id", null);
+    query = query
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
   }
   if (!viewPreset && filterDueToday) query = query.eq("due_date", today);
   if (!viewPreset && filterCompletedToday) {
@@ -303,6 +322,7 @@ export default async function WorkOrdersPage({
     const bld = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
     const un = Array.isArray(row.units) ? row.units[0] : row.units;
     const ast = Array.isArray(row.assets) ? row.assets[0] : row.assets;
+    const ven = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
     const technician_name = tech && typeof tech === "object" && "technician_name" in tech ? (tech as { technician_name?: string }).technician_name ?? (tech as { name?: string }).name : null;
     const crew_name = crewRow && typeof crewRow === "object" && "name" in crewRow ? (crewRow as { name?: string }).name : null;
     const company_name = comp && typeof comp === "object" && "name" in comp ? (comp as { name?: string }).name : null;
@@ -311,19 +331,21 @@ export default async function WorkOrdersPage({
     const building_name = bld && typeof bld === "object" ? (bld as { building_name?: string }).building_name ?? (bld as { name?: string }).name : null;
     const unit_name = un && typeof un === "object" ? (un as { unit_name?: string }).unit_name ?? (un as { name_or_number?: string }).name_or_number : null;
     const asset_name = ast && typeof ast === "object" ? (ast as { asset_name?: string }).asset_name ?? (ast as { name?: string }).name : null;
+    const vendor_name = ven && typeof ven === "object" && "name" in ven ? (ven as { name?: string }).name : null;
     const locationParts = [property_name, building_name, unit_name].filter(Boolean);
     const location = locationParts.length ? locationParts.join(" / ") : null;
-    const { technicians: _, crews: __, companies: ___, customers: ____, properties: _____, buildings: ______, units: _______, assets: ________, ...rest } = row;
+    const { technicians: _, crews: __, companies: ___, customers: ____, properties: _____, buildings: ______, units: _______, assets: ________, vendors: _________, ...rest } = row;
     return {
       ...rest,
       technician_name: technician_name ?? undefined,
       crew_name: crew_name ?? undefined,
+      vendor_name: vendor_name ?? undefined,
       company_name: company_name ?? undefined,
       customer_name: customer_name ?? undefined,
       location: location ?? undefined,
       asset_name: asset_name ?? undefined,
     };
-  }) as (WorkOrder & { technician_name?: string; crew_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
+  }) as (WorkOrder & { technician_name?: string; crew_name?: string; vendor_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
 
   const stats = {
     open: workOrders.filter(
@@ -376,6 +398,7 @@ export default async function WorkOrdersPage({
         assets={assetOptions}
         technicians={technicianOptions}
         crews={crewOptions}
+        vendors={vendorOptions}
         slaPolicies={
           (slaPoliciesData ?? []) as {
             company_id: string;

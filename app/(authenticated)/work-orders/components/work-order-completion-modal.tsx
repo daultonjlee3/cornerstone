@@ -82,6 +82,7 @@ export function WorkOrderCompletionModal({
   const [partsUsedSummary, setPartsUsedSummary] = useState("");
   const [rootCause, setRootCause] = useState("");
   const [actualHours, setActualHours] = useState<string>(estimatedHours != null ? String(estimatedHours) : "");
+  const [vendorCost, setVendorCost] = useState("");
   const [completionStatus, setCompletionStatus] = useState<string>("successful");
   const [followUpRequired, setFollowUpRequired] = useState(false);
   const [customerVisibleSummary, setCustomerVisibleSummary] = useState("");
@@ -166,6 +167,13 @@ export function WorkOrderCompletionModal({
       setError("Resolution summary is required.");
       return;
     }
+    if (vendorCost) {
+      const parsedVendorCost = Number(vendorCost);
+      if (!Number.isFinite(parsedVendorCost) || parsedVendorCost < 0) {
+        setError("External vendor cost must be zero or greater.");
+        return;
+      }
+    }
     startTransition(async () => {
       let remainingParts = [...queuedParts];
       for (let index = 0; index < queuedParts.length; index += 1) {
@@ -187,6 +195,7 @@ export function WorkOrderCompletionModal({
         parts_used_summary: partsUsedSummary.trim() || null,
         root_cause: rootCause.trim() || null,
         actual_hours: actualHours ? parseFloat(actualHours) : null,
+        vendor_cost: vendorCost ? parseFloat(vendorCost) : null,
         follow_up_required: followUpRequired,
         customer_visible_summary: customerVisibleSummary.trim() || null,
         internal_completion_notes: internalCompletionNotes.trim() || null,
@@ -353,6 +362,21 @@ export function WorkOrderCompletionModal({
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label htmlFor="completion-vendor-cost" className={labelOptionalClass}>
+                  External vendor cost
+                </label>
+                <input
+                  id="completion-vendor-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={vendorCost}
+                  onChange={(e) => setVendorCost(e.target.value)}
+                  className={inputClass}
+                  placeholder="0.00"
+                />
               </div>
             </div>
             <div className="mt-3">

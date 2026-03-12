@@ -32,6 +32,12 @@ const STATUS_OPTIONS_FOR_DROPDOWN = [
 
 type TechnicianOption = { id: string; name: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type VendorOption = {
+  id: string;
+  name: string;
+  company_id: string;
+  service_type?: string | null;
+};
 
 type WorkOrderDetailViewProps = {
   workOrder: Record<string, unknown>;
@@ -50,6 +56,7 @@ type WorkOrderDetailViewProps = {
   }[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors: VendorOption[];
   sla: {
     responseTargetMinutes: number;
     responseDueAt: string | null;
@@ -70,6 +77,7 @@ type WorkOrderDetailViewProps = {
     cost: number | null;
     quantity: number;
   }[];
+  laborMinutes?: number | null;
 };
 
 export type PartUsageForDetail = {
@@ -100,8 +108,10 @@ export function WorkOrderDetailView({
   attachments,
   technicians,
   crews,
+  vendors,
   sla,
   inventoryItems,
+  laborMinutes = null,
 }: WorkOrderDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -225,12 +235,14 @@ export function WorkOrderDetailView({
             initial={{
               assigned_technician_id: (workOrder.assigned_technician_id as string) ?? null,
               assigned_crew_id: (workOrder.assigned_crew_id as string) ?? null,
+              assigned_vendor_id: (workOrder.vendor_id as string) ?? null,
               scheduled_date: (workOrder.scheduled_date as string) ?? null,
               scheduled_start: (workOrder.scheduled_start as string) ?? null,
               scheduled_end: (workOrder.scheduled_end as string) ?? null,
             }}
             technicians={technicians}
             crews={crews}
+            vendors={vendors}
             onSuccess={() => {
               setMessage({ type: "success", text: "Assignment updated." });
               router.refresh();
@@ -306,6 +318,8 @@ export function WorkOrderDetailView({
           <WorkOrderCostSummary
             partsTotal={partUsage.reduce((sum, p) => sum + (p.total_cost ?? 0), 0)}
             actualHours={workOrder.actual_hours as number | null | undefined}
+            laborMinutes={laborMinutes}
+            vendorCost={(workOrder.vendor_cost as number | null | undefined) ?? null}
           />
         </div>
 
