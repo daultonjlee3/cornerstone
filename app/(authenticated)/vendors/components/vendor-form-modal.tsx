@@ -10,6 +10,7 @@ export type VendorRecord = {
   id: string;
   company_id: string;
   name: string;
+  service_type: string | null;
   contact_name: string | null;
   email: string | null;
   phone: string | null;
@@ -19,6 +20,9 @@ export type VendorRecord = {
   preferred_vendor: boolean;
   created_at: string;
   updated_at: string;
+  jobs_completed?: number;
+  average_response_time_minutes?: number | null;
+  total_vendor_cost?: number;
   company_name?: string;
 };
 
@@ -36,6 +40,7 @@ const emptyVendor: VendorRecord = {
   id: "",
   company_id: "",
   name: "",
+  service_type: null,
   contact_name: null,
   email: null,
   phone: null,
@@ -76,6 +81,15 @@ export function VendorFormModal({ open, onClose, vendor, companies, saveAction }
         </FormField>
         <FormField label="Vendor name" htmlFor="vendor-name" required>
           <input id="vendor-name" name="name" defaultValue={row.name} required className="ui-input" />
+        </FormField>
+        <FormField label="Service type" htmlFor="vendor-service-type">
+          <input
+            id="vendor-service-type"
+            name="service_type"
+            defaultValue={row.service_type ?? ""}
+            className="ui-input"
+            placeholder="HVAC, Electrical, Plumbing..."
+          />
         </FormField>
         <FormField label="Contact name" htmlFor="vendor-contact-name">
           <input id="vendor-contact-name" name="contact_name" defaultValue={row.contact_name ?? ""} className="ui-input" />

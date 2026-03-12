@@ -132,15 +132,18 @@ async function validateAssignmentTargets(
     companyId,
     technicianId,
     crewId,
+    vendorId,
   }: {
     tenantId: string;
     companyId: string;
     technicianId: string | null;
     crewId: string | null;
+    vendorId: string | null;
   }
 ): Promise<string | null> {
-  if (technicianId && crewId) {
-    return "Assign either a technician or a crew, not both.";
+  const selectedTargets = [technicianId, crewId, vendorId].filter(Boolean).length;
+  if (selectedTargets > 1) {
+    return "Assign to one target only: technician, crew, or external vendor.";
   }
 
   if (technicianId) {
@@ -174,6 +177,18 @@ async function validateAssignmentTargets(
     }
     if ((crew as { is_active?: boolean | null }).is_active === false) {
       return "Selected crew is inactive.";
+    }
+  }
+
+  if (vendorId) {
+    const { data: vendor } = await supabase
+      .from("vendors")
+      .select("id, company_id")
+      .eq("id", vendorId)
+      .maybeSingle();
+    if (!vendor) return "Selected vendor was not found.";
+    if ((vendor as { company_id?: string | null }).company_id !== companyId) {
+      return "Selected vendor does not belong to the selected company.";
     }
   }
 
@@ -326,6 +341,33 @@ function sanitizeFileName(name: string): string {
     .slice(0, 120);
 }
 
+const SLA_PRIORITIES = ["low", "medium", "high", "urgent", "emergency"] as const;
+type SlaPriority = (typeof SLA_PRIORITIES)[number];
+
+const DEFAULT_SLA_RESPONSE_TARGET_MINUTES: Record<SlaPriority, number> = {
+  emergency: 60,
+  urgent: 120,
+  high: 240,
+  medium: 1440,
+  low: 4320,
+};
+
+const SUPPORTED_ATTACHMENT_MIME_TYPES = new Set<string>([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
+function isSupportedAttachmentMimeType(mimeType: string): boolean {
+  const normalized = mimeType.toLowerCase();
+  return normalized.startsWith("image/") || SUPPORTED_ATTACHMENT_MIME_TYPES.has(normalized);
+}
+
+function isImageMimeType(mimeType: string): boolean {
+  return mimeType.toLowerCase().startsWith("image/");
+}
+
 export async function saveWorkOrder(
   _prev: WorkOrderFormState,
   formData: FormData
@@ -437,8 +479,10 @@ export async function saveWorkOrder(
       .maybeSingle();
     if (b?.property_id) resolvedPropertyId = b.property_id;
   }
-  const assignedTechnicianId = (formData.get("assigned_technician_id") as string)?.trim() || null;
+  const assignedTechnicianId =
+    (formData.get("assigned_technician_id") as string)?.trim() || null;
   const assignedCrewId = (formData.get("assigned_crew_id") as string)?.trim() || null;
+  const assignedVendorId = (formData.get("assigned_vendor_id") as string)?.trim() || null;
   const dueDateRaw = (formData.get("due_date") as string)?.trim();
   const priority = (formData.get("priority") as string)?.trim();
   const status = (formData.get("status") as string)?.trim();
@@ -476,6 +520,7 @@ export async function saveWorkOrder(
     companyId,
     technicianId: assignedTechnicianId,
     crewId: assignedCrewId,
+    vendorId: assignedVendorId,
   });
   if (assignmentValidationError) return { error: assignmentValidationError };
 
@@ -503,6 +548,7 @@ export async function saveWorkOrder(
     due_date: dueDateRaw || null,
     assigned_technician_id: assignedTechnicianId,
     assigned_crew_id: assignedCrewId || null,
+    vendor_id: assignedVendorId,
     estimated_hours: estimatedHoursRaw ? parseFloat(estimatedHoursRaw) : null,
     estimated_technicians: estimatedTechniciansRaw ? parseInt(estimatedTechniciansRaw, 10) : null,
     billable,
@@ -516,7 +562,9 @@ export async function saveWorkOrder(
   const scheduleExists = Boolean(
     payload.scheduled_date || payload.scheduled_start || payload.scheduled_end
   );
-  const assignmentExists = Boolean(payload.assigned_technician_id || payload.assigned_crew_id);
+  const assignmentExists = Boolean(
+    payload.assigned_technician_id || payload.assigned_crew_id || payload.vendor_id
+  );
   if (validStatus === "new" && (scheduleExists || assignmentExists)) {
     payload.status = scheduleExists ? "scheduled" : "ready_to_schedule";
   }
@@ -911,9 +959,68 @@ export async function logDispatchRebalance(
   return {};
 }
 
+export type WorkOrderSlaPolicyInput = {
+  priority: SlaPriority;
+  response_target_minutes: number;
+};
+
+export async function upsertWorkOrderSlaPolicies(
+  companyId: string,
+  policies: WorkOrderSlaPolicyInput[]
+): Promise<WorkOrderFormState> {
+  const tenantId = await getTenantId();
+  if (!tenantId) return { error: "Unauthorized." };
+  if (!companyId) return { error: "Company is required." };
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { error: "Unauthorized." };
+
+  const supabase = await createClient();
+  const actorId = await getActorId(supabase);
+
+  const incoming = new Map<SlaPriority, number>();
+  for (const policy of policies) {
+    if (!SLA_PRIORITIES.includes(policy.priority)) continue;
+    const minutes = Number(policy.response_target_minutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return { error: `Response target for ${policy.priority} must be greater than zero.` };
+    }
+    incoming.set(policy.priority, Math.round(minutes));
+  }
+
+  const upsertRows = SLA_PRIORITIES.map((priority) => ({
+    company_id: companyId,
+    priority,
+    response_target_minutes:
+      incoming.get(priority) ?? DEFAULT_SLA_RESPONSE_TARGET_MINUTES[priority],
+  }));
+
+  const { error } = await supabase
+    .from("work_order_sla_policies")
+    .upsert(upsertRows, { onConflict: "company_id,priority" });
+  if (error) return { error: error.message };
+
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId,
+    entityType: "work_order_sla_policy",
+    entityId: companyId,
+    actionType: "work_order_sla_policy_updated",
+    performedBy: actorId,
+    metadata: {
+      policies: upsertRows,
+      source: "upsertWorkOrderSlaPolicies",
+    },
+  });
+
+  revalidatePath("/work-orders");
+  revalidatePath("/dispatch");
+  return { success: true };
+}
+
 export type WorkOrderAssignmentPayload = {
   assigned_technician_id: string | null;
   assigned_crew_id: string | null;
+  assigned_vendor_id?: string | null;
   scheduled_date?: string | null;
   scheduled_start?: string | null;
   scheduled_end?: string | null;
@@ -947,11 +1054,13 @@ export async function updateWorkOrderAssignment(
 
   const nextTechnicianId = payload.assigned_technician_id || null;
   const nextCrewId = payload.assigned_crew_id || null;
+  const nextVendorId = payload.assigned_vendor_id || null;
   const assignmentValidationError = await validateAssignmentTargets(supabase, {
     tenantId,
     companyId: (beforeState.company_id as string) ?? "",
     technicianId: nextTechnicianId,
     crewId: nextCrewId,
+    vendorId: nextVendorId,
   });
   if (assignmentValidationError) return { error: assignmentValidationError };
   const nextScheduledDate =
@@ -972,7 +1081,7 @@ export async function updateWorkOrderAssignment(
       : ((beforeState.scheduled_end as string | null) ?? null);
 
   const hasSchedule = Boolean(nextScheduledDate || nextScheduledStart || nextScheduledEnd);
-  const hasAssignment = Boolean(nextTechnicianId || nextCrewId);
+  const hasAssignment = Boolean(nextTechnicianId || nextCrewId || nextVendorId);
   const statusComparable = toComparableStatus(status);
   let nextStatus = normalizeStatus(status);
   if (["new", "ready_to_schedule", "scheduled", "draft"].includes(statusComparable)) {
@@ -983,6 +1092,7 @@ export async function updateWorkOrderAssignment(
   const update: Record<string, unknown> = {
     assigned_technician_id: nextTechnicianId,
     assigned_crew_id: nextCrewId,
+    vendor_id: nextVendorId,
     status: nextStatus,
     created_by_user_id: actorId,
   };
@@ -1000,14 +1110,17 @@ export async function updateWorkOrderAssignment(
 
   const afterState = (updated as Record<string, unknown>) ?? {};
   const beforeHadAssignment = Boolean(
-    beforeState.assigned_technician_id || beforeState.assigned_crew_id
+    beforeState.assigned_technician_id ||
+      beforeState.assigned_crew_id ||
+      beforeState.vendor_id
   );
   const beforeHadSchedule = Boolean(
     beforeState.scheduled_date || beforeState.scheduled_start || beforeState.scheduled_end
   );
   const assignmentChanged =
     (beforeState.assigned_technician_id as string | null) !== nextTechnicianId ||
-    (beforeState.assigned_crew_id as string | null) !== nextCrewId;
+    (beforeState.assigned_crew_id as string | null) !== nextCrewId ||
+    (beforeState.vendor_id as string | null) !== nextVendorId;
   const scheduleChanged =
     (beforeState.scheduled_date as string | null) !== nextScheduledDate ||
     (beforeState.scheduled_start as string | null) !== nextScheduledStart ||
@@ -1028,10 +1141,12 @@ export async function updateWorkOrderAssignment(
       beforeState: {
         assigned_technician_id: beforeState.assigned_technician_id as string | null,
         assigned_crew_id: beforeState.assigned_crew_id as string | null,
+        vendor_id: beforeState.vendor_id as string | null,
       },
       afterState: {
         assigned_technician_id: nextTechnicianId,
         assigned_crew_id: nextCrewId,
+        vendor_id: nextVendorId,
       },
       metadata: { source: "updateWorkOrderAssignment" },
     });
@@ -1045,10 +1160,12 @@ export async function updateWorkOrderAssignment(
       beforeState: {
         assigned_technician_id: beforeState.assigned_technician_id as string | null,
         assigned_crew_id: beforeState.assigned_crew_id as string | null,
+        vendor_id: beforeState.vendor_id as string | null,
       },
       afterState: {
         assigned_technician_id: nextTechnicianId,
         assigned_crew_id: nextCrewId,
+        vendor_id: nextVendorId,
       },
       metadata: { source: "updateWorkOrderAssignment", transport: "dispatch" },
     });
@@ -1104,6 +1221,7 @@ export async function updateWorkOrderAssignment(
       beforeState: {
         assigned_technician_id: beforeState.assigned_technician_id as string | null,
         assigned_crew_id: beforeState.assigned_crew_id as string | null,
+        vendor_id: beforeState.vendor_id as string | null,
         scheduled_date: beforeState.scheduled_date as string | null,
         scheduled_start: beforeState.scheduled_start as string | null,
         scheduled_end: beforeState.scheduled_end as string | null,
@@ -1111,6 +1229,7 @@ export async function updateWorkOrderAssignment(
       afterState: {
         assigned_technician_id: null,
         assigned_crew_id: null,
+        vendor_id: null,
         scheduled_date: null,
         scheduled_start: null,
         scheduled_end: null,
@@ -1149,6 +1268,7 @@ export type WorkOrderCompletionPayload = {
   parts_used_summary?: string | null;
   root_cause?: string | null;
   actual_hours?: number | null;
+  vendor_cost?: number | null;
   follow_up_required?: boolean;
   customer_visible_summary?: string | null;
   internal_completion_notes?: string | null;
@@ -1223,6 +1343,7 @@ export async function completeWorkOrder(
     completion_notes: completionNotes,
     root_cause: (payload.root_cause ?? "").trim() || null,
     actual_hours: payload.actual_hours ?? null,
+    vendor_cost: payload.vendor_cost ?? null,
     follow_up_required: payload.follow_up_required ?? false,
     customer_visible_summary: (payload.customer_visible_summary ?? "").trim() || null,
     internal_completion_notes: (payload.internal_completion_notes ?? "").trim() || null,
@@ -1285,6 +1406,7 @@ export async function completeWorkOrder(
     metadata: {
       completed_at: completedAt,
       actual_hours: finalActualHours,
+      vendor_cost: payload.vendor_cost ?? null,
       completion_status: completionStatus,
     },
   });
@@ -1298,6 +1420,7 @@ export async function completeWorkOrder(
     metadata: {
       completed_at: completedAt,
       actual_hours: finalActualHours,
+      vendor_cost: payload.vendor_cost ?? null,
       completion_status: completionStatus,
     },
   });
@@ -1643,7 +1766,7 @@ export async function addWorkOrderNote(
   return { success: true };
 }
 
-export async function uploadWorkOrderPhoto(
+export async function uploadWorkOrderAttachment(
   workOrderId: string,
   payload: {
     fileDataUrl: string;
@@ -1651,6 +1774,7 @@ export async function uploadWorkOrderPhoto(
     mimeType: string;
     caption?: string | null;
     technicianId?: string | null;
+    restrictToImages?: boolean;
   }
 ): Promise<WorkOrderFormState> {
   const tenantId = await getTenantId();
@@ -1670,14 +1794,29 @@ export async function uploadWorkOrderPhoto(
   if (!allowed) return { error: "Unauthorized." };
 
   const dataUrl = (payload.fileDataUrl ?? "").trim();
-  if (!dataUrl.startsWith("data:image/")) {
+  const mimeType = (payload.mimeType ?? "").trim().toLowerCase();
+  if (!dataUrl.startsWith("data:")) {
+    return { error: "Invalid attachment format." };
+  }
+  if (!mimeType || !isSupportedAttachmentMimeType(mimeType)) {
+    return {
+      error:
+        "Unsupported attachment type. Allowed: images, PDF, Word documents, and plain text files.",
+    };
+  }
+  if (payload.restrictToImages && !isImageMimeType(mimeType)) {
     return { error: "Only image uploads are supported." };
   }
-  if (dataUrl.length > 8_000_000) {
-    return { error: "Image is too large. Please use an image under 6MB." };
+  const maxLength = isImageMimeType(mimeType) ? 8_000_000 : 12_000_000;
+  if (dataUrl.length > maxLength) {
+    return {
+      error: isImageMimeType(mimeType)
+        ? "Image is too large. Please use an image under 6MB."
+        : "Attachment is too large. Please use a file under 9MB.",
+    };
   }
 
-  const name = sanitizeFileName(payload.fileName || "photo.jpg") || "photo.jpg";
+  const name = sanitizeFileName(payload.fileName || "attachment") || "attachment";
   const caption = (payload.caption ?? "").trim() || null;
   const resolvedTechnicianId =
     payload.technicianId ||
@@ -1689,8 +1828,10 @@ export async function uploadWorkOrderPhoto(
       work_order_id: workOrderId,
       file_name: name,
       file_url: dataUrl,
-      file_type: payload.mimeType || "image/jpeg",
+      file_type: mimeType,
       uploaded_by_user_id: actorId,
+      uploaded_by: actorId,
+      uploaded_at: new Date().toISOString(),
       technician_id: resolvedTechnicianId,
       caption,
     })
@@ -1698,22 +1839,23 @@ export async function uploadWorkOrderPhoto(
     .single();
   if (error) return { error: error.message };
 
+  const isImage = isImageMimeType(mimeType);
   await insertActivityLog(supabase, {
     tenantId,
     companyId,
     entityType: "work_order",
     entityId: workOrderId,
-    actionType: "work_order_photo_uploaded",
+    actionType: isImage ? "work_order_photo_uploaded" : "work_order_attachment_uploaded",
     performedBy: actorId,
     metadata: {
       attachment_id: (inserted as { id?: string } | null)?.id ?? null,
       file_name: name,
-      mime_type: payload.mimeType || "image/jpeg",
+      mime_type: mimeType,
       technician_id: resolvedTechnicianId,
       caption,
     },
   });
-  if ((row as { asset_id?: string | null }).asset_id) {
+  if (isImage && (row as { asset_id?: string | null }).asset_id) {
     await insertActivityLog(supabase, {
       tenantId,
       companyId,
@@ -1738,6 +1880,22 @@ export async function uploadWorkOrderPhoto(
     revalidatePath(`/assets/${(row as { asset_id: string }).asset_id}`);
   }
   return { success: true };
+}
+
+export async function uploadWorkOrderPhoto(
+  workOrderId: string,
+  payload: {
+    fileDataUrl: string;
+    fileName: string;
+    mimeType: string;
+    caption?: string | null;
+    technicianId?: string | null;
+  }
+): Promise<WorkOrderFormState> {
+  return uploadWorkOrderAttachment(workOrderId, {
+    ...payload,
+    restrictToImages: true,
+  });
 }
 
 export async function toggleWorkOrderChecklistItem(

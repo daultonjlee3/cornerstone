@@ -35,5 +35,6 @@ export type TechnicianPortalAttachment = {
   file_type: string | null;
   caption: string | null;
   technician_id: string | null;
+  uploaded_at?: string | null;
   created_at: string;
 };

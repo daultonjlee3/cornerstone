@@ -22,6 +22,7 @@ export async function saveVendor(
   const payload = {
     company_id: companyId,
     name,
+    service_type: ((formData.get("service_type") as string | null) ?? "").trim() || null,
     contact_name: ((formData.get("contact_name") as string | null) ?? "").trim() || null,
     email: ((formData.get("email") as string | null) ?? "").trim() || null,
     phone: ((formData.get("phone") as string | null) ?? "").trim() || null,

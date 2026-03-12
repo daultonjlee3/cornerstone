@@ -150,6 +150,11 @@ export default async function AssetsPage({
     .select("id, name, company_id")
     .in("company_id", companyIds)
     .order("name");
+  const { data: vendorsData } = await supabase
+    .from("vendors")
+    .select("id, name, company_id, service_type")
+    .in("company_id", companyIds)
+    .order("name");
 
   const { data: assetsForWO } = await supabase
     .from("assets")
@@ -285,6 +290,12 @@ export default async function AssetsPage({
     name: (c as { name: string }).name,
     company_id: (c as { company_id: string }).company_id,
   }));
+  const vendorOptions = (vendorsData ?? []).map((vendor) => ({
+    id: (vendor as { id: string }).id,
+    name: (vendor as { name: string }).name,
+    company_id: (vendor as { company_id: string }).company_id,
+    service_type: (vendor as { service_type?: string | null }).service_type ?? null,
+  }));
   const assetOptionsForWO = (assetsForWO ?? []).map((a) => ({
     id: (a as { id: string }).id,
     name: (a as { asset_name?: string }).asset_name ?? (a as { name?: string }).name ?? (a as { id: string }).id,
@@ -341,6 +352,7 @@ export default async function AssetsPage({
           assets: assetOptionsForWO,
           technicians: technicianOptions,
           crews: crewOptions,
+          vendors: vendorOptions,
           saveWorkOrder,
         }}
       />

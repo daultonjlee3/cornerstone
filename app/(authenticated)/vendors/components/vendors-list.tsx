@@ -17,6 +17,24 @@ type VendorsListProps = {
 
 const PAGE_SIZE = 12;
 
+function formatMinutes(minutes: number | null | undefined): string {
+  if (minutes == null || !Number.isFinite(minutes)) return "—";
+  const normalized = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  if (hours <= 0) return `${mins}m`;
+  return `${hours}h ${String(mins).padStart(2, "0")}m`;
+}
+
+function formatCurrency(value: number | null | undefined): string {
+  const amount = Number(value ?? 0);
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(Number.isFinite(amount) ? amount : 0);
+}
+
 export function VendorsList({ vendors, companies }: VendorsListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -125,11 +143,15 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
       </div>
 
       <DataTable>
-        <Table className="min-w-[860px]">
+        <Table className="min-w-[1120px]">
           <TableHead>
             <Th>Vendor</Th>
             <Th>Company</Th>
+            <Th>Service Type</Th>
             <Th>Contact</Th>
+            <Th>Jobs Completed</Th>
+            <Th>Avg Response</Th>
+            <Th>Total Vendor Cost</Th>
             <Th>Preferred</Th>
             <Th>Updated</Th>
             <Th className="w-32">Actions</Th>
@@ -137,7 +159,7 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
           <TBody>
             {pageRows.length === 0 ? (
               <Tr>
-                <td className="px-4 py-3.5 text-center text-[var(--muted)]" colSpan={6}>
+                <td className="px-4 py-3.5 text-center text-[var(--muted)]" colSpan={10}>
                   No vendors found.
                 </td>
               </Tr>
@@ -153,7 +175,11 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
                   ) : null}
                 </Td>
                 <Td>{vendor.company_name ?? "—"}</Td>
+                <Td>{vendor.service_type ?? "—"}</Td>
                 <Td className="text-[var(--muted)]">{vendor.contact_name ?? vendor.email ?? vendor.phone ?? "—"}</Td>
+                <Td>{vendor.jobs_completed ?? 0}</Td>
+                <Td>{formatMinutes(vendor.average_response_time_minutes)}</Td>
+                <Td>{formatCurrency(vendor.total_vendor_cost)}</Td>
                 <Td>
                   {vendor.preferred_vendor ? (
                     <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700">

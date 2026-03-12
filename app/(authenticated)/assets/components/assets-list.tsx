@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState, useCallback, useEffect } from "react";
+import { useTransition, useState, useCallback } from "react";
 import { deleteAsset, updateAssetStatus } from "../actions";
 import type { Asset } from "./asset-form-modal";
 import { AssetFormModal } from "./asset-form-modal";
@@ -48,6 +48,7 @@ type WorkOrderFormData = {
   assets: { id: string; name: string; company_id: string; property_id: string | null; building_id: string | null; unit_id: string | null }[];
   technicians: { id: string; name: string }[];
   crews: { id: string; name: string; company_id: string | null }[];
+  vendors: { id: string; name: string; company_id: string; service_type?: string | null }[];
   saveWorkOrder: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
 };
 
@@ -133,10 +134,7 @@ export function AssetsList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
-  const [searchLocal, setSearchLocal] = useState(filterParams.q);
   const [selectedAssetForWO, setSelectedAssetForWO] = useState<AssetRow | null>(null);
-
-  useEffect(() => setSearchLocal(filterParams.q), [filterParams.q]);
 
   const applyFilters = useCallback(
     (updates: Record<string, string>) => {
@@ -150,7 +148,9 @@ export function AssetsList({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    applyFilters({ q: searchLocal.trim() });
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const nextQ = String(formData.get("q") ?? "").trim();
+    applyFilters({ q: nextQ });
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -243,9 +243,9 @@ export function AssetsList({
             </label>
             <input
               id="assets-q"
+              name="q"
               type="search"
-              value={searchLocal}
-              onChange={(e) => setSearchLocal(e.target.value)}
+              defaultValue={filterParams.q}
               placeholder="Name, tag, model, serial..."
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             />
@@ -553,9 +553,9 @@ export function AssetsList({
         saveAction={saveAction}
       />
 
-      {workOrderFormData && (
+      {workOrderFormData && selectedAssetForWO ? (
         <WorkOrderFormModal
-          open={!!selectedAssetForWO}
+          open={true}
           onClose={closeWoModal}
           workOrder={null}
           prefill={selectedAssetForWO ? buildWoPrefillFromAsset(selectedAssetForWO) : null}
@@ -567,9 +567,10 @@ export function AssetsList({
           assets={workOrderFormData.assets}
           technicians={workOrderFormData.technicians}
           crews={workOrderFormData.crews}
+          vendors={workOrderFormData.vendors}
           saveAction={workOrderFormData.saveWorkOrder}
         />
-      )}
+      ) : null}
     </div>
   );
 }

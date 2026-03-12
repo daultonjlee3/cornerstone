@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState, useEffect } from "react";
+import { useTransition, useState } from "react";
 import { updateWorkOrderAssignment } from "../actions";
 import { Modal } from "@/src/components/ui/modal";
 import { Button } from "@/src/components/ui/button";
@@ -8,6 +8,7 @@ import { FormField } from "@/src/components/ui/form-field";
 
 type TechnicianOption = { id: string; name: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type VendorOption = { id: string; name: string; company_id: string; service_type?: string | null };
 
 type WorkOrderAssignmentModalProps = {
   open: boolean;
@@ -18,16 +19,29 @@ type WorkOrderAssignmentModalProps = {
   initial: {
     assigned_technician_id: string | null;
     assigned_crew_id: string | null;
+    assigned_vendor_id?: string | null;
     scheduled_date: string | null;
     scheduled_start: string | null;
     scheduled_end: string | null;
   };
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors?: VendorOption[];
   onSuccess: () => void;
 };
 
-type AssignmentMode = "none" | "technician" | "crew";
+type AssignmentMode = "none" | "technician" | "crew" | "vendor";
+
+function deriveAssignmentMode(initial: {
+  assigned_technician_id: string | null;
+  assigned_crew_id: string | null;
+  assigned_vendor_id?: string | null;
+}): AssignmentMode {
+  if (initial.assigned_technician_id) return "technician";
+  if (initial.assigned_crew_id) return "crew";
+  if (initial.assigned_vendor_id) return "vendor";
+  return "none";
+}
 
 function toDateInputValue(iso: string | null): string {
   if (!iso) return "";
@@ -56,43 +70,38 @@ export function WorkOrderAssignmentModal({
   initial,
   technicians,
   crews,
+  vendors = [],
   onSuccess,
 }: WorkOrderAssignmentModalProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("none");
-  const [technicianId, setTechnicianId] = useState("");
-  const [crewId, setCrewId] = useState("");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [scheduledStart, setScheduledStart] = useState("");
-  const [scheduledEnd, setScheduledEnd] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    const nextMode: AssignmentMode = initial.assigned_technician_id
-      ? "technician"
-      : initial.assigned_crew_id
-        ? "crew"
-        : "none";
-    setAssignmentMode(nextMode);
-    setTechnicianId(nextMode === "technician" ? initial.assigned_technician_id ?? "" : "");
-    setCrewId(nextMode === "crew" ? initial.assigned_crew_id ?? "" : "");
-    setScheduledDate(toDateInputValue(initial.scheduled_date));
-    setScheduledStart(toTimeInputValue(initial.scheduled_start));
-    setScheduledEnd(toTimeInputValue(initial.scheduled_end));
-    setError(null);
-  }, [
-    open,
-    initial.assigned_technician_id,
-    initial.assigned_crew_id,
-    initial.scheduled_date,
-    initial.scheduled_start,
-    initial.scheduled_end,
-  ]);
+  const defaultMode = deriveAssignmentMode(initial);
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>(defaultMode);
+  const [technicianId, setTechnicianId] = useState(
+    defaultMode === "technician" ? initial.assigned_technician_id ?? "" : ""
+  );
+  const [crewId, setCrewId] = useState(
+    defaultMode === "crew" ? initial.assigned_crew_id ?? "" : ""
+  );
+  const [vendorId, setVendorId] = useState(
+    defaultMode === "vendor" ? initial.assigned_vendor_id ?? "" : ""
+  );
+  const [scheduledDate, setScheduledDate] = useState(
+    toDateInputValue(initial.scheduled_date)
+  );
+  const [scheduledStart, setScheduledStart] = useState(
+    toTimeInputValue(initial.scheduled_start)
+  );
+  const [scheduledEnd, setScheduledEnd] = useState(
+    toTimeInputValue(initial.scheduled_end)
+  );
 
   const crewsFiltered = companyId
     ? crews.filter((c) => !c.company_id || c.company_id === companyId)
     : crews;
+  const vendorsFiltered = companyId
+    ? vendors.filter((vendor) => vendor.company_id === companyId)
+    : vendors;
 
   const isCompletedOrCancelled =
     workOrderStatus === "completed" || workOrderStatus === "cancelled" || workOrderStatus === "closed";
@@ -116,9 +125,11 @@ export function WorkOrderAssignmentModal({
     startTransition(async () => {
       const nextTechnicianId = assignmentMode === "technician" ? technicianId || null : null;
       const nextCrewId = assignmentMode === "crew" ? crewId || null : null;
+      const nextVendorId = assignmentMode === "vendor" ? vendorId || null : null;
       const result = await updateWorkOrderAssignment(workOrderId, {
         assigned_technician_id: nextTechnicianId,
         assigned_crew_id: nextCrewId,
+        assigned_vendor_id: nextVendorId,
         scheduled_date: scheduledDate || null,
         scheduled_start: startVal,
         scheduled_end: endVal,
@@ -137,7 +148,7 @@ export function WorkOrderAssignmentModal({
       open={open}
       onClose={onClose}
       title="Assign work order"
-      description="Assign to one technician or one crew, then schedule the work."
+      description="Assign to one technician, crew, or external vendor, then schedule the work."
       className="max-w-md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -148,7 +159,7 @@ export function WorkOrderAssignmentModal({
           )}
           <div>
             <p className="ui-label">Assignment type</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <button
                 type="button"
                 className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
@@ -160,6 +171,7 @@ export function WorkOrderAssignmentModal({
                   setAssignmentMode("none");
                   setTechnicianId("");
                   setCrewId("");
+                  setVendorId("");
                 }}
               >
                 Unassigned
@@ -174,6 +186,7 @@ export function WorkOrderAssignmentModal({
                 onClick={() => {
                   setAssignmentMode("technician");
                   setCrewId("");
+                  setVendorId("");
                 }}
               >
                 Technician
@@ -188,9 +201,25 @@ export function WorkOrderAssignmentModal({
                 onClick={() => {
                   setAssignmentMode("crew");
                   setTechnicianId("");
+                  setVendorId("");
                 }}
               >
                 Crew
+              </button>
+              <button
+                type="button"
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                  assignmentMode === "vendor"
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "border-[var(--card-border)] text-[var(--muted)] hover:bg-[var(--background)]"
+                }`}
+                onClick={() => {
+                  setAssignmentMode("vendor");
+                  setTechnicianId("");
+                  setCrewId("");
+                }}
+              >
+                Vendor
               </button>
             </div>
           </div>
@@ -206,6 +235,23 @@ export function WorkOrderAssignmentModal({
               {technicians.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="External vendor" htmlFor="assign-modal-vendor">
+            <select
+              id="assign-modal-vendor"
+              value={vendorId}
+              onChange={(e) => setVendorId(e.target.value)}
+              disabled={assignmentMode !== "vendor"}
+              className="ui-select disabled:cursor-not-allowed disabled:bg-[var(--background)] disabled:text-[var(--muted)]"
+            >
+              <option value="">None</option>
+              {vendorsFiltered.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                  {vendor.service_type ? ` (${vendor.service_type})` : ""}
                 </option>
               ))}
             </select>

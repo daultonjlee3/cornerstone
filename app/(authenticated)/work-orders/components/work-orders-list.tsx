@@ -14,6 +14,7 @@ import { WorkOrderStatusBadge } from "./work-order-status-badge";
 import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
 import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
+import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id: string };
@@ -28,6 +29,12 @@ type AssetOption = {
   unit_id: string | null;
 };
 type TechnicianOption = { id: string; name: string };
+type VendorOption = {
+  id: string;
+  name: string;
+  company_id: string;
+  service_type?: string | null;
+};
 
 export type WorkOrderListStats = WorkOrderKpiStats & {
   new: number;
@@ -39,6 +46,7 @@ export type WorkOrderListStats = WorkOrderKpiStats & {
 type WorkOrderListRow = WorkOrder & {
   technician_name?: string;
   crew_name?: string;
+  vendor_name?: string;
   company_name?: string;
   customer_name?: string;
   location?: string;
@@ -56,6 +64,11 @@ const STATUS_OPTIONS_QUICK = [
 
 type CustomerOption = { id: string; name: string; company_id: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type SlaPolicyOption = {
+  company_id: string;
+  priority: string;
+  response_target_minutes: number;
+};
 
 type WorkOrdersListProps = {
   workOrders: WorkOrderListRow[];
@@ -68,6 +81,8 @@ type WorkOrdersListProps = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors: VendorOption[];
+  slaPolicies: SlaPolicyOption[];
   initialPrefill?: WorkOrderPrefill | null;
   autoOpenNew?: boolean;
   initialEditId?: string | null;
@@ -77,9 +92,13 @@ type WorkOrdersListProps = {
 function assignedDisplay(wo: WorkOrderListRow): string {
   const tech = wo.technician_name;
   const crew = wo.crew_name;
+  const vendor = wo.vendor_name;
   if (tech && crew) return `${tech} / ${crew}`;
+  if (tech && vendor) return `${tech} / ${vendor}`;
+  if (crew && vendor) return `${crew} / ${vendor}`;
   if (tech) return tech;
   if (crew) return crew;
+  if (vendor) return vendor;
   return "—";
 }
 
@@ -104,6 +123,8 @@ export function WorkOrdersList({
   assets,
   technicians,
   crews,
+  vendors,
+  slaPolicies,
   initialPrefill = null,
   autoOpenNew = false,
   initialEditId = null,
@@ -122,6 +143,7 @@ export function WorkOrdersList({
   const [detailDrawerRow, setDetailDrawerRow] = useState<WorkOrderListRow | null>(null);
   const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [slaModalOpen, setSlaModalOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
 
@@ -329,6 +351,14 @@ export function WorkOrdersList({
               </>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setSlaModalOpen(true)}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            title="Configure SLA response targets"
+          >
+            SLA Settings
+          </button>
           <button
             type="button"
             onClick={() => handleExport(initialList.map((w) => w.id))}
@@ -602,21 +632,25 @@ export function WorkOrdersList({
         </div>
       )}
 
-      <WorkOrderFormModal
-        open={modalOpen}
-        onClose={closeModal}
-        workOrder={editingWorkOrder}
-        prefill={editingWorkOrder ? null : prefill}
-        companies={companies}
-        customers={customers}
-        properties={properties}
-        buildings={buildings}
-        units={units}
-        assets={assets}
-        technicians={technicians}
-        crews={crews}
-        saveAction={saveWorkOrder}
-      />
+      {modalOpen ? (
+        <WorkOrderFormModal
+          key={editingWorkOrder?.id ?? "new-work-order"}
+          open={modalOpen}
+          onClose={closeModal}
+          workOrder={editingWorkOrder}
+          prefill={editingWorkOrder ? null : prefill}
+          companies={companies}
+          customers={customers}
+          properties={properties}
+          buildings={buildings}
+          units={units}
+          assets={assets}
+          technicians={technicians}
+          crews={crews}
+          vendors={vendors}
+          saveAction={saveWorkOrder}
+        />
+      ) : null}
 
       <WorkOrderDetailDrawer
         workOrder={detailDrawerRow}
@@ -644,18 +678,28 @@ export function WorkOrdersList({
           initial={{
             assigned_technician_id: assigningWorkOrder.assigned_technician_id ?? null,
             assigned_crew_id: assigningWorkOrder.assigned_crew_id ?? null,
+            assigned_vendor_id: assigningWorkOrder.vendor_id ?? null,
             scheduled_date: assigningWorkOrder.scheduled_date ?? null,
             scheduled_start: assigningWorkOrder.scheduled_start ?? null,
             scheduled_end: assigningWorkOrder.scheduled_end ?? null,
           }}
           technicians={technicians}
           crews={crews}
+          vendors={vendors}
           onSuccess={() => {
             setAssigningWorkOrder(null);
             router.refresh();
           }}
         />
       )}
+      <WorkOrderSlaSettingsModal
+        key={slaModalOpen ? "sla-open" : "sla-closed"}
+        open={slaModalOpen}
+        onClose={() => setSlaModalOpen(false)}
+        companies={companies}
+        policies={slaPolicies}
+        onSaved={() => router.refresh()}
+      />
     </div>
   );
 }
