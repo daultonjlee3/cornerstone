@@ -32,9 +32,12 @@ type DispatchMapPanelProps = {
   filterOptions: DispatchFilterOptions;
   selectedTechnicianId: string | null;
   selectedWorkOrderId: string | null;
+  hoveredWorkOrderId?: string | null;
   assignmentPending?: boolean;
   onSelectTechnician: (technicianId: string | null) => void;
   onSelectWorkOrder: (workOrderId: string | null) => void;
+  onHoverWorkOrder?: (workOrderId: string | null) => void;
+  onOpenWorkOrderDrawer: (workOrderId: string) => void;
   onOpenWorkOrder: (workOrderId: string) => void;
   onAssignFromMap: (workOrderId: string, technicianId: string) => Promise<void>;
   onPatchFilters: (patch: Partial<DispatchFilterState>) => void;
@@ -55,12 +58,21 @@ function shortWorkOrderLabel(workOrder: DispatchWorkOrder): string {
   return `WO-${workOrder.id.slice(0, 6)}`;
 }
 
-function workOrderPinIcon(workOrder: DispatchWorkOrder) {
+function workOrderPinIcon(
+  workOrder: DispatchWorkOrder,
+  selected: boolean,
+  hovered: boolean
+) {
+  const stateClass = selected
+    ? "dispatch-map-pin-selected"
+    : hovered
+      ? "dispatch-map-pin-hovered"
+      : "";
   return divIcon({
     className: "dispatch-map-pin-shell",
-    html: `<span class="dispatch-map-pin ${priorityClass(workOrder.priority)}">WO</span>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
+    html: `<span class="dispatch-map-pin ${priorityClass(workOrder.priority)} ${stateClass}">WO</span>`,
+    iconSize: selected ? [32, 32] : [26, 26],
+    iconAnchor: selected ? [16, 16] : [13, 13],
   });
 }
 
@@ -97,9 +109,12 @@ export function DispatchMapPanel({
   filterOptions,
   selectedTechnicianId,
   selectedWorkOrderId,
+  hoveredWorkOrderId = null,
   assignmentPending = false,
   onSelectTechnician,
   onSelectWorkOrder,
+  onHoverWorkOrder,
+  onOpenWorkOrderDrawer,
   onOpenWorkOrder,
   onAssignFromMap,
   onPatchFilters,
@@ -146,13 +161,6 @@ export function DispatchMapPanel({
     if (!filterState.companyId) return filterOptions.properties;
     return filterOptions.properties.filter((row) => row.company_id === filterState.companyId);
   }, [filterOptions.properties, filterState.companyId]);
-  const buildingOptions = useMemo(() => {
-    const scopedByCompany = filterState.companyId
-      ? filterOptions.buildings.filter((row) => row.company_id === filterState.companyId)
-      : filterOptions.buildings;
-    if (!filterState.propertyId) return scopedByCompany;
-    return scopedByCompany.filter((row) => row.property_id === filterState.propertyId);
-  }, [filterOptions.buildings, filterState.companyId, filterState.propertyId]);
 
   const workOrderCoordinates = useMemo(
     () =>
@@ -285,6 +293,8 @@ export function DispatchMapPanel({
         <MapContainer
           center={[mapCenter.latitude, mapCenter.longitude]}
           zoom={zoomLevel}
+          minZoom={3}
+          maxZoom={19}
           scrollWheelZoom
           className="h-full w-full"
         >
@@ -302,12 +312,18 @@ export function DispatchMapPanel({
                 <Marker
                   key={workOrder.id}
                   position={[workOrder.latitude as number, workOrder.longitude as number]}
-                  icon={workOrderPinIcon(workOrder)}
+                  icon={workOrderPinIcon(
+                    workOrder,
+                    selectedWorkOrderId === workOrder.id,
+                    hoveredWorkOrderId === workOrder.id
+                  )}
                   eventHandlers={{
                     click: () => {
                       onSelectWorkOrder(workOrder.id);
-                      onOpenWorkOrder(workOrder.id);
+                      onOpenWorkOrderDrawer(workOrder.id);
                     },
+                    mouseover: () => onHoverWorkOrder?.(workOrder.id),
+                    mouseout: () => onHoverWorkOrder?.(null),
                   }}
                 >
                   <Popup>
@@ -323,6 +339,13 @@ export function DispatchMapPanel({
                       </p>
                       <p className="text-xs text-slate-600">{locationLine(workOrder)}</p>
                       <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                          onClick={() => onOpenWorkOrderDrawer(workOrder.id)}
+                        >
+                          View details
+                        </button>
                         <button
                           type="button"
                           className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
@@ -363,7 +386,12 @@ export function DispatchMapPanel({
                           key={workOrder.id}
                           type="button"
                           className="block w-full rounded border border-slate-200 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-100"
-                          onClick={() => onOpenWorkOrder(workOrder.id)}
+                          onClick={() => {
+                            onSelectWorkOrder(workOrder.id);
+                            onOpenWorkOrderDrawer(workOrder.id);
+                          }}
+                          onMouseEnter={() => onHoverWorkOrder?.(workOrder.id)}
+                          onMouseLeave={() => onHoverWorkOrder?.(null)}
                         >
                           {shortWorkOrderLabel(workOrder)} · {workOrder.priority ?? "medium"} ·{" "}
                           {workOrder.status ?? "new"}
