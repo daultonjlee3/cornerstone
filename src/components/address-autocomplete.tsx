@@ -20,6 +20,13 @@ type MapboxFeature = {
   geometry?: { type?: string; coordinates?: [number, number] };
   address?: string;
   text?: string;
+  properties?: {
+    full_address?: string;
+    name?: string;
+    place_formatted?: string;
+    context?: Record<string, { name?: string; text?: string } | null> | null;
+    coordinates?: { longitude?: number; latitude?: number } | null;
+  };
   context?: Array<{ id: string; text: string }>;
 };
 
@@ -28,23 +35,53 @@ type MapboxResponse = {
 };
 
 function parseFeature(f: MapboxFeature): AddressSuggestion | null {
-  const coords = f?.center?.length === 2 ? f.center : f?.geometry?.coordinates?.length === 2 ? f.geometry.coordinates : null;
+  const coords =
+    f?.center?.length === 2
+      ? f.center
+      : f?.geometry?.coordinates?.length === 2
+        ? f.geometry.coordinates
+        : f?.properties?.coordinates?.longitude != null &&
+            f?.properties?.coordinates?.latitude != null
+          ? [f.properties.coordinates.longitude, f.properties.coordinates.latitude]
+          : null;
   if (!coords) return null;
   const [longitude, latitude] = coords;
-  const ctx = (f.context ?? []).reduce(
-    (acc, c) => {
-      const id = (c.id ?? "").toLowerCase();
-      if (id.startsWith("region")) acc.region = c.text;
-      else if (id.startsWith("place")) acc.place = c.text;
-      else if (id.startsWith("postcode")) acc.postcode = c.text;
-      else if (id.startsWith("country")) acc.country = c.text;
-      return acc;
-    },
-    {} as { region?: string; place?: string; postcode?: string; country?: string }
-  );
+  const ctx = {
+    region: undefined as string | undefined,
+    place: undefined as string | undefined,
+    postcode: undefined as string | undefined,
+    country: undefined as string | undefined,
+  };
+  const legacyContext = Array.isArray(f.context) ? f.context : [];
+  for (const c of legacyContext) {
+    const id = (c.id ?? "").toLowerCase();
+    if (id.startsWith("region")) ctx.region = c.text;
+    else if (id.startsWith("place")) ctx.place = c.text;
+    else if (id.startsWith("postcode")) ctx.postcode = c.text;
+    else if (id.startsWith("country")) ctx.country = c.text;
+  }
+  const v6Context = f.properties?.context;
+  if (v6Context && typeof v6Context === "object") {
+    const pick = (key: string): string | undefined => {
+      const value = v6Context[key];
+      if (!value) return undefined;
+      return value.name ?? value.text ?? undefined;
+    };
+    ctx.region = ctx.region ?? pick("region");
+    ctx.place = ctx.place ?? pick("place");
+    ctx.postcode = ctx.postcode ?? pick("postcode");
+    ctx.country = ctx.country ?? pick("country");
+  }
   const addressLine1 = [f.address, f.text].filter(Boolean).join(" ").trim()
+    || f.properties?.name?.trim()
+    || f.properties?.full_address?.split(",")[0]?.trim()
     || (f.place_name ?? "").split(",")[0]?.trim()
     || null;
+  const placeName =
+    f.place_name
+    ?? f.properties?.full_address
+    ?? [f.properties?.name, f.properties?.place_formatted].filter(Boolean).join(", ")
+    ?? "";
   return {
     address_line1: addressLine1,
     city: ctx.place ?? null,
@@ -53,7 +90,7 @@ function parseFeature(f: MapboxFeature): AddressSuggestion | null {
     country: ctx.country ?? null,
     latitude,
     longitude,
-    place_name: f.place_name ?? "",
+    place_name: placeName,
   };
 }
 
@@ -84,37 +121,63 @@ function tokenDebugMeta(raw: string | null | undefined, normalized: string | nul
 async function fetchSuggestions(query: string, token: string): Promise<AddressSuggestion[]> {
   const q = query.trim();
   if (!q || q.length < MIN_QUERY_LENGTH) return [];
-  const url = new URL(
+  const v6 = new URL("https://api.mapbox.com/search/geocode/v6/forward");
+  v6.searchParams.set("access_token", token);
+  v6.searchParams.set("q", q);
+  v6.searchParams.set("limit", "5");
+  v6.searchParams.set("types", "address,street,place,postcode");
+
+  const v5 = new URL(
     "https://api.mapbox.com/geocoding/v5/mapbox.places/" + encodeURIComponent(q) + ".json"
   );
-  url.searchParams.set("access_token", token);
-  url.searchParams.set("types", "address,place");
-  url.searchParams.set("limit", "5");
-  const urlStr = url.toString();
-  const res = await fetch(urlStr);
-  let data: MapboxResponse & { message?: string };
-  try {
-    data = (await res.json()) as MapboxResponse & { message?: string };
-  } catch {
-    data = {};
-  }
-  if (!res.ok) {
-    const msg = data?.message ?? res.statusText;
-    console.error("[AddressAutocomplete] Mapbox request failed:", res.status, msg, urlStr.replace(token, "***"));
-    if (res.status === 401) {
-      console.warn(
-        "[AddressAutocomplete] 401 Invalid Token: Check (1) token in .env.local matches https://account.mapbox.com/access-tokens/ , " +
-        "(2) if URL restrictions are set, add http://localhost:3000 and your production URL, (3) token has Geocoding scope."
-      );
+  v5.searchParams.set("access_token", token);
+  v5.searchParams.set("types", "address,place");
+  v5.searchParams.set("limit", "5");
+
+  const endpoints = [
+    { label: "v6", url: v6.toString() },
+    { label: "v5", url: v5.toString() },
+  ];
+
+  let sawUnauthorized = false;
+  for (const endpoint of endpoints) {
+    const res = await fetch(endpoint.url);
+    let data: MapboxResponse & { message?: string };
+    try {
+      data = (await res.json()) as MapboxResponse & { message?: string };
+    } catch {
+      data = {};
     }
+    if (!res.ok) {
+      if (res.status === 401) sawUnauthorized = true;
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          `[AddressAutocomplete] Mapbox ${endpoint.label} failed:`,
+          res.status,
+          data?.message ?? res.statusText
+        );
+      }
+      continue;
+    }
+    const out: AddressSuggestion[] = [];
+    for (const f of data.features ?? []) {
+      const parsed = parseFeature(f);
+      if (parsed) out.push(parsed);
+    }
+    if (out.length > 0) return out;
     return [];
   }
-  const out: AddressSuggestion[] = [];
-  for (const f of data.features ?? []) {
-    const parsed = parseFeature(f);
-    if (parsed) out.push(parsed);
+
+  if (sawUnauthorized) {
+    console.error(
+      "[AddressAutocomplete] Mapbox request failed with 401 on both v6 and v5 endpoints."
+    );
+    console.warn(
+      "[AddressAutocomplete] 401 Invalid Token: Check (1) token in .env.local matches https://account.mapbox.com/access-tokens/ , " +
+      "(2) if URL restrictions are set, add http://localhost:3000 and your production URL, (3) token has Geocoding/Search scope."
+    );
   }
-  return out;
+  return [];
 }
 
 type AddressAutocompleteProps = {
