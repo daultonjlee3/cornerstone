@@ -80,7 +80,7 @@ export async function saveProperty(
     name: propertyName,
     property_name: propertyName,
     company_id: companyId,
-    address_line1,
+    address_line1: addressLine1,
     address_line2: (formData.get("address_line2") as string)?.trim() || null,
     city,
     state,

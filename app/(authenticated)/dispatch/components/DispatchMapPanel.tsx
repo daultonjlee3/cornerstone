@@ -285,6 +285,8 @@ export function DispatchMapPanel({
         <MapContainer
           center={[mapCenter.latitude, mapCenter.longitude]}
           zoom={zoomLevel}
+          minZoom={3}
+          maxZoom={19}
           scrollWheelZoom
           className="h-full w-full"
         >
