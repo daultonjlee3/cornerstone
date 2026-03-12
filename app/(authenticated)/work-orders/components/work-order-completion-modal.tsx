@@ -2,9 +2,32 @@
 
 import { useTransition, useState } from "react";
 import type { WorkOrderCompletionPayload } from "../actions";
-import { completeWorkOrder } from "../actions";
+import {
+  completeWorkOrder,
+  addWorkOrderPartUsage,
+  type AddPartUsagePayload,
+  uploadWorkOrderPhoto,
+} from "../actions";
+import { PhotoUploader } from "@/src/components/ui/photo-uploader";
 
 type TechnicianOption = { id: string; name: string };
+type InventoryItemOption = {
+  id: string;
+  product_id: string;
+  stock_location_id: string;
+  name: string;
+  location_name: string;
+  sku: string | null;
+  unit: string | null;
+  cost: number | null;
+  quantity: number;
+};
+
+type QueuedPart = {
+  id: string;
+  payload: AddPartUsagePayload;
+  displayName: string;
+};
 
 const COMPLETION_STATUS_OPTIONS = [
   { value: "successful", label: "Successful" },
@@ -19,6 +42,8 @@ type WorkOrderCompletionModalProps = {
   technicians: TechnicianOption[];
   assignedTechnicianId: string | null;
   estimatedHours: number | null;
+  inventoryItems?: InventoryItemOption[];
+  technicianIdForUpload?: string | null;
   enforceChecklistCompletion?: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -42,6 +67,8 @@ export function WorkOrderCompletionModal({
   technicians,
   assignedTechnicianId,
   estimatedHours,
+  inventoryItems = [],
+  technicianIdForUpload = null,
   enforceChecklistCompletion = false,
   onClose,
   onSuccess,
@@ -60,6 +87,76 @@ export function WorkOrderCompletionModal({
   const [customerVisibleSummary, setCustomerVisibleSummary] = useState("");
   const [internalCompletionNotes, setInternalCompletionNotes] = useState("");
   const [completedByTechnicianId, setCompletedByTechnicianId] = useState<string>(assignedTechnicianId ?? "");
+  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
+  const [inventoryOptionId, setInventoryOptionId] = useState("");
+  const [partNameManual, setPartNameManual] = useState("");
+  const [partQty, setPartQty] = useState("");
+  const [partUnitCost, setPartUnitCost] = useState("");
+  const [partNotes, setPartNotes] = useState("");
+  const [partDeductInventory, setPartDeductInventory] = useState(true);
+  const [queuedParts, setQueuedParts] = useState<QueuedPart[]>([]);
+
+  const selectedItem = inventoryOptionId
+    ? inventoryItems.find((item) => item.id === inventoryOptionId)
+    : null;
+  const effectivePartCost =
+    partUnitCost !== ""
+      ? partUnitCost
+      : selectedItem?.cost != null
+        ? String(selectedItem.cost)
+        : "";
+
+  const queuePart = () => {
+    setError(null);
+    const qty = Number(partQty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setError("Part quantity must be greater than zero.");
+      return;
+    }
+    const unitCostValue =
+      effectivePartCost === "" ? null : Number(effectivePartCost);
+    if (unitCostValue != null && (!Number.isFinite(unitCostValue) || unitCostValue < 0)) {
+      setError("Part unit cost must be zero or greater.");
+      return;
+    }
+    if (!inventoryOptionId && !partNameManual.trim()) {
+      setError("Select an inventory product or provide a part name.");
+      return;
+    }
+
+    const payload: AddPartUsagePayload = {
+      quantity_used: qty,
+      unit_cost: unitCostValue,
+      notes: partNotes.trim() || undefined,
+      deduct_inventory: Boolean(inventoryOptionId && partDeductInventory),
+    };
+    let displayName = partNameManual.trim();
+    if (selectedItem) {
+      payload.product_id = selectedItem.product_id;
+      payload.stock_location_id = selectedItem.stock_location_id;
+      payload.part_name_snapshot = selectedItem.name;
+      payload.sku_snapshot = selectedItem.sku ?? null;
+      payload.unit_of_measure = selectedItem.unit ?? null;
+      displayName = selectedItem.name;
+    } else {
+      payload.part_name_snapshot = partNameManual.trim();
+    }
+
+    setQueuedParts((current) => [
+      ...current,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        payload,
+        displayName: displayName || "Part",
+      },
+    ]);
+    setInventoryOptionId("");
+    setPartNameManual("");
+    setPartQty("");
+    setPartUnitCost("");
+    setPartNotes("");
+    setPartDeductInventory(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +167,18 @@ export function WorkOrderCompletionModal({
       return;
     }
     startTransition(async () => {
+      let remainingParts = [...queuedParts];
+      for (let index = 0; index < queuedParts.length; index += 1) {
+        const queuedPart = queuedParts[index];
+        const partResult = await addWorkOrderPartUsage(workOrderId, queuedPart.payload);
+        if (partResult.error) {
+          remainingParts = queuedParts.slice(index);
+          setQueuedParts(remainingParts);
+          setError(`Failed to log part "${queuedPart.displayName}": ${partResult.error}`);
+          return;
+        }
+      }
+
       const payload: WorkOrderCompletionPayload = {
         completed_at: completedAt ? new Date(completedAt).toISOString() : null,
         completion_date: completedAt ? completedAt.slice(0, 10) : null,
@@ -90,6 +199,7 @@ export function WorkOrderCompletionModal({
         setError(result.error);
         return;
       }
+      setQueuedParts([]);
       onSuccess();
       onClose();
     });
@@ -256,6 +366,165 @@ export function WorkOrderCompletionModal({
                 <span className="text-sm text-[var(--foreground)]">Follow-up required</span>
               </label>
             </div>
+          </div>
+
+          {/* B2. Parts used */}
+          <div>
+            <h3 className={sectionTitleClass}>Parts used</h3>
+            <p className="mb-3 text-xs text-[var(--muted)]">
+              Record parts during closeout; inventory can be deducted automatically.
+            </p>
+            <div className="space-y-3 rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-3">
+              <div>
+                <label htmlFor="completion-part-stocked" className={labelOptionalClass}>
+                  Product from inventory
+                </label>
+                <select
+                  id="completion-part-stocked"
+                  value={inventoryOptionId}
+                  onChange={(e) => {
+                    setInventoryOptionId(e.target.value);
+                    setPartUnitCost("");
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Manual entry</option>
+                  {inventoryItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                      {item.sku ? ` (${item.sku})` : ""} — {item.quantity} on hand
+                      {item.location_name ? ` @ ${item.location_name}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {!inventoryOptionId ? (
+                <div>
+                  <label htmlFor="completion-part-name" className={labelOptionalClass}>
+                    Part / product name
+                  </label>
+                  <input
+                    id="completion-part-name"
+                    type="text"
+                    value={partNameManual}
+                    onChange={(e) => setPartNameManual(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="completion-part-qty" className={labelOptionalClass}>
+                    Quantity used
+                  </label>
+                  <input
+                    id="completion-part-qty"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={partQty}
+                    onChange={(e) => setPartQty(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="completion-part-cost" className={labelOptionalClass}>
+                    Unit cost
+                  </label>
+                  <input
+                    id="completion-part-cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={effectivePartCost}
+                    onChange={(e) => setPartUnitCost(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="completion-part-notes" className={labelOptionalClass}>
+                  Part notes
+                </label>
+                <input
+                  id="completion-part-notes"
+                  type="text"
+                  value={partNotes}
+                  onChange={(e) => setPartNotes(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              {inventoryOptionId ? (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={partDeductInventory}
+                    onChange={(e) => setPartDeductInventory(e.target.checked)}
+                    className="rounded border-[var(--card-border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                  <span className="text-sm text-[var(--foreground)]">Deduct from inventory</span>
+                </label>
+              ) : null}
+              <button
+                type="button"
+                onClick={queuePart}
+                className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+              >
+                Add part to completion
+              </button>
+            </div>
+            {queuedParts.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {queuedParts.map((part) => (
+                  <li
+                    key={part.id}
+                    className="flex items-center justify-between rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium text-[var(--foreground)]">{part.displayName}</p>
+                      <p className="text-xs text-[var(--muted)]">
+                        Qty {part.payload.quantity_used}
+                        {part.payload.unit_cost != null
+                          ? ` • $${Number(part.payload.unit_cost).toFixed(2)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQueuedParts((current) =>
+                          current.filter((entry) => entry.id !== part.id)
+                        )
+                      }
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+
+          {/* B3. Completion photos */}
+          <div>
+            <h3 className={sectionTitleClass}>Completion photos</h3>
+            {photoMessage ? (
+              <p className="mb-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
+                {photoMessage}
+              </p>
+            ) : null}
+            <PhotoUploader
+              onUpload={async (photoPayload) => {
+                const result = await uploadWorkOrderPhoto(workOrderId, {
+                  ...photoPayload,
+                  technicianId: technicianIdForUpload ?? (completedByTechnicianId || null),
+                });
+                if (result.error) throw new Error(result.error);
+                setPhotoMessage("Photo uploaded.");
+              }}
+              disabled={isPending}
+            />
           </div>
 
           {/* C. Customer notes */}

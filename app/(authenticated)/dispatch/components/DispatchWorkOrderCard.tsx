@@ -126,6 +126,7 @@ export function DispatchWorkOrderCard({
   const jobType = getJobType(workOrder);
   const typeBadgeClass = getTypeBadgeClass(jobType);
   const overdue = isOverdue(workOrder);
+  const slaBreached = Boolean(workOrder.sla_response_breached);
   const showActions = showQuickActions && !isDragging && onOpenWorkOrder;
   const preventDragFromAction = (event: React.SyntheticEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -133,7 +134,13 @@ export function DispatchWorkOrderCard({
 
   if (variant === "compact") {
     return (
-      <DispatchCard priority={priority} isOverdue={overdue} isDragging={isDragging} className="text-sm">
+      <DispatchCard
+        priority={priority}
+        isOverdue={overdue}
+        isSlaBreached={slaBreached}
+        isDragging={isDragging}
+        className="text-sm"
+      >
         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           {workOrder.work_order_number ?? "Work order"}
         </p>
@@ -152,6 +159,7 @@ export function DispatchWorkOrderCard({
     <DispatchCard
       priority={priority}
       isOverdue={overdue}
+        isSlaBreached={slaBreached}
       isDragging={isDragging}
       className="h-full cursor-grab active:cursor-grabbing"
     >
@@ -175,6 +183,11 @@ export function DispatchWorkOrderCard({
         {overdue ? (
           <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
             Overdue
+          </span>
+        ) : null}
+        {slaBreached ? (
+          <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+            SLA Breach
           </span>
         ) : null}
         {travelEstimate ? (

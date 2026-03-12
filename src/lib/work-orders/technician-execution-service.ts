@@ -78,6 +78,7 @@ type Attachment = {
   file_type: string | null;
   caption: string | null;
   technician_id: string | null;
+  uploaded_at?: string | null;
   created_at: string;
 };
 
@@ -278,7 +279,7 @@ export async function getTechnicianExecutionPayload(
       })(),
       supabase
         .from("work_order_attachments")
-        .select("id, file_name, file_url, file_type, caption, technician_id, created_at")
+        .select("id, file_name, file_url, file_type, caption, technician_id, uploaded_at, created_at")
         .eq("work_order_id", workOrderId)
         .order("created_at", { ascending: false }),
       supabase

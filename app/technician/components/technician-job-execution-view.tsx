@@ -210,6 +210,9 @@ export function TechnicianJobExecutionView({
   const isInProgress = workOrder.status === "in_progress";
   const isOnHold = workOrder.status === "on_hold";
   const checklistProgress = workOrder.checklist_progress;
+  const photoAttachments = attachments.filter((attachment) =>
+    String(attachment.file_type ?? "").startsWith("image/")
+  );
 
   const activeEntry = useMemo(
     () =>
@@ -736,11 +739,11 @@ export function TechnicianJobExecutionView({
 
       <section className="space-y-2 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
         <h2 className="text-sm font-semibold text-[var(--foreground)]">Uploaded photos</h2>
-        {attachments.length === 0 ? (
+        {photoAttachments.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">No photos attached yet.</p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            {attachments.map((attachment) => (
+            {photoAttachments.map((attachment) => (
               <a
                 key={attachment.id}
                 href={attachment.file_url}
@@ -797,6 +800,8 @@ export function TechnicianJobExecutionView({
           technicians={technicians}
           assignedTechnicianId={workOrder.assigned_technician_id}
           estimatedHours={workOrder.estimated_hours}
+          inventoryItems={inventoryItems}
+          technicianIdForUpload={workOrder.technician_id_for_actor}
           enforceChecklistCompletion={enforceChecklistCompletion}
           onClose={() => setCompletionOpen(false)}
           onSuccess={() => router.refresh()}

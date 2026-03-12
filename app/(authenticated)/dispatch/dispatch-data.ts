@@ -1,5 +1,10 @@
 import { createClient } from "@/src/lib/supabase/server";
 import type { DispatchWorkOrder, DispatchCrew } from "./types";
+import {
+  calculateWorkOrderSlaSnapshot,
+  groupSlaPoliciesByCompany,
+  type WorkOrderSlaPolicyRow,
+} from "@/src/lib/work-orders/sla";
 
 export type LoadDispatchResult = {
   crews: DispatchCrew[];
@@ -200,6 +205,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     { data: crewsData },
     { data: techniciansData },
     { data: assetsData },
+    { data: slaPoliciesData },
   ] = await Promise.all([
     supabase.from("companies").select("id, name").eq("tenant_id", tenantId).order("name"),
     supabase
@@ -230,6 +236,10 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     .in("company_id", companyIds)
       .order("asset_name")
       .order("name"),
+    supabase
+      .from("work_order_sla_policies")
+      .select("company_id, priority, response_target_minutes")
+      .in("company_id", companyIds),
   ]);
 
   const companyList = (companies ?? []) as { id: string; name: string }[];
@@ -293,6 +303,9 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
 
   const technicianNameById = new Map(allTechnicians.map((t) => [t.id, t.name]));
   const crewNameById = new Map(crewList.map((c) => [c.id, c.name]));
+  const slaPolicyByCompany = groupSlaPoliciesByCompany(
+    ((slaPoliciesData ?? []) as unknown) as WorkOrderSlaPolicyRow[]
+  );
 
   const crewIds = crewList.map((c) => c.id);
   const crewMembersByCrewId = new Map<string, string[]>();
@@ -317,6 +330,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     .select(
       `
       id, title, status, priority, category, latitude, longitude,
+      created_at, first_response_at, completed_at, response_time_minutes, resolution_time_minutes,
       scheduled_date, scheduled_start, scheduled_end, due_date,
       assigned_crew_id, assigned_technician_id, estimated_hours,
       company_id, property_id, building_id, unit_id,
@@ -502,6 +516,18 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
         : "unassigned";
     const categoryValue = (rest.category as string | null | undefined) ?? null;
     if (categoryValue) categorySet.add(categoryValue);
+    const companyId = (rest.company_id as string | null | undefined) ?? null;
+    const sla = calculateWorkOrderSlaSnapshot({
+      priority: (rest.priority as string | null | undefined) ?? null,
+      createdAt: (rest.created_at as string | null | undefined) ?? null,
+      firstResponseAt: (rest.first_response_at as string | null | undefined) ?? null,
+      completedAt: (rest.completed_at as string | null | undefined) ?? null,
+      responseTimeMinutes:
+        (rest.response_time_minutes as number | null | undefined) ?? null,
+      resolutionTimeMinutes:
+        (rest.resolution_time_minutes as number | null | undefined) ?? null,
+      companyPolicyMap: companyId ? slaPolicyByCompany.get(companyId) ?? null : null,
+    });
     return {
       ...rest,
       property_name: propertyName,
@@ -515,6 +541,11 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
       assigned_technician_name,
       assigned_crew_name: assigned_crew_name ?? undefined,
       assignment_type,
+      sla_response_due_at: sla.responseDueAt,
+      sla_response_breached: sla.responseBreached,
+      sla_response_pending: sla.responsePending,
+      sla_response_target_minutes: sla.responseTargetMinutes,
+      sla_response_exceeded_by_minutes: sla.responseExceededByMinutes,
     } as DispatchWorkOrder;
   });
 

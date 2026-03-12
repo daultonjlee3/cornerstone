@@ -2,6 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { WorkOrderDetailView, type PartUsageForDetail } from "../components/work-order-detail-view";
+import {
+  calculateWorkOrderSlaSnapshot,
+  groupSlaPoliciesByCompany,
+  type WorkOrderSlaPolicyRow,
+} from "@/src/lib/work-orders/sla";
 
 export const metadata = {
   title: "Work Order | Cornerstone Tech",
@@ -36,6 +41,7 @@ export default async function WorkOrderDetailPage({
       company_id, customer_id, property_id, building_id, unit_id, asset_id,
       source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date, completed_at,
+      first_response_at, response_time_minutes, resolution_time_minutes,
       completion_date, resolution_summary, completion_notes, root_cause,
       follow_up_required, customer_visible_summary, internal_completion_notes,
       completed_by_technician_id, completion_status,
@@ -58,7 +64,8 @@ export default async function WorkOrderDetailPage({
 
   if (error || !woRaw) notFound();
 
-  const companyId = (woRaw as { company_id?: string }).company_id;
+  const companyId = String((woRaw as { company_id?: string }).company_id ?? "");
+  if (!companyId) notFound();
   const { data: companyRow } = await supabase
     .from("companies")
     .select("id")
@@ -66,6 +73,11 @@ export default async function WorkOrderDetailPage({
     .eq("tenant_id", membership.tenant_id)
     .maybeSingle();
   if (!companyRow) notFound();
+
+  const { data: slaPolicyRows } = await supabase
+    .from("work_order_sla_policies")
+    .select("company_id, priority, response_target_minutes")
+    .eq("company_id", companyId);
 
   const row = woRaw as Record<string, unknown>;
   const comp = Array.isArray(row.companies) ? row.companies[0] : row.companies;
@@ -143,6 +155,22 @@ export default async function WorkOrderDetailPage({
     crew_member_names: crewMemberNames,
     completed_by_technician_name: completedByTechnicianName,
   };
+  const slaPolicyMapByCompany = groupSlaPoliciesByCompany(
+    ((slaPolicyRows ?? []) as unknown) as WorkOrderSlaPolicyRow[]
+  );
+  const workOrderRecord = workOrder as Record<string, unknown>;
+  const sla = calculateWorkOrderSlaSnapshot({
+    priority: (workOrderRecord.priority as string | null | undefined) ?? null,
+    createdAt: (workOrderRecord.created_at as string | null | undefined) ?? null,
+    firstResponseAt:
+      (workOrderRecord.first_response_at as string | null | undefined) ?? null,
+    completedAt: (workOrderRecord.completed_at as string | null | undefined) ?? null,
+    responseTimeMinutes:
+      (workOrderRecord.response_time_minutes as number | null | undefined) ?? null,
+    resolutionTimeMinutes:
+      (workOrderRecord.resolution_time_minutes as number | null | undefined) ?? null,
+    companyPolicyMap: slaPolicyMapByCompany.get(companyId) ?? null,
+  });
 
   const { data: notes } = await supabase
     .from("work_order_notes")
@@ -187,7 +215,7 @@ export default async function WorkOrderDetailPage({
 
   const { data: attachments } = await supabase
     .from("work_order_attachments")
-    .select("id, file_name, file_url, file_type, created_at")
+    .select("id, file_name, file_url, file_type, caption, uploaded_at, created_at")
     .eq("work_order_id", id)
     .order("created_at", { ascending: false });
 
@@ -246,9 +274,20 @@ export default async function WorkOrderDetailPage({
           };
         }) as unknown) as PartUsageForDetail[]}
         statusHistory={(statusHistory ?? []) as { id: string; from_status: string | null; to_status: string; changed_at: string }[]}
-        attachments={(attachments ?? []) as { id: string; file_name: string; file_url: string; file_type: string | null; created_at: string }[]}
+        attachments={
+          (attachments ?? []) as {
+            id: string;
+            file_name: string;
+            file_url: string;
+            file_type: string | null;
+            caption?: string | null;
+            uploaded_at?: string | null;
+            created_at: string;
+          }[]
+        }
         technicians={technicianOptions}
         crews={crewOptions}
+        sla={sla}
         inventoryItems={((inventoryItems ?? []).map((row) => {
           const record = row as Record<string, unknown>;
           const product = Array.isArray(record.products) ? record.products[0] : record.products;

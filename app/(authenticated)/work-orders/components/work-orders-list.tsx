@@ -14,6 +14,7 @@ import { WorkOrderStatusBadge } from "./work-order-status-badge";
 import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
 import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
+import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id: string };
@@ -56,6 +57,11 @@ const STATUS_OPTIONS_QUICK = [
 
 type CustomerOption = { id: string; name: string; company_id: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type SlaPolicyOption = {
+  company_id: string;
+  priority: string;
+  response_target_minutes: number;
+};
 
 type WorkOrdersListProps = {
   workOrders: WorkOrderListRow[];
@@ -68,6 +74,7 @@ type WorkOrdersListProps = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  slaPolicies: SlaPolicyOption[];
   initialPrefill?: WorkOrderPrefill | null;
   autoOpenNew?: boolean;
   initialEditId?: string | null;
@@ -104,6 +111,7 @@ export function WorkOrdersList({
   assets,
   technicians,
   crews,
+  slaPolicies,
   initialPrefill = null,
   autoOpenNew = false,
   initialEditId = null,
@@ -122,6 +130,7 @@ export function WorkOrdersList({
   const [detailDrawerRow, setDetailDrawerRow] = useState<WorkOrderListRow | null>(null);
   const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [slaModalOpen, setSlaModalOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
 
@@ -329,6 +338,14 @@ export function WorkOrdersList({
               </>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setSlaModalOpen(true)}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            title="Configure SLA response targets"
+          >
+            SLA Settings
+          </button>
           <button
             type="button"
             onClick={() => handleExport(initialList.map((w) => w.id))}
@@ -656,6 +673,14 @@ export function WorkOrdersList({
           }}
         />
       )}
+      <WorkOrderSlaSettingsModal
+        key={slaModalOpen ? "sla-open" : "sla-closed"}
+        open={slaModalOpen}
+        onClose={() => setSlaModalOpen(false)}
+        companies={companies}
+        policies={slaPolicies}
+        onSaved={() => router.refresh()}
+      />
     </div>
   );
 }

@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
-import { updateWorkOrderStatus, toggleWorkOrderChecklistItem } from "../actions";
+import {
+  updateWorkOrderStatus,
+  toggleWorkOrderChecklistItem,
+  uploadWorkOrderAttachment,
+} from "../actions";
 import { WorkOrderCompletionModal } from "./work-order-completion-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
 import { WorkOrderHeader } from "./work-order-header";
@@ -15,6 +19,7 @@ import { WorkOrderCostSummary } from "./work-order-cost-summary";
 import { WorkOrderNotesCard } from "./work-order-notes-card";
 import { WorkOrderStatusTimeline } from "./work-order-status-timeline";
 import { WorkOrderCompletionCard } from "./work-order-completion-card";
+import { AttachmentUploader } from "@/src/components/ui/attachment-uploader";
 
 const STATUS_OPTIONS_FOR_DROPDOWN = [
   "new",
@@ -34,9 +39,26 @@ type WorkOrderDetailViewProps = {
   checklistItems: { id: string; label: string; completed: boolean; sort_order: number }[];
   partUsage: PartUsageForDetail[];
   statusHistory: { id: string; from_status: string | null; to_status: string; changed_at: string }[];
-  attachments: { id: string; file_name: string; file_url: string; file_type: string | null; created_at: string }[];
+  attachments: {
+    id: string;
+    file_name: string;
+    file_url: string;
+    file_type: string | null;
+    caption?: string | null;
+    uploaded_at?: string | null;
+    created_at: string;
+  }[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  sla: {
+    responseTargetMinutes: number;
+    responseDueAt: string | null;
+    responseTimeMinutes: number | null;
+    resolutionTimeMinutes: number | null;
+    responseBreached: boolean;
+    responsePending: boolean;
+    responseExceededByMinutes: number | null;
+  };
   inventoryItems: {
     id: string;
     product_id: string;
@@ -78,6 +100,7 @@ export function WorkOrderDetailView({
   attachments,
   technicians,
   crews,
+  sla,
   inventoryItems,
 }: WorkOrderDetailViewProps) {
   const router = useRouter();
@@ -91,6 +114,14 @@ export function WorkOrderDetailView({
   const status = (workOrder.status as string) ?? "new";
   const priority = (workOrder.priority as string) ?? "medium";
   const isCompleted = status === "completed";
+
+  const formatDuration = (minutes: number | null) => {
+    if (minutes == null) return "—";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours <= 0) return `${mins}m`;
+    return `${hours}h ${String(mins).padStart(2, "0")}m`;
+  };
 
   const setStatus = (newStatus: string) => {
     setStatusDropdown(false);
@@ -123,6 +154,7 @@ export function WorkOrderDetailView({
           technicians={technicians}
           assignedTechnicianId={(workOrder.assigned_technician_id as string) ?? null}
           estimatedHours={(workOrder.estimated_hours as number) ?? null}
+          inventoryItems={inventoryItems}
           onClose={() => setCompletionModalOpen(false)}
           onSuccess={() => router.refresh()}
         />
@@ -155,6 +187,14 @@ export function WorkOrderDetailView({
           onCompleteClick={() => setCompletionModalOpen(true)}
           isPending={isPending}
         />
+        {sla.responseBreached ? (
+          <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-300">
+            Response SLA breached
+            {sla.responseExceededByMinutes != null
+              ? ` by ${formatDuration(sla.responseExceededByMinutes)}.`
+              : "."}
+          </div>
+        ) : null}
 
         {statusDropdown && (
           <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-3 shadow-sm">
@@ -198,9 +238,46 @@ export function WorkOrderDetailView({
           />
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-3">
           <WorkOrderOverviewCard workOrder={workOrder} />
           <WorkOrderLocationCard workOrder={workOrder} />
+          <div className={cardClass}>
+            <h2 className={cardTitleClass}>SLA</h2>
+            <dl className="space-y-2 text-sm">
+              <div>
+                <dt className="text-xs text-[var(--muted)]">Response target</dt>
+                <dd className="text-[var(--foreground)]">{formatDuration(sla.responseTargetMinutes)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[var(--muted)]">Response due by</dt>
+                <dd className="text-[var(--foreground)]">
+                  {sla.responseDueAt ? new Date(sla.responseDueAt).toLocaleString() : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[var(--muted)]">First response time</dt>
+                <dd className="text-[var(--foreground)]">
+                  {sla.responsePending ? "Pending" : formatDuration(sla.responseTimeMinutes)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[var(--muted)]">Resolution time</dt>
+                <dd className="text-[var(--foreground)]">{formatDuration(sla.resolutionTimeMinutes)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[var(--muted)]">SLA status</dt>
+                <dd
+                  className={
+                    sla.responseBreached
+                      ? "font-medium text-red-600 dark:text-red-400"
+                      : "font-medium text-emerald-700 dark:text-emerald-400"
+                  }
+                >
+                  {sla.responseBreached ? "Breached" : sla.responsePending ? "Pending" : "Met"}
+                </dd>
+              </div>
+            </dl>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -242,27 +319,37 @@ export function WorkOrderDetailView({
           {attachments.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">No attachments.</p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="space-y-2">
               {attachments.map((a) => (
-                <li key={a.id}>
+                <li key={a.id} className="rounded border border-[var(--card-border)] bg-[var(--background)] p-2">
                   <a
                     href={a.file_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-[var(--accent)] hover:underline"
+                    className="text-sm font-medium text-[var(--accent)] hover:underline"
                   >
-                    {a.file_name}
+                    {a.caption?.trim() || a.file_name}
                   </a>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">
+                    {(a.file_type ?? "file").replace("application/", "")}
+                    {" • "}
+                    {new Date(a.uploaded_at ?? a.created_at).toLocaleString()}
+                  </p>
                 </li>
               ))}
             </ul>
           )}
-          <button
-            type="button"
-            className="mt-3 rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--background)]/80"
-          >
-            Upload (placeholder)
-          </button>
+          <AttachmentUploader
+            className="mt-3"
+            label="Upload image, PDF, or document"
+            submitLabel="Upload attachment"
+            onUpload={async (payload) => {
+              const result = await uploadWorkOrderAttachment(id, payload);
+              if (result.error) throw new Error(result.error);
+              setMessage({ type: "success", text: "Attachment uploaded." });
+              router.refresh();
+            }}
+          />
         </div>
       </div>
     </>

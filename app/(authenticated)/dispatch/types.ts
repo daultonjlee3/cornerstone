@@ -38,6 +38,16 @@ export type DispatchWorkOrder = {
   source_type?: string | null;
   preventive_maintenance_plan_id?: string | null;
   updated_at?: string | null;
+  created_at?: string | null;
+  first_response_at?: string | null;
+  completed_at?: string | null;
+  response_time_minutes?: number | null;
+  resolution_time_minutes?: number | null;
+  sla_response_due_at?: string | null;
+  sla_response_breached?: boolean;
+  sla_response_pending?: boolean;
+  sla_response_target_minutes?: number | null;
+  sla_response_exceeded_by_minutes?: number | null;
   [key: string]: unknown;
 };
 

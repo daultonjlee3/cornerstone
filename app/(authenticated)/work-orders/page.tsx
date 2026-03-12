@@ -8,13 +8,14 @@ export const metadata = {
   description: "Operational hub for triage, dispatch, and work order management",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function WorkOrdersPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -54,6 +55,11 @@ export default async function WorkOrdersPage({
       </div>
     );
   }
+
+  const { data: slaPoliciesData } = await supabase
+    .from("work_order_sla_policies")
+    .select("company_id, priority, response_target_minutes")
+    .in("company_id", companyIds);
 
   const { data: properties } = await supabase
     .from("properties")
@@ -141,52 +147,66 @@ export default async function WorkOrdersPage({
     unit_id: (a as { unit_id?: string }).unit_id ?? null,
   }));
 
-  const newParam = searchParams?.new;
+  const newParam = resolvedSearchParams?.new;
   const wantNew = newParam === "1" || newParam === "true";
   const prefill = wantNew
     ? {
-        company_id: typeof searchParams?.company_id === "string" ? searchParams.company_id : undefined,
-        property_id: typeof searchParams?.property_id === "string" ? searchParams.property_id : undefined,
-        building_id: typeof searchParams?.building_id === "string" ? searchParams.building_id : undefined,
-        unit_id: typeof searchParams?.unit_id === "string" ? searchParams.unit_id : undefined,
-        asset_id: typeof searchParams?.asset_id === "string" ? searchParams.asset_id : undefined,
-        title: typeof searchParams?.title === "string" ? decodeURIComponent(searchParams.title) : undefined,
-        description: typeof searchParams?.description === "string" ? decodeURIComponent(searchParams.description) : undefined,
+        company_id: typeof resolvedSearchParams?.company_id === "string" ? resolvedSearchParams.company_id : undefined,
+        property_id: typeof resolvedSearchParams?.property_id === "string" ? resolvedSearchParams.property_id : undefined,
+        building_id: typeof resolvedSearchParams?.building_id === "string" ? resolvedSearchParams.building_id : undefined,
+        unit_id: typeof resolvedSearchParams?.unit_id === "string" ? resolvedSearchParams.unit_id : undefined,
+        asset_id: typeof resolvedSearchParams?.asset_id === "string" ? resolvedSearchParams.asset_id : undefined,
+        title: typeof resolvedSearchParams?.title === "string" ? decodeURIComponent(resolvedSearchParams.title) : undefined,
+        description:
+          typeof resolvedSearchParams?.description === "string"
+            ? decodeURIComponent(resolvedSearchParams.description)
+            : undefined,
       }
     : null;
   const autoOpenNew = wantNew && (prefill?.company_id ?? prefill?.property_id ?? prefill?.building_id ?? prefill?.unit_id ?? prefill?.asset_id ?? prefill?.title ?? prefill?.description);
-  const editId = typeof searchParams?.edit === "string" ? searchParams.edit : null;
+  const editId = typeof resolvedSearchParams?.edit === "string" ? resolvedSearchParams.edit : null;
   const technicianOptions = (techniciansData ?? []).map((t) => ({
     id: t.id,
     name: (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? t.id,
   }));
 
-  const q = typeof searchParams?.q === "string" ? searchParams.q.trim() : "";
-  const filterStatus = typeof searchParams?.status === "string" ? searchParams.status : null;
-  const filterPriority = typeof searchParams?.priority === "string" ? searchParams.priority : null;
-  const filterCategory = typeof searchParams?.category === "string" ? searchParams.category : null;
-  const filterCompany = typeof searchParams?.company_id === "string" ? searchParams.company_id : null;
-  const filterProperty = typeof searchParams?.property_id === "string" ? searchParams.property_id : null;
-  const filterBuilding = typeof searchParams?.building_id === "string" ? searchParams.building_id : null;
-  const filterUnit = typeof searchParams?.unit_id === "string" ? searchParams.unit_id : null;
-  const filterAsset = typeof searchParams?.asset_id === "string" ? searchParams.asset_id : null;
-  const filterTechnician = typeof searchParams?.technician_id === "string" ? searchParams.technician_id : null;
-  const filterCrew = typeof searchParams?.crew_id === "string" ? searchParams.crew_id : null;
-  const filterSourceType = typeof searchParams?.source_type === "string" ? searchParams.source_type : null;
-  const filterOverdue = searchParams?.overdue === "1" || searchParams?.overdue === "true";
-  const filterUnassigned = searchParams?.unassigned === "1" || searchParams?.unassigned === "true";
-  const filterDueToday = searchParams?.due_today === "1" || searchParams?.due_today === "true";
-  const filterCompletedToday = searchParams?.completed_today === "1" || searchParams?.completed_today === "true";
-  const viewPreset = typeof searchParams?.view === "string" ? searchParams.view : null;
-  const dateFrom = typeof searchParams?.date_from === "string" ? searchParams.date_from : null;
-  const dateTo = typeof searchParams?.date_to === "string" ? searchParams.date_to : null;
-  const filterCompletionStatus = typeof searchParams?.completion_status === "string" ? searchParams.completion_status : null;
-  const completedFrom = typeof searchParams?.completed_from === "string" ? searchParams.completed_from : null;
-  const completedTo = typeof searchParams?.completed_to === "string" ? searchParams.completed_to : null;
-  const sortBy = typeof searchParams?.sort === "string" && ["updated_at", "scheduled_date", "due_date", "completed_at", "priority", "status"].includes(searchParams.sort)
-    ? searchParams.sort
+  const q = typeof resolvedSearchParams?.q === "string" ? resolvedSearchParams.q.trim() : "";
+  const filterStatus = typeof resolvedSearchParams?.status === "string" ? resolvedSearchParams.status : null;
+  const filterPriority = typeof resolvedSearchParams?.priority === "string" ? resolvedSearchParams.priority : null;
+  const filterCategory = typeof resolvedSearchParams?.category === "string" ? resolvedSearchParams.category : null;
+  const filterCompany = typeof resolvedSearchParams?.company_id === "string" ? resolvedSearchParams.company_id : null;
+  const filterProperty = typeof resolvedSearchParams?.property_id === "string" ? resolvedSearchParams.property_id : null;
+  const filterBuilding = typeof resolvedSearchParams?.building_id === "string" ? resolvedSearchParams.building_id : null;
+  const filterUnit = typeof resolvedSearchParams?.unit_id === "string" ? resolvedSearchParams.unit_id : null;
+  const filterAsset = typeof resolvedSearchParams?.asset_id === "string" ? resolvedSearchParams.asset_id : null;
+  const filterTechnician = typeof resolvedSearchParams?.technician_id === "string" ? resolvedSearchParams.technician_id : null;
+  const filterCrew = typeof resolvedSearchParams?.crew_id === "string" ? resolvedSearchParams.crew_id : null;
+  const filterSourceType = typeof resolvedSearchParams?.source_type === "string" ? resolvedSearchParams.source_type : null;
+  const filterOverdue = resolvedSearchParams?.overdue === "1" || resolvedSearchParams?.overdue === "true";
+  const filterUnassigned =
+    resolvedSearchParams?.unassigned === "1" || resolvedSearchParams?.unassigned === "true";
+  const filterDueToday = resolvedSearchParams?.due_today === "1" || resolvedSearchParams?.due_today === "true";
+  const filterCompletedToday =
+    resolvedSearchParams?.completed_today === "1" || resolvedSearchParams?.completed_today === "true";
+  const viewPreset = typeof resolvedSearchParams?.view === "string" ? resolvedSearchParams.view : null;
+  const dateFrom = typeof resolvedSearchParams?.date_from === "string" ? resolvedSearchParams.date_from : null;
+  const dateTo = typeof resolvedSearchParams?.date_to === "string" ? resolvedSearchParams.date_to : null;
+  const filterCompletionStatus =
+    typeof resolvedSearchParams?.completion_status === "string"
+      ? resolvedSearchParams.completion_status
+      : null;
+  const completedFrom =
+    typeof resolvedSearchParams?.completed_from === "string" ? resolvedSearchParams.completed_from : null;
+  const completedTo =
+    typeof resolvedSearchParams?.completed_to === "string" ? resolvedSearchParams.completed_to : null;
+  const sortBy =
+    typeof resolvedSearchParams?.sort === "string" &&
+    ["updated_at", "scheduled_date", "due_date", "completed_at", "priority", "status"].includes(
+      resolvedSearchParams.sort
+    )
+    ? resolvedSearchParams.sort
     : "updated_at";
-  const sortOrder = searchParams?.order === "asc" ? "asc" : "desc";
+  const sortOrder = resolvedSearchParams?.order === "asc" ? "asc" : "desc";
   const today = new Date().toISOString().slice(0, 10);
 
   let query = supabase
@@ -356,6 +376,13 @@ export default async function WorkOrdersPage({
         assets={assetOptions}
         technicians={technicianOptions}
         crews={crewOptions}
+        slaPolicies={
+          (slaPoliciesData ?? []) as {
+            company_id: string;
+            priority: string;
+            response_target_minutes: number;
+          }[]
+        }
         initialPrefill={prefill}
         autoOpenNew={!!autoOpenNew}
         initialEditId={editId}

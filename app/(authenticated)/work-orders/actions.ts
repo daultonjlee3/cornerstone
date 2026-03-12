@@ -326,6 +326,33 @@ function sanitizeFileName(name: string): string {
     .slice(0, 120);
 }
 
+const SLA_PRIORITIES = ["low", "medium", "high", "urgent", "emergency"] as const;
+type SlaPriority = (typeof SLA_PRIORITIES)[number];
+
+const DEFAULT_SLA_RESPONSE_TARGET_MINUTES: Record<SlaPriority, number> = {
+  emergency: 60,
+  urgent: 120,
+  high: 240,
+  medium: 1440,
+  low: 4320,
+};
+
+const SUPPORTED_ATTACHMENT_MIME_TYPES = new Set<string>([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
+function isSupportedAttachmentMimeType(mimeType: string): boolean {
+  const normalized = mimeType.toLowerCase();
+  return normalized.startsWith("image/") || SUPPORTED_ATTACHMENT_MIME_TYPES.has(normalized);
+}
+
+function isImageMimeType(mimeType: string): boolean {
+  return mimeType.toLowerCase().startsWith("image/");
+}
+
 export async function saveWorkOrder(
   _prev: WorkOrderFormState,
   formData: FormData
@@ -909,6 +936,64 @@ export async function logDispatchRebalance(
     },
   });
   return {};
+}
+
+export type WorkOrderSlaPolicyInput = {
+  priority: SlaPriority;
+  response_target_minutes: number;
+};
+
+export async function upsertWorkOrderSlaPolicies(
+  companyId: string,
+  policies: WorkOrderSlaPolicyInput[]
+): Promise<WorkOrderFormState> {
+  const tenantId = await getTenantId();
+  if (!tenantId) return { error: "Unauthorized." };
+  if (!companyId) return { error: "Company is required." };
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { error: "Unauthorized." };
+
+  const supabase = await createClient();
+  const actorId = await getActorId(supabase);
+
+  const incoming = new Map<SlaPriority, number>();
+  for (const policy of policies) {
+    if (!SLA_PRIORITIES.includes(policy.priority)) continue;
+    const minutes = Number(policy.response_target_minutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return { error: `Response target for ${policy.priority} must be greater than zero.` };
+    }
+    incoming.set(policy.priority, Math.round(minutes));
+  }
+
+  const upsertRows = SLA_PRIORITIES.map((priority) => ({
+    company_id: companyId,
+    priority,
+    response_target_minutes:
+      incoming.get(priority) ?? DEFAULT_SLA_RESPONSE_TARGET_MINUTES[priority],
+  }));
+
+  const { error } = await supabase
+    .from("work_order_sla_policies")
+    .upsert(upsertRows, { onConflict: "company_id,priority" });
+  if (error) return { error: error.message };
+
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId,
+    entityType: "work_order_sla_policy",
+    entityId: companyId,
+    actionType: "work_order_sla_policy_updated",
+    performedBy: actorId,
+    metadata: {
+      policies: upsertRows,
+      source: "upsertWorkOrderSlaPolicies",
+    },
+  });
+
+  revalidatePath("/work-orders");
+  revalidatePath("/dispatch");
+  return { success: true };
 }
 
 export type WorkOrderAssignmentPayload = {
@@ -1643,7 +1728,7 @@ export async function addWorkOrderNote(
   return { success: true };
 }
 
-export async function uploadWorkOrderPhoto(
+export async function uploadWorkOrderAttachment(
   workOrderId: string,
   payload: {
     fileDataUrl: string;
@@ -1651,6 +1736,7 @@ export async function uploadWorkOrderPhoto(
     mimeType: string;
     caption?: string | null;
     technicianId?: string | null;
+    restrictToImages?: boolean;
   }
 ): Promise<WorkOrderFormState> {
   const tenantId = await getTenantId();
@@ -1670,14 +1756,29 @@ export async function uploadWorkOrderPhoto(
   if (!allowed) return { error: "Unauthorized." };
 
   const dataUrl = (payload.fileDataUrl ?? "").trim();
-  if (!dataUrl.startsWith("data:image/")) {
+  const mimeType = (payload.mimeType ?? "").trim().toLowerCase();
+  if (!dataUrl.startsWith("data:")) {
+    return { error: "Invalid attachment format." };
+  }
+  if (!mimeType || !isSupportedAttachmentMimeType(mimeType)) {
+    return {
+      error:
+        "Unsupported attachment type. Allowed: images, PDF, Word documents, and plain text files.",
+    };
+  }
+  if (payload.restrictToImages && !isImageMimeType(mimeType)) {
     return { error: "Only image uploads are supported." };
   }
-  if (dataUrl.length > 8_000_000) {
-    return { error: "Image is too large. Please use an image under 6MB." };
+  const maxLength = isImageMimeType(mimeType) ? 8_000_000 : 12_000_000;
+  if (dataUrl.length > maxLength) {
+    return {
+      error: isImageMimeType(mimeType)
+        ? "Image is too large. Please use an image under 6MB."
+        : "Attachment is too large. Please use a file under 9MB.",
+    };
   }
 
-  const name = sanitizeFileName(payload.fileName || "photo.jpg") || "photo.jpg";
+  const name = sanitizeFileName(payload.fileName || "attachment") || "attachment";
   const caption = (payload.caption ?? "").trim() || null;
   const resolvedTechnicianId =
     payload.technicianId ||
@@ -1689,8 +1790,10 @@ export async function uploadWorkOrderPhoto(
       work_order_id: workOrderId,
       file_name: name,
       file_url: dataUrl,
-      file_type: payload.mimeType || "image/jpeg",
+      file_type: mimeType,
       uploaded_by_user_id: actorId,
+      uploaded_by: actorId,
+      uploaded_at: new Date().toISOString(),
       technician_id: resolvedTechnicianId,
       caption,
     })
@@ -1698,22 +1801,23 @@ export async function uploadWorkOrderPhoto(
     .single();
   if (error) return { error: error.message };
 
+  const isImage = isImageMimeType(mimeType);
   await insertActivityLog(supabase, {
     tenantId,
     companyId,
     entityType: "work_order",
     entityId: workOrderId,
-    actionType: "work_order_photo_uploaded",
+    actionType: isImage ? "work_order_photo_uploaded" : "work_order_attachment_uploaded",
     performedBy: actorId,
     metadata: {
       attachment_id: (inserted as { id?: string } | null)?.id ?? null,
       file_name: name,
-      mime_type: payload.mimeType || "image/jpeg",
+      mime_type: mimeType,
       technician_id: resolvedTechnicianId,
       caption,
     },
   });
-  if ((row as { asset_id?: string | null }).asset_id) {
+  if (isImage && (row as { asset_id?: string | null }).asset_id) {
     await insertActivityLog(supabase, {
       tenantId,
       companyId,
@@ -1738,6 +1842,22 @@ export async function uploadWorkOrderPhoto(
     revalidatePath(`/assets/${(row as { asset_id: string }).asset_id}`);
   }
   return { success: true };
+}
+
+export async function uploadWorkOrderPhoto(
+  workOrderId: string,
+  payload: {
+    fileDataUrl: string;
+    fileName: string;
+    mimeType: string;
+    caption?: string | null;
+    technicianId?: string | null;
+  }
+): Promise<WorkOrderFormState> {
+  return uploadWorkOrderAttachment(workOrderId, {
+    ...payload,
+    restrictToImages: true,
+  });
 }
 
 export async function toggleWorkOrderChecklistItem(
