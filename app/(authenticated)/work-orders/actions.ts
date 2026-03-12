@@ -4,6 +4,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { createTenantNotification, sendEmailAlert } from "@/src/lib/notifications";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
   calculateNextRunDateAfterExecution,
@@ -92,6 +93,31 @@ async function getActorId(
     data: { user },
   } = await supabase.auth.getUser();
   return user?.id ?? null;
+}
+
+async function getCompanyAlertRecipients(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  companyId: string | null
+): Promise<string[]> {
+  if (!companyId) return [];
+  const { data: company } = await supabase
+    .from("companies")
+    .select("email, primary_contact_email")
+    .eq("id", companyId)
+    .limit(1)
+    .maybeSingle();
+  if (!company) return [];
+  const payload = company as {
+    email?: string | null;
+    primary_contact_email?: string | null;
+  };
+  return Array.from(
+    new Set(
+      [payload.email ?? null, payload.primary_contact_email ?? null].filter(
+        (email): email is string => Boolean(email && email.includes("@"))
+      )
+    )
+  );
 }
 
 async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
@@ -1169,6 +1195,34 @@ export async function updateWorkOrderAssignment(
       },
       metadata: { source: "updateWorkOrderAssignment", transport: "dispatch" },
     });
+
+    try {
+      const workOrderLabel =
+        (afterState.work_order_number as string | null) ??
+        (afterState.title as string | null) ??
+        "Work order";
+      await createTenantNotification(supabase, {
+        tenantId,
+        type: "work_order_assigned",
+        entityType: "work_order",
+        entityId: id,
+        message: `${workOrderLabel} was assigned.`,
+        metadata: {
+          assigned_technician_id: nextTechnicianId,
+          assigned_crew_id: nextCrewId,
+          vendor_id: nextVendorId,
+          company_id: companyId,
+        },
+      });
+      const recipients = await getCompanyAlertRecipients(supabase, companyId);
+      await sendEmailAlert({
+        subject: "Work order assigned",
+        message: `${workOrderLabel} was assigned and scheduled for execution.`,
+        recipients,
+      });
+    } catch {
+      // Notification delivery is best-effort and should not block assignment updates.
+    }
   }
   if (scheduleChanged && hasSchedule) {
     await insertActivityLog(supabase, {
