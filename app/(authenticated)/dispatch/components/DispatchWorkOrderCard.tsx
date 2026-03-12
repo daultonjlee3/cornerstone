@@ -52,6 +52,9 @@ function getAssignmentLine(wo: DispatchWorkOrder): { label: string; tone: string
   if (wo.assigned_crew_name) {
     return { label: `Assigned to ${wo.assigned_crew_name}`, tone: "text-teal-700" };
   }
+  if (wo.vendor_name) {
+    return { label: `Vendor ${wo.vendor_name}`, tone: "text-purple-700" };
+  }
   return { label: "Unassigned", tone: "text-amber-700" };
 }
 
@@ -132,6 +135,7 @@ export function DispatchWorkOrderCard({
   const jobType = getJobType(workOrder);
   const typeBadgeClass = getTypeBadgeClass(jobType);
   const overdue = isOverdue(workOrder);
+  const slaBreached = Boolean(workOrder.sla_response_breached);
   const showActions = showQuickActions && !isDragging && onOpenWorkOrder;
   const preventDragFromAction = (event: React.SyntheticEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -146,6 +150,9 @@ export function DispatchWorkOrderCard({
         className={`text-sm ${isHighlighted ? "ring-2 ring-[var(--accent)]/30" : ""}`}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        isSlaBreached={slaBreached}
+        isDragging={isDragging}
+        className="text-sm"
       >
         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           {workOrder.work_order_number ?? "Work order"}
@@ -165,6 +172,7 @@ export function DispatchWorkOrderCard({
     <DispatchCard
       priority={priority}
       isOverdue={overdue}
+        isSlaBreached={slaBreached}
       isDragging={isDragging}
       className={`h-full cursor-grab active:cursor-grabbing ${
         isHighlighted ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : ""
@@ -192,6 +200,11 @@ export function DispatchWorkOrderCard({
         {overdue ? (
           <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
             Overdue
+          </span>
+        ) : null}
+        {slaBreached ? (
+          <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+            SLA Breach
           </span>
         ) : null}
         {travelEstimate ? (

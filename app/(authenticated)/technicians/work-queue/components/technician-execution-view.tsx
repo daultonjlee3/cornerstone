@@ -305,6 +305,7 @@ export function TechnicianExecutionView({
           technicians={technicians}
           assignedTechnicianId={workOrder.assigned_technician_id}
           estimatedHours={workOrder.estimated_hours}
+          inventoryItems={inventoryItems}
           onClose={() => setCompletionOpen(false)}
           onSuccess={() => router.refresh()}
         />

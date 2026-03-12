@@ -13,6 +13,7 @@ export type WorkOrder = {
   building_id: string | null;
   unit_id: string | null;
   asset_id: string | null;
+  vendor_id?: string | null;
   description: string | null;
   safety_notes?: string | null;
   category: string | null;
@@ -55,6 +56,7 @@ type AssetOption = {
 };
 type TechnicianOption = { id: string; name: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type VendorOption = { id: string; name: string; company_id: string; service_type?: string | null };
 
 export type WorkOrderPrefill = {
   company_id?: string;
@@ -82,6 +84,7 @@ type WorkOrderFormModalProps = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors: VendorOption[];
   saveAction: (
     prev: { error?: string; success?: boolean },
     formData: FormData
@@ -252,15 +255,13 @@ export function WorkOrderFormModal({
   assets,
   technicians,
   crews,
+  vendors,
   saveAction,
 }: WorkOrderFormModalProps) {
   const isEdit = !!workOrder?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
 
-  const initial = useMemo(
-    () => getInitialLocation(workOrder, prefill),
-    [workOrder?.id, prefill, open]
-  );
+  const initial = getInitialLocation(workOrder, prefill);
 
   const [companyId, setCompanyId] = useState(initial.companyId);
   const [customerId, setCustomerId] = useState(initial.customerId);
@@ -268,17 +269,6 @@ export function WorkOrderFormModal({
   const [buildingId, setBuildingId] = useState(initial.buildingId);
   const [unitId, setUnitId] = useState(initial.unitId);
   const [assetId, setAssetId] = useState(initial.assetId);
-
-  useEffect(() => {
-    if (!open) return;
-    const next = getInitialLocation(workOrder, prefill);
-    setCompanyId(next.companyId);
-    setCustomerId(next.customerId);
-    setPropertyId(next.propertyId);
-    setBuildingId(next.buildingId);
-    setUnitId(next.unitId);
-    setAssetId(next.assetId);
-  }, [open, workOrder?.id, prefill?.company_id, prefill?.customer_id, prefill?.property_id, prefill?.building_id, prefill?.unit_id, prefill?.asset_id]);
 
   useEffect(() => {
     if (state?.success) onClose();
@@ -318,6 +308,10 @@ export function WorkOrderFormModal({
   const crewsFiltered = useMemo(
     () => (companyId ? crews.filter((c) => !c.company_id || c.company_id === companyId) : crews),
     [companyId, crews]
+  );
+  const vendorsFiltered = useMemo(
+    () => (companyId ? vendors.filter((vendor) => vendor.company_id === companyId) : []),
+    [companyId, vendors]
   );
   const assetsFiltered = useMemo(() => {
     if (!companyId) return [];
@@ -604,7 +598,7 @@ export function WorkOrderFormModal({
                 <label htmlFor="due_date" className={labelClass}>Due Date</label>
                 <DateInputWithPicker id="due_date" name="due_date" type="date" defaultValue={wo.due_date ?? ""} className={inputClass} aria-label="Due date" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="assigned_technician_id" className={labelClass}>Assigned Technician</label>
                   <select id="assigned_technician_id" name="assigned_technician_id" defaultValue={wo.assigned_technician_id ?? ""} className={inputClass}>
@@ -623,7 +617,27 @@ export function WorkOrderFormModal({
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label htmlFor="assigned_vendor_id" className={labelClass}>External Vendor</label>
+                  <select
+                    id="assigned_vendor_id"
+                    name="assigned_vendor_id"
+                    defaultValue={wo.vendor_id ?? ""}
+                    className={inputClass}
+                  >
+                    <option value="">None</option>
+                    {vendorsFiltered.map((vendor) => (
+                      <option key={vendor.id} value={vendor.id}>
+                        {vendor.name}
+                        {vendor.service_type ? ` (${vendor.service_type})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+              <p className="text-xs text-[var(--muted)]">
+                Choose one assignment target: technician, crew, or external vendor.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="estimated_hours" className={labelClass}>Estimated Hours</label>

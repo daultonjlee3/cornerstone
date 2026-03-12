@@ -241,6 +241,55 @@ export default async function TechnicianWorkPage() {
   const completedTodayCount = completed.filter((job) => isoDate(job.completedAt) === today).length;
   const overdueCount = overdue.length;
 
+  const { data: completionStatsRows } = await supabase
+    .from("work_orders")
+    .select("created_at, completed_at")
+    .in("company_id", companyIds)
+    .eq("status", "completed")
+    .or(
+      `assigned_technician_id.eq.${currentTechnician.id},completed_by_technician_id.eq.${currentTechnician.id}`
+    );
+  const averageCompletionMinutes = (() => {
+    let total = 0;
+    let count = 0;
+    for (const row of completionStatsRows ?? []) {
+      const record = row as { created_at?: string | null; completed_at?: string | null };
+      if (!record.created_at || !record.completed_at) continue;
+      const start = new Date(record.created_at).getTime();
+      const end = new Date(record.completed_at).getTime();
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+      total += Math.floor((end - start) / 60000);
+      count += 1;
+    }
+    return count > 0 ? Math.round(total / count) : null;
+  })();
+  const formatMinutes = (minutes: number | null) => {
+    if (minutes == null) return "—";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours <= 0) return `${mins}m`;
+    return `${hours}h ${String(mins).padStart(2, "0")}m`;
+  };
+  const timeLogsResult = await supabase
+    .from("work_order_time_logs")
+    .select("duration_minutes")
+    .eq("technician_id", currentTechnician.id);
+  const fallbackTimeLogs =
+    timeLogsResult.error != null
+      ? await supabase
+          .from("work_order_labor_entries")
+          .select("duration_minutes")
+          .eq("technician_id", currentTechnician.id)
+      : null;
+  const laborMinutesTotal = ((timeLogsResult.error ? fallbackTimeLogs?.data : timeLogsResult.data) ??
+    [])
+    .reduce((sum, row) => {
+      const minutes = (row as { duration_minutes?: number | null }).duration_minutes;
+      if (typeof minutes !== "number" || !Number.isFinite(minutes)) return sum;
+      return sum + Math.max(0, minutes);
+    }, 0);
+  const laborHoursTotal = (laborMinutesTotal / 60).toFixed(2);
+
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)]">
@@ -266,6 +315,23 @@ export default async function TechnicianWorkPage() {
         <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3">
           <p className="text-xs text-[var(--muted)]">Overdue</p>
           <p className="text-lg font-semibold text-red-700">{overdueCount}</p>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3">
+          <p className="text-xs text-[var(--muted)]">Jobs Completed</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">{completed.length}</p>
+        </div>
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3">
+          <p className="text-xs text-[var(--muted)]">Avg Completion Time</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">
+            {formatMinutes(averageCompletionMinutes)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3">
+          <p className="text-xs text-[var(--muted)]">Labor Hours Logged</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">{laborHoursTotal}</p>
         </div>
       </section>
 

@@ -24,7 +24,11 @@ function Row({ label, value }: { label: string; value?: unknown }) {
 }
 
 export function WorkOrderSchedulingCard({ workOrder, onAssignTechnician }: WorkOrderSchedulingCardProps) {
-  const hasTechnician = !!(workOrder.technician_name as string);
+  const hasAssignment = Boolean(
+    (workOrder.technician_name as string | null | undefined) ||
+      (workOrder.crew_name as string | null | undefined) ||
+      (workOrder.vendor_name as string | null | undefined)
+  );
   const scheduledStart = workOrder.scheduled_start ? formatDateTime(workOrder.scheduled_start as string) : null;
   const scheduledEnd = workOrder.scheduled_end ? formatDateTime(workOrder.scheduled_end as string) : null;
   const scheduledRange = [scheduledStart, scheduledEnd].filter(Boolean).join(" – ") || null;
@@ -42,6 +46,7 @@ export function WorkOrderSchedulingCard({ workOrder, onAssignTechnician }: WorkO
         <Row label="Due date" value={formatDate(workOrder.due_date as string)} />
         <Row label="Assigned technician" value={workOrder.technician_name != null ? String(workOrder.technician_name) : "—"} />
         <Row label="Assigned crew" value={workOrder.crew_name != null ? String(workOrder.crew_name) : "—"} />
+        <Row label="External vendor" value={workOrder.vendor_name != null ? String(workOrder.vendor_name) : "—"} />
         {workOrder.crew_name && workOrder.crew_lead_name ? (
           <Row label="Crew lead" value={crewLeadName} />
         ) : null}
@@ -51,10 +56,10 @@ export function WorkOrderSchedulingCard({ workOrder, onAssignTechnician }: WorkO
         <Row label="Estimated hours" value={workOrder.estimated_hours != null ? String(workOrder.estimated_hours) : null} />
         <Row label="Actual hours" value={workOrder.actual_hours != null ? String(workOrder.actual_hours) : null} />
       </dl>
-      {!hasTechnician && (
+      {!hasAssignment && (
         <div className="mt-4">
           <button type="button" onClick={onAssignTechnician} className={btnClass}>
-            Assign technician
+            Assign work order
           </button>
         </div>
       )}
