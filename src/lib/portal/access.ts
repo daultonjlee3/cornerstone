@@ -71,16 +71,22 @@ export async function resolvePortalAccessContext(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: membership } = await supabase
+  const { data: membershipRows } = await supabase
     .from("tenant_memberships")
     .select("tenant_id, role")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership?.tenant_id) return null;
+    .eq("user_id", user.id);
+  const firstMembership = (membershipRows ?? [])[0] as
+    | { tenant_id: string; role?: string }
+    | undefined;
+  if (!firstMembership?.tenant_id) return null;
 
-  const membershipRole = (membership.role as string | null | undefined) ?? "member";
-  const isAdmin = isAdminRole(membershipRole);
+  const membershipRole =
+    (firstMembership.role as string | null | undefined) ?? "member";
+  const isAdmin =
+    isAdminRole(membershipRole) ||
+    (membershipRows ?? []).some((m) =>
+      isAdminRole((m as { role?: string }).role)
+    );
   const impersonationCookie = await getImpersonationSession();
   const impersonation =
     isAdmin && impersonationCookie?.admin_user_id === user.id ? impersonationCookie : null;
@@ -99,7 +105,7 @@ export async function resolvePortalAccessContext(
   let technicianQuery = supabase
     .from("technicians")
     .select("id, technician_name, name, company_id, status, user_id")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", firstMembership.tenant_id)
     .eq("status", "active")
     .eq("user_id", targetUserId)
     .limit(1);
@@ -127,7 +133,7 @@ export async function resolvePortalAccessContext(
 
   return {
     userId: user.id,
-    tenantId: membership.tenant_id,
+    tenantId: firstMembership.tenant_id,
     membershipRole,
     isAdmin,
     isPortalOnlyUser,

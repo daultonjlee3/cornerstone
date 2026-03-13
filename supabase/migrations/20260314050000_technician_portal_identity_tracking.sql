@@ -38,6 +38,80 @@ CREATE INDEX IF NOT EXISTS idx_technicians_user_id
   ON public.technicians (user_id)
   WHERE user_id IS NOT NULL;
 
+-- Automatically ensure a user + memberships exist for new technicians.
+-- New technicians get a portal-only user with role = 'technician' by default,
+-- unless an explicit user_id is provided.
+CREATE OR REPLACE FUNCTION public.ensure_technician_user_fn()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_tenant_id uuid;
+BEGIN
+  -- If a user is already linked, do nothing.
+  IF NEW.user_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Without an email we cannot safely create an auth user.
+  IF NEW.email IS NULL OR btrim(NEW.email) = '' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Try to reuse an existing auth user by email.
+  SELECT id INTO v_user_id
+  FROM auth.users
+  WHERE lower(email) = lower(NEW.email)
+  ORDER BY created_at ASC
+  LIMIT 1;
+
+  -- If none exists, create a new auth user (public.users will be created
+  -- by the existing handle_new_auth_user trigger).
+  IF v_user_id IS NULL THEN
+    INSERT INTO auth.users (email, email_confirmed_at, raw_user_meta_data)
+    VALUES (
+      lower(NEW.email),
+      now(),
+      jsonb_build_object('full_name', NEW.name)
+    )
+    RETURNING id INTO v_user_id;
+
+    -- Mark as portal-only by default; admins can later upgrade this user.
+    UPDATE public.users
+    SET is_portal_only = true
+    WHERE id = v_user_id;
+  END IF;
+
+  NEW.user_id := v_user_id;
+
+  -- Resolve tenant from the technician's company.
+  SELECT tenant_id INTO v_tenant_id
+  FROM public.companies
+  WHERE id = NEW.company_id;
+
+  IF v_tenant_id IS NOT NULL THEN
+    -- Ensure tenant_membership with technician role.
+    INSERT INTO public.tenant_memberships (tenant_id, user_id, role)
+    VALUES (v_tenant_id, v_user_id, 'technician')
+    ON CONFLICT (tenant_id, user_id) DO NOTHING;
+
+    -- Ensure company_membership with technician role.
+    INSERT INTO public.company_memberships (company_id, user_id, role)
+    VALUES (NEW.company_id, v_user_id, 'technician')
+    ON CONFLICT (company_id, user_id) DO NOTHING;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_ensure_technician_user ON public.technicians;
+CREATE TRIGGER trg_ensure_technician_user
+  BEFORE INSERT ON public.technicians
+  FOR EACH ROW
+  EXECUTE FUNCTION public.ensure_technician_user_fn();
+
 -- Enforce that any linked technician user is a member of the same company.
 CREATE OR REPLACE FUNCTION public.validate_technician_user_company_fn()
 RETURNS TRIGGER

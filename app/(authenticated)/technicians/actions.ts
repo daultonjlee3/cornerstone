@@ -44,6 +44,29 @@ async function companyBelongsToTenant(companyId: string, tenantId: string): Prom
   return !!data;
 }
 
+const FULL_APP_ROLES = ["owner", "admin", "member", "viewer"] as const;
+
+function isFullAppRole(role: string | null | undefined): boolean {
+  return FULL_APP_ROLES.includes(role as (typeof FULL_APP_ROLES)[number]);
+}
+
+/** Returns true if this user already has a full-app role in this tenant (do not downgrade to portal-only). */
+async function existingUserHasFullAppRoleInTenant(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  tenantId: string
+): Promise<boolean> {
+  const { data: row } = await admin
+    .from("tenant_memberships")
+    .select("role")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  const role = (row as { role?: string } | null)?.role;
+  return isFullAppRole(role);
+}
+
 async function resolveOrCreatePortalUser({
   email,
   technicianName,
@@ -58,6 +81,7 @@ async function resolveOrCreatePortalUser({
   const admin = createAdminClient();
   let userId: string | null = null;
   let inviteSent = false;
+  let isExistingUser = false;
 
   const inviteResult = await admin.auth.admin.inviteUserByEmail(email, {
     data: {
@@ -79,6 +103,7 @@ async function resolveOrCreatePortalUser({
     );
     if (existing?.id) {
       userId = existing.id;
+      isExistingUser = true;
     }
   }
 
@@ -101,7 +126,29 @@ async function resolveOrCreatePortalUser({
     throw new Error("Failed to create or resolve technician login user.");
   }
 
+  const preserveFullAppAccess =
+    isExistingUser &&
+    (await existingUserHasFullAppRoleInTenant(admin, userId, tenantId));
+
   const supabase = await createClient();
+  if (preserveFullAppAccess) {
+    // Link technician to existing full-app user: do NOT set is_portal_only or overwrite tenant role.
+    await supabase.from("users").upsert(
+      { id: userId, full_name: technicianName },
+      { onConflict: "id" }
+    );
+    // Do not upsert tenant_memberships — keep their existing owner/admin/member/viewer role.
+    await supabase.from("company_memberships").upsert(
+      {
+        company_id: companyId,
+        user_id: userId,
+        role: "technician",
+      },
+      { onConflict: "company_id,user_id" }
+    );
+    return { userId, inviteSent: false };
+  }
+
   await supabase.from("users").upsert(
     {
       id: userId,
@@ -284,24 +331,31 @@ export async function saveTechnician(
           .eq("user_id", linkedUserId)
           .eq("role", "technician");
       }
-      if (previousPortalOnly !== portalLoginEnabled) {
+      const admin = createAdminClient();
+      const hasFullAppRole = await existingUserHasFullAppRoleInTenant(
+        admin,
+        linkedUserId,
+        actor.tenantId
+      );
+      const effectiveNext = portalLoginEnabled && !hasFullAppRole;
+      if (previousPortalOnly !== effectiveNext) {
         await supabase
           .from("users")
-          .update({ is_portal_only: portalLoginEnabled })
+          .update({ is_portal_only: effectiveNext })
           .eq("id", linkedUserId);
         await insertActivityLog(supabaseClient, {
           tenantId: actor.tenantId,
           companyId,
           entityType: "technician",
           entityId: id,
-          actionType: portalLoginEnabled
+          actionType: effectiveNext
             ? "technician_login_enabled"
             : "technician_login_disabled",
           performedBy: actor.userId,
           metadata: {
             user_id: linkedUserId,
             previous: previousPortalOnly,
-            next: portalLoginEnabled,
+            next: effectiveNext,
           },
         });
       }
@@ -376,6 +430,40 @@ export async function saveTechnician(
   revalidatePath("/portal/profile");
   revalidatePath("/portal/work-orders");
   return { success: true };
+}
+
+/**
+ * Check if an email belongs to an existing user who already has full app access in this tenant.
+ * Used to show a warning when creating/linking a technician login so the admin knows they will keep main app access.
+ */
+export async function checkEmailForTechnicianLink(
+  email: string | null
+): Promise<{ existingFullAppUser: boolean; message?: string }> {
+  const actor = await getActorContext();
+  if (!actor || !email?.trim()) return { existingFullAppUser: false };
+
+  const admin = createAdminClient();
+  const normalized = email.trim().toLowerCase();
+  const usersResult = await admin.auth.admin.listUsers({ page: 1, perPage: 5000 });
+  if (usersResult.error) return { existingFullAppUser: false };
+  const authUser = usersResult.data?.users?.find(
+    (u) => (u.email ?? "").toLowerCase() === normalized
+  );
+  if (!authUser?.id) return { existingFullAppUser: false };
+
+  const hasFullApp = await existingUserHasFullAppRoleInTenant(
+    admin,
+    authUser.id,
+    actor.tenantId
+  );
+  if (hasFullApp) {
+    return {
+      existingFullAppUser: true,
+      message:
+        "This email is already a user in your organization. They will be linked as a technician and will keep their current main app access.",
+    };
+  }
+  return { existingFullAppUser: false };
 }
 
 export async function deleteTechnician(id: string): Promise<TechnicianFormState> {

@@ -6,6 +6,7 @@ import { SignOutButton } from "@/app/components/sign-out-button";
 import { resolvePortalAccessContext } from "@/src/lib/portal/access";
 import { endTechnicianImpersonationAction } from "@/app/(authenticated)/technicians/impersonation-actions";
 import { PortalLocationTracker } from "./components/portal-location-tracker";
+import { RestoreMainAppButton } from "./components/restore-main-app-button";
 
 export default async function PortalLayout({
   children,
@@ -33,7 +34,34 @@ export default async function PortalLayout({
             </p>
             <h1 className="text-base font-semibold">{technicianName}</h1>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-2">
+            {context.impersonation ? (
+              <form action={endTechnicianImpersonationAction}>
+                <button
+                  type="submit"
+                  className="rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]"
+                >
+                  Back to main app
+                </button>
+              </form>
+            ) : (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]"
+                >
+                  Back to main app
+                </Link>
+                <RestoreMainAppButton />
+                {!context.isAdmin ? (
+                  <p className="hidden text-xs text-[var(--muted)] sm:block">
+                    Need full app access? Contact your administrator.
+                  </p>
+                ) : null}
+              </>
+            )}
+            <SignOutButton />
+          </div>
         </div>
       </header>
 
@@ -48,7 +76,7 @@ export default async function PortalLayout({
                 type="submit"
                 className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
               >
-                Return to Admin
+                Back to main app
               </button>
             </form>
           </div>

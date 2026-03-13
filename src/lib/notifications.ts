@@ -8,9 +8,11 @@ export type NotificationType =
 
 export type NotificationPayload = {
   userIds: string[];
+  /** Logical notification type; stored as event_type in the DB. */
   type: NotificationType;
   entityType: string;
   entityId: string;
+  /** Short title for the notification (used as title/body in the DB). */
   message: string;
   metadata?: Record<string, unknown> | null;
 };
@@ -18,6 +20,7 @@ export type NotificationPayload = {
 export type NotificationListItem = {
   id: string;
   type: string;
+  title: string;
   entity_type: string;
   entity_id: string;
   message: string;
@@ -46,7 +49,7 @@ export async function createNotifications(
     .from("notifications")
     .select("user_id")
     .in("user_id", dedupedUserIds)
-    .eq("type", payload.type)
+    .eq("event_type", payload.type)
     .eq("entity_type", payload.entityType)
     .eq("entity_id", payload.entityId)
     .is("read_at", null);
@@ -59,11 +62,14 @@ export async function createNotifications(
   const rowsToInsert = dedupedUserIds
     .filter((userId) => !existingUserIds.has(userId))
     .map((userId) => ({
+      company_id: null,
       user_id: userId,
-      type: payload.type,
+      event_type: payload.type,
+      title: payload.message,
+      message: payload.message,
+      body: null,
       entity_type: payload.entityType,
       entity_id: payload.entityId,
-      message: payload.message,
       metadata: payload.metadata ?? {},
     }));
   if (rowsToInsert.length === 0) return 0;
@@ -107,7 +113,7 @@ export async function listNotificationsForUser(
   const [rowsResult, unreadResult] = await Promise.all([
     supabase
       .from("notifications")
-      .select("id, type, entity_type, entity_id, message, created_at, read_at")
+      .select("id, event_type, title, entity_type, entity_id, message, created_at, read_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(limit),
@@ -120,7 +126,25 @@ export async function listNotificationsForUser(
 
   return {
     unreadCount: unreadResult.count ?? 0,
-    items: (rowsResult.data ?? []) as NotificationListItem[],
+    items: ((rowsResult.data ?? []) as Array<{
+      id: string;
+      event_type: string;
+      title: string | null;
+      entity_type: string;
+      entity_id: string;
+      message: string | null;
+      created_at: string;
+      read_at: string | null;
+    }>).map((row) => ({
+      id: row.id,
+      type: row.event_type,
+      title: row.title ?? row.message ?? "",
+      entity_type: row.entity_type,
+      entity_id: row.entity_id,
+      message: row.message ?? "",
+      created_at: row.created_at,
+      read_at: row.read_at,
+    })),
   };
 }
 

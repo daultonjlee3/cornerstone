@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { checkEmailForTechnicianLink } from "../actions";
 
 export type Technician = {
   id: string;
@@ -126,8 +127,14 @@ export function TechnicianFormModal({
                 name="email"
                 type="email"
                 defaultValue={t.email ?? ""}
+                onBlur={onEmailBlur}
                 className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               />
+              {fullAppUserWarning ? (
+                <p className="mt-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-200" role="status">
+                  {fullAppUserWarning}
+                </p>
+              ) : null}
             </div>
             <div>
               <label htmlFor="phone" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
@@ -181,7 +188,7 @@ export function TechnicianFormModal({
               <span>
                 <span className="block font-medium">Create login for this technician</span>
                 <span className="block text-xs text-[var(--muted)]">
-                  Requires email. Login is restricted to the technician portal only.
+                  Requires email. New logins are technician portal only; existing org users keep main app access.
                 </span>
               </span>
             </label>

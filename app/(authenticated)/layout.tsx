@@ -39,7 +39,14 @@ export default async function AuthenticatedLayout({
   );
   const portalImpersonation = await getImpersonationSession();
   const isPortalImpersonating = portalImpersonation?.admin_user_id === user.id;
-  if (isPortalOnly || isPortalImpersonating) {
+  const { data: membershipRows } = await supabase
+    .from("tenant_memberships")
+    .select("role")
+    .eq("user_id", user.id);
+  const isAdminOrOwner = (membershipRows ?? []).some(
+    (r) => (r as { role?: string }).role === "owner" || (r as { role?: string }).role === "admin"
+  );
+  if (!isAdminOrOwner && (isPortalOnly || isPortalImpersonating)) {
     redirect("/portal");
   }
 

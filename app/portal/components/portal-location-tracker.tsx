@@ -28,12 +28,9 @@ function haversineKm(
 }
 
 export function PortalLocationTracker({ active }: PortalLocationTrackerProps) {
+  const [mounted, setMounted] = useState(false);
   const [permissionState, setPermissionState] =
-    useState<GeolocationPermissionState>(() =>
-      typeof navigator !== "undefined" && "geolocation" in navigator
-        ? "unknown"
-        : "unsupported"
-    );
+    useState<GeolocationPermissionState>("unknown");
   const lastSentRef = useRef<{
     latitude: number;
     longitude: number;
@@ -41,8 +38,15 @@ export function PortalLocationTracker({ active }: PortalLocationTrackerProps) {
   } | null>(null);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!active) return;
-    if (!("geolocation" in navigator)) return;
+    if (!("geolocation" in navigator)) {
+      setPermissionState("unsupported");
+      return;
+    }
 
     let watchId: number | null = null;
     let isMounted = true;
@@ -122,6 +126,7 @@ export function PortalLocationTracker({ active }: PortalLocationTrackerProps) {
   }, [active]);
 
   if (!active) return null;
+  if (!mounted) return null;
   if (permissionState === "unknown" || permissionState === "granted") return null;
 
   return (
