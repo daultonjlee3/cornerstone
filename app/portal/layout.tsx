@@ -25,8 +25,8 @@ export default async function PortalLayout({
   const technicianName = context.technicianName ?? "Technician";
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <header className="sticky top-0 z-40 border-b border-[var(--card-border)] bg-[var(--card)]/95 backdrop-blur">
+    <div className="min-h-screen text-[var(--foreground)]">
+      <header className="sticky top-0 z-40 border-b border-[var(--card-border)] bg-white/84 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
@@ -39,7 +39,7 @@ export default async function PortalLayout({
               <form action={endTechnicianImpersonationAction}>
                 <button
                   type="submit"
-                  className="rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]"
+                  className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
                 >
                   Back to main app
                 </button>
@@ -48,7 +48,7 @@ export default async function PortalLayout({
               <>
                 <Link
                   href="/dashboard"
-                  className="rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]"
+                  className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
                 >
                   Back to main app
                 </Link>
@@ -87,35 +87,35 @@ export default async function PortalLayout({
 
       <main className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4">{children}</main>
 
-      <nav className="sticky bottom-0 z-30 border-t border-[var(--card-border)] bg-[var(--card)]/95 backdrop-blur">
+      <nav className="sticky bottom-0 z-30 border-t border-[var(--card-border)] bg-white/86 backdrop-blur-xl">
         <div className="mx-auto grid w-full max-w-3xl grid-cols-5 gap-2 px-3 py-2 sm:px-4">
           <Link
             href="/portal/work-orders"
-            className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-2 py-2 text-center text-xs font-medium"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2 py-2 text-center text-xs font-semibold text-[var(--muted-strong)] shadow-[var(--shadow-soft)]"
           >
             Work
           </Link>
           <Link
             href="/portal/schedule"
-            className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-2 py-2 text-center text-xs font-medium"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2 py-2 text-center text-xs font-semibold text-[var(--muted-strong)] shadow-[var(--shadow-soft)]"
           >
             Schedule
           </Link>
           <Link
             href="/portal/map"
-            className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-2 py-2 text-center text-xs font-medium"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2 py-2 text-center text-xs font-semibold text-[var(--muted-strong)] shadow-[var(--shadow-soft)]"
           >
             Map
           </Link>
           <Link
             href="/portal/profile"
-            className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-2 py-2 text-center text-xs font-medium"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2 py-2 text-center text-xs font-semibold text-[var(--muted-strong)] shadow-[var(--shadow-soft)]"
           >
             Profile
           </Link>
           <Link
             href="/portal"
-            className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-2 py-2 text-center text-xs font-medium"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2 py-2 text-center text-xs font-semibold text-[var(--muted-strong)] shadow-[var(--shadow-soft)]"
           >
             Home
           </Link>

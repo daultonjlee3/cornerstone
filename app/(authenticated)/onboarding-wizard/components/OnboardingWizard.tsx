@@ -11,6 +11,7 @@ import { AssetImportUploader } from "./AssetImportUploader";
 import { ColumnMappingInterface } from "./ColumnMappingInterface";
 import { ImportPreviewTable } from "./ImportPreviewTable";
 import { DemoDataGenerator } from "./DemoDataGenerator";
+import { PageHeader } from "@/src/components/ui/page-header";
 import type {
   AssetImportField,
   FieldMapping,
@@ -185,14 +186,10 @@ export function OnboardingWizard({
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Asset-First Onboarding Wizard
-        </h1>
-        <p className="text-sm text-[var(--muted)]">
-          Bootstrap your entire maintenance hierarchy from one asset spreadsheet in minutes.
-        </p>
-      </header>
+      <PageHeader
+        title="Asset-First Onboarding Wizard"
+        subtitle="Bootstrap your entire maintenance hierarchy from one asset spreadsheet in minutes."
+      />
 
       {resolvedMode === "upload" ||
       resolvedMode === "mapping" ||

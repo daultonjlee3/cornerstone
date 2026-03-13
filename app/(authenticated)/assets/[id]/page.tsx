@@ -5,6 +5,7 @@ import { AssetHealthIndicator } from "../components/asset-health-indicator";
 import { AssetIntelligencePanel } from "../components/asset-intelligence-panel";
 import { AssetTimeline } from "../components/asset-timeline";
 import { getAssetIntelligenceSnapshot } from "@/src/lib/assets/assetIntelligenceService";
+import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
 
 export const metadata = {
   title: "Asset | Cornerstone Tech",
@@ -326,7 +327,7 @@ export default async function AssetDetailPage({
         <span className="text-[var(--foreground)]">{asset.name}</span>
       </div>
 
-      <header className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-6">
+      <header className="ui-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--foreground)]">{asset.name}</h1>
@@ -348,7 +349,7 @@ export default async function AssetDetailPage({
             </p>
             <Link
               href="/assets/intelligence"
-              className="mt-3 inline-flex rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+              className="mt-3 inline-flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
             >
               Portfolio Intelligence
             </Link>
@@ -362,12 +363,12 @@ export default async function AssetDetailPage({
           failureRisk={intelligence.health.failureRisk}
           lastCalculatedAt={intelligence.health.lastCalculatedAt}
         />
-        <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <section className="ui-card p-4">
           <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
             Quick Asset Signals
           </h2>
           {healthWarnings.length === 0 ? (
-            <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
+            <p className="mt-3 text-sm text-emerald-700">
               Asset health is stable based on recent maintenance and PM schedule.
             </p>
           ) : (
@@ -375,7 +376,7 @@ export default async function AssetDetailPage({
               {healthWarnings.map((warning) => (
                 <li
                   key={warning}
-                  className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
+                  className="rounded-[var(--radius-control)] border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700"
                 >
                   {warning}
                 </li>
@@ -527,30 +528,26 @@ export default async function AssetDetailPage({
             No completed work orders for this asset yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)]">
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Date</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Work Order</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Type</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Technician / Crew</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Completion Notes</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Photos</th>
-                </tr>
-              </thead>
-              <tbody>
+          <DataTable>
+            <Table className="min-w-[960px]">
+              <TableHead>
+                <Th>Date</Th>
+                <Th>Work Order</Th>
+                <Th>Type</Th>
+                <Th>Technician / Crew</Th>
+                <Th>Completion Notes</Th>
+                <Th>Photos</Th>
+              </TableHead>
+              <TBody>
                 {serviceHistoryWithPhotos.map((entry) => (
-                  <tr key={entry.id} className="border-b border-[var(--card-border)] last:border-0">
-                    <td className="px-2 py-2 text-[var(--muted)]">
-                      {formatDateTime(entry.completed_at)}
-                    </td>
-                    <td className="px-2 py-2 text-[var(--foreground)]">
+                  <Tr key={entry.id}>
+                    <Td className="text-[var(--muted)]">{formatDateTime(entry.completed_at)}</Td>
+                    <Td>
                       <Link href={`/work-orders/${entry.id}`} className="text-[var(--accent)] hover:underline">
                         {entry.work_order_number ?? entry.title}
                       </Link>
-                    </td>
-                    <td className="px-2 py-2 text-[var(--muted)]">
+                    </Td>
+                    <Td className="text-[var(--muted)]">
                       {entry.source_type === "preventive_maintenance" ? (
                         <span>
                           PM
@@ -571,14 +568,14 @@ export default async function AssetDetailPage({
                       ) : (
                         "Reactive"
                       )}
-                    </td>
-                    <td className="px-2 py-2 text-[var(--muted)]">
+                    </Td>
+                    <Td className="text-[var(--muted)]">
                       {[entry.completed_by, entry.crew_name].filter(Boolean).join(" / ") || "—"}
-                    </td>
-                    <td className="px-2 py-2 text-[var(--muted)]">
+                    </Td>
+                    <Td className="text-[var(--muted)]">
                       {entry.completion_notes ?? "—"}
-                    </td>
-                    <td className="px-2 py-2 text-[var(--muted)]">
+                    </Td>
+                    <Td className="text-[var(--muted)]">
                       {entry.photo_count > 0 ? (
                         <a
                           href={entry.first_photo_url ?? "#"}
@@ -591,12 +588,12 @@ export default async function AssetDetailPage({
                       ) : (
                         "—"
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TBody>
+            </Table>
+          </DataTable>
         )}
       </section>
 
@@ -605,29 +602,27 @@ export default async function AssetDetailPage({
         {partsHistory.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">No parts history linked to completed work orders.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)]">
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Date</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Part</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Quantity</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Cost</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Work Order</th>
-                </tr>
-              </thead>
-              <tbody>
+          <DataTable>
+            <Table className="min-w-[760px]">
+              <TableHead>
+                <Th>Date</Th>
+                <Th>Part</Th>
+                <Th>Quantity</Th>
+                <Th>Cost</Th>
+                <Th>Work Order</Th>
+              </TableHead>
+              <TBody>
                 {partsHistory.map((part) => (
-                  <tr key={part.id} className="border-b border-[var(--card-border)] last:border-0">
-                    <td className="px-2 py-2 text-[var(--muted)]">{formatDateTime(part.used_at)}</td>
-                    <td className="px-2 py-2 text-[var(--foreground)]">{part.part_name}</td>
-                    <td className="px-2 py-2 text-[var(--muted)]">
+                  <Tr key={part.id}>
+                    <Td className="text-[var(--muted)]">{formatDateTime(part.used_at)}</Td>
+                    <Td>{part.part_name}</Td>
+                    <Td className="text-[var(--muted)]">
                       {part.quantity_used} {part.unit_of_measure ?? ""}
-                    </td>
-                    <td className="px-2 py-2 text-[var(--muted)]">
+                    </Td>
+                    <Td className="text-[var(--muted)]">
                       ${part.total_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-2 py-2 text-[var(--foreground)]">
+                    </Td>
+                    <Td>
                       {part.work_order_id ? (
                         <Link href={`/work-orders/${part.work_order_id}`} className="text-[var(--accent)] hover:underline">
                           {part.work_order_number}
@@ -635,12 +630,12 @@ export default async function AssetDetailPage({
                       ) : (
                         "—"
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TBody>
+            </Table>
+          </DataTable>
         )}
       </section>
     </div>

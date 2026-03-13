@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { endImpersonation } from "@/app/platform/impersonate/actions";
 import { Sidebar } from "./sidebar";
@@ -25,16 +25,14 @@ export function Shell({
   impersonationBanner = null,
 }: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  });
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDispatchFullscreen =
     pathname === "/dispatch" && searchParams.get("dispatch_fullscreen") === "1";
-
-  useEffect(() => {
-    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    setSidebarCollapsed(stored === "1");
-  }, []);
 
   const handleToggleCollapse = () => {
     setSidebarCollapsed((prev) => {
@@ -45,7 +43,7 @@ export function Shell({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+    <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
       {!isDispatchFullscreen ? (
         <Sidebar
           open={sidebarOpen}
@@ -82,7 +80,7 @@ export function Shell({
           {isDispatchFullscreen ? (
             <div className="h-full px-2 py-2">{children}</div>
           ) : (
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+            <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">{children}</div>
           )}
         </div>
       </div>

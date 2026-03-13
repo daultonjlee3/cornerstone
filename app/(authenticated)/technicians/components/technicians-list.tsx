@@ -7,6 +7,17 @@ import { deleteTechnician, saveTechnician } from "../actions";
 import type { Technician } from "./technician-form-modal";
 import { TechnicianFormModal } from "./technician-form-modal";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { Button } from "@/src/components/ui/button";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+  TableEmptyState,
+} from "@/src/components/ui/data-table";
 
 type CompanyOption = { id: string; name: string };
 
@@ -85,80 +96,70 @@ export function TechniciansList({
       )}
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Technicians</h2>
-        <button
-          type="button"
-          onClick={openNew}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        >
+        <Button type="button" onClick={openNew}>
           New Technician
-        </button>
+        </Button>
       </div>
 
       {initialList.length === 0 ? (
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">No technicians yet.</p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
+          <Button type="button" onClick={openNew} className="mt-4">
             Add your first technician
-          </button>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
-                  <th className="px-4 py-3 font-semibold">Name</th>
-                  <th className="px-4 py-3 font-semibold">Company</th>
-                  <th className="px-4 py-3 font-semibold">Trade</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="w-24 px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {initialList.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
-                  >
-                    <td className="px-4 py-3.5 text-[var(--foreground)]">
-                      <Link href={`/technicians/${t.id}`} className="text-[var(--accent)] hover:underline">
-                        {technicianDisplayName(t)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{companyDisplay(t as Technician & { company_name?: string })}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{t.trade ?? "—"}</td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(t)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(t.id, technicianDisplayName(t))}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable>
+          <Table className="min-w-[640px]">
+            <TableHead>
+              <Th>Name</Th>
+              <Th>Company</Th>
+              <Th>Trade</Th>
+              <Th>Status</Th>
+              <Th className="w-24">Actions</Th>
+            </TableHead>
+            <TBody>
+              {initialList.length === 0 ? (
+                <TableEmptyState colSpan={5} message="No technicians yet." />
+              ) : null}
+              {initialList.map((t) => (
+                <Tr key={t.id}>
+                  <Td>
+                    <Link href={`/technicians/${t.id}`} className="text-[var(--accent)] hover:underline">
+                      {technicianDisplayName(t)}
+                    </Link>
+                  </Td>
+                  <Td className="text-[var(--muted)]">
+                    {companyDisplay(t as Technician & { company_name?: string })}
+                  </Td>
+                  <Td className="text-[var(--muted)]">{t.trade ?? "—"}</Td>
+                  <Td>
+                    <StatusBadge status={t.status} />
+                  </Td>
+                  <Td>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(t)}
+                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(t.id, technicianDisplayName(t))}
+                        disabled={isPending}
+                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        </DataTable>
       )}
 
       <TechnicianFormModal

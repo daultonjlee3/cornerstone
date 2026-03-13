@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { InventoryView } from "./components/inventory-view";
 import type { StockLocationRecord } from "./components/stock-location-form-modal";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Inventory | Cornerstone Tech",
@@ -15,8 +16,7 @@ export default async function InventoryPage() {
   if (scope.companyIds.length === 0) {
     return (
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Inventory</h1>
-        <p className="text-sm text-[var(--muted)]">Create a company first to manage inventory.</p>
+        <PageHeader title="Inventory" subtitle="Create a company first to manage inventory." />
       </div>
     );
   }
@@ -256,12 +256,10 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">Inventory</h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Location-level balances with low-stock alerts and audited adjustments.
-        </p>
-      </div>
+      <PageHeader
+        title="Inventory Overview"
+        subtitle="Location-level balances with low-stock alerts and audited adjustments."
+      />
       <InventoryView
         rows={rows}
         transactions={transactions}

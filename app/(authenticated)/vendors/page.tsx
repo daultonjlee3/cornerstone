@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { VendorsList } from "./components/vendors-list";
 import type { VendorRecord } from "./components/vendor-form-modal";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Vendors | Cornerstone Tech",
@@ -15,8 +16,10 @@ export default async function VendorsPage() {
   if (scope.companyIds.length === 0) {
     return (
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Vendors</h1>
-        <p className="text-sm text-[var(--muted)]">Create a company first to manage suppliers and procurement.</p>
+        <PageHeader
+          title="Vendors"
+          subtitle="Create a company first to manage suppliers and procurement."
+        />
       </div>
     );
   }
@@ -107,12 +110,10 @@ export default async function VendorsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">Vendors</h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage supplier profiles used by products and purchase orders.
-        </p>
-      </div>
+      <PageHeader
+        title="Vendors"
+        subtitle="Manage supplier profiles used by products and purchase orders."
+      />
       <VendorsList vendors={vendors} companies={scope.companies} />
     </div>
   );

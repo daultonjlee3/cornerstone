@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/src/components/ui/button";
-import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+  TableToolbar,
+  TableEmptyState,
+  TablePagination,
+} from "@/src/components/ui/data-table";
 import { deleteVendor, saveVendor } from "../actions";
 import { VendorFormModal, type VendorRecord } from "./vendor-form-modal";
 
@@ -112,7 +123,7 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
           {message.text}
         </div>
       ) : null}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <TableToolbar>
         <div className="flex min-w-[260px] flex-1 flex-wrap items-end gap-2">
           <label className="w-full max-w-sm">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">Search</span>
@@ -140,7 +151,7 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
           </label>
         </div>
         <Button onClick={openNew}>New Vendor</Button>
-      </div>
+      </TableToolbar>
 
       <DataTable>
         <Table className="min-w-[1120px]">
@@ -158,11 +169,7 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
           </TableHead>
           <TBody>
             {pageRows.length === 0 ? (
-              <Tr>
-                <td className="px-4 py-3.5 text-center text-[var(--muted)]" colSpan={10}>
-                  No vendors found.
-                </td>
-              </Tr>
+              <TableEmptyState colSpan={10} message="No vendors found." />
             ) : null}
             {pageRows.map((vendor) => (
               <Tr key={vendor.id}>
@@ -215,28 +222,15 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
         </Table>
       </DataTable>
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--muted)]">
-          Showing {(currentPage - 1) * PAGE_SIZE + (pageRows.length ? 1 : 0)}-
-          {(currentPage - 1) * PAGE_SIZE + pageRows.length} of {filtered.length}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Previous
-          </Button>
-          <span className="text-sm text-[var(--muted)]">
-            Page {currentPage} / {totalPages}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={currentPage >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <TablePagination
+        page={currentPage}
+        totalPages={totalPages}
+        totalRows={filtered.length}
+        showingFrom={(currentPage - 1) * PAGE_SIZE + (pageRows.length ? 1 : 0)}
+        showingTo={(currentPage - 1) * PAGE_SIZE + pageRows.length}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <VendorFormModal
         open={modalOpen}

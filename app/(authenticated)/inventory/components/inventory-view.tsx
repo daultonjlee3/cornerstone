@@ -4,7 +4,21 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/src/components/ui/button";
-import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+  TableToolbar,
+  TableEmptyState,
+  TablePagination,
+} from "@/src/components/ui/data-table";
+import { MetricCard } from "@/src/components/ui/metric-card";
+import { Modal } from "@/src/components/ui/modal";
+import { FormField } from "@/src/components/ui/form-field";
 import { recordInventoryAdjustment, saveStockLocation } from "../actions";
 import {
   StockLocationFormModal,
@@ -164,21 +178,16 @@ export function InventoryView({
         </div>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-3">
-          <p className="text-xs text-[var(--muted)]">Inventory rows</p>
-          <p className="text-2xl font-semibold text-[var(--foreground)]">{rows.length}</p>
-        </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-3">
-          <p className="text-xs text-[var(--muted)]">Low stock alerts</p>
-          <p className="text-2xl font-semibold text-amber-700">{lowStockCount}</p>
-        </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-3">
-          <p className="text-xs text-[var(--muted)]">Tracked locations</p>
-          <p className="text-2xl font-semibold text-[var(--foreground)]">{locations.length}</p>
-        </div>
+        <MetricCard title="Inventory rows" value={rows.length} />
+        <MetricCard
+          title="Low stock alerts"
+          value={lowStockCount}
+          trend={lowStockCount > 0 ? { label: "Needs replenishment", tone: "bad" } : { label: "No alerts", tone: "good" }}
+        />
+        <MetricCard title="Tracked locations" value={locations.length} />
       </div>
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <TableToolbar>
         <div className="flex flex-1 flex-wrap items-end gap-2">
           <label className="w-full max-w-sm">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">Search</span>
@@ -231,7 +240,7 @@ export function InventoryView({
           </label>
         </div>
         <Button onClick={openLocationCreate}>New Stock Location</Button>
-      </div>
+      </TableToolbar>
 
       <DataTable>
         <Table className="min-w-[1100px]">
@@ -246,11 +255,7 @@ export function InventoryView({
           </TableHead>
           <TBody>
             {pageRows.length === 0 ? (
-              <Tr>
-                <td colSpan={7} className="px-4 py-3.5 text-center text-[var(--muted)]">
-                  No inventory rows found.
-                </td>
-              </Tr>
+              <TableEmptyState colSpan={7} message="No inventory rows found." />
             ) : null}
             {pageRows.map((row) => {
               const reorder = Number(row.reorder_point ?? 0);
@@ -308,28 +313,15 @@ export function InventoryView({
         </Table>
       </DataTable>
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--muted)]">
-          Showing {(currentPage - 1) * PAGE_SIZE + (pageRows.length ? 1 : 0)}-
-          {(currentPage - 1) * PAGE_SIZE + pageRows.length} of {filtered.length}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Previous
-          </Button>
-          <span className="text-sm text-[var(--muted)]">
-            Page {currentPage} / {totalPages}
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={currentPage >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <TablePagination
+        page={currentPage}
+        totalPages={totalPages}
+        totalRows={filtered.length}
+        showingFrom={(currentPage - 1) * PAGE_SIZE + (pageRows.length ? 1 : 0)}
+        showingTo={(currentPage - 1) * PAGE_SIZE + pageRows.length}
+        onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
 
       <StockLocationFormModal
         key={`${editingLocation?.id ?? "new"}-${locationModalOpen ? "open" : "closed"}`}
@@ -347,53 +339,57 @@ export function InventoryView({
         saveAction={saveStockLocation}
       />
 
-      {adjustment ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-[var(--foreground)]">Adjust inventory</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              {adjustment.productName} at {adjustment.locationName}
-            </p>
-            <div className="mt-4 space-y-3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-[var(--muted)]">Quantity change</span>
-                <input
-                  className="ui-input"
-                  type="number"
-                  step="0.0001"
-                  value={adjustQuantity}
-                  onChange={(event) => setAdjustQuantity(event.target.value)}
-                  placeholder="Use negative to deduct, positive to add"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-[var(--muted)]">Notes</span>
-                <textarea
-                  className="ui-input"
-                  rows={3}
-                  value={adjustNotes}
-                  onChange={(event) => setAdjustNotes(event.target.value)}
-                />
-              </label>
-              <div className="flex gap-2">
-                <Button disabled={isPending} onClick={runAdjustment} className="flex-1">
-                  {isPending ? "Saving…" : "Record adjustment"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setAdjustment(null);
-                    setAdjustQuantity("");
-                    setAdjustNotes("");
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+      <Modal
+        open={Boolean(adjustment)}
+        onClose={() => {
+          setAdjustment(null);
+          setAdjustQuantity("");
+          setAdjustNotes("");
+        }}
+        title="Adjust inventory"
+        description={
+          adjustment
+            ? `${adjustment.productName} at ${adjustment.locationName}`
+            : undefined
+        }
+        className="max-w-lg"
+      >
+        <div className="space-y-3">
+          <FormField label="Quantity change">
+            <input
+              className="ui-input"
+              type="number"
+              step="0.0001"
+              value={adjustQuantity}
+              onChange={(event) => setAdjustQuantity(event.target.value)}
+              placeholder="Use negative to deduct, positive to add"
+            />
+          </FormField>
+          <FormField label="Notes">
+            <textarea
+              className="ui-textarea"
+              rows={3}
+              value={adjustNotes}
+              onChange={(event) => setAdjustNotes(event.target.value)}
+            />
+          </FormField>
+          <div className="flex gap-2">
+            <Button disabled={isPending} onClick={runAdjustment} className="flex-1">
+              {isPending ? "Saving…" : "Record adjustment"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAdjustment(null);
+                setAdjustQuantity("");
+                setAdjustNotes("");
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </div>
-      ) : null}
+      </Modal>
 
       <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
         <h2 className="text-lg font-semibold text-[var(--foreground)]">Recent inventory transactions</h2>

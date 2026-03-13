@@ -3,6 +3,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Technician } from "./components/technician-form-modal";
 import { TechniciansList } from "./components/technicians-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Technicians | Cornerstone Tech",
@@ -35,14 +36,10 @@ export default async function TechniciansPage() {
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Technicians
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage technicians and assign them to work orders.
-          </p>
-        </div>
+        <PageHeader
+          title="Technicians"
+          subtitle="Manage technicians and assign them to work orders."
+        />
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add technicians.</p>
         </div>
@@ -219,28 +216,26 @@ export default async function TechniciansPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Technicians
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage technicians and assign them to work orders.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href="/technicians/work-queue"
-            className="inline-flex rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-          >
-            Open Technician Work Queue
-          </Link>
-          <Link
-            href="/portal"
-            className="inline-flex rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
-            Open Technician Portal
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Technicians"
+        subtitle="Manage technicians and assign them to work orders."
+        actions={
+          <>
+            <Link
+              href="/technicians/work-queue"
+              className="inline-flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]/80"
+            >
+              Open Technician Work Queue
+            </Link>
+            <Link
+              href="/portal"
+              className="inline-flex rounded-[var(--radius-control)] bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)]"
+            >
+              Open Technician Portal
+            </Link>
+          </>
+        }
+      />
       <section className="space-y-3 rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-[var(--foreground)]">

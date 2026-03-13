@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { WorkOrder } from "./components/work-order-form-modal";
 import { WorkOrdersList } from "./components/work-orders-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Work Order Command Center | Cornerstone OS",
@@ -41,14 +42,10 @@ export default async function WorkOrdersPage({
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Work Orders
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Create and track maintenance and repair work.
-          </p>
-        </div>
+        <PageHeader
+          title="Work Orders"
+          subtitle="Create and track maintenance and repair work."
+        />
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add work orders.</p>
         </div>
@@ -379,14 +376,6 @@ export default async function WorkOrdersPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Work Order Command Center
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations.
-        </p>
-      </div>
       <WorkOrdersList
         workOrders={workOrders}
         stats={stats}

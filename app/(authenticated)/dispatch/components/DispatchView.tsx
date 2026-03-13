@@ -39,6 +39,7 @@ import { DispatchSpeedActions } from "./DispatchSpeedActions";
 import type { WorkOrderTravelInfo } from "./DispatchOperationsJobList";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 const DispatchMapPanel = dynamic(
   () => import("./DispatchMapPanel").then((module) => module.DispatchMapPanel),
@@ -1033,37 +1034,31 @@ export function DispatchView({
           </Button>
         </header>
       ) : (
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-              Dispatch Operations Board
-            </h1>
-            {!isFullScreen ? (
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                Assign to technicians or crews, schedule by day/week/month, and balance workload.
-              </p>
-            ) : (
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Full screen command center mode enabled.
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {!isFullScreen ? (
-              <>
-                <Link href="/work-orders">
-                  <Button variant="secondary">Open Work Orders</Button>
-                </Link>
-                <Link href="/technicians/work-queue">
-                  <Button>Technician Queue</Button>
-                </Link>
-              </>
-            ) : null}
-            <Button variant={isFullScreen ? "secondary" : "primary"} onClick={() => setFullScreen(!isFullScreen)}>
-              {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
-            </Button>
-          </div>
-        </header>
+        <PageHeader
+          title="Dispatch Operations Board"
+          subtitle={
+            !isFullScreen
+              ? "Assign to technicians or crews, schedule by day/week/month, and balance workload."
+              : "Full screen command center mode enabled."
+          }
+          actions={
+            <>
+              {!isFullScreen ? (
+                <>
+                  <Link href="/work-orders">
+                    <Button variant="secondary">Open Work Orders</Button>
+                  </Link>
+                  <Link href="/technicians/work-queue">
+                    <Button>Technician Queue</Button>
+                  </Link>
+                </>
+              ) : null}
+              <Button variant={isFullScreen ? "secondary" : "primary"} onClick={() => setFullScreen(!isFullScreen)}>
+                {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
+              </Button>
+            </>
+          }
+        />
       )}
 
       {!opsMode && (
@@ -1093,7 +1088,7 @@ export function DispatchView({
       )}
 
       <div
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-[var(--card-border)] bg-[var(--card)] ${
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
           opsMode ? "rounded-lg" : "rounded-xl"
         }`}
       >
