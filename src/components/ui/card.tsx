@@ -11,7 +11,7 @@ export function Card({ children, className = "" }: CardProps) {
 
 export function CardHeader({ children, className = "" }: CardProps) {
   return (
-    <header className={`border-b border-[var(--card-border)] px-5 py-4 ${className}`}>
+    <header className={`border-b border-[var(--card-border)]/90 px-5 py-4 ${className}`}>
       {children}
     </header>
   );
@@ -25,7 +25,7 @@ export function CardTitle({
   className?: string;
 }) {
   return (
-    <h3 className={`text-sm font-semibold tracking-tight text-[var(--foreground)] ${className}`}>
+    <h3 className={`text-base font-semibold tracking-tight text-[var(--foreground)] ${className}`}>
       {children}
     </h3>
   );
@@ -38,7 +38,7 @@ export function CardDescription({
   children: ReactNode;
   className?: string;
 }) {
-  return <p className={`mt-1 text-xs text-[var(--muted)] ${className}`}>{children}</p>;
+  return <p className={`mt-1 text-sm text-[var(--muted)] ${className}`}>{children}</p>;
 }
 
 export function CardContent({ children, className = "" }: CardProps) {

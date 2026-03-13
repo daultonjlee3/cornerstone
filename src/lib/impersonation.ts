@@ -18,7 +18,9 @@ function parseCookie(value: string | undefined): { actingAsUserId: string; start
   if (!value) return null;
   try {
     const parsed = JSON.parse(decodeURIComponent(value)) as { actingAsUserId?: string; startedAt?: string };
-    if (typeof parsed?.actingAsUserId === "string" && typeof parsed?.startedAt === "string") return parsed;
+    if (typeof parsed?.actingAsUserId === "string" && typeof parsed?.startedAt === "string") {
+      return { actingAsUserId: parsed.actingAsUserId, startedAt: parsed.startedAt };
+    }
   } catch {
     // ignore
   }

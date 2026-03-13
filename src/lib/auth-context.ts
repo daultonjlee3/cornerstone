@@ -85,9 +85,10 @@ export async function getTenantIdForUser(
 
 /** Company IDs the current user can access (all companies in their tenant). */
 export async function getCompanyIdsForUser(
-  supabase?: Awaited<ReturnType<typeof createClient>>
+  supabase?: Awaited<ReturnType<typeof createClient>>,
+  effectiveUserId?: string | null
 ): Promise<string[]> {
-  const tenantId = await getTenantIdForUser(supabase);
+  const tenantId = await getTenantIdForUser(supabase, effectiveUserId);
   if (!tenantId) return [];
   const client = supabase ?? (await getSupabaseClient());
   const { data } = await client

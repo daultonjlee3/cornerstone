@@ -92,17 +92,17 @@ function getJobTypeLabel(jobType: string): string {
 function getTypeBadgeClass(jobType: string): string {
   switch (jobType) {
     case "emergency":
-      return "border border-red-200 bg-red-100 text-red-700";
+      return "border-red-200 bg-red-100 text-red-700";
     case "preventive_maintenance":
-      return "border border-blue-200 bg-blue-100 text-blue-700";
+      return "border-blue-200 bg-blue-100 text-blue-700";
     case "inspection":
-      return "border border-purple-200 bg-purple-100 text-purple-700";
+      return "border-purple-200 bg-purple-100 text-purple-700";
     case "installation":
-      return "border border-green-200 bg-green-100 text-green-700";
+      return "border-green-200 bg-green-100 text-green-700";
     case "repair":
-      return "border border-amber-200 bg-amber-100 text-amber-700";
+      return "border-amber-200 bg-amber-100 text-amber-700";
     default:
-      return "border border-slate-200 bg-slate-100 text-slate-700";
+      return "border-slate-200 bg-slate-100 text-slate-700";
   }
 }
 
@@ -198,22 +198,22 @@ export function DispatchWorkOrderCard({
 
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
         <PriorityBadge priority={priority} />
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${typeBadgeClass}`}>
+        <span className={`ui-badge ${typeBadgeClass}`}>
           {getJobTypeLabel(jobType)}
         </span>
         {workOrder.status ? <StatusBadge status={workOrder.status} /> : null}
         {overdue ? (
-          <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+          <span className="ui-badge border-red-200 bg-red-100 text-red-700">
             Overdue
           </span>
         ) : null}
         {slaBreached ? (
-          <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+          <span className="ui-badge border-red-200 bg-red-100 text-red-700">
             SLA Breach
           </span>
         ) : null}
         {travelEstimate ? (
-          <span className="rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+          <span className="ui-badge border-indigo-200 bg-indigo-50 text-indigo-700">
             {travelEstimate}
           </span>
         ) : null}

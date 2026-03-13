@@ -15,11 +15,24 @@ export default async function SettingsUsersPage() {
     .eq("tenant_id", tenantId)
     .order("role");
 
-  const memberRows = (memberships ?? []) as Array<{
-    user_id: string;
-    role: string;
-    users: { id: string; full_name: string | null } | null;
-  }>;
+  const memberRows = (memberships ?? []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const usersRaw = record.users;
+    const userRecord = Array.isArray(usersRaw)
+      ? (usersRaw[0] as Record<string, unknown> | undefined) ?? null
+      : (usersRaw as Record<string, unknown> | null);
+    return {
+      user_id: String(record.user_id ?? ""),
+      role: String(record.role ?? "member"),
+      user: userRecord
+        ? {
+            id: String(userRecord.id ?? ""),
+            full_name:
+              userRecord.full_name == null ? null : String(userRecord.full_name),
+          }
+        : null,
+    };
+  });
 
   const { data: superAdminRows } = await supabase
     .from("platform_super_admins")
@@ -40,7 +53,7 @@ export default async function SettingsUsersPage() {
         <UsersTable
           members={memberRows.map((m) => ({
             userId: m.user_id,
-            fullName: m.users?.full_name ?? "—",
+            fullName: m.user?.full_name ?? "—",
             role: m.role,
             isPlatformSuperAdmin: superAdminIds.has(m.user_id),
           }))}

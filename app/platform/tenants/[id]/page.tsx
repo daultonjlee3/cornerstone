@@ -32,11 +32,24 @@ export default async function PlatformTenantDetailPage({
 
   const tenantName = (tenant as { name: string }).name;
   const companyRows = (companies ?? []) as Array<{ id: string; name: string; status: string | null }>;
-  const memberRows = (memberships ?? []) as Array<{
-    user_id: string;
-    role: string;
-    users: { id: string; full_name: string | null } | null;
-  }>;
+  const memberRows = (memberships ?? []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const usersRaw = record.users;
+    const userRecord = Array.isArray(usersRaw)
+      ? (usersRaw[0] as Record<string, unknown> | undefined) ?? null
+      : (usersRaw as Record<string, unknown> | null);
+    return {
+      user_id: String(record.user_id ?? ""),
+      role: String(record.role ?? "member"),
+      user: userRecord
+        ? {
+            id: String(userRecord.id ?? ""),
+            full_name:
+              userRecord.full_name == null ? null : String(userRecord.full_name),
+          }
+        : null,
+    };
+  });
 
   const { data: superAdminRows } = await supabase
     .from("platform_super_admins")
@@ -102,7 +115,7 @@ export default async function PlatformTenantDetailPage({
               <tbody>
                 {memberRows.map((m) => {
                   const userId = m.user_id;
-                  const name = m.users?.full_name ?? "—";
+                  const name = m.user?.full_name ?? "—";
                   const isSuperAdmin = superAdminIds.has(userId);
                   return (
                     <tr key={userId} className="border-b border-[var(--card-border)] last:border-0">

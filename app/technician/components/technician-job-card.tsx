@@ -34,7 +34,7 @@ export function TechnicianJobCard({ job }: TechnicianJobCardProps) {
   return (
     <Link
       href={`/portal/work-orders/${job.id}`}
-      className="block rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)] transition hover:border-[var(--accent)]/35 hover:shadow-[var(--shadow-card)]"
+      className="block rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/88 p-4 shadow-[var(--shadow-soft)] transition hover:border-[var(--accent)]/35 hover:shadow-[var(--shadow-card)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -58,10 +58,10 @@ export function TechnicianJobCard({ job }: TechnicianJobCardProps) {
           {job.isPm ? "PM" : "Reactive"}
         </span>
         <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+          className={`ui-badge ${
             job.assignmentScope === "direct"
-              ? "bg-blue-100 text-blue-700"
-              : "bg-teal-100 text-teal-700"
+              ? "border-blue-200 bg-blue-100 text-blue-700"
+              : "border-teal-200 bg-teal-100 text-teal-700"
           }`}
         >
           {job.assignmentScope === "direct"
@@ -70,7 +70,7 @@ export function TechnicianJobCard({ job }: TechnicianJobCardProps) {
         </span>
       </div>
 
-      <div className="mt-3 rounded-xl border border-[var(--card-border)] bg-[var(--background)]/65 px-3 py-2">
+      <div className="mt-3 rounded-[var(--radius-control)] border border-[var(--card-border)] bg-[var(--background)]/65 px-3 py-2">
         <p className="text-xs font-medium text-[var(--muted)]">
           Due: {formatDate(job.dueDate)}
         </p>

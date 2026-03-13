@@ -15,6 +15,8 @@ import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
 import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
 import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
+import { PageHeader } from "@/src/components/ui/page-header";
+import { ActionBar } from "@/src/components/ui/action-bar";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id: string };
@@ -295,17 +297,16 @@ export function WorkOrdersList({
           {message.text}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-medium text-[var(--foreground)]">Work Orders</h2>
-          <p className="text-sm text-[var(--muted)]">Create and track maintenance and service jobs</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Work Orders Command Center"
+        subtitle="Create, prioritize, assign, and track maintenance service jobs."
+        actions={
+          <div className="flex items-center gap-2">
           <div className="relative">
             <button
               type="button"
               onClick={() => setQuickActionsOpen((v) => !v)}
-              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
               title="Quick actions"
             >
               Quick actions ▾
@@ -354,7 +355,7 @@ export function WorkOrdersList({
           <button
             type="button"
             onClick={() => setSlaModalOpen(true)}
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
             title="Configure SLA response targets"
           >
             SLA Settings
@@ -362,7 +363,7 @@ export function WorkOrdersList({
           <button
             type="button"
             onClick={() => handleExport(initialList.map((w) => w.id))}
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
             title="Export visible work orders to CSV"
           >
             Export
@@ -370,12 +371,13 @@ export function WorkOrdersList({
           <button
             type="button"
             onClick={openNew}
-            className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+            className="rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             New Work Order
           </button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <WorkOrderKpiBar
         stats={{
@@ -405,7 +407,7 @@ export function WorkOrdersList({
       </Suspense>
 
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3">
+        <ActionBar className="flex flex-wrap items-center gap-3 border-[var(--accent)]/30 bg-[var(--accent)]/5">
           <span className="text-sm font-medium text-[var(--foreground)]">
             {selectedIds.size} selected
           </span>
@@ -458,7 +460,7 @@ export function WorkOrdersList({
           >
             Clear selection
           </button>
-        </div>
+        </ActionBar>
       )}
 
       {initialList.length === 0 ? (
@@ -473,7 +475,7 @@ export function WorkOrdersList({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
+        <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/90 shadow-[var(--shadow-soft)]">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>

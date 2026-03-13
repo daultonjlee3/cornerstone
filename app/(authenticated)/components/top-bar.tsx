@@ -146,7 +146,7 @@ export function TopBar({
   }, [unreadCount]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] bg-[var(--card)]/95 px-4 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] bg-white/78 px-4 backdrop-blur-xl sm:px-6">
       <button
         type="button"
         onClick={onMenuClick}
@@ -175,7 +175,7 @@ export function TopBar({
             id="topbar-search"
             type="search"
             placeholder="Search work orders, assets, technicians..."
-            className="ui-input !bg-[var(--background)] py-2 pl-9 pr-3"
+            className="ui-input !h-9 !bg-white pl-9 pr-3"
           />
         </div>
       </div>
@@ -183,7 +183,7 @@ export function TopBar({
         <div className="relative" ref={notificationPanelRef}>
           <button
             type="button"
-            className="relative rounded-lg border border-[var(--card-border)] p-2 text-[var(--muted)] hover:bg-[var(--background)]/70 hover:text-[var(--foreground)]"
+            className="relative rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white p-2 text-[var(--muted)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]/55 hover:text-[var(--foreground)]"
             aria-label="Notifications"
             onClick={() => {
               setNotificationOpen((prev) => !prev);
@@ -202,7 +202,7 @@ export function TopBar({
             </svg>
           </button>
           {notificationOpen ? (
-            <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
+            <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/96 shadow-[var(--shadow-card)]">
               <div className="flex items-center justify-between border-b border-[var(--card-border)] px-3 py-2">
                 <p className="text-sm font-semibold text-[var(--foreground)]">Notifications</p>
                 <button
@@ -253,7 +253,7 @@ export function TopBar({
           <button
             type="button"
             onClick={() => setAccountOpen((o) => !o)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)] hover:opacity-90"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)] hover:opacity-90"
             aria-expanded={accountOpen}
             aria-haspopup="true"
             aria-label="Account menu"
@@ -262,7 +262,7 @@ export function TopBar({
           </button>
           {accountOpen ? (
             <div
-              className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg"
+              className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white py-1 shadow-[var(--shadow-card)]"
               role="menu"
             >
               {isImpersonating && onReturnToProfile ? (

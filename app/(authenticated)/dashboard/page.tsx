@@ -9,6 +9,7 @@ import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { Button } from "@/src/components/ui/button";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -53,27 +54,23 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Operations Command Center
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Live operational intelligence across work orders, preventive maintenance, and technician execution.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/reports">
-            <Button variant="secondary">Operations Reports</Button>
-          </Link>
-          <Link href="/dispatch">
-            <Button variant="secondary">Open Dispatch</Button>
-          </Link>
-          <Link href="/work-orders">
-            <Button>Open Work Orders</Button>
-          </Link>
-        </div>
-      </header>
+      <PageHeader
+        title="Operations Command Center"
+        subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
+        actions={
+          <>
+            <Link href="/reports">
+              <Button variant="secondary">Operations Reports</Button>
+            </Link>
+            <Link href="/dispatch">
+              <Button variant="secondary">Open Dispatch</Button>
+            </Link>
+            <Link href="/work-orders">
+              <Button>Open Work Orders</Button>
+            </Link>
+          </>
+        }
+      />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard title="Open Work Orders" value={operations.kpis.openWorkOrders} description="New, ready, scheduled, in progress, on hold" />

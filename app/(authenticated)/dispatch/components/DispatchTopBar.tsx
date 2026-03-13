@@ -99,9 +99,9 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
   };
 
   const selectBase =
-    "h-7 min-h-0 w-auto max-w-[10rem] shrink-0 rounded border border-[var(--card-border)] bg-[var(--card)] py-0 pl-2 pr-6 text-[11px] text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
+    "h-8 min-h-0 w-auto max-w-[10rem] shrink-0 rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white py-0 pl-2 pr-6 text-[11px] font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
   return (
-    <div className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-2 py-1">
+    <div className="shrink-0 border-b border-[var(--card-border)] bg-white/88 px-2 py-1.5 backdrop-blur">
       {/* Row 1: Date navigation + view tabs */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="flex items-center gap-0.5">
@@ -129,7 +129,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
             </svg>
           </button>
         </div>
-        <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5" role="tablist" aria-label="Dispatch view">
+        <div className="flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-[var(--background)]/70 p-0.5" role="tablist" aria-label="Dispatch view">
           {(["day", "week", "month", "map", "combined"] as const).map((mode) => (
             <button
               key={mode}
@@ -156,19 +156,19 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && applySearch()}
-          className="ui-input h-7 min-h-0 flex-1 min-w-0 rounded py-0 text-[11px]"
+          className="ui-input h-8 min-h-0 flex-1 min-w-0 rounded-[var(--radius-control)] py-0 text-[11px]"
         />
         <button
           type="button"
           onClick={applySearch}
-          className="shrink-0 rounded border border-[var(--card-border)] bg-[var(--background)] px-2.5 py-1 text-[11px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+          className="shrink-0 rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
         >
           Search
         </button>
       </div>
       {/* Row 3: Inline dropdown filters — compact toolbar strip */}
       <div
-        className={`flex flex-wrap items-center rounded-md border border-[var(--card-border)]/80 bg-[var(--background)]/60 ${
+        className={`flex flex-wrap items-center rounded-[var(--radius-control)] border border-[var(--card-border)]/80 bg-[var(--background)]/60 ${
           opsMode ? "mt-0.5 gap-x-1.5 gap-y-1 px-1.5 py-1" : "mt-1 gap-x-2 gap-y-1.5 px-2 py-1.5"
         }`}
       >
