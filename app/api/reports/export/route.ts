@@ -151,7 +151,8 @@ export async function GET(request: Request) {
   }
 
   const pdfBytes = await buildPdf(dataset.title, dataset.columns, dataset.rows);
-  return new NextResponse(pdfBytes, {
+  const pdfBody = Buffer.from(pdfBytes);
+  return new NextResponse(pdfBody, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

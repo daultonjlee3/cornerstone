@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
+import Link from "next/link";
 import { deleteTechnician, saveTechnician } from "../actions";
 import type { Technician } from "./technician-form-modal";
 import { TechnicianFormModal } from "./technician-form-modal";
@@ -123,7 +124,11 @@ export function TechniciansList({
                     key={t.id}
                     className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >
-                    <td className="px-4 py-3.5 text-[var(--foreground)]">{technicianDisplayName(t)}</td>
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">
+                      <Link href={`/technicians/${t.id}`} className="text-[var(--accent)] hover:underline">
+                        {technicianDisplayName(t)}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{companyDisplay(t as Technician & { company_name?: string })}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{t.trade ?? "—"}</td>
                     <td className="px-4 py-3.5">

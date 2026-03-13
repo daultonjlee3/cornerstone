@@ -1,3 +1,6 @@
+import { insertAuditLog } from "@/src/lib/audit-logs";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 export type ActivityLogPayload = {
   tenantId?: string | null;
   companyId?: string | null;
@@ -11,8 +14,29 @@ export type ActivityLogPayload = {
   performedAt?: string | null;
 };
 
+function normalizeAuditAction(payload: ActivityLogPayload): string {
+  const action = payload.actionType;
+  if (payload.entityType === "work_order") {
+    if (action === "work_order_created") return "work_order_created";
+    if (action === "work_order_assigned" || action === "work_order.assigned") {
+      return "work_order_assigned";
+    }
+    if (action.includes("assigned")) return "work_order_assigned";
+    if (action === "work_order_edited" || action === "work_order_status_changed") {
+      return "work_order_updated";
+    }
+  }
+  if (payload.entityType === "asset" && (action === "asset_edited" || action === "asset_created")) {
+    return "asset_modified";
+  }
+  if (payload.entityType === "work_request" && action === "request.created") {
+    return "maintenance_request_created";
+  }
+  return action;
+}
+
 export async function insertActivityLog(
-  supabase: { from: (table: string) => any },
+  supabase: SupabaseClient,
   payload: ActivityLogPayload
 ): Promise<void> {
   const { error } = await supabase.from("activity_logs").insert({
@@ -31,4 +55,20 @@ export async function insertActivityLog(
   if (error) {
     throw new Error(error.message);
   }
+
+  await insertAuditLog(supabase, {
+    userId: payload.performedBy ?? null,
+    action: normalizeAuditAction(payload),
+    entityType: payload.entityType,
+    entityId: payload.entityId,
+    timestamp: payload.performedAt ?? new Date().toISOString(),
+    metadata: {
+      tenant_id: payload.tenantId ?? null,
+      company_id: payload.companyId ?? null,
+      activity_action: payload.actionType,
+      before_state: payload.beforeState ?? null,
+      after_state: payload.afterState ?? null,
+      metadata: payload.metadata ?? {},
+    },
+  });
 }

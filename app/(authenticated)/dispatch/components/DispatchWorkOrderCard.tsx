@@ -154,8 +154,6 @@ export function DispatchWorkOrderCard({
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         isSlaBreached={slaBreached}
-        isDragging={isDragging}
-        className="text-sm"
       >
         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           {workOrder.work_order_number ?? "Work order"}

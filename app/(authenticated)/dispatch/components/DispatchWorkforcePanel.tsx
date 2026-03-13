@@ -30,6 +30,21 @@ function textTone(utilization: number): string {
   return "text-emerald-700";
 }
 
+function formatLastUpdated(lastLocationAt: string | null | undefined): {
+  label: string;
+  stale: boolean;
+} {
+  if (!lastLocationAt) return { label: "Last updated —", stale: true };
+  const ms = new Date(lastLocationAt).getTime();
+  if (!Number.isFinite(ms)) return { label: "Last updated —", stale: true };
+  const minutes = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (minutes < 1) return { label: "Last updated just now", stale: false };
+  return {
+    label: `Last updated ${minutes} minute${minutes === 1 ? "" : "s"} ago`,
+    stale: minutes >= 10,
+  };
+}
+
 export function DispatchWorkforcePanel({
   workforce,
   insights,
@@ -98,30 +113,43 @@ export function DispatchWorkforcePanel({
         tableClassName="max-h-[260px] overflow-auto"
       >
         <div className="space-y-1.5">
-          {technicianRows.map((technician) => (
-            <div key={technician.id} className="rounded border border-[var(--card-border)]/60 bg-[var(--background)]/50 p-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                  {technician.name}
+          {technicianRows.map((technician) => {
+            const freshness = formatLastUpdated(technician.lastLocationAt);
+            return (
+              <div
+                key={technician.id}
+                className="rounded border border-[var(--card-border)]/60 bg-[var(--background)]/50 p-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {technician.name}
+                  </p>
+                  <p className={`text-xs font-semibold ${textTone(technician.utilization)}`}>
+                    {technician.workloadHoursToday.toFixed(1)} / {technician.dailyCapacityHours.toFixed(1)}h
+                  </p>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200/80">
+                  <div
+                    className={`h-full ${barTone(technician.utilization)}`}
+                    style={{ width: `${Math.min(100, Math.max(6, technician.utilization * 100))}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--muted)]">
+                  {technician.currentAssignments} assigned · {technician.inProgress} active ·{" "}
+                  {technician.crewMemberships.length > 0
+                    ? technician.crewMemberships.join(", ")
+                    : "No crew membership"}
                 </p>
-                <p className={`text-xs font-semibold ${textTone(technician.utilization)}`}>
-                  {technician.workloadHoursToday.toFixed(1)} / {technician.dailyCapacityHours.toFixed(1)}h
+                <p
+                  className={`mt-1 text-[11px] ${
+                    freshness.stale ? "text-amber-700" : "text-[var(--muted)]"
+                  }`}
+                >
+                  {freshness.label}
                 </p>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200/80">
-                <div
-                  className={`h-full ${barTone(technician.utilization)}`}
-                  style={{ width: `${Math.min(100, Math.max(6, technician.utilization * 100))}%` }}
-                />
-              </div>
-              <p className="mt-1 text-[11px] text-[var(--muted)]">
-                {technician.currentAssignments} assigned · {technician.inProgress} active ·{" "}
-                {technician.crewMemberships.length > 0
-                  ? technician.crewMemberships.join(", ")
-                  : "No crew membership"}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </WorkloadPanel>
 

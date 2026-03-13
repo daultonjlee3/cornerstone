@@ -59,7 +59,7 @@ export function DispatchSpeedActions({
       <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">Quick assign</span>
       <Button
         size="sm"
-        variant="outline"
+        variant="secondary"
         className="h-7 text-[11px]"
         disabled={!bestId || assigning}
         onClick={() => bestId && onAssign(selectedWorkOrder.id, bestId)}
@@ -68,7 +68,7 @@ export function DispatchSpeedActions({
       </Button>
       <Button
         size="sm"
-        variant="outline"
+        variant="secondary"
         className="h-7 text-[11px]"
         disabled={!nearestId || assigning}
         onClick={() => nearestId && onAssign(selectedWorkOrder.id, nearestId)}
@@ -77,7 +77,7 @@ export function DispatchSpeedActions({
       </Button>
       <Button
         size="sm"
-        variant="outline"
+        variant="secondary"
         className="h-7 text-[11px]"
         disabled={!leastLoadedId || assigning}
         onClick={() => leastLoadedId && onAssign(selectedWorkOrder.id, leastLoadedId)}

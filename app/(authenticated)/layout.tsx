@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Shell } from "./components/shell";
 import { isPlatformSuperAdmin } from "@/src/lib/auth-context";
 import { getImpersonationStateFromCookie } from "@/src/lib/impersonation";
+import { getImpersonationSession } from "@/src/lib/portal/access";
 
 export default async function AuthenticatedLayout({
   children,
@@ -15,8 +16,8 @@ export default async function AuthenticatedLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const impersonation = await getImpersonationStateFromCookie();
-  const effectiveUserId = impersonation?.actingAsUserId ?? user.id;
+  const impersonationState = await getImpersonationStateFromCookie();
+  const effectiveUserId = impersonationState?.actingAsUserId ?? user.id;
 
   const { data: membership } = await supabase
     .from("tenant_memberships")
@@ -26,6 +27,21 @@ export default async function AuthenticatedLayout({
     .maybeSingle();
 
   if (!membership) redirect("/onboarding");
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_portal_only")
+    .eq("id", user.id)
+    .limit(1)
+    .maybeSingle();
+  const isPortalOnly = Boolean(
+    (profile as { is_portal_only?: boolean | null } | null)?.is_portal_only
+  );
+  const portalImpersonation = await getImpersonationSession();
+  const isPortalImpersonating = portalImpersonation?.admin_user_id === user.id;
+  if (isPortalOnly || isPortalImpersonating) {
+    redirect("/portal");
+  }
 
   const tenantData = (membership as { tenants?: { name: string }[] | { name: string } | null })
     ?.tenants;
@@ -43,11 +59,11 @@ export default async function AuthenticatedLayout({
   const showPlatformAdmin = await isPlatformSuperAdmin(supabase);
 
   let impersonationBanner: { actingAsName: string; companyName: string } | null = null;
-  if (impersonation?.actingAsUserId) {
+  if (impersonationState?.actingAsUserId) {
     const { data: actingUser } = await supabase
       .from("users")
       .select("full_name")
-      .eq("id", impersonation.actingAsUserId)
+      .eq("id", impersonationState.actingAsUserId)
       .maybeSingle();
     const actingAsName = (actingUser as { full_name?: string } | null)?.full_name ?? "User";
     impersonationBanner = { actingAsName, companyName };

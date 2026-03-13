@@ -1611,6 +1611,7 @@ export function DispatchView({
         assets={createFormOptions.assets}
         technicians={createFormOptions.technicians}
         crews={createFormOptions.crews}
+        vendors={createFormOptions.vendors}
         saveAction={saveWorkOrder}
       />
       {assignmentTarget ? (

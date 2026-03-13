@@ -58,5 +58,24 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   }
 
   const next = formData.get("next") as string | null;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase
+        .from("users")
+        .select("is_portal_only")
+        .eq("id", user.id)
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const isPortalOnly = Boolean(
+    (profile as { is_portal_only?: boolean | null } | null)?.is_portal_only
+  );
+
+  if (isPortalOnly) {
+    redirect("/portal");
+  }
   redirect(next && next.startsWith("/") ? next : "/dashboard");
 }

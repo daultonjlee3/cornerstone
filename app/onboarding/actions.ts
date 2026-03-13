@@ -53,5 +53,5 @@ export async function onboardingAction(
     return { error: membershipError.message || "Failed to add you to the organization." };
   }
 
-  redirect("/dashboard");
+  redirect("/onboarding-wizard");
 }

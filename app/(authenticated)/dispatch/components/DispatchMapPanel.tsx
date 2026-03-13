@@ -103,6 +103,21 @@ function locationLine(workOrder: DispatchWorkOrder): string {
   return pieces.join(" / ");
 }
 
+function locationFreshness(lastLocationAt: string | null | undefined): {
+  label: string;
+  stale: boolean;
+} {
+  if (!lastLocationAt) return { label: "Last updated —", stale: true };
+  const ms = new Date(lastLocationAt).getTime();
+  if (!Number.isFinite(ms)) return { label: "Last updated —", stale: true };
+  const diffMinutes = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (diffMinutes < 1) return { label: "Last updated just now", stale: false };
+  return {
+    label: `Last updated ${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`,
+    stale: diffMinutes >= 10,
+  };
+}
+
 export function DispatchMapPanel({
   workOrders,
   workforce,
@@ -450,6 +465,15 @@ export function DispatchMapPanel({
                   <p className="text-xs font-semibold text-slate-800">{technician.name}</p>
                   <p className="text-xs text-slate-600">
                     {technician.currentAssignments} assignments · {technician.workloadHoursToday.toFixed(1)}h
+                  </p>
+                  <p
+                    className={`text-[11px] ${
+                      locationFreshness(technician.lastLocationAt).stale
+                        ? "text-amber-700"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {locationFreshness(technician.lastLocationAt).label}
                   </p>
                   <button
                     type="button"
