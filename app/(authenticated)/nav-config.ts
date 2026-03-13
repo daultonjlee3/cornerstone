@@ -54,4 +54,8 @@ export const navConfig: NavGroup[] = [
       { label: "Invoices", href: "/dashboard/invoices" },
     ],
   },
+  {
+    label: "Organization",
+    items: [{ label: "Settings", href: "/settings" }],
+  },
 ];

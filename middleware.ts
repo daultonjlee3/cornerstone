@@ -26,6 +26,8 @@ const protectedPaths = [
   "/crews",
   "/dispatch",
   "/preventive-maintenance",
+  "/platform",
+  "/settings",
 ];
 const authPaths = ["/login", "/signup"];
 
@@ -106,6 +108,10 @@ export const config = {
     "/dispatch/:path*",
     "/preventive-maintenance",
     "/preventive-maintenance/:path*",
+    "/platform",
+    "/platform/:path*",
+    "/settings",
+    "/settings/:path*",
     "/login",
     "/signup",
   ],

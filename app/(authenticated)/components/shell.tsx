@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { endImpersonation } from "@/app/platform/impersonate/actions";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
+import { ImpersonationBanner } from "./impersonation-banner";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -11,9 +13,17 @@ type ShellProps = {
   children: React.ReactNode;
   tenantName: string;
   companyName: string;
+  showPlatformAdmin?: boolean;
+  impersonationBanner?: { actingAsName: string; companyName: string } | null;
 };
 
-export function Shell({ children, tenantName, companyName }: ShellProps) {
+export function Shell({
+  children,
+  tenantName,
+  companyName,
+  showPlatformAdmin = false,
+  impersonationBanner = null,
+}: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
@@ -42,6 +52,7 @@ export function Shell({ children, tenantName, companyName }: ShellProps) {
           onClose={() => setSidebarOpen(false)}
           collapsed={sidebarCollapsed}
           onToggleCollapse={handleToggleCollapse}
+          showPlatformAdmin={showPlatformAdmin}
         />
       ) : null}
       {/* Main panel: fills remaining width, column layout, scrollable content */}
@@ -55,6 +66,16 @@ export function Shell({ children, tenantName, companyName }: ShellProps) {
             tenantName={tenantName}
             companyName={companyName}
             onMenuClick={() => setSidebarOpen(true)}
+            isImpersonating={!!impersonationBanner}
+            onReturnToProfile={
+              impersonationBanner ? () => endImpersonation("/dashboard") : undefined
+            }
+          />
+        ) : null}
+        {impersonationBanner ? (
+          <ImpersonationBanner
+            actingAsName={impersonationBanner.actingAsName}
+            companyName={impersonationBanner.companyName}
           />
         ) : null}
         <div className="min-h-0 flex-1 overflow-auto">

@@ -4,6 +4,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { createNotification } from "@/src/lib/notifications/service";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
   calculateNextRunDateAfterExecution,
@@ -690,6 +691,19 @@ export async function saveWorkOrder(
       afterState: inserted as Record<string, unknown>,
       metadata: { source: "saveWorkOrder" },
     });
+    const insertedId = (inserted as { id: string }).id;
+    if (actorId) {
+      await createNotification(supabase, {
+        companyId,
+        userId: actorId,
+        eventType: "work_order.created",
+        title: `Work order created: ${title}`,
+        message: (inserted as { work_order_number?: string }).work_order_number ?? undefined,
+        entityType: "work_order",
+        entityId: insertedId,
+        metadata: { work_order_number: (inserted as { work_order_number?: string }).work_order_number },
+      });
+    }
     const locationInherited =
       resolvedPropertyId !== propertyId ||
       resolvedBuildingId !== buildingId ||

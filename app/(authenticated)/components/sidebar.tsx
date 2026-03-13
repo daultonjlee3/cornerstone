@@ -9,6 +9,7 @@ type SidebarProps = {
   onClose: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  showPlatformAdmin?: boolean;
 };
 
 function isActive(href: string, pathname: string): boolean {
@@ -16,7 +17,7 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ open, onClose, collapsed = false, onToggleCollapse, showPlatformAdmin = false }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -85,36 +86,49 @@ export function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }: 
           )}
         </div>
         {!collapsed && (
-          <nav className="min-h-0 flex-1 overflow-y-auto py-4">
-            {navConfig.map((group) => (
-              <div key={group.label} className="mb-6">
-                <h3 className="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                  {group.label}
-                </h3>
-                <ul className="space-y-1">
-                  {group.items.map((item) => {
-                    const active = isActive(item.href, pathname ?? "");
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          onClick={onClose}
-                          className={`
-                            block rounded-r-lg border-l-2 py-2 pl-4 pr-4 text-sm transition-colors
-                            ${active
-                              ? "border-[var(--accent)] bg-[var(--accent)]/12 font-medium text-[var(--accent)]"
-                              : "border-transparent text-[var(--foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                            }
-                          `}
-                        >
-                          {item.label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
+          <nav className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto py-4">
+              {navConfig.map((group) => (
+                <div key={group.label} className="mb-6">
+                  <h3 className="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    {group.label}
+                  </h3>
+                  <ul className="space-y-1">
+                    {group.items.map((item) => {
+                      const active = isActive(item.href, pathname ?? "");
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            onClick={onClose}
+                            className={`
+                              block rounded-r-lg border-l-2 py-2 pl-4 pr-4 text-sm transition-colors
+                              ${active
+                                ? "border-[var(--accent)] bg-[var(--accent)]/12 font-medium text-[var(--accent)]"
+                                : "border-transparent text-[var(--foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                              }
+                            `}
+                          >
+                            {item.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            {showPlatformAdmin && (
+              <div className="shrink-0 border-t border-[var(--card-border)] px-4 py-3">
+                <Link
+                  href="/platform"
+                  onClick={onClose}
+                  className="block rounded-r-lg border-l-2 border-transparent py-2 pl-4 pr-4 text-sm text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                >
+                  Platform Admin
+                </Link>
               </div>
-            ))}
+            )}
           </nav>
         )}
       </aside>
