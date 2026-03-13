@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import {
   completeOnboardingWizardAction,
-  importOnboardingStepAction,
-  type OnboardingWizardStep,
-} from "./actions";
-import { OnboardingWizard } from "./components/onboarding-wizard";
+  generateDemoDataAction,
+  importAssetSpreadsheetAction,
+} from "./asset-first-actions";
+import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export const metadata = {
   title: "Onboarding Wizard | Cornerstone Tech",
@@ -76,20 +76,21 @@ export default async function OnboardingWizardPage() {
       .eq("company_id", companyId),
   ]);
 
-  const counts: Record<OnboardingWizardStep, number> = {
+  const counts = {
     properties: propertiesCount.count ?? 0,
     buildings: buildingsCount.count ?? 0,
     technicians: techniciansCount.count ?? 0,
     products: productsCount.count ?? 0,
-    work_orders: workOrdersCount.count ?? 0,
+    workOrders: workOrdersCount.count ?? 0,
     assets: assetsCount.count ?? 0,
-    pm_schedules: pmPlansCount.count ?? 0,
+    pmPlans: pmPlansCount.count ?? 0,
   };
 
   return (
     <OnboardingWizard
       counts={counts}
-      importAction={importOnboardingStepAction}
+      importAction={importAssetSpreadsheetAction}
+      demoAction={generateDemoDataAction}
       completeAction={completeOnboardingWizardAction}
     />
   );
