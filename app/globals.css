@@ -165,6 +165,12 @@ body {
   transform: scale(1.14);
   border-color: #0f97ad;
   box-shadow: 0 0 0 4px rgba(15, 151, 173, 0.28), 0 6px 16px rgba(15, 23, 42, 0.32);
+  animation: dispatch-pin-pulse 1.5s ease-out 2;
+}
+
+@keyframes dispatch-pin-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(15, 151, 173, 0.28), 0 6px 16px rgba(15, 23, 42, 0.32); }
+  50% { box-shadow: 0 0 0 10px rgba(15, 151, 173, 0.2), 0 0 0 4px rgba(15, 151, 173, 0.35), 0 6px 16px rgba(15, 23, 42, 0.32); }
 }
 
 .dispatch-map-pin-cluster {

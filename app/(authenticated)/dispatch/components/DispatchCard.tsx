@@ -6,6 +6,8 @@ type DispatchCardProps = {
   isSlaBreached?: boolean;
   isDragging?: boolean;
   className?: string;
+  /** Optional extra class for the content wrapper (e.g. padding). */
+  contentClassName?: string;
   children: React.ReactNode;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -17,6 +19,7 @@ export function DispatchCard({
   isSlaBreached = false,
   isDragging = false,
   className = "",
+  contentClassName,
   children,
   onMouseEnter,
   onMouseLeave,
@@ -34,7 +37,7 @@ export function DispatchCard({
       } ${isDragging ? "opacity-90 shadow-lg" : ""} ${className}`}
     >
       <PriorityStripe priority={priority} />
-      <div className="p-2.5">{children}</div>
+      <div className={`p-2.5 ${contentClassName ?? ""}`}>{children}</div>
     </article>
   );
 }

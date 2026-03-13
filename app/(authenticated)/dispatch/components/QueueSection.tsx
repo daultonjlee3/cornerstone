@@ -79,7 +79,7 @@ export function QueueSection({
       </h3>
       {!collapsed && (
         <ul
-          className={`flex flex-col gap-1.5 p-1.5 ${isScrollable ? "overflow-y-auto overscroll-contain" : ""}`}
+          className={`flex flex-col gap-2 p-2 ${isScrollable ? "overflow-y-auto overscroll-contain" : ""}`}
           style={isScrollable ? { maxHeight: SECTION_LIST_MAX_HEIGHT } : undefined}
         >
           {count === 0 ? (
@@ -95,6 +95,7 @@ export function QueueSection({
                     <DispatchWorkOrderCard
                       workOrder={wo}
                       variant="block"
+                      size="queue"
                       showScheduledTime
                       showCrew={false}
                       showQuickActions={false}

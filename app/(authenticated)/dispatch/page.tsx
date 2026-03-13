@@ -1,8 +1,8 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { loadDispatchData } from "./dispatch-data";
-import { DispatchView } from "./components/DispatchView";
 import { parseFilterStateFromParams } from "./filter-state";
+import { DispatchViewClient } from "./components/DispatchViewClient";
 
 export const metadata = {
   title: "Dispatch | Cornerstone Tech",
@@ -64,7 +64,7 @@ export default async function DispatchPage({
   });
 
   return (
-    <DispatchView
+    <DispatchViewClient
       initialData={result}
       filterState={filterState}
     />
