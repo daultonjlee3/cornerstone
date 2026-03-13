@@ -27,6 +27,8 @@ export default async function InventoryPage() {
         .select(
           "id, product_id, stock_location_id, quantity_on_hand, minimum_stock, reorder_point, updated_at, products(id, company_id, name, sku, category, companies(name)), stock_locations(id, name, location_type, company_id)"
         )
+        .in("products.company_id", scope.companyIds)
+        .in("stock_locations.company_id", scope.companyIds)
         .order("updated_at", { ascending: false }),
       scope.supabase
         .from("stock_locations")
