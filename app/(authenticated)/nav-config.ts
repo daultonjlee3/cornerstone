@@ -31,7 +31,7 @@ export const navConfig: NavGroup[] = [
       { label: "Asset Intelligence", href: "/assets/intelligence" },
       { label: "Technicians", href: "/technicians" },
       { label: "Technician Work Queue", href: "/technicians/work-queue" },
-      { label: "Technician Portal", href: "/technician/jobs" },
+      { label: "Technician Portal", href: "/portal" },
       { label: "Crews", href: "/crews" },
       { label: "Dispatch", href: "/dispatch" },
       { label: "Preventive Maintenance", href: "/preventive-maintenance" },

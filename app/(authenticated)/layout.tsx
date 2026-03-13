@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Shell } from "./components/shell";
+import { getImpersonationSession } from "@/src/lib/portal/access";
 
 export default async function AuthenticatedLayout({
   children,
@@ -21,6 +22,21 @@ export default async function AuthenticatedLayout({
     .maybeSingle();
 
   if (!membership) redirect("/onboarding");
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_portal_only")
+    .eq("id", user.id)
+    .limit(1)
+    .maybeSingle();
+  const isPortalOnly = Boolean(
+    (profile as { is_portal_only?: boolean | null } | null)?.is_portal_only
+  );
+  const impersonation = await getImpersonationSession();
+  const isImpersonating = impersonation?.admin_user_id === user.id;
+  if (isPortalOnly || isImpersonating) {
+    redirect("/portal");
+  }
 
   const tenantData = (membership as { tenants?: { name: string }[] | { name: string } | null })
     ?.tenants;

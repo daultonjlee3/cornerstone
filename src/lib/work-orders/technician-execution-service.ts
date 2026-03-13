@@ -34,7 +34,12 @@ const WORK_ORDER_SELECT_LEGACY = `
       crews!assigned_crew_id(name)
     `;
 
-type TechnicianOption = { id: string; name: string; email: string };
+type TechnicianOption = {
+  id: string;
+  name: string;
+  email: string;
+  user_id: string | null;
+};
 
 type ChecklistItem = {
   id: string;
@@ -184,7 +189,11 @@ function normalizeTechnicianName(row: Record<string, unknown>): string {
 
 export async function getTechnicianExecutionPayload(
   workOrderId: string,
-  options?: { supabase?: SupabaseClient; requireAssignedAccess?: boolean }
+  options?: {
+    supabase?: SupabaseClient;
+    requireAssignedAccess?: boolean;
+    actorTechnicianId?: string | null;
+  }
 ): Promise<TechnicianExecutionPayload> {
   const supabase = options?.supabase ?? ((await createClient()) as unknown as SupabaseClient);
   const requireAssignedAccess = options?.requireAssignedAccess ?? true;
@@ -238,7 +247,7 @@ export async function getTechnicianExecutionPayload(
     await Promise.all([
       supabase
         .from("technicians")
-        .select("id, technician_name, name, email")
+        .select("id, technician_name, name, email, user_id")
         .eq("company_id", companyId)
         .eq("status", "active")
         .order("technician_name"),
@@ -329,9 +338,15 @@ export async function getTechnicianExecutionPayload(
     id: (row as { id: string }).id,
     name: normalizeTechnicianName(row as Record<string, unknown>),
     email: ((row as { email?: string | null }).email ?? "").toLowerCase(),
+    user_id: (row as { user_id?: string | null }).user_id ?? null,
   })) as TechnicianOption[];
   const currentTechnician =
-    technicians.find((technician) => technician.email === (user.email ?? "").toLowerCase()) ?? null;
+    (options?.actorTechnicianId
+      ? technicians.find((technician) => technician.id === options.actorTechnicianId)
+      : null) ??
+    technicians.find((technician) => technician.user_id === user.id) ??
+    technicians.find((technician) => technician.email === (user.email ?? "").toLowerCase()) ??
+    null;
 
   const assignedTechnicianId =
     (workOrderRaw as { assigned_technician_id?: string | null }).assigned_technician_id ?? null;
@@ -347,13 +362,11 @@ export async function getTechnicianExecutionPayload(
   const currentCrewIds = (currentCrewRows ?? []).map((row) => (row as { crew_id: string }).crew_id);
 
   if (requireAssignedAccess) {
-    const hasAssignmentTarget = Boolean(assignedTechnicianId || assignedCrewId);
-    const hasAccess =
-      Boolean(
-        currentTechnician &&
-          (assignedTechnicianId === currentTechnician.id ||
-            (assignedCrewId && currentCrewIds.includes(assignedCrewId)))
-      ) || !hasAssignmentTarget;
+    const hasAccess = Boolean(
+      currentTechnician &&
+        (assignedTechnicianId === currentTechnician.id ||
+          (assignedCrewId && currentCrewIds.includes(assignedCrewId)))
+    );
     if (!hasAccess) throw new Error("Unauthorized.");
   }
 

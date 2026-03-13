@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/src/lib/supabase/server";
+import { resolvePortalAccessContext } from "@/src/lib/portal/access";
 import { getTechnicianExecutionPayload } from "@/src/lib/work-orders/technician-execution-service";
 
 export async function GET(
@@ -15,9 +16,16 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
+    const portalContext = await resolvePortalAccessContext(
+      supabase as unknown as SupabaseClient
+    );
+    const requireAssignedAccess = Boolean(
+      portalContext?.isPortalOnlyUser || portalContext?.impersonation
+    );
     const payload = await getTechnicianExecutionPayload(id, {
       supabase: supabase as unknown as SupabaseClient,
-      requireAssignedAccess: false,
+      requireAssignedAccess,
+      actorTechnicianId: portalContext?.technicianId ?? null,
     });
     return NextResponse.json(payload);
   } catch (error) {

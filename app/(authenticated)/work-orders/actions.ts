@@ -95,6 +95,76 @@ async function getActorId(
   return user?.id ?? null;
 }
 
+type PortalTechnicianGuard = {
+  isPortalOnly: boolean;
+  technicianId: string | null;
+  crewIds: Set<string>;
+};
+
+async function resolvePortalTechnicianGuard(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<PortalTechnicianGuard> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    return { isPortalOnly: false, technicianId: null, crewIds: new Set() };
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_portal_only")
+    .eq("id", user.id)
+    .limit(1)
+    .maybeSingle();
+  const isPortalOnly = Boolean(
+    (profile as { is_portal_only?: boolean | null } | null)?.is_portal_only
+  );
+  if (!isPortalOnly) {
+    return { isPortalOnly: false, technicianId: null, crewIds: new Set() };
+  }
+
+  const { data: technician } = await supabase
+    .from("technicians")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  const technicianId = (technician as { id?: string } | null)?.id ?? null;
+  const { data: crewRows } = technicianId
+    ? await supabase.from("crew_members").select("crew_id").eq("technician_id", technicianId)
+    : { data: [] as unknown[] };
+  const crewIds = new Set(
+    ((crewRows ?? []) as Array<{ crew_id?: string | null }>)
+      .map((row) => row.crew_id)
+      .filter((value): value is string => Boolean(value))
+  );
+
+  return {
+    isPortalOnly: true,
+    technicianId,
+    crewIds,
+  };
+}
+
+function portalGuardHasWorkOrderAccess(
+  guard: PortalTechnicianGuard,
+  workOrder: {
+    assigned_technician_id?: string | null;
+    assigned_crew_id?: string | null;
+  }
+): boolean {
+  if (!guard.isPortalOnly) return true;
+  if (!guard.technicianId) return false;
+  const assignedTechnicianId = workOrder.assigned_technician_id ?? null;
+  const assignedCrewId = workOrder.assigned_crew_id ?? null;
+  return (
+    assignedTechnicianId === guard.technicianId ||
+    Boolean(assignedCrewId && guard.crewIds.has(assignedCrewId))
+  );
+}
+
 async function getCompanyAlertRecipients(
   supabase: Awaited<ReturnType<typeof createClient>>,
   companyId: string | null
@@ -753,7 +823,7 @@ export async function deleteWorkOrder(id: string): Promise<WorkOrderFormState> {
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("work_orders")
-    .select("company_id")
+    .select("company_id, assigned_technician_id, assigned_crew_id")
     .eq("id", id)
     .maybeSingle();
   if (!row) return { error: "Work order not found." };
@@ -792,6 +862,17 @@ export async function updateWorkOrderStatus(
     tenantId
   );
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (beforeState.assigned_technician_id as string | null | undefined) ?? null,
+      assigned_crew_id:
+        (beforeState.assigned_crew_id as string | null | undefined) ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
   const currentStatus = String(beforeState.status ?? "");
   if (TERMINAL_STATUSES.has(currentStatus)) {
     return { error: "Cannot change status for completed or cancelled work orders." };
@@ -928,6 +1009,8 @@ export async function updateWorkOrderStatus(
   revalidatePath("/technician/jobs");
   revalidatePath("/technician/work");
   revalidatePath(`/technician/jobs/${id}`);
+  revalidatePath("/portal/work-orders");
+  revalidatePath(`/portal/work-orders/${id}`);
   return { success: true };
 }
 
@@ -1311,6 +1394,8 @@ export async function updateWorkOrderAssignment(
   revalidatePath("/technician/jobs");
   revalidatePath("/technician/work");
   revalidatePath(`/technician/jobs/${id}`);
+  revalidatePath("/portal/work-orders");
+  revalidatePath(`/portal/work-orders/${id}`);
   return { success: true };
 }
 
@@ -1357,6 +1442,17 @@ export async function completeWorkOrder(
     tenantId
   );
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (beforeState.assigned_technician_id as string | null | undefined) ?? null,
+      assigned_crew_id:
+        (beforeState.assigned_crew_id as string | null | undefined) ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
   if (String(beforeState.status ?? "") === "cancelled") {
     return { error: "Cancelled work orders cannot be completed." };
   }
@@ -1636,6 +1732,8 @@ export async function completeWorkOrder(
   revalidatePath("/technician/jobs");
   revalidatePath("/technician/work");
   revalidatePath(`/technician/jobs/${id}`);
+  revalidatePath("/portal/work-orders");
+  revalidatePath(`/portal/work-orders/${id}`);
   if (assetId) {
     revalidatePath("/assets");
     revalidatePath(`/assets/${assetId}`);
@@ -1663,7 +1761,7 @@ export async function logWorkOrderLabor(
   const actorId = await getActorId(supabase);
   const { data: workOrder } = await supabase
     .from("work_orders")
-    .select("company_id, status")
+    .select("company_id, status, assigned_technician_id, assigned_crew_id")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!workOrder) return { error: "Work order not found." };
@@ -1671,6 +1769,17 @@ export async function logWorkOrderLabor(
   if (!companyId) return { error: "Work order company is missing." };
   const allowed = await companyBelongsToTenant(companyId, tenantId);
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (workOrder as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+      assigned_crew_id:
+        (workOrder as { assigned_crew_id?: string | null }).assigned_crew_id ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
   if ((workOrder as { status?: string | null }).status === "cancelled") {
     return { error: "Cannot log labor on cancelled work orders." };
   }
@@ -1751,6 +1860,8 @@ export async function logWorkOrderLabor(
   revalidatePath(`/technicians/work-queue/${workOrderId}`);
   revalidatePath(`/technician/jobs/${workOrderId}`);
   revalidatePath("/technician/work");
+  revalidatePath(`/portal/work-orders/${workOrderId}`);
+  revalidatePath("/portal/work-orders");
   return { success: true };
 }
 
@@ -1772,6 +1883,17 @@ export async function addWorkOrderNote(
   if (!row) return { error: "Work order not found." };
   const allowed = await companyBelongsToTenant(row.company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (row as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+      assigned_crew_id:
+        (row as { assigned_crew_id?: string | null }).assigned_crew_id ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
   const resolvedTechnicianId =
     technicianId ||
     (await resolveActorTechnicianIdForCompany(supabase, {
@@ -1817,6 +1939,8 @@ export async function addWorkOrderNote(
   revalidatePath(`/technicians/work-queue/${workOrderId}`);
   revalidatePath(`/technician/jobs/${workOrderId}`);
   revalidatePath("/technician/work");
+  revalidatePath(`/portal/work-orders/${workOrderId}`);
+  revalidatePath("/portal/work-orders");
   return { success: true };
 }
 
@@ -1838,7 +1962,7 @@ export async function uploadWorkOrderAttachment(
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
-    .select("company_id, asset_id")
+    .select("company_id, asset_id, assigned_technician_id, assigned_crew_id")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!row) return { error: "Work order not found." };
@@ -1846,6 +1970,17 @@ export async function uploadWorkOrderAttachment(
   if (!companyId) return { error: "Work order company is missing." };
   const allowed = await companyBelongsToTenant(companyId, tenantId);
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (row as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+      assigned_crew_id:
+        (row as { assigned_crew_id?: string | null }).assigned_crew_id ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
 
   const dataUrl = (payload.fileDataUrl ?? "").trim();
   const mimeType = (payload.mimeType ?? "").trim().toLowerCase();
@@ -1929,6 +2064,8 @@ export async function uploadWorkOrderAttachment(
   revalidatePath(`/technicians/work-queue/${workOrderId}`);
   revalidatePath(`/technician/jobs/${workOrderId}`);
   revalidatePath("/technician/work");
+  revalidatePath(`/portal/work-orders/${workOrderId}`);
+  revalidatePath("/portal/work-orders");
   revalidatePath("/assets");
   if ((row as { asset_id?: string | null }).asset_id) {
     revalidatePath(`/assets/${(row as { asset_id: string }).asset_id}`);
@@ -1968,12 +2105,23 @@ export async function toggleWorkOrderChecklistItem(
   if (!item) return { error: "Checklist item not found." };
   const { data: wo } = await supabase
     .from("work_orders")
-    .select("company_id")
+    .select("company_id, assigned_technician_id, assigned_crew_id")
     .eq("id", item.work_order_id)
     .maybeSingle();
   if (!wo) return { error: "Work order not found." };
   const allowed = await companyBelongsToTenant(wo.company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (wo as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+      assigned_crew_id:
+        (wo as { assigned_crew_id?: string | null }).assigned_crew_id ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
   const { error } = await supabase
     .from("work_order_checklist_items")
     .update({ completed })
@@ -1997,6 +2145,8 @@ export async function toggleWorkOrderChecklistItem(
   revalidatePath(`/technicians/work-queue/${item.work_order_id}`);
   revalidatePath(`/technician/jobs/${item.work_order_id}`);
   revalidatePath("/technician/work");
+  revalidatePath(`/portal/work-orders/${item.work_order_id}`);
+  revalidatePath("/portal/work-orders");
   return { success: true };
 }
 
@@ -2012,12 +2162,23 @@ export async function addWorkOrderChecklistItem(
   const actorId = await getActorId(supabase);
   const { data: wo } = await supabase
     .from("work_orders")
-    .select("company_id")
+    .select("company_id, assigned_technician_id, assigned_crew_id")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!wo) return { error: "Work order not found." };
   const allowed = await companyBelongsToTenant(wo.company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (wo as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+      assigned_crew_id:
+        (wo as { assigned_crew_id?: string | null }).assigned_crew_id ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
   const { data: maxSort } = await supabase
     .from("work_order_checklist_items")
     .select("sort_order")
@@ -2049,6 +2210,8 @@ export async function addWorkOrderChecklistItem(
   revalidatePath(`/technicians/work-queue/${workOrderId}`);
   revalidatePath(`/technician/jobs/${workOrderId}`);
   revalidatePath("/technician/work");
+  revalidatePath(`/portal/work-orders/${workOrderId}`);
+  revalidatePath("/portal/work-orders");
   return { success: true };
 }
 
@@ -2077,12 +2240,23 @@ export async function addWorkOrderPartUsage(
   const actorId = await getActorId(supabase);
   const { data: wo } = await supabase
     .from("work_orders")
-    .select("company_id, status, asset_id, assigned_technician_id")
+    .select("company_id, status, asset_id, assigned_technician_id, assigned_crew_id")
     .eq("id", workOrderId)
     .maybeSingle();
   if (!wo) return { error: "Work order not found." };
   const allowed = await companyBelongsToTenant((wo as { company_id: string }).company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
+  const portalGuard = await resolvePortalTechnicianGuard(supabase);
+  if (
+    !portalGuardHasWorkOrderAccess(portalGuard, {
+      assigned_technician_id:
+        (wo as { assigned_technician_id?: string | null }).assigned_technician_id ?? null,
+      assigned_crew_id:
+        (wo as { assigned_crew_id?: string | null }).assigned_crew_id ?? null,
+    })
+  ) {
+    return { error: "Unauthorized." };
+  }
 
   const companyId = (wo as { company_id: string }).company_id;
   let unitCost = payload.unit_cost;
@@ -2267,6 +2441,8 @@ export async function addWorkOrderPartUsage(
   revalidatePath(`/technicians/work-queue/${workOrderId}`);
   revalidatePath(`/technician/jobs/${workOrderId}`);
   revalidatePath("/technician/work");
+  revalidatePath(`/portal/work-orders/${workOrderId}`);
+  revalidatePath("/portal/work-orders");
   return { success: true };
 }
 

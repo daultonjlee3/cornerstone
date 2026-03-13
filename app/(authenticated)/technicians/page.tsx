@@ -52,7 +52,9 @@ export default async function TechniciansPage() {
 
   const { data: techniciansRaw, error } = await supabase
     .from("technicians")
-    .select("id, technician_name, name, company_id, email, phone, trade, status, hourly_cost, notes, companies(name)")
+    .select(
+      "id, technician_name, name, company_id, user_id, email, phone, trade, status, hourly_cost, notes, companies(name), users(is_portal_only)"
+    )
     .in("company_id", companyIds)
     .order("technician_name")
     .order("name");
@@ -64,10 +66,17 @@ export default async function TechniciansPage() {
       comp && typeof comp === "object" && "name" in comp
         ? (comp as { name?: string }).name
         : null;
-    const { companies: _, ...rest } = row;
+    const user = Array.isArray(row.users) ? row.users[0] : row.users;
+    const rest = { ...row };
+    delete (rest as { companies?: unknown }).companies;
+    delete (rest as { users?: unknown }).users;
     return {
       ...rest,
       company_name: company_name ?? undefined,
+      is_portal_only:
+        user && typeof user === "object" && "is_portal_only" in user
+          ? Boolean((user as { is_portal_only?: boolean | null }).is_portal_only)
+          : false,
     };
   }) as (Technician & { company_name?: string })[];
 
@@ -225,7 +234,7 @@ export default async function TechniciansPage() {
             Open Technician Work Queue
           </Link>
           <Link
-            href="/technician/jobs"
+            href="/portal"
             className="inline-flex rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
           >
             Open Technician Portal

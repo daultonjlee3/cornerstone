@@ -33,7 +33,7 @@ type TechnicianJobCardProps = {
 export function TechnicianJobCard({ job }: TechnicianJobCardProps) {
   return (
     <Link
-      href={`/technician/jobs/${job.id}`}
+      href={`/portal/work-orders/${job.id}`}
       className="block rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[var(--shadow-soft)] transition hover:border-[var(--accent)]/35 hover:shadow-[var(--shadow-card)]"
     >
       <div className="flex items-start justify-between gap-3">

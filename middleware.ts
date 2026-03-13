@@ -11,6 +11,7 @@ import { type NextRequest, NextResponse } from "next/server";
 const protectedPaths = [
   "/dashboard",
   "/onboarding",
+  "/portal",
   "/companies",
   "/properties",
   "/buildings",
@@ -28,12 +29,28 @@ const protectedPaths = [
   "/preventive-maintenance",
 ];
 const authPaths = ["/login", "/signup"];
+const IMPERSONATION_COOKIE = "cs_impersonation";
 
 function isProtected(pathname: string) {
   return protectedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 function isAuthPath(pathname: string) {
   return authPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
+function isPortalPath(pathname: string) {
+  return pathname === "/portal" || pathname.startsWith("/portal/");
+}
+
+function parseImpersonationCookie(rawValue: string | undefined): { admin_user_id: string } | null {
+  if (!rawValue) return null;
+  try {
+    const parsed = JSON.parse(rawValue) as { admin_user_id?: string };
+    if (!parsed?.admin_user_id) return null;
+    return { admin_user_id: parsed.admin_user_id };
+  } catch {
+    return null;
+  }
 }
 
 export async function middleware(request: NextRequest) {
@@ -59,13 +76,45 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (isProtected(request.nextUrl.pathname) && !user) {
+  const pathname = request.nextUrl.pathname;
+
+  if (isProtected(pathname) && !user) {
     const login = new URL("/login", request.url);
-    login.searchParams.set("next", request.nextUrl.pathname);
+    login.searchParams.set("next", pathname);
     return NextResponse.redirect(login);
   }
 
-  if (isAuthPath(request.nextUrl.pathname) && user) {
+  if (!user) {
+    return response;
+  }
+
+  const impersonationCookie = parseImpersonationCookie(
+    request.cookies.get(IMPERSONATION_COOKIE)?.value
+  );
+  const isImpersonating = impersonationCookie?.admin_user_id === user.id;
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_portal_only")
+    .eq("id", user.id)
+    .limit(1)
+    .maybeSingle();
+  const isPortalOnly = Boolean((profile as { is_portal_only?: boolean | null } | null)?.is_portal_only);
+  const portalActor = isPortalOnly || isImpersonating;
+
+  if (pathname === "/technician" || pathname.startsWith("/technician/")) {
+    return NextResponse.redirect(new URL("/portal", request.url));
+  }
+
+  if (isAuthPath(pathname)) {
+    return NextResponse.redirect(new URL(portalActor ? "/portal" : "/dashboard", request.url));
+  }
+
+  if (portalActor && isProtected(pathname) && !isPortalPath(pathname)) {
+    return NextResponse.redirect(new URL("/portal", request.url));
+  }
+
+  if (!portalActor && isPortalPath(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -76,6 +125,8 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/onboarding",
+    "/portal",
+    "/portal/:path*",
     "/companies",
     "/companies/:path*",
     "/properties",
