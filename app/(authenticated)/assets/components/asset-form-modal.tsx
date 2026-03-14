@@ -220,13 +220,6 @@ export function AssetFormModal({
   }, [companyId, propertyId, buildingId, propertiesFiltered, buildingsFiltered]);
 
   useEffect(() => {
-    if (!parentAssetId) return;
-    if (!parentCandidatesFiltered.some((candidate) => candidate.id === parentAssetId)) {
-      setParentAssetId("");
-    }
-  }, [parentAssetId, parentCandidatesFiltered]);
-
-  useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
@@ -277,6 +270,7 @@ export function AssetFormModal({
                 setPropertyId("");
                 setBuildingId("");
                 setUnitId("");
+                setParentAssetId("");
               }}
               className={inputClass}
             >

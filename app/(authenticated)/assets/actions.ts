@@ -67,24 +67,24 @@ async function validateParentAssignment(
     assetId: string | null;
     parentAssetId: string | null;
   }
-): Promise<{ error?: string; parent: Awaited<ReturnType<typeof getAssetHierarchyNode>> }> {
+): Promise<{ error?: string }> {
   if (!parentAssetId) {
-    return { parent: null };
+    return {};
   }
 
   if (assetId && assetId === parentAssetId) {
-    return { error: "An asset cannot be its own parent.", parent: null };
+    return { error: "An asset cannot be its own parent." };
   }
 
   const parent = await getAssetHierarchyNode(supabase, parentAssetId);
   if (!parent) {
-    return { error: "Selected parent asset was not found.", parent: null };
+    return { error: "Selected parent asset was not found." };
   }
   if (parent.tenant_id && parent.tenant_id !== tenantId) {
-    return { error: "Selected parent asset is out of scope.", parent: null };
+    return { error: "Selected parent asset is out of scope." };
   }
   if (parent.company_id !== companyId) {
-    return { error: "Selected parent asset must belong to the same company.", parent: null };
+    return { error: "Selected parent asset must belong to the same company." };
   }
 
   if (assetId) {
@@ -92,12 +92,11 @@ async function validateParentAssignment(
     if (createsCycle) {
       return {
         error: "Invalid parent selection. A descendant cannot be selected as parent.",
-        parent: null,
       };
     }
   }
 
-  return { parent };
+  return {};
 }
 
 export async function saveAsset(

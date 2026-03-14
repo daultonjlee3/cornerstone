@@ -1,11 +1,5 @@
 type SupabaseLike = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error?: { message: string } | null }>;
-      };
-    };
-  };
+  from: (table: string) => any;
 };
 
 const MAX_HIERARCHY_DEPTH = 25;
