@@ -262,8 +262,9 @@ export function WorkOrderFormModal({
   const [state, formAction, isPending] = useActionState(saveAction, {});
 
   const initial = getInitialLocation(workOrder, prefill);
+  const defaultCompanyId = initial.companyId || (companies.length === 1 ? companies[0]?.id : "") || "";
 
-  const [companyId, setCompanyId] = useState(initial.companyId);
+  const [companyId, setCompanyId] = useState(defaultCompanyId);
   const [customerId, setCustomerId] = useState(initial.customerId);
   const [propertyId, setPropertyId] = useState(initial.propertyId);
   const [buildingId, setBuildingId] = useState(initial.buildingId);

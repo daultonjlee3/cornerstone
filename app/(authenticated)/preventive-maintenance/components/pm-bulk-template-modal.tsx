@@ -41,7 +41,7 @@ export function PreventiveMaintenanceBulkTemplateModal({
   saveAction,
 }: Props) {
   const [state, formAction, isPending] = useActionState(saveAction, {});
-  const [companyId, setCompanyId] = useState("");
+  const [companyId, setCompanyId] = useState(companies.length === 1 ? companies[0]?.id ?? "" : "");
 
   useEffect(() => {
     if (state?.success) onClose();

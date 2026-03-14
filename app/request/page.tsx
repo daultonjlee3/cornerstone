@@ -1,10 +1,7 @@
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/src/lib/supabase/server";
-import { RequestForm } from "./components/RequestForm";
-
-export const metadata = {
-  title: "Maintenance Request | Cornerstone OS",
-  description: "Submit a maintenance request",
-};
+import { resolveRequestPortalLocale, t } from "@/src/lib/i18n/request-portal";
+import { RequestPortalLayout } from "./components/RequestPortalLayout";
 
 type PropertyOption = { id: string; name: string };
 type AssetOption = { id: string; name: string };
@@ -44,31 +41,37 @@ async function getPortalAssets(companyId: string | undefined): Promise<AssetOpti
   });
 }
 
+async function getRequestPageLocale(): Promise<"en" | "es" | "fr"> {
+  const cookieStore = await cookies();
+  const acceptLanguage = (await headers()).get("accept-language");
+  return resolveRequestPortalLocale({
+    cookieLocale: cookieStore.get("request_portal_locale")?.value ?? null,
+    acceptLanguage,
+    envDefaultLocale: process.env.PORTAL_DEFAULT_LOCALE?.trim() || null,
+  });
+}
+
+export async function generateMetadata() {
+  const locale = await getRequestPageLocale();
+  return {
+    title: `${t(locale, "requestPortal.title")} | Cornerstone OS`,
+    description: t(locale, "requestPortal.subtitle"),
+  };
+}
+
 export default async function RequestPage() {
   const companyId = process.env.PORTAL_COMPANY_ID?.trim();
+  const locale = await getRequestPageLocale();
   const [properties, assets] = await Promise.all([
     getPortalProperties(companyId),
     getPortalAssets(companyId),
   ]);
 
   return (
-    <div className="min-h-screen px-4 py-8 sm:py-14">
-      <div className="mx-auto max-w-lg">
-        <header className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Maintenance Request
-          </h1>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            Submit a request and we&apos;ll get back to you.
-          </p>
-        </header>
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] sm:p-10">
-          <RequestForm properties={properties} assets={assets} />
-        </div>
-        <p className="mt-8 text-center text-xs text-[var(--muted)]">
-          Cornerstone OS
-        </p>
-      </div>
-    </div>
+    <RequestPortalLayout
+      initialLocale={locale}
+      properties={properties}
+      assets={assets}
+    />
   );
 }

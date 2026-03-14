@@ -24,7 +24,7 @@ export function RequestSubmissionForm({
   defaultRequesterEmail,
 }: RequestSubmissionFormProps) {
   const [state, formAction, pending] = useActionState(submitWorkRequest, INITIAL_STATE);
-  const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
+  const [companyId, setCompanyId] = useState(companies.length === 1 ? companies[0]?.id ?? "" : "");
 
   const scopedAssets = useMemo(() => {
     if (!companyId) return assets;

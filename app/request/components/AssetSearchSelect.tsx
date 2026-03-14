@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRequestPortalTranslations } from "./RequestPortalI18n";
 
 type AssetOption = { id: string; name: string };
 
@@ -9,6 +10,7 @@ type AssetSearchSelectProps = {
 };
 
 export function AssetSearchSelect({ assets }: AssetSearchSelectProps) {
+  const { t } = useRequestPortalTranslations();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<AssetOption | null>(null);
   const [open, setOpen] = useState(false);
@@ -24,7 +26,7 @@ export function AssetSearchSelect({ assets }: AssetSearchSelectProps) {
 
   return (
     <div className="relative space-y-2">
-      <span className="ui-label">Asset (optional)</span>
+      <span className="ui-label">{t("requestPortal.asset")}</span>
       <input type="hidden" name="asset_id" value={selected?.id ?? ""} />
       <div className="relative">
         <input
@@ -37,7 +39,7 @@ export function AssetSearchSelect({ assets }: AssetSearchSelectProps) {
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 180)}
-          placeholder="Search or select an asset…"
+          placeholder={t("requestPortal.placeholder.assetSearch")}
           className="ui-input min-h-[48px] w-full rounded-xl border-[var(--card-border)] py-3 pr-10 text-base sm:min-h-[44px] sm:py-2.5 sm:text-sm"
           autoComplete="off"
         />
@@ -47,7 +49,7 @@ export function AssetSearchSelect({ assets }: AssetSearchSelectProps) {
             role="listbox"
           >
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-[var(--muted)]">No assets match</li>
+              <li className="px-3 py-2 text-sm text-[var(--muted)]">{t("requestPortal.noAssetsMatch")}</li>
             ) : (
               filtered.map((asset) => (
                 <li
@@ -75,7 +77,7 @@ export function AssetSearchSelect({ assets }: AssetSearchSelectProps) {
           onClick={() => { setSelected(null); setQuery(""); }}
           className="text-xs font-medium text-[var(--accent)] hover:underline"
         >
-          Clear selection
+          {t("requestPortal.clearSelection")}
         </button>
       )}
     </div>

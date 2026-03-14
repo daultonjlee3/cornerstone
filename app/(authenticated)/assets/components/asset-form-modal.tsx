@@ -38,6 +38,9 @@ type ParentAssetOption = {
   name: string;
   company_id: string;
   parent_asset_id: string | null;
+  property_id?: string | null;
+  building_id?: string | null;
+  unit_id?: string | null;
 };
 
 type AssetFormModalProps = {
@@ -99,29 +102,37 @@ export function AssetFormModal({
   const [state, formAction, isPending] = useActionState(saveAction, {});
   const a = asset ?? emptyAsset;
 
-  const [companyId, setCompanyId] = useState(a.company_id || "");
+  const singleCompanyId = companies.length === 1 ? companies[0].id : "";
+  const [companyId, setCompanyId] = useState(a.company_id || singleCompanyId);
   const [propertyId, setPropertyId] = useState(a.property_id ?? "");
   const [buildingId, setBuildingId] = useState(a.building_id ?? "");
   const [unitId, setUnitId] = useState(a.unit_id ?? "");
+  const [isSubAsset, setIsSubAsset] = useState(!!(a.parent_asset_id ?? ""));
   const [parentAssetId, setParentAssetId] = useState(a.parent_asset_id ?? "");
   const [parentSearch, setParentSearch] = useState("");
+  const [lockedFromParent, setLockedFromParent] = useState(false);
   const [assetTypeSelect, setAssetTypeSelect] = useState(
     () => (a.asset_type ?? a.category ?? "").trim()
   );
 
   useEffect(() => {
     if (open && a) {
-      setCompanyId(a.company_id || "");
+      const defaultCompany = a.company_id || (companies.length === 1 ? companies[0].id : "");
+      setCompanyId(defaultCompany);
       setPropertyId(a.property_id ?? "");
       setBuildingId(a.building_id ?? "");
       setUnitId(a.unit_id ?? "");
+      const hasParent = !!(a.parent_asset_id ?? "");
+      setIsSubAsset(hasParent);
       setParentAssetId(a.parent_asset_id ?? "");
       setParentSearch("");
+      setLockedFromParent(hasParent);
       setAssetTypeSelect((a.asset_type ?? a.category ?? "").trim());
     }
   }, [
     open,
     a.company_id,
+    companies.length,
     a.property_id,
     a.building_id,
     a.unit_id,
@@ -129,6 +140,27 @@ export function AssetFormModal({
     a.asset_type,
     a.category,
   ]);
+
+  const selectedParent = useMemo(
+    () => parentCandidates.find((c) => c.id === parentAssetId),
+    [parentAssetId, parentCandidates]
+  );
+
+  useEffect(() => {
+    if (!isSubAsset) {
+      setLockedFromParent(false);
+      return;
+    }
+    if (!parentAssetId || !selectedParent) {
+      setLockedFromParent(false);
+      return;
+    }
+    setLockedFromParent(true);
+    setCompanyId(selectedParent.company_id);
+    setPropertyId(selectedParent.property_id ?? "");
+    setBuildingId(selectedParent.building_id ?? "");
+    setUnitId(selectedParent.unit_id ?? "");
+  }, [isSubAsset, parentAssetId, selectedParent]);
 
   const typeDropdownOptions = useMemo(() => {
     const current = (a.asset_type ?? a.category ?? "").trim();
@@ -196,17 +228,15 @@ export function AssetFormModal({
     return excluded;
   }, [isEdit, a.id, parentCandidates]);
   const parentCandidatesFiltered = useMemo(() => {
-    if (!companyId) return [];
     const query = parentSearch.trim().toLowerCase();
     return parentCandidates
-      .filter((candidate) => candidate.company_id === companyId)
       .filter((candidate) => !excludedParentIds.has(candidate.id))
       .filter((candidate) => {
         if (!query) return true;
         return candidate.name.toLowerCase().includes(query);
       })
       .sort((left, right) => left.name.localeCompare(right.name));
-  }, [companyId, excludedParentIds, parentCandidates, parentSearch]);
+  }, [excludedParentIds, parentCandidates, parentSearch]);
   const selectedParentName = useMemo(
     () => (parentAssetId ? parentNameById.get(parentAssetId) ?? null : null),
     [parentAssetId, parentNameById]
@@ -256,23 +286,98 @@ export function AssetFormModal({
               className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is_sub_asset"
+              checked={isSubAsset}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsSubAsset(checked);
+                if (!checked) {
+                  setParentAssetId("");
+                  setParentSearch("");
+                  setLockedFromParent(false);
+                }
+              }}
+              className="h-4 w-4 rounded border-[var(--card-border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+            />
+            <label htmlFor="is_sub_asset" className="text-sm font-medium text-[var(--foreground)]">
+              This is a sub-asset
+            </label>
+          </div>
+          {!isSubAsset && <input type="hidden" name="parent_asset_id" value="" />}
+          {isSubAsset && (
+            <div>
+              <label htmlFor="parent_asset_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                Parent asset *
+              </label>
+              <input
+                type="search"
+                value={parentSearch}
+                onChange={(e) => setParentSearch(e.target.value)}
+                placeholder="Search parent assets..."
+                className={`${inputClass} mb-2`}
+                aria-label="Search parent assets"
+              />
+              <select
+                id="parent_asset_id"
+                name="parent_asset_id"
+                value={parentAssetId}
+                onChange={(e) => setParentAssetId(e.target.value)}
+                className={inputClass}
+                required={isSubAsset}
+              >
+                <option value="">Select parent asset</option>
+                {parentCandidatesFiltered.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+              {selectedParentName ? (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  This asset will be linked under {selectedParentName}. Company and location are set from the parent.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Select a parent asset to inherit company and location.
+                </p>
+              )}
+            </div>
+          )}
+          {lockedFromParent && (
+            <p className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent-glow)]/20 px-3 py-2 text-xs text-[var(--muted-strong)]">
+              Company and location are inherited from the parent asset. Change the parent to update them.
+            </p>
+          )}
           <div>
             <label htmlFor="company_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Company *
             </label>
+            {lockedFromParent && (
+              <>
+                <input type="hidden" name="company_id" value={companyId} />
+                <input type="hidden" name="property_id" value={propertyId} />
+                <input type="hidden" name="building_id" value={buildingId} />
+                <input type="hidden" name="unit_id" value={unitId} />
+              </>
+            )}
             <select
               id="company_id"
-              name="company_id"
+              name={lockedFromParent ? undefined : "company_id"}
               required
               value={companyId}
+              disabled={lockedFromParent}
               onChange={(e) => {
                 setCompanyId(e.target.value);
                 setPropertyId("");
                 setBuildingId("");
                 setUnitId("");
-                setParentAssetId("");
+                if (!lockedFromParent) setParentAssetId("");
               }}
               className={inputClass}
+              aria-readonly={lockedFromParent}
             >
               <option value="">Select company</option>
               {companies.map((c) => (
@@ -288,14 +393,16 @@ export function AssetFormModal({
             </label>
             <select
               id="property_id"
-              name="property_id"
+              name={lockedFromParent ? undefined : "property_id"}
               value={propertyId}
+              disabled={lockedFromParent}
               onChange={(e) => {
                 setPropertyId(e.target.value);
                 setBuildingId("");
                 setUnitId("");
               }}
               className={inputClass}
+              aria-readonly={lockedFromParent}
             >
               <option value="">None</option>
               {propertiesFiltered.map((p) => (
@@ -311,13 +418,15 @@ export function AssetFormModal({
             </label>
             <select
               id="building_id"
-              name="building_id"
+              name={lockedFromParent ? undefined : "building_id"}
               value={buildingId}
+              disabled={lockedFromParent}
               onChange={(e) => {
                 setBuildingId(e.target.value);
                 setUnitId("");
               }}
               className={inputClass}
+              aria-readonly={lockedFromParent}
             >
               <option value="">None</option>
               {buildingsFiltered.map((b) => (
@@ -333,10 +442,12 @@ export function AssetFormModal({
             </label>
             <select
               id="unit_id"
-              name="unit_id"
+              name={lockedFromParent ? undefined : "unit_id"}
               value={unitId}
+              disabled={lockedFromParent}
               onChange={(e) => setUnitId(e.target.value)}
               className={inputClass}
+              aria-readonly={lockedFromParent}
             >
               <option value="">None</option>
               {unitsFiltered.map((u) => (
@@ -353,41 +464,6 @@ export function AssetFormModal({
             building={selectedBuildingName}
             unit={selectedUnitName}
           />
-          <div>
-            <label htmlFor="parent_asset_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Parent asset
-            </label>
-            <input
-              type="search"
-              value={parentSearch}
-              onChange={(e) => setParentSearch(e.target.value)}
-              placeholder="Search parent assets..."
-              className={`${inputClass} mb-2`}
-            />
-            <select
-              id="parent_asset_id"
-              name="parent_asset_id"
-              value={parentAssetId}
-              onChange={(e) => setParentAssetId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">None</option>
-              {parentCandidatesFiltered.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </option>
-              ))}
-            </select>
-            {selectedParentName ? (
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                This asset will be linked under {selectedParentName}.
-              </p>
-            ) : (
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Optional. Leave empty to keep this as a top-level asset.
-              </p>
-            )}
-          </div>
           <div>
             <label htmlFor="asset_tag" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Asset tag

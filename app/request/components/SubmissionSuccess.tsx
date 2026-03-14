@@ -1,10 +1,14 @@
 "use client";
 
+import { useRequestPortalTranslations } from "./RequestPortalI18n";
+
 type SubmissionSuccessProps = {
   workOrderNumber?: string | null;
 };
 
 export function SubmissionSuccess({ workOrderNumber }: SubmissionSuccessProps) {
+  const { t } = useRequestPortalTranslations();
+
   return (
     <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)] sm:p-10">
       <div className="flex flex-col items-center text-center">
@@ -17,19 +21,19 @@ export function SubmissionSuccess({ workOrderNumber }: SubmissionSuccessProps) {
           </svg>
         </div>
         <h2 className="mt-5 text-xl font-semibold text-[var(--foreground)]">
-          Request Submitted
+          {t("requestPortal.successTitle")}
         </h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          {workOrderNumber ? "Your request has been received." : "Your request has been successfully submitted."}
+          {workOrderNumber ? t("requestPortal.successReceived") : t("requestPortal.successSubmitted")}
         </p>
         {workOrderNumber ? (
           <p className="mt-3 text-sm text-[var(--muted)]">
-            Ticket ID:{" "}
+            {t("requestPortal.successTicketId")}{" "}
             <span className="font-medium text-[var(--foreground)]">{workOrderNumber}</span>
           </p>
         ) : null}
         <p className="mt-4 text-sm text-[var(--muted)]">
-          Our team will review your request and follow up shortly.
+          {t("requestPortal.successFollowUp")}
         </p>
       </div>
     </div>

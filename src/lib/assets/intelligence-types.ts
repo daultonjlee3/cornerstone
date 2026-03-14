@@ -74,10 +74,28 @@ export type AssetFailureRiskResult = {
   riskLabel: "low" | "moderate" | "high" | "urgent";
 };
 
+/** Canonical timeline event types for display and future extension (e.g. predictive, sensor, warranty). */
+export type AssetTimelineEventType =
+  | "WORK_ORDER_COMPLETED"
+  | "WORK_ORDER_CREATED"
+  | "PM_COMPLETED"
+  | "PM_CREATED"
+  | "ASSET_UPDATED"
+  | "SUB_ASSET_ADDED"
+  | "SUB_ASSET_MOVED"
+  | "SUB_ASSET_REMOVED"
+  | "PART_USED"
+  | "NOTE_ADDED"
+  | "ASSET_CREATED"
+  | "ASSET_INSTALLATION"
+  | "ASSET_EVENT";
+
 export type AssetTimelineEvent = {
   id: string;
   eventAt: string;
   eventType: string;
+  /** Canonical type for icons and grouping (maps from eventType when possible). */
+  canonicalType?: AssetTimelineEventType;
   source: string;
   summary: string;
   details: string | null;
@@ -85,6 +103,11 @@ export type AssetTimelineEvent = {
   technicianId: string | null;
   workOrderId: string | null;
   workOrderNumber: string | null;
+  /** When event is for a sub-asset, show on parent timeline with this context. */
+  subAssetId: string | null;
+  subAssetName: string | null;
+  /** User who performed the action (e.g. from activity_log performed_by). */
+  userName: string | null;
 };
 
 export type AssetIntelligenceDashboard = {

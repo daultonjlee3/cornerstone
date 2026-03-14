@@ -62,7 +62,7 @@ export function ProductFormModal({
 }: ProductFormModalProps) {
   const [state, formAction, isPending] = useActionState(saveAction, {});
   const isEdit = Boolean(product?.id);
-  const row = product ?? { ...emptyProduct, company_id: companies[0]?.id ?? "" };
+  const row = product ?? { ...emptyProduct, company_id: companies.length === 1 ? companies[0]?.id ?? "" : "" };
   const [companyId, setCompanyId] = useState(() => row.company_id);
 
   useEffect(() => {

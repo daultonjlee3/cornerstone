@@ -11,6 +11,7 @@ import type {
   AssetInsightRecord,
   AssetIntelligenceDashboard,
   AssetTimelineEvent,
+  AssetTimelineEventType,
   HealthCategory,
 } from "./intelligence-types";
 
@@ -29,6 +30,36 @@ function toEventTypeLabel(eventType: string): string {
   if (eventType.startsWith("pm_")) return "PM";
   if (eventType.includes("inspection")) return "Inspection";
   return eventType.replace(/_/g, " ");
+}
+
+function toCanonicalType(
+  eventType: string,
+  source: string,
+  status?: string
+): AssetTimelineEventType {
+  const lower = eventType.toLowerCase();
+  if (lower.includes("work_order") || source === "work_order") {
+    if (status === "completed" || lower.includes("completed")) return "WORK_ORDER_COMPLETED";
+    return "WORK_ORDER_CREATED";
+  }
+  if (lower.includes("pm_run") || lower.includes("pm run")) {
+    if (lower.includes("completed") || lower.includes("executed")) return "PM_COMPLETED";
+    return "PM_CREATED";
+  }
+  if (lower.includes("pm_plan") || lower.includes("pm plan")) return "PM_CREATED";
+  if (lower.includes("part") || source === "parts") return "PART_USED";
+  if (lower.includes("note") || source === "note") return "NOTE_ADDED";
+  if (lower.includes("asset_sub_asset_linked")) return "SUB_ASSET_ADDED";
+  if (lower.includes("asset_sub_asset_moved")) return "SUB_ASSET_MOVED";
+  if (lower.includes("asset_sub_asset_unlinked")) return "SUB_ASSET_REMOVED";
+  if (lower.includes("asset_edited") || lower.includes("asset_updated")) return "ASSET_UPDATED";
+  if (lower.includes("asset_created")) return "ASSET_CREATED";
+  if (lower.includes("asset_installation")) return "ASSET_INSTALLATION";
+  return "ASSET_EVENT";
+}
+
+function eventBase(): Pick<AssetTimelineEvent, "subAssetId" | "subAssetName" | "userName"> {
+  return { subAssetId: null, subAssetName: null, userName: null };
 }
 
 export async function getAssetInsights(
@@ -56,11 +87,35 @@ export async function getAssetInsights(
   }));
 }
 
+const DEFAULT_TIMELINE_LIMIT = 20;
+
+export type GetAssetTimelineResult = {
+  events: AssetTimelineEvent[];
+  hasMore: boolean;
+};
+
 export async function getAssetTimeline(
   assetId: string,
-  options?: { supabase?: SupabaseClient }
-): Promise<AssetTimelineEvent[]> {
+  options?: { supabase?: SupabaseClient; limit?: number; offset?: number }
+): Promise<GetAssetTimelineResult> {
   const { supabase, asset } = await getAssetIntelligenceContext(assetId, options?.supabase);
+  const limit = options?.limit ?? DEFAULT_TIMELINE_LIMIT;
+  const offset = options?.offset ?? 0;
+
+  const { data: childAssetsRows } = await supabase
+    .from("assets")
+    .select("id, asset_name, name")
+    .eq("parent_asset_id", assetId);
+  const childAssets = (childAssetsRows ?? []).map((row) => {
+    const r = row as Record<string, unknown>;
+    return {
+      id: r.id as string,
+      name: (r.asset_name as string | null) ?? (r.name as string | null) ?? "Sub-asset",
+    };
+  });
+  const childAssetIds = childAssets.map((c) => c.id);
+  const childNameById = new Map(childAssets.map((c) => [c.id, c.name]));
+  const assetIdsForTimeline = [assetId, ...childAssetIds];
 
   const installDate = (asset.install_date as string | null) ?? null;
   const pmPlanRows = await supabase
@@ -72,9 +127,9 @@ export async function getAssetTimeline(
   const workOrderRows = await supabase
     .from("work_orders")
     .select(
-      "id, work_order_number, title, source_type, category, status, created_at, started_at, completed_at, completion_notes, completed_by_technician_id, technicians!completed_by_technician_id(technician_name, name)"
+      "id, asset_id, work_order_number, title, source_type, category, status, created_at, started_at, completed_at, completion_notes, completed_by_technician_id, technicians!completed_by_technician_id(technician_name, name)"
     )
-    .eq("asset_id", assetId)
+    .in("asset_id", assetIdsForTimeline)
     .order("created_at", { ascending: false })
     .limit(120);
   const workOrderIds = (workOrderRows.data ?? []).map(
@@ -117,12 +172,28 @@ export async function getAssetTimeline(
       : Promise.resolve({ data: [] as unknown[] }),
     supabase
       .from("activity_logs")
-      .select("id, action_type, performed_at, metadata, performed_by")
+      .select("id, entity_id, action_type, performed_at, metadata, performed_by")
       .eq("entity_type", "asset")
-      .eq("entity_id", assetId)
+      .in("entity_id", assetIdsForTimeline)
       .order("performed_at", { ascending: false })
-      .limit(80),
+      .limit(100),
   ]);
+  const performedByIds = [
+    ...new Set(
+      (assetLogRows.data ?? [])
+        .map((row) => (row as { performed_by?: string | null }).performed_by)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const { data: userRows } = performedByIds.length
+    ? await supabase.from("users").select("id, full_name").in("id", performedByIds)
+    : { data: [] as unknown[] };
+  const userNameById = new Map(
+    (userRows ?? []).map((row) => [
+      (row as { id: string }).id,
+      (row as { full_name?: string | null }).full_name ?? "Unknown",
+    ])
+  );
 
   const workOrderById = new Map(
     (workOrderRows.data ?? []).map((row) => [row.id as string, row as Record<string, unknown>])
@@ -141,11 +212,14 @@ export async function getAssetTimeline(
   }
 
   const events: AssetTimelineEvent[] = [];
+  const woIdsSeen = new Set<string>();
+
   events.push({
     id: `asset-created-${assetId}`,
     eventAt:
       ((asset.created_at as string | null) ?? (asset.updated_at as string | null) ?? new Date().toISOString()),
     eventType: "asset_created",
+    canonicalType: "ASSET_CREATED",
     source: "system",
     summary: "Asset record created.",
     details: null,
@@ -153,12 +227,14 @@ export async function getAssetTimeline(
     technicianId: null,
     workOrderId: null,
     workOrderNumber: null,
+    ...eventBase(),
   });
   if (installDate) {
     events.push({
       id: `asset-install-${assetId}`,
       eventAt: new Date(`${installDate}T12:00:00`).toISOString(),
       eventType: "asset_installation",
+      canonicalType: "ASSET_INSTALLATION",
       source: "manual",
       summary: "Asset installation date recorded.",
       details: null,
@@ -166,24 +242,36 @@ export async function getAssetTimeline(
       technicianId: null,
       workOrderId: null,
       workOrderNumber: null,
+      ...eventBase(),
     });
   }
 
   for (const row of workOrderRows.data ?? []) {
     const workOrder = row as Record<string, unknown>;
     const workOrderId = workOrder.id as string;
+    const woAssetId = (workOrder.asset_id as string | null) ?? assetId;
+    const isChildAsset = woAssetId !== assetId;
+    const subAssetName = isChildAsset ? childNameById.get(woAssetId) ?? null : null;
+    const status = String(workOrder.status ?? "updated");
+    const completedAt = workOrder.completed_at as string | null;
+    const canonicalType = status === "completed" || completedAt ? "WORK_ORDER_COMPLETED" : "WORK_ORDER_CREATED";
+    woIdsSeen.add(workOrderId);
+    const title = (workOrder.title as string | null) ?? "Work order update";
+    const woNum = (workOrder.work_order_number as string | null) ?? workOrderId.slice(0, 8);
+    const summary = workOrder.source_type === "preventive_maintenance"
+      ? `PM completed: ${title}`
+      : `${title}`;
     events.push({
       id: `work-order-${workOrderId}`,
       eventAt:
-        (workOrder.completed_at as string | null) ??
+        completedAt ??
         (workOrder.started_at as string | null) ??
         (workOrder.created_at as string | null) ??
         new Date().toISOString(),
-      eventType: `work_order_${String(workOrder.status ?? "updated")}`,
+      eventType: `work_order_${status}`,
+      canonicalType,
       source: "work_order",
-      summary: `${workOrder.source_type === "preventive_maintenance" ? "PM" : "Reactive"} work order ${
-        (workOrder.work_order_number as string | null) ?? workOrderId.slice(0, 8)
-      }: ${(workOrder.title as string | null) ?? "Work order update"}.`,
+      summary: isChildAsset ? `${summary}` : summary,
       details: (workOrder.completion_notes as string | null) ?? null,
       technicianName: technicianNameById.get(
         (workOrder.completed_by_technician_id as string | null) ?? ""
@@ -191,6 +279,9 @@ export async function getAssetTimeline(
       technicianId: (workOrder.completed_by_technician_id as string | null) ?? null,
       workOrderId,
       workOrderNumber: (workOrder.work_order_number as string | null) ?? null,
+      subAssetId: isChildAsset ? woAssetId : null,
+      subAssetName,
+      userName: null,
     });
   }
 
@@ -204,9 +295,10 @@ export async function getAssetTimeline(
         (part.used_at as string | null) ??
         (part.created_at as string | null) ??
         new Date().toISOString(),
-      eventType: "part_replaced",
+      eventType: "part_used",
+      canonicalType: "PART_USED",
       source: "parts",
-      summary: `${(part.part_name_snapshot as string | null) ?? "Part"} replaced (${Number(
+      summary: `${(part.part_name_snapshot as string | null) ?? "Part"} used (${Number(
         part.quantity_used ?? 0
       )} ${(part.unit_of_measure as string | null) ?? "units"}).`,
       details: null,
@@ -215,6 +307,7 @@ export async function getAssetTimeline(
       workOrderId,
       workOrderNumber:
         (relatedWorkOrder?.work_order_number as string | null | undefined) ?? null,
+      ...eventBase(),
     });
   }
 
@@ -225,15 +318,17 @@ export async function getAssetTimeline(
     events.push({
       id: `note-${note.id as string}`,
       eventAt: (note.created_at as string | null) ?? new Date().toISOString(),
-      eventType: "technician_note",
+      eventType: "note_added",
+      canonicalType: "NOTE_ADDED",
       source: "note",
-      summary: "Technician note added.",
+      summary: "Note added.",
       details: (note.body as string | null) ?? null,
       technicianName: technicianNameById.get((note.technician_id as string | null) ?? "") ?? null,
       technicianId: (note.technician_id as string | null) ?? null,
       workOrderId,
       workOrderNumber:
         (relatedWorkOrder?.work_order_number as string | null | undefined) ?? null,
+      ...eventBase(),
     });
   }
 
@@ -243,6 +338,7 @@ export async function getAssetTimeline(
       id: `pm-plan-${plan.id as string}`,
       eventAt: (plan.created_at as string | null) ?? new Date().toISOString(),
       eventType: "pm_plan_created",
+      canonicalType: "PM_CREATED",
       source: "pm",
       summary: `Preventive maintenance plan created: ${(plan.name as string | null) ?? "PM Plan"}.`,
       details: `Next run: ${(plan.next_run_date as string | null) ?? "not scheduled"}`,
@@ -250,6 +346,7 @@ export async function getAssetTimeline(
       technicianId: null,
       workOrderId: null,
       workOrderNumber: null,
+      ...eventBase(),
     });
   }
 
@@ -260,6 +357,7 @@ export async function getAssetTimeline(
     const relatedWorkOrder = generatedWorkOrderId
       ? workOrderById.get(generatedWorkOrderId)
       : null;
+    const runStatus = String(run.status ?? "generated");
     events.push({
       id: `pm-run-${run.id as string}`,
       eventAt:
@@ -267,15 +365,17 @@ export async function getAssetTimeline(
         (run.scheduled_date
           ? new Date(`${String(run.scheduled_date)}T12:00:00`).toISOString()
           : new Date().toISOString()),
-      eventType: `pm_run_${String(run.status ?? "generated")}`,
+      eventType: `pm_run_${runStatus}`,
+      canonicalType: runStatus === "completed" ? "PM_COMPLETED" : "PM_CREATED",
       source: "pm",
-      summary: `PM run ${String(run.status ?? "generated")} for this asset.`,
-      details: generatedWorkOrderId ? "Generated linked work order." : null,
+      summary: runStatus === "completed" ? "Preventive maintenance completed." : `PM run ${runStatus}.`,
+      details: generatedWorkOrderId ? "Linked work order generated." : null,
       technicianName: null,
       technicianId: null,
       workOrderId: generatedWorkOrderId,
       workOrderNumber:
         (relatedWorkOrder?.work_order_number as string | null | undefined) ?? null,
+      ...eventBase(),
     });
   }
 
@@ -283,10 +383,12 @@ export async function getAssetTimeline(
     const event = row as Record<string, unknown>;
     const workOrderId = (event.work_order_id as string | null) ?? null;
     const relatedWorkOrder = workOrderId ? workOrderById.get(workOrderId) : null;
+    const eventType = (event.event_type as string | null) ?? "asset_event";
     events.push({
       id: `manual-${event.id as string}`,
       eventAt: (event.event_at as string | null) ?? new Date().toISOString(),
-      eventType: toEventTypeLabel((event.event_type as string | null) ?? "asset_event"),
+      eventType: toEventTypeLabel(eventType),
+      canonicalType: "ASSET_EVENT",
       source: (event.source as string | null) ?? "manual",
       summary: (event.summary as string | null) ?? "Asset event recorded.",
       details: (event.details as string | null) ?? null,
@@ -295,6 +397,7 @@ export async function getAssetTimeline(
       workOrderId,
       workOrderNumber:
         (relatedWorkOrder?.work_order_number as string | null | undefined) ?? null,
+      ...eventBase(),
     });
   }
 
@@ -314,27 +417,59 @@ export async function getAssetTimeline(
       continue;
     }
     const metadata = (log.metadata as Record<string, unknown> | null) ?? null;
+    const logWorkOrderId = (metadata?.work_order_id as string | undefined) ?? null;
+    if (logWorkOrderId && woIdsSeen.has(logWorkOrderId)) continue;
+    const performedBy = (log.performed_by as string | null) ?? null;
+    const userName = performedBy ? userNameById.get(performedBy) ?? null : null;
+    let summary: string;
+    if (actionType === "asset_edited") {
+      summary = userName ? `Asset details updated by ${userName}` : "Asset details updated.";
+    } else if (actionType === "asset_sub_asset_linked") {
+      summary = userName ? `Sub-asset added by ${userName}` : "Sub-asset added.";
+    } else if (actionType === "asset_sub_asset_moved") {
+      summary = userName ? `Sub-asset moved by ${userName}` : "Sub-asset moved.";
+    } else if (actionType === "asset_sub_asset_unlinked") {
+      summary = userName ? `Sub-asset removed by ${userName}` : "Sub-asset removed.";
+    } else {
+      summary =
+        (metadata?.message as string | undefined) ??
+        `Asset ${actionType.replace(/_/g, " ")}.`;
+    }
+    const entityId = (log.entity_id as string | null) ?? assetId;
+    const isChild = entityId !== assetId;
     events.push({
       id: `activity-${log.id as string}`,
       eventAt: (log.performed_at as string | null) ?? new Date().toISOString(),
       eventType: actionType,
+      canonicalType:
+        actionType === "asset_edited"
+          ? "ASSET_UPDATED"
+          : actionType === "asset_sub_asset_linked"
+            ? "SUB_ASSET_ADDED"
+            : actionType === "asset_sub_asset_moved"
+              ? "SUB_ASSET_MOVED"
+              : actionType === "asset_sub_asset_unlinked"
+                ? "SUB_ASSET_REMOVED"
+                : "ASSET_EVENT",
       source: "activity_log",
-      summary:
-        (metadata?.message as string | undefined) ??
-        `Asset ${actionType.replace(/_/g, " ")}.`,
-      details:
-        (metadata?.recommendation as string | undefined) ??
-        null,
+      summary,
+      details: (metadata?.recommendation as string | undefined) ?? null,
       technicianName: null,
       technicianId: null,
       workOrderId: null,
       workOrderNumber: null,
+      subAssetId: isChild ? entityId : null,
+      subAssetName: isChild ? childNameById.get(entityId) ?? null : null,
+      userName,
     });
   }
 
-  return events.sort(
+  const sorted = events.sort(
     (a, b) => new Date(b.eventAt).getTime() - new Date(a.eventAt).getTime()
   );
+  const total = sorted.length;
+  const eventsPage = sorted.slice(offset, offset + limit);
+  return { events: eventsPage, hasMore: total > offset + limit };
 }
 
 export async function getAssetIntelligenceDashboard(
@@ -590,12 +725,12 @@ export async function getAssetIntelligenceSnapshot(
   assetId: string,
   options?: { supabase?: SupabaseClient }
 ) {
-  const [health, insights, timeline] = await Promise.all([
+  const [health, insights, timelineResult] = await Promise.all([
     getAssetHealthBreakdown(assetId),
     getAssetInsights(assetId, options),
-    getAssetTimeline(assetId, options),
+    getAssetTimeline(assetId, { ...options, limit: DEFAULT_TIMELINE_LIMIT }),
   ]);
-  return { health, insights, timeline };
+  return { health, insights, timeline: timelineResult.events };
 }
 
 export async function recalculateAssetIntelligenceForScope(

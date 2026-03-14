@@ -284,12 +284,22 @@ export default async function AssetsPage({
         unit_id: effectiveLocation.unit_id,
       };
     });
-  const parentCandidates = hierarchyRows.map((row) => ({
-    id: row.id,
-    name: row.asset_name ?? row.name ?? row.id,
-    company_id: row.company_id,
-    parent_asset_id: row.parent_asset_id ?? null,
-  }));
+  const parentCandidates = hierarchyRows.map((row) => {
+    const effectiveLocation = effectiveLocationByAssetId.get(row.id) ?? {
+      property_id: null,
+      building_id: null,
+      unit_id: null,
+    };
+    return {
+      id: row.id,
+      name: row.asset_name ?? row.name ?? row.id,
+      company_id: row.company_id,
+      parent_asset_id: row.parent_asset_id ?? null,
+      property_id: effectiveLocation.property_id ?? row.property_id ?? null,
+      building_id: effectiveLocation.building_id ?? row.building_id ?? null,
+      unit_id: effectiveLocation.unit_id ?? row.unit_id ?? null,
+    };
+  });
 
   let assetsQuery = supabase
     .from("assets")

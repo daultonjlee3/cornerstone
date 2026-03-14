@@ -71,7 +71,7 @@ export function VendorFormModal({ open, onClose, vendor, companies, saveAction }
           </p>
         ) : null}
         <FormField label="Company" htmlFor="vendor-company" required>
-          <select id="vendor-company" name="company_id" defaultValue={row.company_id} required className="ui-select">
+          <select id="vendor-company" name="company_id" defaultValue={row.company_id || (companies.length === 1 ? companies[0].id : "")} required className="ui-select">
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.name}

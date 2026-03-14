@@ -3,6 +3,7 @@
 import { Buffer } from "node:buffer";
 import { createClient } from "@/src/lib/supabase/server";
 import { saveWorkOrder } from "@/app/(authenticated)/work-orders/actions";
+import { t, type RequestPortalLocaleCode } from "@/src/lib/i18n/request-portal";
 
 export type PortalSubmissionState = {
   error?: string;
@@ -11,6 +12,13 @@ export type PortalSubmissionState = {
 };
 
 const VALID_PRIORITY = new Set(["low", "medium", "high", "urgent", "emergency"]);
+
+const SUPPORTED: RequestPortalLocaleCode[] = ["en", "es", "fr"];
+
+function getLocale(formData: FormData): RequestPortalLocaleCode {
+  const raw = ((formData.get("locale") as string | null) ?? "").trim().toLowerCase();
+  return SUPPORTED.includes(raw as RequestPortalLocaleCode) ? (raw as RequestPortalLocaleCode) : "en";
+}
 
 async function imageFileToDataUrl(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
@@ -29,10 +37,11 @@ export async function submitMaintenanceRequestPortal(
   _prev: PortalSubmissionState,
   formData: FormData
 ): Promise<PortalSubmissionState> {
+  const locale = getLocale(formData);
   const tenantId = process.env.PORTAL_TENANT_ID?.trim();
   const companyId = process.env.PORTAL_COMPANY_ID?.trim();
   if (!tenantId || !companyId) {
-    return { error: "Maintenance request portal is not configured." };
+    return { error: t(locale, "validation.portalNotConfigured") };
   }
 
   const requesterName = ((formData.get("requester_name") as string | null) ?? "").trim();
@@ -45,11 +54,11 @@ export async function submitMaintenanceRequestPortal(
   const rawPriority = ((formData.get("priority") as string | null) ?? "").trim().toLowerCase();
   const priority = VALID_PRIORITY.has(rawPriority) ? rawPriority : "medium";
 
-  if (!requesterName) return { error: "Requester name is required." };
+  if (!requesterName) return { error: t(locale, "validation.requesterNameRequired") };
   if (!requesterEmail || !requesterEmail.includes("@")) {
-    return { error: "Valid requester email is required." };
+    return { error: t(locale, "validation.emailRequired") };
   }
-  if (!description) return { error: "Description is required." };
+  if (!description) return { error: t(locale, "validation.descriptionRequired") };
 
   const supabase = await createClient();
   const { data: company } = await supabase
@@ -58,7 +67,7 @@ export async function submitMaintenanceRequestPortal(
     .eq("id", companyId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  if (!company) return { error: "Maintenance request portal is not configured." };
+  if (!company) return { error: t(locale, "validation.portalNotConfigured") };
 
   const locationParts: string[] = [];
   if (propertyId) {
@@ -81,7 +90,7 @@ export async function submitMaintenanceRequestPortal(
       .eq("id", assetId)
       .eq("company_id", companyId)
       .maybeSingle();
-    if (!asset) return { error: "Selected asset was not found." };
+    if (!asset) return { error: t(locale, "validation.assetNotFound") };
     const a = asset as { id: string; asset_name?: string | null; name?: string | null };
     validatedAssetId = a.id;
     assetName = a.asset_name ?? a.name ?? null;
@@ -89,7 +98,7 @@ export async function submitMaintenanceRequestPortal(
   if (assetName) locationParts.push(assetName);
 
   const location = locationParts.length > 0 ? locationParts.join(", ") : locationFallback;
-  if (!location) return { error: "Please specify a location (property, room, or address)." };
+  if (!location) return { error: t(locale, "validation.locationRequired") };
 
   const detailBody = [
     description,

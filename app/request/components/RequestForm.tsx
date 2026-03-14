@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { submitMaintenanceRequestPortal, type PortalSubmissionState } from "../actions";
 import { Button } from "@/src/components/ui/button";
+import { useRequestPortalTranslations } from "./RequestPortalI18n";
 import { PrioritySelect } from "./PrioritySelect";
 import { PhotoUploader } from "./PhotoUploader";
 import { SubmissionSuccess } from "./SubmissionSuccess";
@@ -19,6 +20,7 @@ type RequestFormProps = {
 };
 
 export function RequestForm({ properties, assets }: RequestFormProps) {
+  const { t, locale } = useRequestPortalTranslations();
   const [state, formAction, pending] = useActionState(
     submitMaintenanceRequestPortal,
     INITIAL_STATE
@@ -32,6 +34,7 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <input type="hidden" name="locale" value={locale} />
       {state.error ? (
         <div className="rounded-xl bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
           {state.error}
@@ -40,24 +43,24 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2">
-          <span className="ui-label">Your name</span>
+          <span className="ui-label">{t("requestPortal.yourName")}</span>
           <input
             name="requester_name"
             type="text"
             required
             className="ui-input min-h-[48px] rounded-xl border-[var(--card-border)] py-3 text-base sm:min-h-[44px] sm:py-2.5 sm:text-sm"
-            placeholder="Full name"
+            placeholder={t("requestPortal.placeholder.fullName")}
             autoComplete="name"
           />
         </label>
         <label className="block space-y-2">
-          <span className="ui-label">Email</span>
+          <span className="ui-label">{t("requestPortal.email")}</span>
           <input
             name="requester_email"
             type="email"
             required
             className="ui-input min-h-[48px] rounded-xl border-[var(--card-border)] py-3 text-base sm:min-h-[44px] sm:py-2.5 sm:text-sm"
-            placeholder="you@example.com"
+            placeholder={t("requestPortal.placeholder.email")}
             autoComplete="email"
           />
         </label>
@@ -66,12 +69,12 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
       {hasStructuredLocation ? (
         <>
           <label className="block space-y-2">
-            <span className="ui-label">Property</span>
+            <span className="ui-label">{t("requestPortal.property")}</span>
             <select
               name="property_id"
               className="ui-input min-h-[48px] rounded-xl border-[var(--card-border)] py-3 text-base sm:min-h-[44px] sm:py-2.5 sm:text-sm"
             >
-              <option value="">Select a property (optional)</option>
+              <option value="">{t("requestPortal.selectPropertyOptional")}</option>
               {properties.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -80,12 +83,12 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="ui-label">Room / Unit (optional)</span>
+            <span className="ui-label">{t("requestPortal.roomOrUnit")}</span>
             <input
               name="room_or_unit"
               type="text"
               className="ui-input min-h-[48px] rounded-xl border-[var(--card-border)] py-3 text-base sm:min-h-[44px] sm:py-2.5 sm:text-sm"
-              placeholder="Room number, unit, or suite"
+              placeholder={t("requestPortal.placeholder.roomOrUnit")}
             />
           </label>
           {assets.length > 0 ? <AssetSearchSelect assets={assets} /> : null}
@@ -93,13 +96,13 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
         </>
       ) : (
         <label className="block space-y-2">
-          <span className="ui-label">Location</span>
+          <span className="ui-label">{t("requestPortal.location")}</span>
           <input
             name="location"
             type="text"
             required
             className="ui-input min-h-[48px] rounded-xl border-[var(--card-border)] py-3 text-base sm:min-h-[44px] sm:py-2.5 sm:text-sm"
-            placeholder="Building, room, asset, or address"
+            placeholder={t("requestPortal.placeholder.location")}
           />
         </label>
       )}
@@ -107,13 +110,13 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
       <PrioritySelect />
 
       <label className="block space-y-2">
-        <span className="ui-label">Description</span>
+        <span className="ui-label">{t("requestPortal.description")}</span>
         <textarea
           name="description"
           required
           rows={4}
           className="ui-textarea min-h-[100px] rounded-xl border-[var(--card-border)] py-3 text-base sm:min-h-[88px] sm:py-2.5 sm:text-sm"
-          placeholder="Describe the issue and where it is."
+          placeholder={t("requestPortal.placeholder.description")}
         />
       </label>
 
@@ -129,13 +132,13 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
             size="md"
             className="min-h-[48px] w-full rounded-xl px-6 text-base font-medium sm:min-h-[44px] sm:w-auto sm:text-sm"
           >
-            {pending ? "Submitting…" : "Submit request"}
+            {pending ? t("requestPortal.submitting") : t("requestPortal.submitRequest")}
           </Button>
         </div>
         <p className="text-center text-xs text-[var(--muted)] sm:text-left">
-          Typical response time: 4–24 hours.
+          {t("requestPortal.typicalResponseTime")}
           <br />
-          For emergencies please contact your maintenance team directly.
+          {t("requestPortal.emergencyInstruction")}
         </p>
       </div>
     </form>

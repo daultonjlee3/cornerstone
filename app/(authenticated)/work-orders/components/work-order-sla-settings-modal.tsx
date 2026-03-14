@@ -79,7 +79,7 @@ export function WorkOrderSlaSettingsModal({
       low: toHours(companyPolicies?.get("low") ?? DEFAULT_MINUTES.low),
     };
   };
-  const initialCompanyId = companies[0]?.id ?? "";
+  const initialCompanyId = companies.length === 1 ? companies[0]?.id ?? "" : "";
   const [companyId, setCompanyId] = useState(initialCompanyId);
   const [valuesByPriority, setValuesByPriority] = useState<Record<Priority, string>>(
     () => getHoursForCompany(initialCompanyId)

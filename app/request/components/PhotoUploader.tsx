@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRequestPortalTranslations } from "./RequestPortalI18n";
 
 export function PhotoUploader() {
+  const { t } = useRequestPortalTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function PhotoUploader() {
 
   return (
     <div className="space-y-2">
-      <span className="ui-label">Photo (optional)</span>
+      <span className="ui-label">{t("requestPortal.photoOptional")}</span>
       <input
         ref={inputRef}
         type="file"
@@ -59,7 +61,7 @@ export function PhotoUploader() {
           <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[var(--background)]">
             <img
               src={preview}
-              alt="Upload preview"
+              alt={t("requestPortal.uploadPreview")}
               className="h-full w-full object-contain"
             />
           </div>
@@ -69,7 +71,7 @@ export function PhotoUploader() {
             onClick={clearPhoto}
             className="mt-2 text-xs font-medium text-[var(--accent)] hover:underline"
           >
-            Remove photo
+            {t("requestPortal.removePhoto")}
           </button>
         </div>
       ) : (
@@ -81,9 +83,9 @@ export function PhotoUploader() {
           className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--card-border)] bg-[var(--background)]/50 py-8 transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-glow)]/30 min-h-[120px] sm:min-h-[100px]"
         >
           <span className="text-2xl" aria-hidden>📷</span>
-          <span className="text-sm font-medium text-[var(--foreground)]">Add Photo</span>
+          <span className="text-sm font-medium text-[var(--foreground)]">{t("requestPortal.addPhoto")}</span>
           <span className="text-xs text-[var(--muted)]">
-            Drag & drop or tap to take a picture
+            {t("requestPortal.dragOrTap")}
           </span>
         </button>
       )}

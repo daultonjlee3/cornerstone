@@ -593,7 +593,7 @@ export default async function AssetDetailPage({
         upcomingPmCount={upcomingPmCount}
       />
 
-      <AssetTimeline events={intelligence.timeline} />
+      <AssetTimeline key={id} events={intelligence.timeline} assetId={id} />
 
       {childAssets.length > 0 ? (
         <section className="ui-card p-4">

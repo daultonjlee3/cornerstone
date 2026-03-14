@@ -72,7 +72,7 @@ export function PreventiveMaintenanceTemplateFormModal({
             <select
               name="company_id"
               required
-              defaultValue={template?.company_id ?? ""}
+              defaultValue={template?.company_id ?? (companies.length === 1 ? companies[0].id : "")}
               className={inputClass}
             >
               <option value="">Select company</option>

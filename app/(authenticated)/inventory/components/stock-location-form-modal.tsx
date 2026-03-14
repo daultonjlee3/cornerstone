@@ -56,7 +56,7 @@ export function StockLocationFormModal({
   saveAction,
 }: StockLocationFormModalProps) {
   const [state, formAction, isPending] = useActionState(saveAction, {});
-  const [companyId, setCompanyId] = useState(() => location?.company_id ?? companies[0]?.id ?? "");
+  const [companyId, setCompanyId] = useState(() => location?.company_id ?? (companies.length === 1 ? companies[0]?.id ?? "" : ""));
   const [propertyId, setPropertyId] = useState(() => location?.property_id ?? "");
   const [buildingId, setBuildingId] = useState(() => location?.building_id ?? "");
 

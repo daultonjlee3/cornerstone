@@ -105,7 +105,7 @@ export function TechnicianFormModal({
               id="company_id"
               name="company_id"
               required
-              defaultValue={t.company_id}
+              defaultValue={t.company_id || (companies.length === 1 ? companies[0].id : "")}
               className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             >
               <option value="">Select company</option>

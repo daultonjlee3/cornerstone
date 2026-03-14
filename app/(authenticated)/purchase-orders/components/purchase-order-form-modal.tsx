@@ -49,7 +49,7 @@ export function PurchaseOrderFormModal({
 }: PurchaseOrderFormModalProps) {
   const [state, formAction, isPending] = useActionState(saveAction, {});
   const [companyId, setCompanyId] = useState(
-    () => purchaseOrder?.company_id ?? companies[0]?.id ?? ""
+    () => purchaseOrder?.company_id ?? (companies.length === 1 ? companies[0]?.id ?? "" : "")
   );
 
   useEffect(() => {

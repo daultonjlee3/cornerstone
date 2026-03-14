@@ -127,7 +127,7 @@ export function PropertyFormModal({
               id="company_id"
               name="company_id"
               required
-              defaultValue={p.company_id}
+              defaultValue={p.company_id || (companies.length === 1 ? companies[0].id : "")}
               className="ui-select"
             >
               <option value="">Select company</option>

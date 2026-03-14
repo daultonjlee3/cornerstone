@@ -105,7 +105,7 @@ export function PreventiveMaintenancePlanFormModal({
   const isEdit = !!plan?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
 
-  const [companyId, setCompanyId] = useState(plan?.company_id ?? prefill?.company_id ?? "");
+  const [companyId, setCompanyId] = useState(plan?.company_id ?? prefill?.company_id ?? (companies.length === 1 ? companies[0]?.id ?? "" : ""));
   const [assetId, setAssetId] = useState(plan?.asset_id ?? prefill?.asset_id ?? "");
   const [frequencyType, setFrequencyType] = useState<PreventiveMaintenanceFrequencyType>(
     plan?.frequency_type ?? "monthly"
