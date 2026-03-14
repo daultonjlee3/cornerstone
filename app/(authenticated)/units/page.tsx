@@ -1,6 +1,8 @@
+import { DoorOpen } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { UnitsList } from "./components/units-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Units | Cornerstone Tech",
@@ -32,14 +34,11 @@ export default async function UnitsPage() {
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Units
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage spaces within buildings.
-          </p>
-        </div>
+        <PageHeader
+          icon={<DoorOpen className="size-5" />}
+          title="Units"
+          subtitle="Manage spaces within buildings."
+        />
         <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company, property, and building first, then add units.</p>
         </div>
@@ -69,14 +68,11 @@ export default async function UnitsPage() {
   if (buildingIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Units
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage spaces within buildings.
-          </p>
-        </div>
+        <PageHeader
+          icon={<DoorOpen className="size-5" />}
+          title="Units"
+          subtitle="Manage spaces within buildings."
+        />
         <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a building first, then add units.</p>
         </div>
@@ -109,16 +105,13 @@ export default async function UnitsPage() {
     };
   });
 
-  return (
+return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Units
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage spaces within buildings.
-        </p>
-      </div>
+      <PageHeader
+        icon={<DoorOpen className="size-5" />}
+        title="Units"
+        subtitle="Manage spaces within buildings."
+      />
       <UnitsList
         units={normalized}
         buildings={buildingOptions}

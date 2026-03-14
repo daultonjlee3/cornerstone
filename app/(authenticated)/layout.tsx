@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Shell } from "./components/shell";
 import { isPlatformSuperAdmin } from "@/src/lib/auth-context";
+import { getCompletedTourIds } from "./tours/actions";
 import { getImpersonationStateFromCookie } from "@/src/lib/impersonation";
 import { getImpersonationSession } from "@/src/lib/portal/access";
 
@@ -76,12 +77,15 @@ export default async function AuthenticatedLayout({
     impersonationBanner = { actingAsName, companyName };
   }
 
+  const completedTourIds = await getCompletedTourIds();
+
   return (
     <Shell
       tenantName={tenantName}
       companyName={companyName}
       showPlatformAdmin={showPlatformAdmin}
       impersonationBanner={impersonationBanner}
+      completedTourIds={completedTourIds}
     >
       {children}
     </Shell>

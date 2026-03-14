@@ -52,6 +52,21 @@ function priorityClass(priority: string | null | undefined): string {
   return "dispatch-map-pin-low";
 }
 
+/** Status-based marker color: Red=Overdue, Yellow=Ready/Unscheduled, Blue=Scheduled, Green=Completed */
+function statusPinClass(
+  workOrder: DispatchWorkOrder,
+  selectedDate: string
+): string {
+  const status = String(workOrder.status ?? "").toLowerCase();
+  const due = workOrder.due_date ?? null;
+  const scheduled = workOrder.scheduled_date ?? null;
+  const isOverdue = due && due < selectedDate && status !== "completed" && status !== "closed" && status !== "cancelled";
+  if (isOverdue) return "dispatch-map-pin-status-overdue";
+  if (status === "completed" || status === "closed" || status === "cancelled") return "dispatch-map-pin-status-completed";
+  if (scheduled && (workOrder.assigned_technician_id || workOrder.assigned_crew_id)) return "dispatch-map-pin-status-scheduled";
+  return "dispatch-map-pin-status-ready";
+}
+
 function shortWorkOrderLabel(workOrder: DispatchWorkOrder): string {
   if (workOrder.work_order_number) return workOrder.work_order_number;
   if (workOrder.title) return workOrder.title.slice(0, 18);
@@ -60,6 +75,7 @@ function shortWorkOrderLabel(workOrder: DispatchWorkOrder): string {
 
 function workOrderPinIcon(
   workOrder: DispatchWorkOrder,
+  selectedDate: string,
   selected: boolean,
   hovered: boolean
 ) {
@@ -69,9 +85,10 @@ function workOrderPinIcon(
     : hovered
       ? "dispatch-map-pin-hovered"
       : "";
+  const statusClass = statusPinClass(workOrder, selectedDate);
   return divIcon({
     className: "dispatch-map-pin-shell",
-    html: `<span class="dispatch-map-pin ${priorityClass(workOrder.priority)} ${stateClass}">${label}</span>`,
+    html: `<span class="dispatch-map-pin ${statusClass} ${stateClass}">${label}</span>`,
     iconSize: selected ? [36, 36] : [30, 30],
     iconAnchor: selected ? [18, 18] : [15, 15],
   });
@@ -361,6 +378,7 @@ export function DispatchMapPanel({
                   position={[workOrder.latitude as number, workOrder.longitude as number]}
                   icon={workOrderPinIcon(
                     workOrder,
+                    filterState.selectedDate,
                     selectedWorkOrderId === workOrder.id,
                     hoveredWorkOrderId === workOrder.id
                   )}

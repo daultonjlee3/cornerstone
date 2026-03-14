@@ -1,7 +1,9 @@
+import { Landmark } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BuildingsList } from "./components/buildings-list";
 import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Buildings | Cornerstone Tech",
@@ -33,14 +35,11 @@ export default async function BuildingsPage() {
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Buildings
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage buildings at each property.
-          </p>
-        </div>
+        <PageHeader
+          icon={<Landmark className="size-5" />}
+          title="Buildings"
+          subtitle="Manage buildings at each property."
+        />
         <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company and property first, then add buildings.</p>
         </div>
@@ -58,14 +57,11 @@ export default async function BuildingsPage() {
   if (propertyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Buildings
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage buildings at each property.
-          </p>
-        </div>
+        <PageHeader
+          icon={<Landmark className="size-5" />}
+          title="Buildings"
+          subtitle="Manage buildings at each property."
+        />
         <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a property first, then add buildings.</p>
         </div>
@@ -100,14 +96,11 @@ export default async function BuildingsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Buildings
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage buildings at each property.
-        </p>
-      </div>
+<PageHeader
+          icon={<Landmark className="size-5" />}
+          title="Buildings"
+          subtitle="Manage buildings at each property."
+        />
       <BuildingsList
         buildings={normalized}
         properties={propertyOptions}

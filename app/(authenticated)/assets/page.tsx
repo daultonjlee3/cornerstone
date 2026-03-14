@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { Factory } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { saveAsset } from "./actions";
 import { ASSET_TYPE_OPTIONS } from "./constants";
 import { AssetsList, type AssetRow } from "./components/assets-list";
 import { saveWorkOrder } from "../work-orders/actions";
+import { savePreventiveMaintenancePlan } from "../preventive-maintenance/actions";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Assets | Cornerstone Tech",
@@ -78,14 +81,11 @@ export default async function AssetsPage({
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Assets
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Track equipment and assets by location.
-          </p>
-        </div>
+        <PageHeader
+          icon={<Factory className="size-5" />}
+          title="Assets"
+          subtitle="Track equipment and assets by location."
+        />
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add assets.</p>
         </div>
@@ -132,7 +132,7 @@ export default async function AssetsPage({
 
   const { data: techniciansData } = await supabase
     .from("technicians")
-    .select("id, technician_name, name")
+    .select("id, technician_name, name, company_id")
     .in("company_id", companyIds)
     .eq("status", "active")
     .order("technician_name")
@@ -280,6 +280,11 @@ export default async function AssetsPage({
     id: (t as { id: string }).id,
     name: (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? (t as { id: string }).id,
   }));
+  const pmTechnicians = (techniciansData ?? []).map((t) => ({
+    id: (t as { id: string }).id,
+    name: (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? (t as { id: string }).id,
+    company_id: (t as { company_id: string }).company_id,
+  }));
   const crewOptions = (crewsData ?? []).map((c) => ({
     id: (c as { id: string }).id,
     name: (c as { name: string }).name,
@@ -305,24 +310,26 @@ export default async function AssetsPage({
     unit_id: (a as { unit_id?: string }).unit_id ?? null,
   }));
 
+  const { count: pmPlanCount } = await supabase
+    .from("preventive_maintenance_plans")
+    .select("id", { count: "exact", head: true })
+    .in("company_id", companyIds);
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Assets
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Track equipment and assets by location.
-        </p>
-        </div>
-        <Link
-          href="/assets/intelligence"
-          className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-        >
-          Open Asset Intelligence
-        </Link>
-      </div>
+    <div className="space-y-8" data-tour="assets:asset-list">
+      <PageHeader
+        icon={<Factory className="size-5" />}
+        title="Assets"
+        subtitle="Track equipment and assets by location."
+        actions={
+          <Link
+            href="/assets/intelligence"
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+          >
+            Open Asset Intelligence
+          </Link>
+        }
+      />
       <AssetsList
         assets={assets as AssetRow[]}
         companies={companyOptions}
@@ -343,6 +350,13 @@ export default async function AssetsPage({
         }}
         error={error?.message ?? null}
         saveAction={saveAsset}
+        pmPlanCount={pmPlanCount ?? 0}
+        pmModalData={{
+          companies: companyOptions,
+          assets: assetOptionsForWO,
+          technicians: pmTechnicians,
+          saveAction: savePreventiveMaintenancePlan,
+        }}
         workOrderFormData={{
           companies: companyOptions,
           customers: customerOptions,

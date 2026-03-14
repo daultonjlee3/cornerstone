@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback } from "react";
 import { WorkOrderStatusBadge } from "./work-order-status-badge";
 import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 
 export type WorkOrderListRow = {
   id: string;
@@ -148,6 +149,8 @@ export function WorkOrderDetailDrawer({
             >
               View full
             </Link>
+            <Tooltip placement="top">
+              <TooltipTrigger>
             <button
               type="button"
               onClick={() => { onEdit(); onClose(); }}
@@ -155,6 +158,11 @@ export function WorkOrderDetailDrawer({
             >
               Edit
             </button>
+              </TooltipTrigger>
+              <TooltipContent>Modify work order</TooltipContent>
+            </Tooltip>
+            <Tooltip placement="top">
+              <TooltipTrigger>
             <button
               type="button"
               onClick={() => { onAssign(); onClose(); }}
@@ -162,6 +170,9 @@ export function WorkOrderDetailDrawer({
             >
               Assign
             </button>
+              </TooltipTrigger>
+              <TooltipContent>Assign technician</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>

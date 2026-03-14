@@ -376,10 +376,6 @@ export default async function WorkOrdersPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Work Order Command Center"
-        subtitle="Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations."
-      />
       <WorkOrdersList
         workOrders={workOrders}
         stats={stats}

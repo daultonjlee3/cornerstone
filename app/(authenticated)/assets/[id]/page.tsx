@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { AssetHealthIndicator } from "../components/asset-health-indicator";
 import { AssetIntelligencePanel } from "../components/asset-intelligence-panel";
 import { AssetTimeline } from "../components/asset-timeline";
+import { AssetDetailHelperTip } from "../components/asset-detail-helper-tip";
 import { getAssetIntelligenceSnapshot } from "@/src/lib/assets/assetIntelligenceService";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
 
@@ -326,6 +327,11 @@ export default async function AssetDetailPage({
         <span>/</span>
         <span className="text-[var(--foreground)]">{asset.name}</span>
       </div>
+
+      <AssetDetailHelperTip
+        repeatedRepairs={(recentFailureCount ?? 0) >= 2}
+        noPmPlans={plans.length === 0}
+      />
 
       <header className="ui-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">

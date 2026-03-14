@@ -9,6 +9,8 @@ import { AssetFormModal } from "./asset-form-modal";
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import type { WorkOrderPrefill } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { Hint } from "@/src/components/ui/hint";
+import { PreventiveMaintenancePlanFormModal } from "@/app/(authenticated)/preventive-maintenance/components/pm-plan-form-modal";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id?: string | undefined };
@@ -64,6 +66,13 @@ type AssetsListProps = {
   filterParams: FilterParams;
   error?: string | null;
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  pmPlanCount?: number;
+  pmModalData?: {
+    companies: { id: string; name: string }[];
+    assets: { id: string; name: string; company_id: string; property_id: string | null; building_id: string | null; unit_id: string | null }[];
+    technicians: { id: string; name: string; company_id: string }[];
+    saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  } | null;
   workOrderFormData?: WorkOrderFormData | null;
 };
 
@@ -127,6 +136,8 @@ export function AssetsList({
   error: initialError,
   saveAction,
   workOrderFormData,
+  pmPlanCount = 0,
+  pmModalData = null,
 }: AssetsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -135,6 +146,7 @@ export function AssetsList({
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [selectedAssetForWO, setSelectedAssetForWO] = useState<AssetRow | null>(null);
+  const [selectedAssetForPM, setSelectedAssetForPM] = useState<AssetRow | null>(null);
 
   const applyFilters = useCallback(
     (updates: Record<string, string>) => {
@@ -210,7 +222,7 @@ export function AssetsList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="assets:asset-list">
       {message && (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -223,7 +235,20 @@ export function AssetsList({
           {message.text}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {initialAssets.length > 0 && pmPlanCount === 0 && (
+        <Hint
+          id="assets-no-pm"
+          variant="card"
+          title="Suggest preventive maintenance"
+          message="You have assets but no PM schedules. Create recurring plans to auto-generate work orders and keep equipment maintained."
+          action={
+            <Link href="/preventive-maintenance" className="text-sm font-medium text-[var(--accent)] hover:underline">
+              Go to Preventive Maintenance →
+            </Link>
+          }
+        />
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-4" data-tour="assets:schedule-pm">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Assets</h2>
         <button
           type="button"
@@ -389,22 +414,31 @@ export function AssetsList({
       </div>
 
       {initialAssets.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
-          <p className="text-[var(--muted)]">
-            {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status
-              ? "No assets match your filters."
-              : "No assets yet."}
-          </p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
-            Add your first asset
-          </button>
+        <div className="space-y-4">
+          {!filterParams.q && !filterParams.company_id && !filterParams.property_id && !filterParams.type && !filterParams.condition && !filterParams.status && !filterParams.health_status && (
+            <Hint
+              id="assets-no-assets"
+              variant="empty-state"
+              message="Assets are the foundation of maintenance tracking. Add equipment and systems here, then link work orders and preventive maintenance to them."
+            />
+          )}
+          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+            <p className="text-[var(--muted)]">
+              {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status
+                ? "No assets match your filters."
+                : "No assets yet."}
+            </p>
+            <button
+              type="button"
+              onClick={openNew}
+              className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+            >
+              Add your first asset
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm" data-tour="assets:asset-detail">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead>
@@ -422,7 +456,7 @@ export function AssetsList({
                   <th className="w-40 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-tour="assets:maintenance-history">
                 {initialAssets.map((a) => (
                   <tr
                     key={a.id}
@@ -482,7 +516,7 @@ export function AssetsList({
                     <td className="px-4 py-3.5">
                       <StatusBadge status={a.status} />
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5" data-tour="assets:create-wo">
                       <div className="flex flex-wrap gap-2">
                         <Link
                           href={`/assets/${a.id}`}
@@ -524,6 +558,22 @@ export function AssetsList({
                         >
                           Create WO
                         </button>
+                        {pmModalData ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAssetForPM(a)}
+                            className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                          >
+                            Schedule PM
+                          </button>
+                        ) : (
+                          <Link
+                            href={`/preventive-maintenance?new=1&company_id=${encodeURIComponent(a.company_id)}&asset_id=${encodeURIComponent(a.id)}`}
+                            className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                          >
+                            Schedule PM
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleDelete(a.id, assetDisplayName(a))}
@@ -569,6 +619,19 @@ export function AssetsList({
           crews={workOrderFormData.crews}
           vendors={workOrderFormData.vendors}
           saveAction={workOrderFormData.saveWorkOrder}
+        />
+      ) : null}
+
+      {pmModalData && selectedAssetForPM ? (
+        <PreventiveMaintenancePlanFormModal
+          open={true}
+          onClose={() => setSelectedAssetForPM(null)}
+          plan={null}
+          companies={pmModalData.companies}
+          assets={pmModalData.assets}
+          technicians={pmModalData.technicians}
+          prefill={{ company_id: selectedAssetForPM.company_id, asset_id: selectedAssetForPM.id }}
+          saveAction={pmModalData.saveAction}
         />
       ) : null}
     </div>

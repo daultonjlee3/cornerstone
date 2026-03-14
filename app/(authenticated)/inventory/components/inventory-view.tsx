@@ -24,6 +24,10 @@ import {
   StockLocationFormModal,
   type StockLocationRecord,
 } from "./stock-location-form-modal";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
+import { Hint } from "@/src/components/ui/hint";
+import { HelperTip } from "@/src/components/ui/helper-tip";
+import Link from "next/link";
 
 type InventoryBalanceRow = {
   id: string;
@@ -177,7 +181,35 @@ export function InventoryView({
           {message.text}
         </div>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-3">
+      {locations.length === 0 && rows.length === 0 && (
+        <Hint
+          id="inventory-no-locations"
+          variant="card"
+          title="Location-based inventory"
+          message="Track stock by place—warehouses, trucks, lockers. Create stock locations first, then add products and record balances."
+          action={
+            <button
+              type="button"
+              onClick={openLocationCreate}
+              className="text-sm font-medium text-[var(--accent)] hover:underline"
+            >
+              New Stock Location
+            </button>
+          }
+        />
+      )}
+      {lowStockCount > 0 && (
+        <HelperTip
+          id="helper-tip-inventory-low-stock"
+          message="Low stock may impact upcoming work."
+          action={
+            <Link href="/purchase-orders" className="text-[var(--accent)] hover:underline">
+              Purchase Orders →
+            </Link>
+          }
+        />
+      )}
+      <div className="grid gap-3 sm:grid-cols-3" data-tour="inventory:products">
         <MetricCard title="Inventory rows" value={rows.length} />
         <MetricCard
           title="Low stock alerts"
@@ -187,6 +219,7 @@ export function InventoryView({
         <MetricCard title="Tracked locations" value={locations.length} />
       </div>
 
+      <div data-tour="inventory:stock-locations">
       <TableToolbar>
         <div className="flex flex-1 flex-wrap items-end gap-2">
           <label className="w-full max-w-sm">
@@ -282,6 +315,8 @@ export function InventoryView({
                   </Td>
                   <Td>
                     <div className="flex flex-wrap gap-2">
+                      <Tooltip placement="top">
+                        <TooltipTrigger>
                       <button
                         className="text-[var(--accent)] hover:underline"
                         onClick={() =>
@@ -295,6 +330,9 @@ export function InventoryView({
                       >
                         Adjust
                       </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Change stock level</TooltipContent>
+                      </Tooltip>
                       <button
                         className="text-[var(--accent)] hover:underline"
                         onClick={() => {
@@ -312,6 +350,7 @@ export function InventoryView({
           </TBody>
         </Table>
       </DataTable>
+      </div>
 
       <TablePagination
         page={currentPage}
@@ -391,7 +430,7 @@ export function InventoryView({
         </div>
       </Modal>
 
-      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4" data-tour="inventory:transactions">
         <h2 className="text-lg font-semibold text-[var(--foreground)]">Recent inventory transactions</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Audited movement history for receipts, work-order usage, and adjustments.

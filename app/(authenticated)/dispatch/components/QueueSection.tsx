@@ -20,6 +20,8 @@ type QueueSectionProps = {
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
   ) => void;
+  /** When set, the matching item gets id and highlight for sync with map/details panel */
+  selectedWorkOrderId?: string | null;
 };
 
 function stylesForVariant(variant: QueueSectionProps["variant"]) {
@@ -55,6 +57,7 @@ export function QueueSection({
   onToggleCollapse,
   DraggableWrapper,
   onOpenWorkOrder,
+  selectedWorkOrderId = null,
 }: QueueSectionProps) {
   const styles = stylesForVariant(variant);
   const count = items.length;
@@ -88,7 +91,11 @@ export function QueueSection({
             </li>
           ) : (
             items.map((wo) => (
-              <li key={wo.id}>
+              <li
+                key={wo.id}
+                id={selectedWorkOrderId === wo.id ? `dispatch-queue-wo-${wo.id}` : undefined}
+                className={selectedWorkOrderId === wo.id ? "ring-2 ring-[var(--accent)] ring-offset-2 rounded-lg" : undefined}
+              >
                 {DraggableWrapper({
                   workOrder: wo,
                   children: (

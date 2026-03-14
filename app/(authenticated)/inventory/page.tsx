@@ -1,3 +1,4 @@
+import { Boxes } from "lucide-react";
 import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { InventoryView } from "./components/inventory-view";
@@ -16,7 +17,7 @@ export default async function InventoryPage() {
   if (scope.companyIds.length === 0) {
     return (
       <div className="space-y-3">
-        <PageHeader title="Inventory" subtitle="Create a company first to manage inventory." />
+        <PageHeader icon={<Boxes className="size-5" />} title="Inventory" subtitle="Create a company first to manage inventory." />
       </div>
     );
   }
@@ -259,6 +260,7 @@ export default async function InventoryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<Boxes className="size-5" />}
         title="Inventory Overview"
         subtitle="Location-level balances with low-stock alerts and audited adjustments."
       />

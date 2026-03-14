@@ -10,6 +10,7 @@ import {
   PurchaseOrderFormModal,
   type PurchaseOrderRecord,
 } from "./purchase-order-form-modal";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 
 type CompanyOption = { id: string; name: string };
 type VendorOption = { id: string; name: string; company_id: string };
@@ -76,7 +77,7 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="purchase-orders:ordering">
       {message ? (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -120,9 +121,15 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
             </select>
           </label>
         </div>
+        <Tooltip placement="bottom">
+          <TooltipTrigger>
         <Button onClick={openNew}>New Purchase Order</Button>
+          </TooltipTrigger>
+          <TooltipContent>Order and receive parts</TooltipContent>
+        </Tooltip>
       </div>
 
+      <div data-tour="purchase-orders:receiving">
       <DataTable>
         <Table className="min-w-[980px]">
           <TableHead>
@@ -179,6 +186,7 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
           </TBody>
         </Table>
       </DataTable>
+      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--muted)]">

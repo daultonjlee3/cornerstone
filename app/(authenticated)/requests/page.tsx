@@ -1,6 +1,8 @@
+import { Inbox } from "lucide-react";
 import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { RequestsList, type WorkRequestListItem } from "./components/requests-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Work Requests | Cornerstone Tech",
@@ -80,14 +82,11 @@ export default async function RequestsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Work requests
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Review incoming requests, approve or reject them, and convert approved requests into work orders.
-        </p>
-      </div>
+      <PageHeader
+        icon={<Inbox className="size-5" />}
+        title="Work requests"
+        subtitle="Review incoming requests, approve or reject them, and convert approved requests into work orders."
+      />
       <RequestsList requests={requests} />
     </div>
   );

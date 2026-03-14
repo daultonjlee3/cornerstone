@@ -415,108 +415,115 @@ export function DispatchBoard({
 
   return (
     <div ref={dayScrollRef} className="flex h-full flex-col overflow-auto bg-[var(--background)]">
-      <div className="flex shrink-0 border-b-2 border-[var(--card-border)] bg-[var(--card)]">
-        <div className="w-14 shrink-0 border-r border-[var(--card-border)] bg-[var(--background)] px-1.5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Time
+      {/* Single horizontal scroll container so header and body stay in sync */}
+      <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-x-auto">
+        {/* Sticky header row: time column + lane headers */}
+        <div className="sticky top-0 z-10 flex shrink-0 border-b-2 border-[var(--card-border)] bg-[var(--card)]">
+          <div className="sticky left-0 z-20 w-14 shrink-0 border-r border-[var(--card-border)] bg-[var(--card)] px-1.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Time
+          </div>
+          <div className="flex min-w-max">
+            {lanes.map((lane) => {
+              const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Unassigned" : lane.id.slice(0, 8));
+              const hasRemaining = lane.remainingHours !== undefined;
+              const cap = lane.capacityHours ?? 0;
+              return (
+                <div
+                  key={lane.id}
+                  className="min-w-[13rem] flex-shrink-0 border-r border-[var(--card-border)] bg-[var(--background)] px-2.5 py-2 last:border-r-0"
+                >
+                  <p className="truncate text-xs font-semibold text-[var(--foreground)]">
+                    {displayName}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-[var(--muted)]">
+                    {cap > 0
+                      ? `${(lane.total_scheduled_hours ?? 0).toFixed(1)} / ${cap.toFixed(0)} hrs`
+                      : `${(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled${hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h left` : ` · ${lane.job_count ?? 0} jobs`}`}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        {lanes.map((lane) => {
-          const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Unassigned" : lane.id.slice(0, 8));
-          const hasRemaining = lane.remainingHours !== undefined;
-          const cap = lane.capacityHours ?? 0;
-          return (
-            <div
-              key={lane.id}
-              className="min-w-[14rem] flex-1 border-r border-[var(--card-border)] bg-[var(--background)] px-3 py-2.5 last:border-r-0"
-            >
-              <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                {displayName}
-              </p>
-              <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-                {cap > 0
-                  ? `${(lane.total_scheduled_hours ?? 0).toFixed(1)} / ${cap.toFixed(0)} hrs`
-                  : `${(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled${hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h left` : ` · ${lane.job_count ?? 0} jobs`}`}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-      <div className="relative flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
         <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
           {nowLabel}
         </div>
-        <div className="flex w-14 shrink-0 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
-          <div
-            className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/80"
-            style={{ height: "56px" }}
-            aria-hidden
-          />
-          {timeLabels.map(({ hour, label }, index) => {
-            const isCurrentHour = currentTime?.hour === hour;
-            return (
+        <div className="flex shrink-0">
+          <div className="sticky left-0 z-10 flex w-14 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
             <div
-              key={hour}
-              className={`relative flex h-[40px] items-start justify-end border-b border-[var(--card-border)] pr-2 pt-0.5 text-[11px] text-[var(--muted)] ${
-                index % 2 === 0 ? "bg-[var(--card)]/40" : "bg-[var(--background)]"
-              } ${isCurrentHour ? "bg-red-50/80" : ""}`}
-              style={{ height: `${100 / timeLabels.length}%`, minHeight: "40px" }}
-            >
-              {label}
-              {isCurrentHour ? (
+              className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/80"
+              style={{ height: "56px" }}
+              aria-hidden
+            />
+            {timeLabels.map(({ hour, label }, index) => {
+              const isCurrentHour = currentTime?.hour === hour;
+              return (
                 <div
-                  className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
-                  style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
-                />
-              ) : null}
-            </div>
-          );
-          })}
-        </div>
-        <div className="flex min-w-max flex-1">
-          {lanes.map((lane) => {
-            const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Individual / Unassigned" : lane.id.slice(0, 8));
-            return (
-            <ScheduleLane
-              key={lane.id}
-              id={lane.id}
-              name={displayName}
-              selectedDate={selectedDate}
-              totalScheduledHours={lane.total_scheduled_hours ?? 0}
-              jobCount={lane.job_count ?? 0}
-              remainingHours={lane.remainingHours}
-              capacityHours={lane.capacityHours}
-              nextOpeningFormatted={lane.nextOpeningFormatted}
-              isSelected={selectedTechnicianId != null && lane.id === `tech-${selectedTechnicianId}`}
-              overDropId={overDropId}
-              isDraggingWorkOrder={isDraggingWorkOrder}
-              timeLabels={timeLabels}
-              currentTime={currentTime}
-            >
-              {(workOrdersByLane.get(lane.id) ?? []).map((wo) => (
-                <DraggableBoardCard
-                  key={wo.id}
-                  workOrder={wo}
-                  selectedDate={selectedDate}
-                  onResizeEnd={onResizeEnd}
-                  isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
-                  onHoverWorkOrder={onHoverWorkOrder}
+                  key={hour}
+                  className={`relative flex h-[40px] items-start justify-end border-b border-[var(--card-border)] pr-2 pt-0.5 text-[11px] text-[var(--muted)] ${
+                    index % 2 === 0 ? "bg-[var(--card)]/40" : "bg-[var(--background)]"
+                  } ${isCurrentHour ? "bg-red-50/80" : ""}`}
+                  style={{ height: `${100 / timeLabels.length}%`, minHeight: "40px" }}
                 >
-                  <DispatchWorkOrderCard
-                    workOrder={wo}
-                    variant="block"
-                    showScheduledTime
-                    showCrew
-                    showQuickActions
-                    isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
-                    onMouseEnter={() => onHoverWorkOrder?.(wo.id)}
-                    onMouseLeave={() => onHoverWorkOrder?.(null)}
-                    travelEstimate={routeTravelByWorkOrderId?.get(wo.id) ?? null}
-                    onOpenWorkOrder={onOpenWorkOrder}
-                  />
-                </DraggableBoardCard>
-              ))}
-            </ScheduleLane>
-          );
-          })}
+                  {label}
+                  {isCurrentHour ? (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
+                      style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex min-w-max">
+            {lanes.map((lane) => {
+              const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Individual / Unassigned" : lane.id.slice(0, 8));
+              return (
+                <ScheduleLane
+                  key={lane.id}
+                  id={lane.id}
+                  name={displayName}
+                  selectedDate={selectedDate}
+                  totalScheduledHours={lane.total_scheduled_hours ?? 0}
+                  jobCount={lane.job_count ?? 0}
+                  remainingHours={lane.remainingHours}
+                  capacityHours={lane.capacityHours}
+                  nextOpeningFormatted={lane.nextOpeningFormatted}
+                  isSelected={selectedTechnicianId != null && lane.id === `tech-${selectedTechnicianId}`}
+                  overDropId={overDropId}
+                  isDraggingWorkOrder={isDraggingWorkOrder}
+                  timeLabels={timeLabels}
+                  currentTime={currentTime}
+                >
+                  {(workOrdersByLane.get(lane.id) ?? []).map((wo) => (
+                    <DraggableBoardCard
+                      key={wo.id}
+                      workOrder={wo}
+                      selectedDate={selectedDate}
+                      onResizeEnd={onResizeEnd}
+                      isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
+                      onHoverWorkOrder={onHoverWorkOrder}
+                    >
+                      <DispatchWorkOrderCard
+                        workOrder={wo}
+                        variant="block"
+                        showScheduledTime
+                        showCrew
+                        showQuickActions
+                        isHighlighted={selectedWorkOrderId === wo.id || hoveredWorkOrderId === wo.id}
+                        onMouseEnter={() => onHoverWorkOrder?.(wo.id)}
+                        onMouseLeave={() => onHoverWorkOrder?.(null)}
+                        travelEstimate={routeTravelByWorkOrderId?.get(wo.id) ?? null}
+                        onOpenWorkOrder={onOpenWorkOrder}
+                      />
+                    </DraggableBoardCard>
+                  ))}
+                </ScheduleLane>
+              );
+            })}
+          </div>
         </div>
         {nowPercent !== null ? (
           <div className="pointer-events-none absolute inset-x-0 z-30" style={{ top: `${nowPercent}%` }}>
@@ -525,6 +532,7 @@ export function DispatchBoard({
             </div>
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );

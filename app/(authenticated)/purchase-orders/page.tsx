@@ -1,7 +1,9 @@
+import { ShoppingCart } from "lucide-react";
 import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { PurchaseOrdersList } from "./components/purchase-orders-list";
 import type { PurchaseOrderRecord } from "./components/purchase-order-form-modal";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Purchase Orders | Cornerstone Tech",
@@ -15,8 +17,11 @@ export default async function PurchaseOrdersPage() {
   if (scope.companyIds.length === 0) {
     return (
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Purchase Orders</h1>
-        <p className="text-sm text-[var(--muted)]">Create a company first to manage procurement workflows.</p>
+        <PageHeader
+          icon={<ShoppingCart className="size-5" />}
+          title="Purchase Orders"
+          subtitle="Create a company first to manage procurement workflows."
+        />
       </div>
     );
   }
@@ -71,12 +76,11 @@ export default async function PurchaseOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">Purchase Orders</h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Draft, order, receive, and reconcile procurement against location-level inventory.
-        </p>
-      </div>
+      <PageHeader
+        icon={<ShoppingCart className="size-5" />}
+        title="Purchase Orders"
+        subtitle="Draft, order, receive, and reconcile procurement against location-level inventory."
+      />
       <PurchaseOrdersList rows={rows} companies={scope.companies} vendors={vendors} />
     </div>
   );

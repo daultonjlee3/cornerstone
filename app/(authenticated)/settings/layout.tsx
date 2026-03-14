@@ -1,13 +1,16 @@
+import { Settings } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser, getTenantIdForUser, getMembershipRoleForUser } from "@/src/lib/auth-context";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 const settingsNav = [
   { label: "Company", href: "/settings/company" },
   { label: "Users", href: "/settings/users" },
   { label: "Roles & Permissions", href: "/settings/roles" },
   { label: "Notifications", href: "/settings/notifications" },
+  { label: "Tours", href: "/settings/tours" },
 ] as const;
 
 export default async function SettingsLayout({
@@ -28,14 +31,11 @@ export default async function SettingsLayout({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">
-          Settings
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Manage your organization, users, roles, and notifications.
-        </p>
-      </div>
+      <PageHeader
+        icon={<Settings className="size-5" />}
+        title="Settings"
+        subtitle="Manage your organization, users, roles, and notifications."
+      />
       <nav className="flex flex-wrap gap-2 border-b border-[var(--card-border)] pb-4">
         {settingsNav.map((item) => (
           <Link

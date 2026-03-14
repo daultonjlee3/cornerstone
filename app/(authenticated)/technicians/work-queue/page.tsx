@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { ListChecks } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PageHeader } from "@/src/components/ui/page-header";
+import { Button } from "@/src/components/ui/button";
 
 export const metadata = {
   title: "Technician Work Queue | Cornerstone Tech",
@@ -258,22 +261,16 @@ export default async function TechnicianWorkQueuePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Technician Work Queue
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Execute assigned work orders, track notes, labor, and materials.
-          </p>
-        </div>
-        <Link
-          href="/technicians"
-          className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-        >
-          Back to Technicians
-        </Link>
-      </div>
+      <PageHeader
+        icon={<ListChecks className="size-5" />}
+        title="Technician Work Queue"
+        subtitle="Execute assigned work orders, track notes, labor, and materials."
+        actions={
+          <Link href="/technicians">
+            <Button variant="secondary">Back to Technicians</Button>
+          </Link>
+        }
+      />
 
       <form className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

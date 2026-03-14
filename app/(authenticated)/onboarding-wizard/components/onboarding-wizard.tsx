@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
+import { Sparkles } from "lucide-react";
 import type {
   OnboardingWizardState,
   OnboardingWizardStep,
 } from "../actions";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 type StepConfig = {
   id: OnboardingWizardStep;
@@ -142,15 +144,12 @@ export function OnboardingWizard({
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Customer Onboarding Wizard
-        </h1>
-        <p className="text-sm text-[var(--muted)]">
-          Import names via textarea or CSV for each onboarding step.
-        </p>
-        <p className="text-xs text-[var(--muted)]">Total records imported: {totalImported}</p>
-      </header>
+      <PageHeader
+        icon={<Sparkles className="size-5" />}
+        title="Customer Onboarding Wizard"
+        subtitle="Import names via textarea or CSV for each onboarding step."
+        meta={<span>Total records imported: {totalImported}</span>}
+      />
 
       <section className="grid gap-4 lg:grid-cols-2">
         {STEPS.map((step) => (

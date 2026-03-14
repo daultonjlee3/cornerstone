@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Search, Menu, Bell } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 
 type NotificationItem = {
@@ -48,13 +50,25 @@ export function TopBar({
   isImpersonating = false,
   onReturnToProfile,
 }: TopBarProps) {
+  const router = useRouter();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
   const accountRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSearchSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const q = searchQuery.trim();
+      if (!q) return;
+      router.push(`/work-orders?q=${encodeURIComponent(q)}`);
+    },
+    [searchQuery, router]
+  );
 
   const initials = `${tenantName.slice(0, 1)}${companyName.slice(0, 1)}`.toUpperCase();
 
@@ -146,44 +160,42 @@ export function TopBar({
   }, [unreadCount]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[var(--card-border)] bg-white/78 px-4 backdrop-blur-xl sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--card-border)] bg-[var(--card)]/95 px-4 backdrop-blur-xl sm:px-5">
       <button
         type="button"
         onClick={onMenuClick}
-        className="rounded p-2 text-[var(--muted)] hover:bg-[var(--card-border)] hover:text-[var(--foreground)] lg:hidden"
+        className="flex size-9 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)] lg:hidden"
         aria-label="Open menu"
       >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <Menu className="size-5" />
       </button>
-      <div className="hidden flex-1 px-4 lg:block">
-        <label htmlFor="topbar-search" className="sr-only">
-          Search
-        </label>
-        <div className="relative max-w-md">
-          <svg
-            aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
-          </svg>
-          <input
-            id="topbar-search"
-            type="search"
-            placeholder="Search work orders, assets, technicians..."
-            className="ui-input !h-9 !bg-white pl-9 pr-3"
-          />
-        </div>
+      <div className="hidden flex-1 lg:block">
+        <form onSubmit={handleSearchSubmit} className="max-w-sm">
+          <label htmlFor="topbar-search" className="sr-only">
+            Search work orders, assets, technicians
+          </label>
+          <div className="relative">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--muted)]"
+            />
+            <input
+              id="topbar-search"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search work orders, assets, technicians..."
+              className="h-9 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)]/80 pl-9 pr-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              aria-label="Search work orders, assets, technicians"
+            />
+          </div>
+        </form>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-3">
         <div className="relative" ref={notificationPanelRef}>
           <button
             type="button"
-            className="relative rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white p-2 text-[var(--muted)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]/55 hover:text-[var(--foreground)]"
+            className="relative flex size-9 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--background)]/60 text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)]"
             aria-label="Notifications"
             onClick={() => {
               setNotificationOpen((prev) => !prev);
@@ -193,13 +205,11 @@ export function TopBar({
             }}
           >
             {unreadLabel ? (
-              <span className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-[1.125rem] items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[10px] font-semibold leading-none text-white">
                 {unreadLabel}
               </span>
             ) : null}
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0m6 0H9" />
-            </svg>
+            <Bell className="size-4" />
           </button>
           {notificationOpen ? (
             <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/96 shadow-[var(--shadow-card)]">
@@ -262,7 +272,7 @@ export function TopBar({
           </button>
           {accountOpen ? (
             <div
-              className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white py-1 shadow-[var(--shadow-card)]"
+              className="absolute right-0 top-full z-50 mt-1.5 min-w-[180px] rounded-xl border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-[var(--shadow-card)]"
               role="menu"
             >
               {isImpersonating && onReturnToProfile ? (

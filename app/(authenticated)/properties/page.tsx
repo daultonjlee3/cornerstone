@@ -1,7 +1,9 @@
+import { MapPin } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { PropertiesList } from "./components/properties-list";
 import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Properties | Cornerstone Tech",
@@ -34,14 +36,11 @@ export default async function PropertiesPage() {
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Properties
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage properties for your organization.
-          </p>
-        </div>
+        <PageHeader
+          icon={<MapPin className="size-5" />}
+          title="Properties"
+          subtitle="Manage properties for your organization."
+        />
         <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add properties.</p>
         </div>
@@ -68,14 +67,11 @@ export default async function PropertiesPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Properties
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage properties for your organization.
-        </p>
-      </div>
+      <PageHeader
+        icon={<MapPin className="size-5" />}
+        title="Properties"
+        subtitle="Manage properties for your organization."
+      />
       <PropertiesList
         properties={normalized}
         companies={companies ?? []}

@@ -1,8 +1,10 @@
+import { Repeat } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { PreventiveMaintenancePlansList } from "./components/pm-plans-list";
 import type { PreventiveMaintenanceTemplate } from "./components/pm-template-form-modal";
 import type { PreventiveMaintenancePlan } from "./components/pm-plan-form-modal";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Preventive Maintenance | Cornerstone Tech",
@@ -72,14 +74,11 @@ export default async function PreventiveMaintenancePage({
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Preventive Maintenance
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Build recurring plans and auto-generate preventive work orders.
-          </p>
-        </div>
+        <PageHeader
+          icon={<Repeat className="size-5" />}
+          title="Preventive Maintenance"
+          subtitle="Build recurring plans and auto-generate preventive work orders."
+        />
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">
             Create a company first, then create preventive maintenance plans.
@@ -235,14 +234,11 @@ export default async function PreventiveMaintenancePage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Preventive Maintenance
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Build recurring plans and auto-generate preventive work orders.
-        </p>
-      </div>
+      <PageHeader
+        icon={<Repeat className="size-5" />}
+        title="Preventive Maintenance"
+        subtitle="Build recurring plans and auto-generate preventive work orders."
+      />
       <PreventiveMaintenancePlansList
         plans={plans}
         templates={templates}

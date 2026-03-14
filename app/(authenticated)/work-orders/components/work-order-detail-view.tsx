@@ -20,6 +20,7 @@ import { WorkOrderNotesCard } from "./work-order-notes-card";
 import { WorkOrderStatusTimeline } from "./work-order-status-timeline";
 import { WorkOrderCompletionCard } from "./work-order-completion-card";
 import { AttachmentUploader } from "@/src/components/ui/attachment-uploader";
+import { HelperTip } from "@/src/components/ui/helper-tip";
 
 const STATUS_OPTIONS_FOR_DROPDOWN = [
   "new",
@@ -181,6 +182,13 @@ export function WorkOrderDetailView({
           >
             {message.text}
           </div>
+        )}
+
+        {showUnassignedTip && (
+          <HelperTip
+            id="helper-tip-work-order-unassigned"
+            message="This work order is unassigned."
+          />
         )}
 
         <WorkOrderHeader

@@ -1,6 +1,8 @@
+import { Building } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { CompaniesList } from "./components/companies-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Companies | Cornerstone Tech",
@@ -31,14 +33,11 @@ export default async function CompaniesPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Companies
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage companies for your organization.
-        </p>
-      </div>
+      <PageHeader
+        icon={<Building className="size-5" />}
+        title="Companies"
+        subtitle="Manage companies for your organization."
+      />
       <CompaniesList
         companies={companies ?? []}
         error={error?.message ?? null}

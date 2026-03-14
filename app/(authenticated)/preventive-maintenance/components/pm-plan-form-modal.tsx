@@ -48,6 +48,19 @@ type Prefill = {
   asset_id?: string;
 } | null;
 
+/** Template fields that can be applied when creating a new plan. */
+export type PMPlanTemplateOption = {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string | null;
+  frequency_type: PreventiveMaintenanceFrequencyType;
+  frequency_interval: number;
+  priority: string;
+  estimated_duration_minutes: number | null;
+  instructions: string | null;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -56,6 +69,8 @@ type Props = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   prefill?: Prefill;
+  /** Optional templates to apply when creating a new plan. Filtered by company in UI. */
+  templates?: PMPlanTemplateOption[] | null;
   saveAction: (
     prev: { error?: string; success?: boolean },
     formData: FormData
@@ -84,6 +99,7 @@ export function PreventiveMaintenancePlanFormModal({
   assets,
   technicians,
   prefill = null,
+  templates = null,
   saveAction,
 }: Props) {
   const isEdit = !!plan?.id;
@@ -100,10 +116,58 @@ export function PreventiveMaintenancePlanFormModal({
   const [startDate, setStartDate] = useState(
     plan?.start_date ?? formatDateOnly(new Date())
   );
+  const [name, setName] = useState(plan?.name ?? "");
+  const [description, setDescription] = useState(plan?.description ?? "");
+  const [priority, setPriority] = useState(plan?.priority ?? "medium");
+  const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState(
+    plan?.estimated_duration_minutes != null ? String(plan.estimated_duration_minutes) : ""
+  );
+  const [instructions, setInstructions] = useState(plan?.instructions ?? "");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
   useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success, onClose]);
+
+  useEffect(() => {
+    if (open && !plan) {
+      setSelectedTemplateId("");
+      setName("");
+      setDescription("");
+      setPriority("medium");
+      setEstimatedDurationMinutes("");
+      setInstructions("");
+    }
+  }, [open, plan]);
+
+  const templatesForCompany = useMemo(
+    () =>
+      companyId && templates?.length
+        ? templates.filter((t) => t.company_id === companyId)
+        : templates ?? [],
+    [templates, companyId]
+  );
+
+  const applyTemplate = (template: PMPlanTemplateOption) => {
+    setName(template.name);
+    setDescription(template.description ?? "");
+    setFrequencyType(template.frequency_type);
+    setFrequencyInterval(String(template.frequency_interval));
+    setPriority(template.priority);
+    setEstimatedDurationMinutes(
+      template.estimated_duration_minutes != null
+        ? String(template.estimated_duration_minutes)
+        : ""
+    );
+    setInstructions(template.instructions ?? "");
+  };
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) return;
+    const template = (templates ?? []).find((t) => t.id === templateId);
+    if (template) applyTemplate(template);
+  };
 
   const assetsForCompany = useMemo(
     () => (companyId ? assets.filter((asset) => asset.company_id === companyId) : []),
@@ -229,6 +293,30 @@ export function PreventiveMaintenancePlanFormModal({
             </p>
           </div>
 
+          {!isEdit && templatesForCompany.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                Apply template
+              </label>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                className={inputClass}
+                aria-label="Apply a template to prefill this plan"
+              >
+                <option value="">None — create from scratch</option>
+                {templatesForCompany.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Selecting a template fills name, frequency, priority, duration, and instructions.
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Plan name *
@@ -236,7 +324,8 @@ export function PreventiveMaintenancePlanFormModal({
             <input
               name="name"
               required
-              defaultValue={plan?.name ?? ""}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className={inputClass}
             />
           </div>
@@ -248,7 +337,8 @@ export function PreventiveMaintenancePlanFormModal({
             <textarea
               name="description"
               rows={2}
-              defaultValue={plan?.description ?? ""}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               className={inputClass}
             />
           </div>
@@ -331,12 +421,13 @@ export function PreventiveMaintenancePlanFormModal({
               </label>
               <select
                 name="priority"
-                defaultValue={plan?.priority ?? "medium"}
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
                 className={inputClass}
               >
-                {PRIORITY_OPTIONS.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {priority}
+                {PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
                   </option>
                 ))}
               </select>
@@ -349,7 +440,8 @@ export function PreventiveMaintenancePlanFormModal({
                 name="estimated_duration_minutes"
                 type="number"
                 min={1}
-                defaultValue={plan?.estimated_duration_minutes ?? ""}
+                value={estimatedDurationMinutes}
+                onChange={(e) => setEstimatedDurationMinutes(e.target.value)}
                 className={inputClass}
               />
             </div>
@@ -372,7 +464,8 @@ export function PreventiveMaintenancePlanFormModal({
             <textarea
               name="instructions"
               rows={3}
-              defaultValue={plan?.instructions ?? ""}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
               className={inputClass}
             />
           </div>

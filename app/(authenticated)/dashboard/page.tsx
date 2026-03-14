@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LayoutDashboard } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { loadOperationsDashboardData } from "@/src/lib/dashboard/operations";
@@ -8,8 +9,11 @@ import { MetricCard } from "@/src/components/ui/metric-card";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
-import { Button } from "@/src/components/ui/button";
 import { PageHeader } from "@/src/components/ui/page-header";
+import { DashboardHeaderActions } from "./components/dashboard-header-actions";
+import { DashboardHelperTips } from "./components/dashboard-helper-tips";
+import { DashboardSectionEmpty } from "./components/dashboard-section-empty";
+import { DashboardSetupGuidance } from "./components/dashboard-setup-guidance";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -52,33 +56,63 @@ export default async function DashboardPage() {
     companyIds,
   });
 
+  const noCompanies = companyIds.length === 0;
+  const hasNoVisibleActivity =
+    !noCompanies &&
+    operations.kpis.openWorkOrders === 0 &&
+    operations.kpis.completedToday === 0 &&
+    operations.kpis.scheduledToday === 0 &&
+    operations.kpis.activeTechnicians === 0 &&
+    intelligence.pmCompliance.upcomingTasks.length === 0 &&
+    intelligence.pmCompliance.overdueTasks.length === 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="dashboard:overview">
       <PageHeader
+        icon={<LayoutDashboard className="size-5" />}
         title="Operations Command Center"
         subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
-        actions={
-          <>
-            <Link href="/reports">
-              <Button variant="secondary">Operations Reports</Button>
-            </Link>
-            <Link href="/dispatch">
-              <Button variant="secondary">Open Dispatch</Button>
-            </Link>
-            <Link href="/work-orders">
-              <Button>Open Work Orders</Button>
-            </Link>
-          </>
-        }
+        actions={<span data-tour="dashboard:quick-actions"><DashboardHeaderActions /></span>}
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard title="Open Work Orders" value={operations.kpis.openWorkOrders} description="New, ready, scheduled, in progress, on hold" />
-        <MetricCard title="In Progress Work Orders" value={operations.kpis.inProgressWorkOrders} description="Actively being executed right now" />
-        <MetricCard title="Completed Today" value={operations.kpis.completedToday} description="Jobs completed in current day window" />
-        <MetricCard title="Overdue Work Orders" value={operations.kpis.overdueWorkOrders} description="Due date has passed without completion" trend={operations.kpis.overdueWorkOrders > 0 ? { label: "Needs immediate attention", tone: "bad" } : { label: "No overdue jobs", tone: "good" }} />
-        <MetricCard title="Scheduled Today" value={operations.kpis.scheduledToday} description="Jobs scheduled for today" />
-        <MetricCard title="Active Technicians" value={operations.kpis.activeTechnicians} description="Technicians with active status" />
+      <DashboardHelperTips overdueWorkOrders={operations.kpis.overdueWorkOrders} />
+
+      {(noCompanies || hasNoVisibleActivity) && (
+        <DashboardSetupGuidance noCompanies={noCompanies} emptyButConfigured={hasNoVisibleActivity} />
+      )}
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-tour="dashboard:metrics">
+        <MetricCard
+          title="Open Work Orders"
+          value={operations.kpis.openWorkOrders}
+          description={operations.kpis.openWorkOrders === 0 ? "No open work orders yet" : "New, ready, scheduled, in progress, on hold"}
+        />
+        <MetricCard
+          title="In Progress Work Orders"
+          value={operations.kpis.inProgressWorkOrders}
+          description={operations.kpis.inProgressWorkOrders === 0 ? "None in progress" : "Actively being executed right now"}
+        />
+        <MetricCard
+          title="Completed Today"
+          value={operations.kpis.completedToday}
+          description={operations.kpis.completedToday === 0 ? "No completions today yet" : "Jobs completed in current day window"}
+        />
+        <MetricCard
+          title="Overdue Work Orders"
+          value={operations.kpis.overdueWorkOrders}
+          description="Due date has passed without completion"
+          trend={operations.kpis.overdueWorkOrders > 0 ? { label: "Needs immediate attention", tone: "bad" } : { label: "No overdue jobs", tone: "good" }}
+        />
+        <MetricCard
+          title="Scheduled Today"
+          value={operations.kpis.scheduledToday}
+          description={operations.kpis.scheduledToday === 0 ? "Nothing scheduled for today" : "Jobs scheduled for today"}
+        />
+        <MetricCard
+          title="Active Technicians"
+          value={operations.kpis.activeTechnicians}
+          description={operations.kpis.activeTechnicians === 0 ? "No active technicians" : "Technicians with active status"}
+        />
       </section>
 
       <section className="space-y-4">
@@ -106,8 +140,8 @@ export default async function DashboardPage() {
           />
           <MetricCard
             title="Compliance %"
-            value={`${intelligence.pmCompliance.compliancePercentage.toFixed(2)}%`}
-            description="On-time / due PM runs"
+            value={intelligence.pmCompliance.compliancePercentage != null ? `${intelligence.pmCompliance.compliancePercentage.toFixed(2)}%` : "—"}
+            description={intelligence.pmCompliance.compliancePercentage != null ? "On-time / due PM runs" : "No PM runs yet — create schedules to see compliance"}
           />
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -118,7 +152,11 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               {intelligence.pmCompliance.upcomingTasks.length === 0 ? (
-                <p className="text-sm text-[var(--muted)]">No upcoming PM tasks.</p>
+                <DashboardSectionEmpty
+                  message="No upcoming PM tasks in the next 30 days."
+                  subtext="PM metrics and this list will populate after you create preventive maintenance plans."
+                  cta={{ label: "Preventive maintenance", href: "/preventive-maintenance" }}
+                />
               ) : (
                 <ul className="space-y-2">
                   {intelligence.pmCompliance.upcomingTasks.slice(0, 6).map((row) => (
@@ -149,7 +187,11 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               {intelligence.pmCompliance.overdueTasks.length === 0 ? (
-                <p className="text-sm text-[var(--muted)]">No overdue PM tasks.</p>
+                <DashboardSectionEmpty
+                  message="No overdue PM tasks."
+                  subtext="Active plans that have passed their next run date will appear here."
+                  cta={{ label: "View PM plans", href: "/preventive-maintenance" }}
+                />
               ) : (
                 <ul className="space-y-2">
                   {intelligence.pmCompliance.overdueTasks.slice(0, 6).map((row) => (
@@ -176,7 +218,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2" data-tour="dashboard:urgent">
         <Card>
           <CardHeader>
             <CardTitle>Operational Alerts</CardTitle>
@@ -188,7 +230,7 @@ export default async function DashboardPage() {
                 Overdue work orders
               </p>
               {operations.alerts.overdueWorkOrders.length === 0 ? (
-                <p className="mt-1 text-sm text-[var(--muted)]">No overdue work orders.</p>
+                <DashboardSectionEmpty message="No overdue work orders." subtext="Work orders past due will appear here." cta={{ label: "Work orders", href: "/work-orders" }} className="mt-1" />
               ) : (
                 <ul className="mt-2 space-y-2">
                   {operations.alerts.overdueWorkOrders.slice(0, 4).map((row) => (
@@ -213,7 +255,7 @@ export default async function DashboardPage() {
                 High priority not started
               </p>
               {operations.alerts.highPriorityNotStarted.length === 0 ? (
-                <p className="mt-1 text-sm text-[var(--muted)]">No blocked high-priority jobs.</p>
+                <DashboardSectionEmpty message="No high-priority jobs waiting to start." subtext="Urgent or high-priority work orders not yet started will appear here." cta={{ label: "Work orders", href: "/work-orders" }} className="mt-1" />
               ) : (
                 <ul className="mt-2 space-y-2">
                   {operations.alerts.highPriorityNotStarted.slice(0, 4).map((row) => (
@@ -266,7 +308,7 @@ export default async function DashboardPage() {
                 Assets with repeated failures (30 days)
               </p>
               {operations.alerts.repeatedFailures.length === 0 ? (
-                <p className="mt-1 text-sm text-[var(--muted)]">No repeated-failure assets detected.</p>
+                <DashboardSectionEmpty message="No repeated-failure assets in the last 30 days." subtext="Assets with multiple repair/emergency completions will appear here." cta={{ label: "Assets", href: "/assets" }} className="mt-1" />
               ) : (
                 <ul className="mt-2 space-y-2">
                   {operations.alerts.repeatedFailures.slice(0, 4).map((row) => (
@@ -317,22 +359,22 @@ export default async function DashboardPage() {
         <MetricCard
           title="Backlog: Open"
           value={operations.backlog.openWorkOrders}
-          description="Open maintenance backlog"
+          description={operations.backlog.openWorkOrders === 0 ? "No open backlog" : "Open maintenance backlog"}
         />
         <MetricCard
           title="Backlog: Overdue"
           value={operations.backlog.overdueWorkOrders}
-          description="Overdue workload"
+          description={operations.backlog.overdueWorkOrders === 0 ? "No overdue backlog" : "Overdue workload"}
         />
         <MetricCard
           title="PM Not Scheduled"
           value={operations.backlog.pmNotScheduled}
-          description="Due PM tasks waiting scheduling"
+          description={operations.backlog.pmNotScheduled === 0 ? "No PM past due unscheduled" : "Due PM tasks waiting scheduling"}
         />
         <MetricCard
           title="Upcoming PM Tasks"
           value={operations.backlog.upcomingPmTasks}
-          description="PM tasks due in next 14 days"
+          description={operations.backlog.upcomingPmTasks === 0 ? "No PM in next 14 days" : "PM tasks due in next 14 days"}
         />
       </section>
 
@@ -340,7 +382,13 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Asset Health</CardTitle>
-            <CardDescription>Risk signals from maintenance history</CardDescription>
+            <CardDescription>
+              {operations.assetHealth.assetsWithMultipleFailures30d === 0 &&
+              operations.assetHealth.assetsOverdueForPm === 0 &&
+              operations.assetHealth.assetsNotServicedIn6Months === 0
+                ? "Risk signals from maintenance history — none detected yet"
+                : "Risk signals from maintenance history"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
@@ -372,7 +420,11 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               {operations.technicianActivity.length === 0 ? (
-                <p className="text-sm text-[var(--muted)]">No active technicians available.</p>
+                <DashboardSectionEmpty
+                  message="No active technicians."
+                  subtext="Add technicians and set status to active to see completed work and assignments here."
+                  cta={{ label: "Technicians", href: "/technicians" }}
+                />
               ) : (
                 <DataTable className="shadow-none">
                   <Table>

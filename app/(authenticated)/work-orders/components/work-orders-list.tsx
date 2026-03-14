@@ -15,8 +15,11 @@ import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
 import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
 import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
+import { ClipboardList } from "lucide-react";
 import { PageHeader } from "@/src/components/ui/page-header";
 import { ActionBar } from "@/src/components/ui/action-bar";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
+import { Hint } from "@/src/components/ui/hint";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id: string };
@@ -298,16 +301,18 @@ export function WorkOrdersList({
         </div>
       )}
       <PageHeader
-        title="Work Orders Command Center"
-        subtitle="Create, prioritize, assign, and track maintenance service jobs."
+        icon={<ClipboardList className="size-5" />}
+        title="Work Order Command Center"
+        subtitle="Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations."
         actions={
           <div className="flex items-center gap-2">
-          <div className="relative">
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
+            <div className="relative">
             <button
               type="button"
               onClick={() => setQuickActionsOpen((v) => !v)}
               className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
-              title="Quick actions"
             >
               Quick actions ▾
             </button>
@@ -352,22 +357,35 @@ export function WorkOrdersList({
               </>
             )}
           </div>
+            </TooltipTrigger>
+            <TooltipContent>Quick actions menu</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
             onClick={() => setSlaModalOpen(true)}
             className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
-            title="Configure SLA response targets"
           >
             SLA Settings
           </button>
+            </TooltipTrigger>
+            <TooltipContent>Configure SLA targets</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
             onClick={() => handleExport(initialList.map((w) => w.id))}
             className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
-            title="Export visible work orders to CSV"
           >
             Export
           </button>
+            </TooltipTrigger>
+            <TooltipContent>Export to CSV</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
             onClick={openNew}
@@ -375,24 +393,42 @@ export function WorkOrdersList({
           >
             New Work Order
           </button>
+            </TooltipTrigger>
+            <TooltipContent>Create work order</TooltipContent>
+          </Tooltip>
           </div>
         }
       />
 
-      <WorkOrderKpiBar
-        stats={{
-          open: stats.open,
-          inProgress: stats.inProgress,
-          onHold: stats.onHold,
-          overdue: stats.overdue,
-          dueToday: stats.dueToday,
-          completedToday: stats.completedToday,
-        }}
-      />
+      {initialList.length > 0 && stats.readyToSchedule + stats.new >= 5 && (
+        <Hint
+          id="work-orders-many-unassigned"
+          variant="banner"
+          message="You have several work orders not yet assigned. Open Dispatch to drag-and-drop jobs onto technicians or crews."
+          action={
+            <Link href="/dispatch" className="mt-1 inline-block text-sm font-medium text-[var(--accent)] hover:underline">
+              Open Dispatch →
+            </Link>
+          }
+        />
+      )}
+      <div data-tour="work-orders:statuses">
+        <WorkOrderKpiBar
+          stats={{
+            open: stats.open,
+            inProgress: stats.inProgress,
+            onHold: stats.onHold,
+            overdue: stats.overdue,
+            dueToday: stats.dueToday,
+            completedToday: stats.completedToday,
+          }}
+        />
+      </div>
       <Suspense fallback={null}>
         <WorkOrderSavedViews />
       </Suspense>
       <Suspense fallback={<div className="h-12 animate-pulse rounded-lg bg-[var(--card-border)]/50" />}>
+        <div data-tour="work-orders:scheduling">
         <WorkOrderFilters
           options={{
             companies,
@@ -404,6 +440,7 @@ export function WorkOrdersList({
             crews,
           }}
         />
+        </div>
       </Suspense>
 
       {selectedIds.size > 0 && (
@@ -475,7 +512,7 @@ export function WorkOrdersList({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/90 shadow-[var(--shadow-soft)]">
+        <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/90 shadow-[var(--shadow-soft)]" data-tour="work-orders:assignment">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>
@@ -504,7 +541,7 @@ export function WorkOrdersList({
                   <th className="w-28 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-tour="work-orders:completion">
                 {initialList.map((wo) => (
                   <tr
                     key={wo.id}

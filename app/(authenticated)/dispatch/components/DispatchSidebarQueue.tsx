@@ -26,6 +26,8 @@ export type DispatchSidebarQueueProps = {
     id: string,
     action?: "view" | "reassign" | "complete" | "open" | "unschedule"
   ) => void;
+  /** When set, the matching queue item is highlighted and can be scrolled into view (e.g. from map selection). */
+  selectedWorkOrderId?: string | null;
 };
 
 function DraggableQueueCard({ workOrder, children }: { workOrder: QueueWorkOrder; children: React.ReactNode }) {
@@ -86,6 +88,14 @@ export function DispatchSidebarQueue({
   });
   const highlighted = isOver || overDropId === "queue-drop-unschedule";
 
+  const expandedBackdrop = !collapsed ? (
+    <div
+      className="fixed inset-0 z-30 bg-black/25 lg:hidden"
+      aria-hidden
+      onClick={onToggleCollapse}
+    />
+  ) : null;
+
   if (collapsed) {
     return (
       <aside
@@ -119,13 +129,16 @@ export function DispatchSidebarQueue({
   }
 
   return (
+    <>
+      {expandedBackdrop}
     <aside
       ref={setNodeRef}
-      className={`flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/95 ${
+      className={`flex shrink-0 flex-col overflow-y-auto border-r border-[var(--card-border)] bg-[var(--card)]/95 shadow-[var(--shadow-soft)]
+        fixed inset-y-0 left-0 z-40 w-[280px] lg:relative lg:inset-auto lg:z-auto lg:w-[320px] lg:shadow-none ${
         highlighted ? "bg-amber-50/90 ring-2 ring-inset ring-amber-400/40" : ""
       }`}
     >
-      <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-2.5 py-2">
+      <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)] px-2.5 py-1.5">
         <div className="flex items-center justify-between gap-1.5">
           <p className="text-xs font-semibold text-[var(--foreground)]">Queue</p>
           <button
@@ -159,6 +172,7 @@ export function DispatchSidebarQueue({
                 <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
               )}
               onOpenWorkOrder={onOpenWorkOrder}
+              selectedWorkOrderId={selectedWorkOrderId}
             />
             <QueueSection
               title="Ready"
@@ -170,6 +184,7 @@ export function DispatchSidebarQueue({
                 <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
               )}
               onOpenWorkOrder={onOpenWorkOrder}
+              selectedWorkOrderId={selectedWorkOrderId}
             />
             <QueueSection
               title="Unscheduled"
@@ -181,10 +196,12 @@ export function DispatchSidebarQueue({
                 <DraggableQueueCard workOrder={workOrder}>{children}</DraggableQueueCard>
               )}
               onOpenWorkOrder={onOpenWorkOrder}
+              selectedWorkOrderId={selectedWorkOrderId}
             />
           </>
         )}
       </div>
     </aside>
+    </>
   );
 }

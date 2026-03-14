@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { endImpersonation } from "@/app/platform/impersonate/actions";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { ImpersonationBanner } from "./impersonation-banner";
+import { TooltipProvider } from "@/src/components/ui/tooltip";
+import { TourProvider, TourOverlay } from "@/src/components/ui/tour";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -15,6 +17,7 @@ type ShellProps = {
   companyName: string;
   showPlatformAdmin?: boolean;
   impersonationBanner?: { actingAsName: string; companyName: string } | null;
+  completedTourIds?: string[];
 };
 
 export function Shell({
@@ -23,12 +26,15 @@ export function Shell({
   companyName,
   showPlatformAdmin = false,
   impersonationBanner = null,
+  completedTourIds = [],
 }: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
-  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    setSidebarCollapsed(stored === null ? true : stored === "1");
+  }, []);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDispatchFullscreen =
@@ -43,47 +49,54 @@ export function Shell({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
-      {!isDispatchFullscreen ? (
-        <Sidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={handleToggleCollapse}
-          showPlatformAdmin={showPlatformAdmin}
-        />
-      ) : null}
-      {/* Main panel: fills remaining width, column layout, scrollable content */}
-      <div
-        className={`flex min-h-0 flex-1 flex-col ${
-          isDispatchFullscreen ? "" : sidebarCollapsed ? "lg:pl-16" : "lg:pl-64"
-        }`}
-      >
+    <TooltipProvider>
+      <TourProvider completedTourIds={completedTourIds}>
+        <TourOverlay />
+        <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
         {!isDispatchFullscreen ? (
-          <TopBar
-            tenantName={tenantName}
-            companyName={companyName}
-            onMenuClick={() => setSidebarOpen(true)}
-            isImpersonating={!!impersonationBanner}
-            onReturnToProfile={
-              impersonationBanner ? () => endImpersonation("/dashboard") : undefined
-            }
+          <Sidebar
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={handleToggleCollapse}
+            showPlatformAdmin={showPlatformAdmin}
           />
         ) : null}
-        {impersonationBanner ? (
-          <ImpersonationBanner
-            actingAsName={impersonationBanner.actingAsName}
-            companyName={impersonationBanner.companyName}
-          />
-        ) : null}
-        <div className="min-h-0 flex-1 overflow-auto">
-          {isDispatchFullscreen ? (
-            <div className="h-full px-2 py-2">{children}</div>
-          ) : (
-            <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">{children}</div>
-          )}
+        {/* Main panel: fills remaining width, column layout, scrollable content */}
+        <div
+          className={`flex min-h-0 flex-1 flex-col ${
+            isDispatchFullscreen ? "" : sidebarCollapsed ? "lg:pl-[4.25rem]" : "lg:pl-60"
+          }`}
+        >
+          {!isDispatchFullscreen ? (
+            <TopBar
+              tenantName={tenantName}
+              companyName={companyName}
+              onMenuClick={() => setSidebarOpen(true)}
+              isImpersonating={!!impersonationBanner}
+              onReturnToProfile={
+                impersonationBanner ? () => endImpersonation("/dashboard") : undefined
+              }
+            />
+          ) : null}
+          {impersonationBanner ? (
+            <ImpersonationBanner
+              actingAsName={impersonationBanner.actingAsName}
+              companyName={impersonationBanner.companyName}
+            />
+          ) : null}
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+            {isDispatchFullscreen ? (
+              <div className="h-full min-h-0 flex-1 px-2 py-2">{children}</div>
+            ) : (
+              <div className="mx-auto flex min-h-0 min-w-0 max-w-[1400px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
+                {children}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      </TourProvider>
+    </TooltipProvider>
   );
 }

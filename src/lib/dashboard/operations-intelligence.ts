@@ -30,7 +30,8 @@ export type OperationsIntelligenceData = {
     completedOnTime: number;
     completedLate: number;
     missed: number;
-    compliancePercentage: number;
+    /** When null, no PM runs exist yet — show "—" or "No PM data" instead of a percentage. */
+    compliancePercentage: number | null;
     upcomingTasks: PmComplianceTask[];
     overdueTasks: PmComplianceTask[];
   };
@@ -208,7 +209,7 @@ export async function loadOperationsIntelligenceData({
         completedOnTime: 0,
         completedLate: 0,
         missed: 0,
-        compliancePercentage: 100,
+        compliancePercentage: null,
         upcomingTasks: [],
         overdueTasks: [],
       },
@@ -240,7 +241,6 @@ export async function loadOperationsIntelligenceData({
     buildingsResult,
     techniciansResult,
     pmPlansResult,
-    pmRunsResult,
   ] = await Promise.all([
     supabase
       .from("work_orders")
@@ -270,11 +270,6 @@ export async function loadOperationsIntelligenceData({
       .from("preventive_maintenance_plans")
       .select("id, name, next_run_date, asset_id, status")
       .in("company_id", companyIds),
-    supabase
-      .from("preventive_maintenance_runs")
-      .select("id, preventive_maintenance_plan_id, scheduled_date, generated_work_order_id, status")
-      .gte("scheduled_date", complianceStartDate)
-      .lte("scheduled_date", today),
   ]);
 
   const workOrders = (workOrdersResult.data ?? []) as Array<
@@ -285,7 +280,18 @@ export async function loadOperationsIntelligenceData({
   const buildings = (buildingsResult.data ?? []) as Array<Record<string, unknown>>;
   const technicians = (techniciansResult.data ?? []) as Array<Record<string, unknown>>;
   const pmPlans = (pmPlansResult.data ?? []) as Array<Record<string, unknown>>;
-  const pmRuns = (pmRunsResult.data ?? []) as Array<Record<string, unknown>>;
+
+  const pmPlanIds = pmPlans.map((row) => String(row.id));
+  let pmRuns: Array<Record<string, unknown>> = [];
+  if (pmPlanIds.length > 0) {
+    const pmRunsResult = await supabase
+      .from("preventive_maintenance_runs")
+      .select("id, preventive_maintenance_plan_id, scheduled_date, generated_work_order_id, status")
+      .in("preventive_maintenance_plan_id", pmPlanIds)
+      .gte("scheduled_date", complianceStartDate)
+      .lte("scheduled_date", today);
+    pmRuns = (pmRunsResult.data ?? []) as Array<Record<string, unknown>>;
+  }
 
   const workOrderIds = workOrders.map((row) => String(row.id));
   const partsCostByWorkOrder = new Map<string, number>();
@@ -624,10 +630,10 @@ export async function loadOperationsIntelligenceData({
     }
   }
   const complianceDenominator = completedOnTime + completedLate + missed;
-  const compliancePercentage =
+  const compliancePercentage: number | null =
     complianceDenominator > 0
       ? Number(((completedOnTime / complianceDenominator) * 100).toFixed(2))
-      : 100;
+      : null;
 
   const upcomingTasks = pmPlans
     .filter((row) => {

@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { Cpu } from "lucide-react";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/src/lib/supabase/server";
 import { getAssetIntelligenceDashboard } from "@/src/lib/assets/assetIntelligenceService";
 import { AssetIntelligenceDashboardView } from "../components/asset-intelligence-dashboard-view";
+import { PageHeader } from "@/src/components/ui/page-header";
+import { Button } from "@/src/components/ui/button";
 
 export const metadata = {
   title: "Asset Intelligence | Cornerstone Tech",
@@ -56,24 +59,18 @@ export default async function AssetIntelligencePage({
 
   return (
     <div className="space-y-6">
-      <header className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-              Asset Intelligence Dashboard
-            </h1>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Portfolio health, failure risk, recurring issue patterns, and replacement pressure.
-            </p>
-          </div>
-          <Link
-            href="/assets"
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-          >
-            Back to Assets
+      <PageHeader
+        variant="surface"
+        icon={<Cpu className="size-5" />}
+        title="Asset Intelligence Dashboard"
+        subtitle="Portfolio health, failure risk, recurring issue patterns, and replacement pressure."
+        actions={
+          <Link href="/assets">
+            <Button variant="secondary">Back to Assets</Button>
           </Link>
-        </div>
-        <form className="mt-4 flex flex-wrap gap-2">
+        }
+        meta={
+          <form className="flex flex-wrap gap-2">
           <select
             name="company_id"
             defaultValue={selectedCompanyId ?? ""}
@@ -99,7 +96,8 @@ export default async function AssetIntelligencePage({
             Reset
           </Link>
         </form>
-      </header>
+        }
+      />
 
       <AssetIntelligenceDashboardView
         data={dashboardData}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Wrench } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Technician } from "./components/technician-form-modal";
@@ -37,6 +38,7 @@ export default async function TechniciansPage() {
     return (
       <div className="space-y-8">
         <PageHeader
+          icon={<Wrench className="size-5" />}
           title="Technicians"
           subtitle="Manage technicians and assign them to work orders."
         />
@@ -217,6 +219,7 @@ export default async function TechniciansPage() {
   return (
     <div className="space-y-8">
       <PageHeader
+        icon={<Wrench className="size-5" />}
         title="Technicians"
         subtitle="Manage technicians and assign them to work orders."
         actions={

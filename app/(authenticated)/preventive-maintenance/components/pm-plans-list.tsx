@@ -23,7 +23,9 @@ import {
   type PreventiveMaintenanceTemplate,
 } from "./pm-template-form-modal";
 import { PreventiveMaintenanceBulkTemplateModal } from "./pm-bulk-template-modal";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { Hint } from "@/src/components/ui/hint";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 
 type CompanyOption = { id: string; name: string };
@@ -247,7 +249,7 @@ export function PreventiveMaintenancePlansList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="preventive-maintenance:pm-schedules">
       {message && (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -261,7 +263,7 @@ export function PreventiveMaintenancePlansList({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3" data-tour="preventive-maintenance:generated-wo">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Preventive Maintenance</h2>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -289,6 +291,8 @@ export function PreventiveMaintenancePlansList({
           >
             Bulk Schedule
           </button>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
             onClick={() => {
@@ -299,6 +303,9 @@ export function PreventiveMaintenancePlansList({
           >
             New PM Plan
           </button>
+            </TooltipTrigger>
+            <TooltipContent>Create recurring plan</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -394,21 +401,30 @@ export function PreventiveMaintenancePlansList({
       </div>
 
       {plans.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
-          <p className="text-[var(--muted)]">No preventive maintenance plans found.</p>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingPlan(null);
-              setPlanModalOpen(true);
-            }}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
-            Create your first PM plan
-          </button>
+        <div className="space-y-4">
+          {!filterParams.q && !filterParams.frequency && !filterParams.status && !filterParams.technician_id && (
+            <Hint
+              id="pm-no-plans"
+              variant="empty-state"
+              message="PM plans define recurring service (e.g. monthly inspection). Create a plan per asset, set frequency, and the system can auto-generate work orders when due."
+            />
+          )}
+          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+            <p className="text-[var(--muted)]">No preventive maintenance plans found.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingPlan(null);
+                setPlanModalOpen(true);
+              }}
+              className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+            >
+              Create your first PM plan
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm" data-tour="preventive-maintenance:recurrence">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead>
@@ -599,6 +615,7 @@ export function PreventiveMaintenancePlansList({
           companies={companies}
           assets={assets}
           technicians={technicians}
+          templates={templates}
           saveAction={savePreventiveMaintenancePlan}
         />
       )}

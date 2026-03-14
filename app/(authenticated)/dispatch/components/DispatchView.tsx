@@ -28,7 +28,6 @@ import type { DispatchWorkOrder } from "../types";
 import type { LoadDispatchResult } from "../dispatch-data";
 import type { DispatchFilterState } from "../filter-state";
 import { filterStateToParams } from "../filter-state";
-import { MetricCard } from "@/src/components/ui/metric-card";
 import { WorkOrderAssignmentModal } from "@/app/(authenticated)/work-orders/components/work-order-assignment-modal";
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import { RebalanceSuggestionsModal } from "./RebalanceSuggestionsModal";
@@ -36,10 +35,11 @@ import { computeRebalanceSuggestions } from "../rebalance-utils";
 import { buildTechnicianRoute, haversineMiles, estimateTravelMinutes, hasCoordinate } from "../dispatch-map-utils";
 import { SuggestedTechniciansPanel } from "./SuggestedTechniciansPanel";
 import { DispatchSpeedActions } from "./DispatchSpeedActions";
+import { CombinedWorkOrderDetailsPanel } from "./CombinedWorkOrderDetailsPanel";
 import type { WorkOrderTravelInfo } from "./DispatchOperationsJobList";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
-import { PageHeader } from "@/src/components/ui/page-header";
+import { Hint } from "@/src/components/ui/hint";
 
 const DispatchMapPanel = dynamic(
   () => import("./DispatchMapPanel").then((module) => module.DispatchMapPanel),
@@ -129,6 +129,7 @@ export function DispatchView({
   const [sortTechniciansByDistance, setSortTechniciansByDistance] = useState(false);
   const [technicianPage, setTechnicianPage] = useState(0);
   const TECHNICIAN_PAGE_SIZE = 8;
+  const [combinedMapVisible, setCombinedMapVisible] = useState(true);
   const [optimisticWorkOrders, setOptimisticWorkOrders] = useState<DispatchWorkOrder[]>(
     initialData.workOrders
   );
@@ -158,6 +159,12 @@ export function DispatchView({
     if (typeof window === "undefined") return;
     window.sessionStorage.setItem("dispatch.insights.collapsed", insightsCollapsed ? "1" : "0");
   }, [insightsCollapsed]);
+
+  useEffect(() => {
+    if (filterState.viewMode !== "combined" || !selectedMapWorkOrderId) return;
+    const el = document.getElementById(`dispatch-queue-wo-${selectedMapWorkOrderId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [filterState.viewMode, selectedMapWorkOrderId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1016,7 +1023,7 @@ export function DispatchView({
   return (
     <div
       className={`flex h-full min-h-0 flex-col ${
-        opsMode ? "gap-0" : isFullScreen ? "gap-2" : "gap-4"
+        opsMode ? "gap-0" : isFullScreen ? "gap-1" : "gap-2"
       }`}
     >
       {opsMode ? (
@@ -1034,57 +1041,45 @@ export function DispatchView({
           </Button>
         </header>
       ) : (
-        <PageHeader
-          title="Dispatch Operations Board"
-          subtitle={
-            !isFullScreen
-              ? "Assign to technicians or crews, schedule by day/week/month, and balance workload."
-              : "Full screen command center mode enabled."
-          }
-          actions={
-            <>
-              {!isFullScreen ? (
-                <>
-                  <Link href="/work-orders">
-                    <Button variant="secondary">Open Work Orders</Button>
-                  </Link>
-                  <Link href="/technicians/work-queue">
-                    <Button>Technician Queue</Button>
-                  </Link>
-                </>
-              ) : null}
-              <Button variant={isFullScreen ? "secondary" : "primary"} onClick={() => setFullScreen(!isFullScreen)}>
-                {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
-              </Button>
-            </>
-          }
-        />
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--card-border)] bg-[var(--card)] px-3 py-2">
+          <h1 className="text-base font-semibold tracking-tight text-[var(--foreground)]">
+            Dispatch
+          </h1>
+          <div className="flex items-center gap-1.5">
+            {!isFullScreen ? (
+              <>
+                <Link href="/work-orders">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs">
+                    Work Orders
+                  </Button>
+                </Link>
+                <Link href="/technicians/work-queue">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs">
+                    Technician Queue
+                  </Button>
+                </Link>
+              </>
+            ) : null}
+            <Button
+              variant={isFullScreen ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setFullScreen(!isFullScreen)}
+            >
+              {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
+            </Button>
+          </div>
+        </header>
       )}
 
-      {!opsMode && (
-        <section className="grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Dispatch insights">
-          <MetricCard
-            title="Open Work Orders"
-            value={dispatchData.insights.total}
-            description="Active jobs in selected scope"
-          />
-          <MetricCard
-            title="Due Today"
-            value={dispatchData.insights.dueToday}
-            description="Jobs with due date today"
-          />
-          <MetricCard
-            title="In Progress"
-            value={dispatchData.insights.inProgressToday}
-            description="Currently in execution"
-          />
-          <MetricCard
-            title="Unassigned"
-            value={dispatchData.insights.unassignedWorkOrders}
-            description="Needs technician or crew assignment"
-            className="border-amber-200/80 bg-amber-50/35"
-          />
-        </section>
+      {!opsMode && rebalanceSuggestions.length > 0 && (
+        <Hint
+          id="dispatch-rebalance"
+          variant="banner"
+          title="Workload rebalance suggested"
+          message="Technician workload is uneven. Open the side panel and use Rebalance to spread jobs across crews."
+          className="shrink-0"
+        />
       )}
 
       <div
@@ -1124,7 +1119,7 @@ export function DispatchView({
         <div className="flex min-h-0 flex-1 min-w-0">
           {filterState.viewMode === "map" ? (
             <>
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2" data-tour="dispatch:routing">
                 <DispatchMapPanel
                   workOrders={optimisticWorkOrders}
                   workforce={workforce}
@@ -1163,49 +1158,48 @@ export function DispatchView({
               onDragCancel={handleDragCancel}
             >
               <div className="flex min-h-0 flex-1 flex-col">
-                <section className="grid shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)]">
-                  <div className="flex h-[480px] min-h-[320px] shrink-0 flex-col">
-                    <DispatchMapPanel
-                      workOrders={optimisticWorkOrders}
-                      workforce={workforce}
-                      filterState={filterState}
-                      filterOptions={filterOptions}
-                      selectedTechnicianId={selectedMapTechnicianId}
-                      selectedWorkOrderId={selectedMapWorkOrderId}
-                      hoveredWorkOrderId={hoveredWorkOrderId}
-                      assignmentPending={mapAssigning}
-                      onSelectTechnician={setSelectedMapTechnicianId}
-                      onSelectWorkOrder={setSelectedMapWorkOrderId}
-                      onHoverWorkOrder={setHoveredWorkOrderId}
-                      onOpenWorkOrderDrawer={openWorkOrderDrawer}
-                      onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                      onAssignFromMap={handleAssignFromMap}
-                      onPatchFilters={patchFilterState}
-                    />
+                {/* SECTION 1 (Top): Map ~38% + Work Order Details Panel; map collapses to toggle on small screens */}
+                <section
+                  className="grid grid-cols-1 shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+                  style={{ minHeight: 0, flex: "0 0 38%" }}
+                >
+                  <div className="flex min-h-0 flex-col overflow-hidden">
+                    {combinedMapVisible ? (
+                      <>
+                        <div className="flex items-center justify-between gap-2 border-b border-[var(--card-border)] pb-1 xl:hidden">
+                          <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">Map</span>
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setCombinedMapVisible(false)}>
+                            Hide map
+                          </Button>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-hidden" data-tour="dispatch:routing">
+                          <DispatchMapPanel
+                            workOrders={optimisticWorkOrders}
+                            workforce={workforce}
+                            filterState={filterState}
+                            filterOptions={filterOptions}
+                            selectedTechnicianId={selectedMapTechnicianId}
+                            selectedWorkOrderId={selectedMapWorkOrderId}
+                            hoveredWorkOrderId={hoveredWorkOrderId}
+                            assignmentPending={mapAssigning}
+                            onSelectTechnician={setSelectedMapTechnicianId}
+                            onSelectWorkOrder={setSelectedMapWorkOrderId}
+                            onHoverWorkOrder={setHoveredWorkOrderId}
+                            onOpenWorkOrderDrawer={openWorkOrderDrawer}
+                            onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                            onAssignFromMap={handleAssignFromMap}
+                            onPatchFilters={patchFilterState}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <Button variant="outline" size="sm" className="h-8 w-full text-[11px]" onClick={() => setCombinedMapVisible(true)}>
+                        Show map
+                      </Button>
+                    )}
                   </div>
-                  <div className="flex min-h-[320px] min-h-0 flex-1 flex-col gap-2">
-                    <DispatchSpeedActions
-                      selectedWorkOrder={
-                        selectedMapWorkOrderId
-                          ? optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
-                          : null
-                      }
-                      technicians={initialData.workforce.technicians}
-                      onAssign={(workOrderId, technicianId) => void handleAssignFromMap(workOrderId, technicianId)}
-                      assigning={mapAssigning}
-                    />
-                    <div className="min-h-0 flex-1 overflow-hidden">
-                      <DispatchOperationsJobList
-                        workOrders={operationsListWorkOrders}
-                        selectedWorkOrderId={selectedMapWorkOrderId}
-                        hoveredWorkOrderId={hoveredWorkOrderId}
-                        onSelectWorkOrder={handleSelectFromOperationsList}
-                        onHoverWorkOrder={setHoveredWorkOrderId}
-                        onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                        travelByWorkOrderId={operationsListTravelByWorkOrderId}
-                      />
-                    </div>
-                    <SuggestedTechniciansPanel
+                  <div className="flex min-h-0 min-w-0 flex-col">
+                    <CombinedWorkOrderDetailsPanel
                       selectedWorkOrder={
                         selectedMapWorkOrderId
                           ? optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
@@ -1216,9 +1210,11 @@ export function DispatchView({
                       selectedDate={filterState.selectedDate}
                       onAssign={(workOrderId, technicianId) => void handleAssignFromMap(workOrderId, technicianId)}
                       assigning={mapAssigning}
+                      onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
                     />
                   </div>
                 </section>
+                {/* SECTION 2 (Bottom): Queue + Dispatch Board ~62% */}
                 <section className="min-h-0 flex-1 border-t border-[var(--card-border)]">
                   <div className="flex h-full min-h-0">
                     <DispatchSidebarQueue
@@ -1229,7 +1225,11 @@ export function DispatchView({
                       overDropId={overDropId}
                       isDraggingWorkOrder={Boolean(activeWo)}
                       onToggleCollapse={() => setQueueCollapsed((current) => !current)}
-                      onOpenWorkOrder={handleOpenWorkOrder}
+                      onOpenWorkOrder={(id, action) => {
+                        setSelectedMapWorkOrderId(id);
+                        handleOpenWorkOrder(id, action);
+                      }}
+                      selectedWorkOrderId={selectedMapWorkOrderId}
                     />
                     <main
                       className={`min-w-0 flex-1 bg-[var(--background)] ${
@@ -1237,7 +1237,7 @@ export function DispatchView({
                       }`}
                     >
                       <div className="flex h-full min-h-0 flex-col">
-                        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-1">
+                        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-0.5">
                           <span className="text-[10px] font-medium text-[var(--muted)]">Timeline:</span>
                           <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
                             <button
@@ -1350,7 +1350,8 @@ export function DispatchView({
                             </p>
                           </div>
                         ) : (
-                          <div className="min-h-0 flex-1">
+                          <div className="min-h-0 flex-1" data-tour="dispatch:technician-columns">
+                            <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
                             <DispatchBoard
                               lanes={filteredLanes}
                               workOrdersByLane={filteredWorkOrdersByLane}
@@ -1368,6 +1369,7 @@ export function DispatchView({
                               onResizeEnd={handleResizeEnd}
                               onOpenWorkOrder={handleOpenWorkOrder}
                             />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1420,7 +1422,7 @@ export function DispatchView({
               >
                 <div className="flex h-full min-h-0 flex-col">
                   {filterState.viewMode === "day" ? (
-                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-1">
+                    <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-0.5">
                       <span className="text-[10px] font-medium text-[var(--muted)]">View:</span>
                       <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
                         <button
@@ -1504,7 +1506,8 @@ export function DispatchView({
                       </p>
                     </div>
                   ) : (
-                    <div className="min-h-0 flex-1">
+                    <div className="min-h-0 flex-1" data-tour="dispatch:technician-columns">
+                      <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
                       <DispatchBoard
                         lanes={filteredLanes}
                         workOrdersByLane={filteredWorkOrdersByLane}
@@ -1522,6 +1525,7 @@ export function DispatchView({
                         onResizeEnd={handleResizeEnd}
                         onOpenWorkOrder={handleOpenWorkOrder}
                       />
+                      </div>
                     </div>
                   )}
                 </div>

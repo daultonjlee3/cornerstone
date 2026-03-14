@@ -1,6 +1,8 @@
+import { Users } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { CrewsList, type CrewRow } from "./components/crews-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Crews | Cornerstone Tech",
@@ -129,14 +131,11 @@ export default async function CrewsPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Crews
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Teams & labor groups
-        </p>
-      </div>
+      <PageHeader
+        icon={<Users className="size-5" />}
+        title="Crews"
+        subtitle="Teams & labor groups"
+      />
       <CrewsList
         crews={crews as CrewRow[]}
         companies={companyOptions}

@@ -1,6 +1,8 @@
+import { Inbox } from "lucide-react";
 import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { RequestSubmissionForm } from "./components/request-submission-form";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Submit Work Request | Cornerstone Tech",
@@ -53,14 +55,11 @@ export default async function RequestSubmissionPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Submit work request
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Report a maintenance issue for approval and conversion into a work order.
-        </p>
-      </div>
+      <PageHeader
+        icon={<Inbox className="size-5" />}
+        title="Submit work request"
+        subtitle="Report a maintenance issue for approval and conversion into a work order."
+      />
       <RequestSubmissionForm
         companies={scope.companies}
         assets={assets}

@@ -1,3 +1,4 @@
+import { Building2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { VendorsList } from "./components/vendors-list";
@@ -111,6 +112,7 @@ export default async function VendorsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<Building2 className="size-5" />}
         title="Vendors"
         subtitle="Manage supplier profiles used by products and purchase orders."
       />

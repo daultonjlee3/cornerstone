@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import type { DispatchFilterState } from "../filter-state";
 import { filterStateToParams, hasActiveFilters } from "../filter-state";
 import type { DispatchFilterOptions, DispatchInsights } from "../dispatch-data";
 import { Button } from "@/src/components/ui/button";
+import { Filter } from "lucide-react";
 
 export type DispatchTopBarProps = {
   filterState: DispatchFilterState;
@@ -24,6 +25,16 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
   const router = useRouter();
   const pathname = usePathname();
   const [searchText, setSearchText] = useState(filterState.search);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const close = (e: MouseEvent) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) setFiltersOpen(false);
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [filtersOpen]);
 
   const propertyOptions = useMemo(() => {
     if (!filterState.companyId) return filterOptions.properties;
@@ -99,188 +110,225 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
   };
 
   const selectBase =
-    "h-8 min-h-0 w-auto max-w-[10rem] shrink-0 rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white py-0 pl-2 pr-6 text-[11px] font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
+    "h-7 min-h-0 w-auto max-w-[9rem] shrink-0 rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white py-0 pl-2 pr-6 text-[11px] font-medium text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
+
+  const filterSelects = (
+    <>
+      <select
+        value={filterState.companyId}
+        onChange={(e) => patchState({ companyId: e.target.value })}
+        className={selectBase}
+        title="Company"
+      >
+        <option value="">Company</option>
+        {filterOptions.companies.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.propertyId}
+        onChange={(e) => patchState({ propertyId: e.target.value })}
+        className={selectBase}
+        title="Property"
+      >
+        <option value="">Property</option>
+        {propertyOptions.map((p) => (
+          <option key={p.id} value={p.id}>{p.property_name ?? p.name ?? p.id}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.buildingId}
+        onChange={(e) => patchState({ buildingId: e.target.value })}
+        className={selectBase}
+        title="Building"
+      >
+        <option value="">Building</option>
+        {buildingOptions.map((b) => (
+          <option key={b.id} value={b.id}>{b.building_name ?? b.name ?? b.id}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.assetId}
+        onChange={(e) => patchState({ assetId: e.target.value })}
+        className={selectBase}
+        title="Asset"
+      >
+        <option value="">Asset</option>
+        {filterOptions.assets.map((a) => (
+          <option key={a.id} value={a.id}>{a.name}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.priority}
+        onChange={(e) => patchState({ priority: e.target.value })}
+        className={selectBase}
+        title="Priority"
+      >
+        <option value="">Priority</option>
+        {filterOptions.priorities.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.status}
+        onChange={(e) => patchState({ status: e.target.value })}
+        className={selectBase}
+        title="Status"
+      >
+        <option value="">Status</option>
+        {filterOptions.statuses.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.technicianId}
+        onChange={(e) => patchState({ technicianId: e.target.value })}
+        className={`${selectBase} max-w-[7rem]`}
+        title="Technician"
+      >
+        <option value="">Technician</option>
+        {filterOptions.technicians.map((t) => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.crewId}
+        onChange={(e) => patchState({ crewId: e.target.value })}
+        className={selectBase}
+        title="Crew"
+      >
+        <option value="">Crew</option>
+        {filterOptions.crews.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+      <select
+        value={filterState.assignmentType}
+        onChange={(e) => patchState({ assignmentType: e.target.value })}
+        className={selectBase}
+        title="Assignment"
+      >
+        <option value="">Assignment</option>
+        {filterOptions.assignmentTypes.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </>
+  );
+
   return (
-    <div className="shrink-0 border-b border-[var(--card-border)] bg-white/88 px-2 py-1.5 backdrop-blur">
-      {/* Row 1: Date navigation + view tabs */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="flex items-center gap-0.5">
+    <div className="shrink-0 border-b border-[var(--card-border)] bg-white/88 px-2 py-1 backdrop-blur">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        {/* Left: Date + view toggle */}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => shiftDate(-1)}
             className="rounded p-0.5 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
-            aria-label="Previous"
+            aria-label="Previous date"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="min-w-[132px] text-[11px] font-medium text-[var(--foreground)]">
+          <span className="min-w-[120px] text-[11px] font-medium text-[var(--foreground)]">
             {formatDisplayDate(filterState.selectedDate)}
           </span>
           <button
             type="button"
             onClick={() => shiftDate(1)}
             className="rounded p-0.5 text-[var(--muted)] hover:bg-[var(--card-border)]/40 hover:text-[var(--foreground)]"
-            aria-label="Next"
+            aria-label="Next date"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         </div>
-        <div className="flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-[var(--background)]/70 p-0.5" role="tablist" aria-label="Dispatch view">
-          {(["day", "week", "month", "map", "combined"] as const).map((mode) => (
+        <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)]/70 p-0.5" role="tablist" aria-label="View">
+          {(["day", "week", "month", "map"] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               role="tab"
               aria-selected={filterState.viewMode === mode}
               onClick={() => setView(mode)}
-              className={`rounded px-2 py-0.5 text-[10px] font-medium capitalize ${
-                filterState.viewMode === mode
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              className={`rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ${
+                filterState.viewMode === mode ? "bg-[var(--accent)] text-white" : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              {mode === "combined" ? "Combined" : mode}
+              {mode}
             </button>
           ))}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filterState.viewMode === "combined"}
+            onClick={() => setView("combined")}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+              filterState.viewMode === "combined" ? "bg-[var(--accent)] text-white" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Map+
+          </button>
         </div>
-      </div>
-      {/* Row 2: Search bar */}
-      <div className={`flex items-center gap-1.5 ${opsMode ? "mt-0.5" : "mt-1"}`}>
-        <input
-          type="search"
-          placeholder="Search work orders by #, title…"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && applySearch()}
-          className="ui-input h-8 min-h-0 flex-1 min-w-0 rounded-[var(--radius-control)] py-0 text-[11px]"
-        />
-        <button
-          type="button"
-          onClick={applySearch}
-          className="shrink-0 rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
-        >
-          Search
-        </button>
-      </div>
-      {/* Row 3: Inline dropdown filters — compact toolbar strip */}
-      <div
-        className={`flex flex-wrap items-center rounded-[var(--radius-control)] border border-[var(--card-border)]/80 bg-[var(--background)]/60 ${
-          opsMode ? "mt-0.5 gap-x-1.5 gap-y-1 px-1.5 py-1" : "mt-1 gap-x-2 gap-y-1.5 px-2 py-1.5"
-        }`}
-      >
-        <select
-          value={filterState.companyId}
-          onChange={(e) => patchState({ companyId: e.target.value })}
-          className={selectBase}
-          title="Company"
-        >
-          <option value="">Company</option>
-          {filterOptions.companies.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.propertyId}
-          onChange={(e) => patchState({ propertyId: e.target.value })}
-          className={selectBase}
-          title="Property"
-        >
-          <option value="">Property</option>
-          {propertyOptions.map((p) => (
-            <option key={p.id} value={p.id}>{p.property_name ?? p.name ?? p.id}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.buildingId}
-          onChange={(e) => patchState({ buildingId: e.target.value })}
-          className={selectBase}
-          title="Building"
-        >
-          <option value="">Building</option>
-          {buildingOptions.map((b) => (
-            <option key={b.id} value={b.id}>{b.building_name ?? b.name ?? b.id}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.assetId}
-          onChange={(e) => patchState({ assetId: e.target.value })}
-          className={selectBase}
-          title="Asset"
-        >
-          <option value="">Asset</option>
-          {filterOptions.assets.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.priority}
-          onChange={(e) => patchState({ priority: e.target.value })}
-          className={selectBase}
-          title="Priority"
-        >
-          <option value="">Priority</option>
-          {filterOptions.priorities.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.status}
-          onChange={(e) => patchState({ status: e.target.value })}
-          className={selectBase}
-          title="Status"
-        >
-          <option value="">Status</option>
-          {filterOptions.statuses.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.technicianId}
-          onChange={(e) => patchState({ technicianId: e.target.value })}
-          className={`${selectBase} max-w-[7.5rem]`}
-          title="Technician"
-        >
-          <option value="">Technician</option>
-          {filterOptions.technicians.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.crewId}
-          onChange={(e) => patchState({ crewId: e.target.value })}
-          className={selectBase}
-          title="Crew"
-        >
-          <option value="">Crew</option>
-          {filterOptions.crews.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <select
-          value={filterState.assignmentType}
-          onChange={(e) => patchState({ assignmentType: e.target.value })}
-          className={selectBase}
-          title="Assignment type"
-        >
-          <option value="">Assignment</option>
-          {filterOptions.assignmentTypes.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <span className="mx-0.5 shrink-0 border-l border-[var(--card-border)]" aria-hidden />
-        <span className="rounded border border-red-200/80 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700">O: {insights.overdue}</span>
-        <span className="rounded border border-emerald-200/80 bg-emerald-50/80 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">R: {insights.ready}</span>
-        <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">U: {insights.unscheduled}</span>
-        <span className="rounded border border-blue-200/80 bg-blue-50/80 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">Today: {insights.scheduledToday}</span>
-        {hasActiveFilters(filterState) ? (
-          <Button variant="secondary" size="sm" className="h-6 shrink-0 px-2 text-[10px]" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        ) : null}
+        {/* Center: Search */}
+        <div className="flex min-w-0 flex-1 items-center gap-1 sm:min-w-[160px]">
+          <input
+            type="search"
+            placeholder="Search work orders…"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && applySearch()}
+            className="ui-input h-7 min-h-0 w-full min-w-0 max-w-[200px] rounded py-0 text-[11px]"
+          />
+          <button
+            type="button"
+            onClick={applySearch}
+            className="shrink-0 rounded border border-[var(--card-border)] bg-white px-2 py-1 text-[10px] font-medium hover:bg-[var(--background)]"
+          >
+            Search
+          </button>
+        </div>
+        {/* Right: Filters — inline on lg, dropdown on small */}
+        <div className="flex items-center gap-1.5">
+          <div className="hidden flex-wrap items-center gap-x-1.5 gap-y-1 lg:flex">
+            {filterSelects}
+          </div>
+          <div className="relative lg:hidden" ref={filtersRef}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[10px]"
+              onClick={(e) => { e.stopPropagation(); setFiltersOpen((o) => !o); }}
+              aria-expanded={filtersOpen}
+            >
+              <Filter className="size-3" />
+              Filters
+              {hasActiveFilters(filterState) ? " •" : ""}
+            </Button>
+            {filtersOpen && (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 w-[280px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-2 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="grid grid-cols-1 gap-2">
+                  {filterSelects}
+                </div>
+                {hasActiveFilters(filterState) && (
+                  <Button variant="secondary" size="sm" className="mt-2 h-6 w-full text-[10px]" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+          {hasActiveFilters(filterState) && (
+            <Button variant="secondary" size="sm" className="hidden h-6 shrink-0 px-2 text-[10px] lg:inline-flex" onClick={clearFilters}>
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
