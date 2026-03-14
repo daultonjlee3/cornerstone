@@ -147,7 +147,7 @@ export function RequestsList({ requests }: { requests: WorkRequestListItem[] }) 
             </select>
           </label>
         </div>
-        <Link href="/request">
+        <Link href="/requests/submit">
           <Button>+ New Request</Button>
         </Link>
       </div>

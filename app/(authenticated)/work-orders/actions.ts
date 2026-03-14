@@ -14,7 +14,12 @@ import {
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
 
-export type WorkOrderFormState = { error?: string; success?: boolean };
+export type WorkOrderFormState = {
+  error?: string;
+  success?: boolean;
+  workOrderId?: string;
+  workOrderNumber?: string;
+};
 
 const LEGACY_STATUS_MAP: Record<string, string> = {
   open: "new",
@@ -465,13 +470,15 @@ function isImageMimeType(mimeType: string): boolean {
   return mimeType.toLowerCase().startsWith("image/");
 }
 
+export type SaveWorkOrderOptions = {
+  portalContext: { tenantId: string; companyId: string };
+};
+
 export async function saveWorkOrder(
   _prev: WorkOrderFormState,
-  formData: FormData
+  formData: FormData,
+  options?: SaveWorkOrderOptions
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const id = (formData.get("id") as string)?.trim() || null;
   const companyId = (formData.get("company_id") as string)?.trim();
   const title = (formData.get("title") as string)?.trim();
@@ -479,8 +486,19 @@ export async function saveWorkOrder(
   if (!title) return { error: "Title is required." };
   if (!companyId) return { error: "Company is required." };
 
-  const allowed = await companyBelongsToTenant(companyId, tenantId);
-  if (!allowed) return { error: "Invalid company." };
+  let tenantId: string;
+  if (options?.portalContext) {
+    tenantId = options.portalContext.tenantId;
+    if (companyId !== options.portalContext.companyId) return { error: "Invalid company." };
+    const allowed = await companyBelongsToTenant(companyId, tenantId);
+    if (!allowed) return { error: "Invalid company." };
+  } else {
+    const resolvedTenantId = await getTenantId();
+    if (!resolvedTenantId) return { error: "Unauthorized." };
+    tenantId = resolvedTenantId;
+    const allowed = await companyBelongsToTenant(companyId, tenantId);
+    if (!allowed) return { error: "Invalid company." };
+  }
 
   const propertyId = (formData.get("property_id") as string)?.trim() || null;
   const buildingId = (formData.get("building_id") as string)?.trim() || null;
@@ -610,7 +628,7 @@ export async function saveWorkOrder(
   const estimatedTechniciansRaw = (formData.get("estimated_technicians") as string)?.trim();
   const nteAmountRaw = (formData.get("nte_amount") as string)?.trim();
   const billable = formData.get("billable") !== null && formData.get("billable") !== "off";
-  const actorId = await getActorId(supabase);
+  const actorId = options?.portalContext ? null : await getActorId(supabase);
 
   const assignmentValidationError = await validateAssignmentTargets(supabase, {
     tenantId,
@@ -655,6 +673,9 @@ export async function saveWorkOrder(
     payload.request_id = requestId;
   }
   payload.created_by_user_id = actorId;
+  if (options?.portalContext) {
+    payload.source_type = "portal";
+  }
 
   const scheduleExists = Boolean(
     payload.scheduled_date || payload.scheduled_start || payload.scheduled_end
@@ -824,6 +845,13 @@ export async function saveWorkOrder(
         metadata: { source: "saveWorkOrder", inherited: true },
       });
     }
+    revalidatePath("/work-orders");
+    revalidatePath("/dispatch");
+    return {
+      success: true,
+      workOrderId: (inserted as { id: string }).id,
+      workOrderNumber: (inserted as { work_order_number?: string }).work_order_number ?? undefined,
+    };
   }
   revalidatePath("/work-orders");
   revalidatePath("/dispatch");

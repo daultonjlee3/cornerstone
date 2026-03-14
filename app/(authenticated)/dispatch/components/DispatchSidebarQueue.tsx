@@ -51,6 +51,7 @@ export function DispatchSidebarQueue({
   isDraggingWorkOrder,
   onToggleCollapse,
   onOpenWorkOrder,
+  selectedWorkOrderId,
 }: DispatchSidebarQueueProps) {
   const [mounted, setMounted] = useState(false);
   const [overdueSectionCollapsed, setOverdueSectionCollapsed] = useState(false);

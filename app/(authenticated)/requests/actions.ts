@@ -187,7 +187,7 @@ export async function submitWorkRequest(
     // Notification delivery is best-effort and must not block request submission.
   }
 
-  revalidatePath("/request");
+  revalidatePath("/requests/submit");
   revalidatePath("/requests");
   return { success: true, requestId };
 }
@@ -396,7 +396,7 @@ export async function convertWorkRequestToWorkOrder(
   });
 
   revalidatePath("/requests");
-  revalidatePath("/request");
+  revalidatePath("/requests/submit");
   revalidatePath("/work-orders");
   revalidatePath(`/work-orders/${workOrderId}`);
   revalidatePath("/dispatch");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { submitWorkRequest, type WorkRequestActionState } from "../../requests/actions";
+import { submitWorkRequest, type WorkRequestActionState } from "../../actions";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 
