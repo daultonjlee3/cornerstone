@@ -22,6 +22,10 @@ export type AssetRow = Asset & {
   building_name?: string;
   unit_name?: string;
   company_name?: string;
+  parent_asset_name?: string | null;
+  parent_asset_id?: string | null;
+  is_parent_asset?: boolean;
+  child_count?: number;
   asset_type?: string | null;
   condition?: string | null;
   health_score?: number | null;
@@ -36,6 +40,7 @@ type FilterParams = {
   condition: string;
   status: string;
   health_status: string;
+  hierarchy: string;
 };
 
 type StatusOption = { value: string; label: string };
@@ -74,6 +79,7 @@ type AssetsListProps = {
     saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
   } | null;
   workOrderFormData?: WorkOrderFormData | null;
+  parentCandidates: { id: string; name: string; company_id: string; parent_asset_id: string | null }[];
 };
 
 function assetDisplayName(a: AssetRow): string {
@@ -138,6 +144,7 @@ export function AssetsList({
   workOrderFormData,
   pmPlanCount = 0,
   pmModalData = null,
+  parentCandidates,
 }: AssetsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -385,13 +392,28 @@ export function AssetsList({
               <option value="critical">Critical</option>
             </select>
           </div>
+          <div className="w-40">
+            <label htmlFor="assets-hierarchy" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Hierarchy
+            </label>
+            <select
+              id="assets-hierarchy"
+              value={filterParams.hierarchy}
+              onChange={(e) => applyFilters({ hierarchy: e.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            >
+              <option value="">All assets</option>
+              <option value="parents">Parent assets only</option>
+              <option value="sub_assets">Sub-assets only</option>
+            </select>
+          </div>
           <button
             type="submit"
             className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             Search
           </button>
-          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status) && (
+          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy) && (
             <button
               type="button"
               onClick={() =>
@@ -403,6 +425,7 @@ export function AssetsList({
                   condition: "",
                   status: "",
                   health_status: "",
+                  hierarchy: "",
                 })
               }
               className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
@@ -415,7 +438,7 @@ export function AssetsList({
 
       {initialAssets.length === 0 ? (
         <div className="space-y-4">
-          {!filterParams.q && !filterParams.company_id && !filterParams.property_id && !filterParams.type && !filterParams.condition && !filterParams.status && !filterParams.health_status && (
+          {!filterParams.q && !filterParams.company_id && !filterParams.property_id && !filterParams.type && !filterParams.condition && !filterParams.status && !filterParams.health_status && !filterParams.hierarchy && (
             <Hint
               id="assets-no-assets"
               variant="empty-state"
@@ -424,7 +447,7 @@ export function AssetsList({
           )}
           <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
             <p className="text-[var(--muted)]">
-              {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status
+              {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy
                 ? "No assets match your filters."
                 : "No assets yet."}
             </p>
@@ -440,11 +463,12 @@ export function AssetsList({
       ) : (
         <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm" data-tour="assets:asset-detail">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
+            <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
                   <th className="px-4 py-3 font-semibold">Asset</th>
                   <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Hierarchy</th>
                   <th className="px-4 py-3 font-semibold">Health</th>
                   <th className="px-4 py-3 font-semibold">Property</th>
                   <th className="px-4 py-3 font-semibold">Building</th>
@@ -463,14 +487,37 @@ export function AssetsList({
                     className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >
                     <td className="px-4 py-3.5 text-[var(--foreground)]">
-                      <Link
-                        href={`/assets/${a.id}`}
-                        className="font-medium text-[var(--accent)] hover:underline"
-                      >
-                        {assetDisplayName(a)}
-                      </Link>
+                      <div>
+                        <Link
+                          href={`/assets/${a.id}`}
+                          className="font-medium text-[var(--accent)] hover:underline"
+                        >
+                          {assetDisplayName(a)}
+                        </Link>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {(a.child_count ?? 0) > 0 ? (
+                            <span className="inline-flex rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                              Parent
+                            </span>
+                          ) : null}
+                          {a.parent_asset_id ? (
+                            <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300">
+                              Sub-asset
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{typeDisplay(a)}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
+                      {a.parent_asset_id && a.parent_asset_name ? (
+                        <span>Child of {a.parent_asset_name}</span>
+                      ) : (a.child_count ?? 0) > 0 ? (
+                        <span>{a.child_count} sub-assets</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-4 py-3.5">
                       {a.health_score != null ? (
                         <div className="space-y-1">
@@ -600,6 +647,7 @@ export function AssetsList({
         properties={properties}
         buildings={buildings}
         units={units}
+        parentCandidates={parentCandidates}
         saveAction={saveAction}
       />
 

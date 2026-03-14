@@ -6,6 +6,7 @@ import { AssetIntelligencePanel } from "../components/asset-intelligence-panel";
 import { AssetTimeline } from "../components/asset-timeline";
 import { AssetDetailHelperTip } from "../components/asset-detail-helper-tip";
 import { getAssetIntelligenceSnapshot } from "@/src/lib/assets/assetIntelligenceService";
+import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
 
 export const metadata = {
@@ -59,7 +60,7 @@ export default async function AssetDetailPage({
   const { data: assetRaw, error } = await supabase
     .from("assets")
     .select(
-      "id, tenant_id, company_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months, health_score, failure_risk, last_health_calculation, warranty_expires, description, location_notes, notes, last_serviced_at, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+      "id, tenant_id, company_id, parent_asset_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months, health_score, failure_risk, last_health_calculation, warranty_expires, description, location_notes, notes, last_serviced_at, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -76,6 +77,7 @@ export default async function AssetDetailPage({
   const asset = {
     id: row.id as string,
     company_id: row.company_id as string,
+    parent_asset_id: (row.parent_asset_id as string | null) ?? null,
     property_id: (row.property_id as string | null) ?? null,
     building_id: (row.building_id as string | null) ?? null,
     unit_id: (row.unit_id as string | null) ?? null,
@@ -126,6 +128,128 @@ export default async function AssetDetailPage({
           null)
         : null,
   };
+  const resolvedLocation = await resolveAssetLocation(supabase, id);
+  const effectivePropertyId = resolvedLocation?.effectivePropertyId ?? asset.property_id;
+  const effectiveBuildingId = resolvedLocation?.effectiveBuildingId ?? asset.building_id;
+  const effectiveUnitId = resolvedLocation?.effectiveUnitId ?? asset.unit_id;
+  const [fallbackProperty, fallbackBuilding, fallbackUnit] = await Promise.all([
+    effectivePropertyId && effectivePropertyId !== asset.property_id
+      ? supabase
+          .from("properties")
+          .select("property_name, name")
+          .eq("id", effectivePropertyId)
+          .maybeSingle()
+      : Promise.resolve({ data: null as Record<string, unknown> | null }),
+    effectiveBuildingId && effectiveBuildingId !== asset.building_id
+      ? supabase
+          .from("buildings")
+          .select("building_name, name")
+          .eq("id", effectiveBuildingId)
+          .maybeSingle()
+      : Promise.resolve({ data: null as Record<string, unknown> | null }),
+    effectiveUnitId && effectiveUnitId !== asset.unit_id
+      ? supabase
+          .from("units")
+          .select("unit_name, name_or_number")
+          .eq("id", effectiveUnitId)
+          .maybeSingle()
+      : Promise.resolve({ data: null as Record<string, unknown> | null }),
+  ]);
+  const effectivePropertyName =
+    asset.property_name ??
+    ((fallbackProperty.data as { property_name?: string; name?: string } | null)?.property_name ??
+      (fallbackProperty.data as { property_name?: string; name?: string } | null)?.name ??
+      null);
+  const effectiveBuildingName =
+    asset.building_name ??
+    ((fallbackBuilding.data as { building_name?: string; name?: string } | null)?.building_name ??
+      (fallbackBuilding.data as { building_name?: string; name?: string } | null)?.name ??
+      null);
+  const effectiveUnitName =
+    asset.unit_name ??
+    ((fallbackUnit.data as { unit_name?: string; name_or_number?: string } | null)?.unit_name ??
+      (fallbackUnit.data as { unit_name?: string; name_or_number?: string } | null)?.name_or_number ??
+      null);
+  const locationIsInherited =
+    Boolean(resolvedLocation?.inheritedFromParent) &&
+    (!asset.property_id || !asset.building_id || !asset.unit_id);
+
+  const parentAssetId = asset.parent_asset_id;
+  const { data: parentAssetRaw } = parentAssetId
+    ? await supabase
+        .from("assets")
+        .select("id, asset_name, name, asset_type, category, status")
+        .eq("id", parentAssetId)
+        .maybeSingle()
+    : { data: null as Record<string, unknown> | null };
+  const parentAsset = parentAssetRaw
+    ? ({
+        id: (parentAssetRaw as { id: string }).id,
+        name:
+          (parentAssetRaw as { asset_name?: string | null }).asset_name ??
+          (parentAssetRaw as { name?: string | null }).name ??
+          (parentAssetRaw as { id: string }).id,
+        type:
+          (parentAssetRaw as { asset_type?: string | null }).asset_type ??
+          (parentAssetRaw as { category?: string | null }).category ??
+          null,
+        status: (parentAssetRaw as { status?: string | null }).status ?? "active",
+      })
+    : null;
+
+  const { data: childAssetsRaw } = await supabase
+    .from("assets")
+    .select("id, asset_name, name, asset_type, category, status, serial_number")
+    .eq("parent_asset_id", id)
+    .order("asset_name", { ascending: true, nullsFirst: false })
+    .order("name");
+  const childAssets = (childAssetsRaw ?? []).map((childRow) => {
+    const child = childRow as Record<string, unknown>;
+    return {
+      id: child.id as string,
+      name:
+        (child.asset_name as string | null) ??
+        (child.name as string | null) ??
+        (child.id as string),
+      type: (child.asset_type as string | null) ?? (child.category as string | null) ?? null,
+      status: (child.status as string | null) ?? "active",
+      serial_number: (child.serial_number as string | null) ?? null,
+    };
+  });
+  const childAssetIds = childAssets.map((child) => child.id);
+  const childAssetNameById = new Map(childAssets.map((child) => [child.id, child.name]));
+  const activeChildCount = childAssets.filter((child) => child.status === "active").length;
+  const { data: recentChildWorkOrdersRaw } = childAssetIds.length
+    ? await supabase
+        .from("work_orders")
+        .select("id, asset_id, work_order_number, title, status, priority, created_at, category")
+        .in("asset_id", childAssetIds)
+        .order("created_at", { ascending: false })
+        .limit(5)
+    : { data: [] as unknown[] };
+  const recentChildWorkOrders = (recentChildWorkOrdersRaw ?? []).map((row) => {
+    const wo = row as Record<string, unknown>;
+    const childAssetId = (wo.asset_id as string | null) ?? null;
+    return {
+      id: wo.id as string,
+      assetName: childAssetId ? childAssetNameById.get(childAssetId) ?? "Sub-asset" : "Sub-asset",
+      workOrderNumber: (wo.work_order_number as string | null) ?? null,
+      title: (wo.title as string | null) ?? "Work order",
+      status: (wo.status as string | null) ?? "new",
+      priority: (wo.priority as string | null) ?? null,
+      createdAt: (wo.created_at as string | null) ?? null,
+    };
+  });
+  const childIssueCutoff = new Date();
+  childIssueCutoff.setDate(childIssueCutoff.getDate() - 30);
+  const { count: recentChildIssueCount } = childAssetIds.length
+    ? await supabase
+        .from("work_orders")
+        .select("id", { count: "exact", head: true })
+        .in("asset_id", childAssetIds)
+        .gte("created_at", childIssueCutoff.toISOString())
+        .in("category", ["repair", "emergency"])
+    : { count: 0 };
 
   const { data: plansRaw } = await supabase
     .from("preventive_maintenance_plans")
@@ -339,9 +463,10 @@ export default async function AssetDetailPage({
             <h1 className="text-2xl font-semibold text-[var(--foreground)]">{asset.name}</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">
               {asset.company_name ?? "—"} •{" "}
-              {[asset.property_name, asset.building_name, asset.unit_name]
+              {[effectivePropertyName, effectiveBuildingName, effectiveUnitName]
                 .filter(Boolean)
                 .join(" / ") || "No linked location"}
+              {locationIsInherited ? " (inherited from parent)" : ""}
             </p>
           </div>
           <div className="text-right">
@@ -362,6 +487,70 @@ export default async function AssetDetailPage({
           </div>
         </div>
       </header>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <section className="ui-card p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+            Parent Asset
+          </h2>
+          {parentAsset ? (
+            <div className="mt-3 space-y-1">
+              <Link href={`/assets/${parentAsset.id}`} className="text-sm font-medium text-[var(--accent)] hover:underline">
+                {parentAsset.name}
+              </Link>
+              <p className="text-xs text-[var(--muted)]">
+                {[parentAsset.type, parentAsset.status].filter(Boolean).join(" • ")}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              This is a top-level asset.
+            </p>
+          )}
+        </section>
+        <section className="ui-card p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              Sub-Assets
+            </h2>
+            <span className="text-xs text-[var(--muted)]">
+              {childAssets.length} total • {activeChildCount} active
+            </span>
+          </div>
+          {childAssets.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">No sub-assets linked.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--card-border)]">
+                    <th className="px-2 py-2 font-medium text-[var(--foreground)]">Name</th>
+                    <th className="px-2 py-2 font-medium text-[var(--foreground)]">Type</th>
+                    <th className="px-2 py-2 font-medium text-[var(--foreground)]">Status</th>
+                    <th className="px-2 py-2 font-medium text-[var(--foreground)]">Serial</th>
+                    <th className="px-2 py-2 font-medium text-[var(--foreground)]">Link</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {childAssets.map((child) => (
+                    <tr key={child.id} className="border-b border-[var(--card-border)] last:border-0">
+                      <td className="px-2 py-2 text-[var(--foreground)]">{child.name}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{child.type ?? "—"}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{child.status}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{child.serial_number ?? "—"}</td>
+                      <td className="px-2 py-2">
+                        <Link href={`/assets/${child.id}`} className="text-[var(--accent)] hover:underline">
+                          Open
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <AssetHealthIndicator
@@ -405,6 +594,41 @@ export default async function AssetDetailPage({
       />
 
       <AssetTimeline events={intelligence.timeline} />
+
+      {childAssets.length > 0 ? (
+        <section className="ui-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              Child Asset Rollup
+            </h2>
+            <p className="text-xs text-[var(--muted)]">
+              Recent child issues (30d): {recentChildIssueCount ?? 0}
+            </p>
+          </div>
+          {recentChildWorkOrders.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              No recent child work orders.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {recentChildWorkOrders.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-[var(--background)]/60 px-3 py-2 text-sm"
+                >
+                  <Link href={`/work-orders/${entry.id}`} className="font-medium text-[var(--accent)] hover:underline">
+                    {entry.workOrderNumber ?? entry.title}
+                  </Link>
+                  <p className="text-xs text-[var(--muted)]">
+                    {entry.assetName} • {entry.status}
+                    {entry.priority ? ` • ${entry.priority}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">

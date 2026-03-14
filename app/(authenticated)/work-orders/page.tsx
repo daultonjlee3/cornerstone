@@ -83,10 +83,59 @@ export default async function WorkOrdersPage({
 
   const { data: assetsData } = await supabase
     .from("assets")
-    .select("id, asset_name, name, company_id, property_id, building_id, unit_id")
+    .select("id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id")
     .in("company_id", companyIds)
     .order("asset_name")
     .order("name");
+  const assetHierarchyRows = (assetsData ?? []) as Array<{
+    id: string;
+    asset_name: string | null;
+    name: string | null;
+    company_id: string;
+    parent_asset_id: string | null;
+    property_id: string | null;
+    building_id: string | null;
+    unit_id: string | null;
+  }>;
+  const assetHierarchyById = new Map(assetHierarchyRows.map((row) => [row.id, row]));
+  const effectiveAssetLocationById = new Map<
+    string,
+    { property_id: string | null; building_id: string | null; unit_id: string | null }
+  >();
+  const resolveEffectiveAssetLocation = (
+    assetId: string,
+    visited: Set<string> = new Set()
+  ): { property_id: string | null; building_id: string | null; unit_id: string | null } => {
+    const cached = effectiveAssetLocationById.get(assetId);
+    if (cached) return cached;
+    const row = assetHierarchyById.get(assetId);
+    if (!row) {
+      return { property_id: null, building_id: null, unit_id: null };
+    }
+    if (visited.has(assetId)) {
+      const fallback = {
+        property_id: row.property_id,
+        building_id: row.building_id,
+        unit_id: row.unit_id,
+      };
+      effectiveAssetLocationById.set(assetId, fallback);
+      return fallback;
+    }
+    visited.add(assetId);
+    const parentLocation = row.parent_asset_id
+      ? resolveEffectiveAssetLocation(row.parent_asset_id, visited)
+      : { property_id: null, building_id: null, unit_id: null };
+    const resolved = {
+      property_id: row.property_id ?? parentLocation.property_id ?? null,
+      building_id: row.building_id ?? parentLocation.building_id ?? null,
+      unit_id: row.unit_id ?? parentLocation.unit_id ?? null,
+    };
+    effectiveAssetLocationById.set(assetId, resolved);
+    return resolved;
+  };
+  for (const row of assetHierarchyRows) {
+    resolveEffectiveAssetLocation(row.id);
+  }
 
   const { data: techniciansData } = await supabase
     .from("technicians")
@@ -147,14 +196,21 @@ export default async function WorkOrdersPage({
     name: (u as { unit_name?: string }).unit_name ?? (u as { name_or_number?: string }).name_or_number ?? u.id,
     building_id: (u as { building_id: string }).building_id,
   }));
-  const assetOptions = (assetsData ?? []).map((a) => ({
-    id: a.id,
-    name: (a as { asset_name?: string }).asset_name ?? (a as { name?: string }).name ?? a.id,
-    company_id: (a as { company_id: string }).company_id,
-    property_id: (a as { property_id?: string }).property_id ?? null,
-    building_id: (a as { building_id?: string }).building_id ?? null,
-    unit_id: (a as { unit_id?: string }).unit_id ?? null,
-  }));
+  const assetOptions = assetHierarchyRows.map((asset) => {
+    const effectiveLocation = effectiveAssetLocationById.get(asset.id) ?? {
+      property_id: null,
+      building_id: null,
+      unit_id: null,
+    };
+    return {
+      id: asset.id,
+      name: asset.asset_name ?? asset.name ?? asset.id,
+      company_id: asset.company_id,
+      property_id: effectiveLocation.property_id,
+      building_id: effectiveLocation.building_id,
+      unit_id: effectiveLocation.unit_id,
+    };
+  });
 
   const newParam = resolvedSearchParams?.new;
   const wantNew = newParam === "1" || newParam === "true";

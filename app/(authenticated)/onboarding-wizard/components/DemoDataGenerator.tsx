@@ -18,8 +18,8 @@ export function DemoDataGenerator({ action }: DemoDataGeneratorProps) {
           Generate Sample Demo Data
         </h3>
         <p className="text-sm text-[var(--muted)]">
-          Creates 3 properties, 6 buildings, 30 assets, 5 technicians, 20 work orders, and 10
-          inventory items with realistic maintenance examples.
+          Creates 3 properties, 6 buildings, baseline assets plus sub-asset hierarchies, 5
+          technicians, 20 work orders, and 10 inventory items with realistic maintenance examples.
         </p>
       </div>
 

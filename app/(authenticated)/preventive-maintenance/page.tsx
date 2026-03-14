@@ -91,13 +91,12 @@ export default async function PreventiveMaintenancePage({
   const { data: assetsData } = await supabase
     .from("assets")
     .select(
-      "id, company_id, property_id, building_id, unit_id, asset_name, name, properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+      "id, company_id, parent_asset_id, property_id, building_id, unit_id, asset_name, name, properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
     )
     .in("company_id", companyIds)
     .order("asset_name")
     .order("name");
-
-  const assets = (assetsData ?? []).map((asset) => {
+  const assetHierarchyRows = (assetsData ?? []).map((asset) => {
     const row = asset as Record<string, unknown>;
     const propertyData = Array.isArray(row.properties) ? row.properties[0] : row.properties;
     const buildingData = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
@@ -105,6 +104,7 @@ export default async function PreventiveMaintenancePage({
     return {
       id: row.id as string,
       company_id: row.company_id as string,
+      parent_asset_id: (row.parent_asset_id as string | null) ?? null,
       property_id: (row.property_id as string | null) ?? null,
       building_id: (row.building_id as string | null) ?? null,
       unit_id: (row.unit_id as string | null) ?? null,
@@ -130,6 +130,89 @@ export default async function PreventiveMaintenancePage({
             (unitData as { name_or_number?: string }).name_or_number ??
             null)
           : null,
+    };
+  });
+  const assetHierarchyById = new Map(assetHierarchyRows.map((row) => [row.id, row]));
+  const propertyNameById = new Map(
+    assetHierarchyRows
+      .filter((row) => row.property_id && row.property_name)
+      .map((row) => [row.property_id as string, row.property_name as string])
+  );
+  const buildingNameById = new Map(
+    assetHierarchyRows
+      .filter((row) => row.building_id && row.building_name)
+      .map((row) => [row.building_id as string, row.building_name as string])
+  );
+  const unitNameById = new Map(
+    assetHierarchyRows
+      .filter((row) => row.unit_id && row.unit_name)
+      .map((row) => [row.unit_id as string, row.unit_name as string])
+  );
+  const effectiveLocationByAssetId = new Map<
+    string,
+    { property_id: string | null; building_id: string | null; unit_id: string | null }
+  >();
+  const resolveEffectiveLocation = (
+    assetId: string,
+    visited: Set<string> = new Set()
+  ): { property_id: string | null; building_id: string | null; unit_id: string | null } => {
+    const cached = effectiveLocationByAssetId.get(assetId);
+    if (cached) return cached;
+    const row = assetHierarchyById.get(assetId);
+    if (!row) return { property_id: null, building_id: null, unit_id: null };
+    if (visited.has(assetId)) {
+      const fallback = {
+        property_id: row.property_id,
+        building_id: row.building_id,
+        unit_id: row.unit_id,
+      };
+      effectiveLocationByAssetId.set(assetId, fallback);
+      return fallback;
+    }
+    visited.add(assetId);
+    const parentLocation = row.parent_asset_id
+      ? resolveEffectiveLocation(row.parent_asset_id, visited)
+      : { property_id: null, building_id: null, unit_id: null };
+    const resolved = {
+      property_id: row.property_id ?? parentLocation.property_id ?? null,
+      building_id: row.building_id ?? parentLocation.building_id ?? null,
+      unit_id: row.unit_id ?? parentLocation.unit_id ?? null,
+    };
+    effectiveLocationByAssetId.set(assetId, resolved);
+    return resolved;
+  };
+  for (const row of assetHierarchyRows) {
+    resolveEffectiveLocation(row.id);
+  }
+
+  const assets = assetHierarchyRows.map((row) => {
+    const effectiveLocation = effectiveLocationByAssetId.get(row.id) ?? {
+      property_id: null,
+      building_id: null,
+      unit_id: null,
+    };
+    return {
+      id: row.id,
+      company_id: row.company_id,
+      property_id: effectiveLocation.property_id,
+      building_id: effectiveLocation.building_id,
+      unit_id: effectiveLocation.unit_id,
+      name: row.name,
+      property_name:
+        row.property_name ??
+        (effectiveLocation.property_id
+          ? propertyNameById.get(effectiveLocation.property_id) ?? null
+          : null),
+      building_name:
+        row.building_name ??
+        (effectiveLocation.building_id
+          ? buildingNameById.get(effectiveLocation.building_id) ?? null
+          : null),
+      unit_name:
+        row.unit_name ??
+        (effectiveLocation.unit_id
+          ? unitNameById.get(effectiveLocation.unit_id) ?? null
+          : null),
     };
   });
 

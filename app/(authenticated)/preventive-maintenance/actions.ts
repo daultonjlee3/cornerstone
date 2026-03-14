@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import {
   calculateNextRunDate,
   calculateNextRunDateAfterExecution,
@@ -98,20 +99,17 @@ async function loadAssetContext(assetId: string): Promise<{
   name: string | null;
 } | null> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("assets")
-    .select("id, company_id, property_id, building_id, unit_id, asset_name, name")
-    .eq("id", assetId)
-    .maybeSingle();
-  return (data as {
-    id: string;
-    company_id: string;
-    property_id: string | null;
-    building_id: string | null;
-    unit_id: string | null;
-    asset_name: string | null;
-    name: string | null;
-  } | null) ?? null;
+  const resolved = await resolveAssetLocation(supabase, assetId);
+  if (!resolved) return null;
+  return {
+    id: resolved.asset.id,
+    company_id: resolved.asset.company_id,
+    property_id: resolved.effectivePropertyId,
+    building_id: resolved.effectiveBuildingId,
+    unit_id: resolved.effectiveUnitId,
+    asset_name: resolved.asset.asset_name,
+    name: resolved.asset.name,
+  };
 }
 
 function parseFrequencyType(input: string | null | undefined): PreventiveMaintenanceFrequencyType | null {

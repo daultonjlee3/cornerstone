@@ -3,6 +3,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
+import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { createNotification } from "@/src/lib/notifications/service";
 import { createTenantNotification, sendEmailAlert } from "@/src/lib/notifications";
@@ -548,23 +549,33 @@ export async function saveWorkOrder(
   let resolvedBuildingId = buildingId;
   let resolvedUnitId = unitId;
   if (assetId) {
-    const { data: ast } = await supabase
-      .from("assets")
-      .select("id, company_id, property_id, building_id, unit_id")
-      .eq("id", assetId)
-      .maybeSingle();
-    if (!ast) return { error: "Selected asset was not found." };
-    if (ast.company_id !== companyId) return { error: "Selected asset does not belong to the selected company." };
-    if (propertyId && ast.property_id !== null && ast.property_id !== propertyId)
+    const resolvedAsset = await resolveAssetLocation(supabase, assetId);
+    if (!resolvedAsset) return { error: "Selected asset was not found." };
+    if (resolvedAsset.asset.company_id !== companyId) {
+      return { error: "Selected asset does not belong to the selected company." };
+    }
+    if (
+      propertyId &&
+      resolvedAsset.effectivePropertyId !== null &&
+      resolvedAsset.effectivePropertyId !== propertyId
+    )
       return { error: "Selected asset does not match the selected property." };
-    if (buildingId && ast.building_id !== null && ast.building_id !== buildingId)
+    if (
+      buildingId &&
+      resolvedAsset.effectiveBuildingId !== null &&
+      resolvedAsset.effectiveBuildingId !== buildingId
+    )
       return { error: "Selected asset does not match the selected building." };
-    if (unitId && ast.unit_id !== null && ast.unit_id !== unitId)
+    if (
+      unitId &&
+      resolvedAsset.effectiveUnitId !== null &&
+      resolvedAsset.effectiveUnitId !== unitId
+    )
       return { error: "Selected asset does not match the selected unit." };
     // Inherit location from asset when form did not set property/building/unit
-    resolvedPropertyId = resolvedPropertyId || (ast.property_id ?? null);
-    resolvedBuildingId = resolvedBuildingId || (ast.building_id ?? null);
-    resolvedUnitId = resolvedUnitId || (ast.unit_id ?? null);
+    resolvedPropertyId = resolvedPropertyId || (resolvedAsset.effectivePropertyId ?? null);
+    resolvedBuildingId = resolvedBuildingId || (resolvedAsset.effectiveBuildingId ?? null);
+    resolvedUnitId = resolvedUnitId || (resolvedAsset.effectiveUnitId ?? null);
   }
   // Inherit building_id and property_id from unit when unit is selected but those are missing
   if (resolvedUnitId && (!resolvedBuildingId || !resolvedPropertyId)) {

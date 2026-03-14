@@ -301,17 +301,29 @@ export async function getAssetTimeline(
   for (const row of assetLogRows.data ?? []) {
     const log = row as Record<string, unknown>;
     const actionType = (log.action_type as string | null) ?? "asset_update";
-    if (!["asset_created", "asset_edited", "asset_health_recalculated"].includes(actionType)) {
+    if (
+      ![
+        "asset_created",
+        "asset_edited",
+        "asset_health_recalculated",
+        "asset_sub_asset_linked",
+        "asset_sub_asset_moved",
+        "asset_sub_asset_unlinked",
+      ].includes(actionType)
+    ) {
       continue;
     }
+    const metadata = (log.metadata as Record<string, unknown> | null) ?? null;
     events.push({
       id: `activity-${log.id as string}`,
       eventAt: (log.performed_at as string | null) ?? new Date().toISOString(),
       eventType: actionType,
       source: "activity_log",
-      summary: `Asset ${actionType.replace(/_/g, " ")}.`,
+      summary:
+        (metadata?.message as string | undefined) ??
+        `Asset ${actionType.replace(/_/g, " ")}.`,
       details:
-        ((log.metadata as Record<string, unknown> | null)?.recommendation as string | undefined) ??
+        (metadata?.recommendation as string | undefined) ??
         null,
       technicianName: null,
       technicianId: null,

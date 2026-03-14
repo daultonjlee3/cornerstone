@@ -534,6 +534,148 @@ export async function generateDemoDataAction(
 
   try {
     const importSummary = await performAssetImport(scope, demoRows);
+    const hierarchyExamples: Array<{
+      property: string;
+      building: string;
+      parentName: string;
+      parentType: string;
+      children: string[];
+    }> = [
+      {
+        property: "Sunset Towers",
+        building: "Building A",
+        parentName: "RTU-4",
+        parentType: "HVAC",
+        children: ["Compressor A", "Fan Motor", "Thermostat Controller"],
+      },
+      {
+        property: "Lakeside Commons",
+        building: "North Wing",
+        parentName: "Generator G-1",
+        parentType: "Generator",
+        children: ["Battery Bank", "Transfer Switch", "Control Module"],
+      },
+      {
+        property: "Harbor View Plaza",
+        building: "East Block",
+        parentName: "Elevator E-2",
+        parentType: "Elevator",
+        children: ["Door Operator", "Motor Assembly", "Control Panel"],
+      },
+    ];
+    const { data: propertiesForHierarchy } = await scope.supabase
+      .from("properties")
+      .select("id, property_name, name")
+      .eq("company_id", scope.companyId);
+    const propertyIdByName = new Map<string, string>();
+    for (const property of (propertiesForHierarchy ?? []) as Array<Record<string, unknown>>) {
+      const id = String(property.id ?? "");
+      if (!id) continue;
+      const keys = [
+        normalizeKey((property.property_name as string | null) ?? null),
+        normalizeKey((property.name as string | null) ?? null),
+      ].filter(Boolean);
+      for (const key of keys) {
+        propertyIdByName.set(key, id);
+      }
+    }
+    const { data: buildingsForHierarchy } = await scope.supabase
+      .from("buildings")
+      .select("id, property_id, building_name, name");
+    const buildingIdByKey = new Map<string, string>();
+    for (const building of (buildingsForHierarchy ?? []) as Array<Record<string, unknown>>) {
+      const id = String(building.id ?? "");
+      const propertyId = String(building.property_id ?? "");
+      if (!id || !propertyId) continue;
+      const keys = [
+        normalizeKey((building.building_name as string | null) ?? null),
+        normalizeKey((building.name as string | null) ?? null),
+      ].filter(Boolean);
+      for (const key of keys) {
+        buildingIdByKey.set(`${propertyId}::${key}`, id);
+      }
+    }
+    const { data: assetsForHierarchyRaw } = await scope.supabase
+      .from("assets")
+      .select("id, asset_name, name, parent_asset_id, property_id, building_id")
+      .eq("company_id", scope.companyId);
+    const assetsForHierarchy = (assetsForHierarchyRaw ?? []) as Array<Record<string, unknown>>;
+    const findAsset = (assetName: string, buildingId: string | null, parentAssetId: string | null) =>
+      assetsForHierarchy.find((asset) => {
+        const currentName = normalizeKey(
+          (asset.asset_name as string | null) ?? (asset.name as string | null) ?? null
+        );
+        if (currentName !== normalizeKey(assetName)) return false;
+        const currentBuildingId = (asset.building_id as string | null) ?? null;
+        const currentParentId = (asset.parent_asset_id as string | null) ?? null;
+        return currentBuildingId === buildingId && currentParentId === parentAssetId;
+      });
+
+    const parentRowsToInsert: Record<string, unknown>[] = [];
+    for (const example of hierarchyExamples) {
+      const propertyId = propertyIdByName.get(normalizeKey(example.property)) ?? null;
+      const buildingId = propertyId
+        ? buildingIdByKey.get(`${propertyId}::${normalizeKey(example.building)}`) ?? null
+        : null;
+      const existingParent = findAsset(example.parentName, buildingId, null);
+      if (existingParent) continue;
+      parentRowsToInsert.push({
+        tenant_id: scope.tenantId,
+        company_id: scope.companyId,
+        property_id: propertyId,
+        building_id: buildingId,
+        unit_id: null,
+        parent_asset_id: null,
+        name: example.parentName,
+        asset_name: example.parentName,
+        asset_type: example.parentType,
+        manufacturer: "Cornerstone Industrial",
+        model: "Demo Platform",
+        status: "active",
+        notes: "Generated demo parent asset",
+      });
+    }
+    const insertedParents = await insertInBatches(
+      scope,
+      "assets",
+      parentRowsToInsert,
+      "id, asset_name, name, parent_asset_id, property_id, building_id"
+    );
+    if (insertedParents.length > 0) {
+      assetsForHierarchy.push(...insertedParents);
+    }
+
+    const childRowsToInsert: Record<string, unknown>[] = [];
+    for (const example of hierarchyExamples) {
+      const propertyId = propertyIdByName.get(normalizeKey(example.property)) ?? null;
+      const buildingId = propertyId
+        ? buildingIdByKey.get(`${propertyId}::${normalizeKey(example.building)}`) ?? null
+        : null;
+      const parentAsset = findAsset(example.parentName, buildingId, null);
+      const parentAssetId = parentAsset ? String(parentAsset.id ?? "") : "";
+      if (!parentAssetId) continue;
+      for (const childName of example.children) {
+        const existingChild = findAsset(childName, null, parentAssetId);
+        if (existingChild) continue;
+        childRowsToInsert.push({
+          tenant_id: scope.tenantId,
+          company_id: scope.companyId,
+          parent_asset_id: parentAssetId,
+          property_id: null,
+          building_id: null,
+          unit_id: null,
+          name: childName,
+          asset_name: childName,
+          asset_type: "Component",
+          manufacturer: "Cornerstone Industrial",
+          model: "Demo Component",
+          status: "active",
+          notes: `Generated demo sub-asset for ${example.parentName}`,
+        });
+      }
+    }
+    const insertedChildren = await insertInBatches(scope, "assets", childRowsToInsert, "id");
+    const hierarchyAssetsInserted = insertedParents.length + insertedChildren.length;
 
     const technicianNames = [
       "Maria Gomez",
@@ -770,7 +912,7 @@ export async function generateDemoDataAction(
     const summary: DemoDataSummary = {
       propertiesCreated: importSummary.propertiesCreated,
       buildingsCreated: importSummary.buildingsCreated,
-      assetsImported: importSummary.assetsImported,
+      assetsImported: importSummary.assetsImported + hierarchyAssetsInserted,
       techniciansCreated: insertedTechnicians.length,
       workOrdersCreated: insertedWorkOrders.length,
       inventoryItemsPrepared: inventoryBalanceRows.length,

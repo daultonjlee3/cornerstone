@@ -4,6 +4,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
+import { getAssetHierarchyNode, wouldCreateAssetCycle } from "@/src/lib/assets/hierarchy";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import { revalidatePath } from "next/cache";
 
@@ -44,6 +45,61 @@ async function getActorId(
   return user?.id ?? null;
 }
 
+function assetDisplayName(row: Record<string, unknown> | null | undefined): string {
+  if (!row) return "Asset";
+  return (
+    (row.asset_name as string | null) ??
+    (row.name as string | null) ??
+    "Asset"
+  );
+}
+
+async function validateParentAssignment(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  {
+    tenantId,
+    companyId,
+    assetId,
+    parentAssetId,
+  }: {
+    tenantId: string;
+    companyId: string;
+    assetId: string | null;
+    parentAssetId: string | null;
+  }
+): Promise<{ error?: string; parent: Awaited<ReturnType<typeof getAssetHierarchyNode>> }> {
+  if (!parentAssetId) {
+    return { parent: null };
+  }
+
+  if (assetId && assetId === parentAssetId) {
+    return { error: "An asset cannot be its own parent.", parent: null };
+  }
+
+  const parent = await getAssetHierarchyNode(supabase, parentAssetId);
+  if (!parent) {
+    return { error: "Selected parent asset was not found.", parent: null };
+  }
+  if (parent.tenant_id && parent.tenant_id !== tenantId) {
+    return { error: "Selected parent asset is out of scope.", parent: null };
+  }
+  if (parent.company_id !== companyId) {
+    return { error: "Selected parent asset must belong to the same company.", parent: null };
+  }
+
+  if (assetId) {
+    const createsCycle = await wouldCreateAssetCycle(supabase, assetId, parentAssetId);
+    if (createsCycle) {
+      return {
+        error: "Invalid parent selection. A descendant cannot be selected as parent.",
+        parent: null,
+      };
+    }
+  }
+
+  return { parent };
+}
+
 export async function saveAsset(
   _prev: AssetFormState,
   formData: FormData
@@ -64,6 +120,7 @@ export async function saveAsset(
   const propertyId = (formData.get("property_id") as string)?.trim() || null;
   const buildingId = (formData.get("building_id") as string)?.trim() || null;
   const unitId = (formData.get("unit_id") as string)?.trim() || null;
+  const parentAssetId = (formData.get("parent_asset_id") as string)?.trim() || null;
   const installDateRaw = (formData.get("install_date") as string)?.trim();
   const warrantyExpiresRaw = (formData.get("warranty_expires") as string)?.trim();
   const statusRaw = (formData.get("status") as string)?.trim();
@@ -82,6 +139,14 @@ export async function saveAsset(
     unitId,
   });
   if (hierarchyError) return { error: hierarchyError };
+
+  const parentValidation = await validateParentAssignment(supabase, {
+    tenantId,
+    companyId,
+    assetId: id,
+    parentAssetId,
+  });
+  if (parentValidation.error) return { error: parentValidation.error };
 
   const payload = {
     name: assetName,
@@ -113,6 +178,7 @@ export async function saveAsset(
     })(),
     warranty_expires: warrantyExpiresRaw || null,
     status,
+    parent_asset_id: parentAssetId,
     condition: (formData.get("condition") as string)?.trim() || null,
     description: (formData.get("description") as string)?.trim() || null,
     location_notes: (formData.get("location_notes") as string)?.trim() || null,
@@ -124,6 +190,7 @@ export async function saveAsset(
     const { data: row } = await supabase.from("assets").select("*").eq("id", id).maybeSingle();
     if (!row) return { error: "Asset not found." };
     const beforeState = row as Record<string, unknown>;
+    const beforeParentAssetId = (beforeState.parent_asset_id as string | null) ?? null;
     const allowedUpdate = await companyBelongsToTenant(
       (beforeState.company_id as string) ?? "",
       tenantId
@@ -146,6 +213,75 @@ export async function saveAsset(
       beforeState,
       afterState: updated as Record<string, unknown>,
     });
+
+    const afterState = updated as Record<string, unknown>;
+    const afterParentAssetId = (afterState.parent_asset_id as string | null) ?? null;
+    if (beforeParentAssetId !== afterParentAssetId) {
+      const assetName = assetDisplayName(afterState);
+      if (!beforeParentAssetId && afterParentAssetId) {
+        const parent = await getAssetHierarchyNode(supabase, afterParentAssetId);
+        const parentName = assetDisplayName(parent as unknown as Record<string, unknown>);
+        await insertActivityLog(supabase, {
+          tenantId,
+          companyId,
+          entityType: "asset",
+          entityId: id,
+          actionType: "asset_sub_asset_linked",
+          performedBy: actorId,
+          metadata: {
+            message: `${assetName} was added as a sub-asset of ${parentName}.`,
+            parent_asset_id: afterParentAssetId,
+          },
+          beforeState: { parent_asset_id: null },
+          afterState: { parent_asset_id: afterParentAssetId },
+        });
+      } else if (beforeParentAssetId && afterParentAssetId) {
+        const [previousParent, nextParent] = await Promise.all([
+          getAssetHierarchyNode(supabase, beforeParentAssetId),
+          getAssetHierarchyNode(supabase, afterParentAssetId),
+        ]);
+        const previousParentName = assetDisplayName(
+          previousParent as unknown as Record<string, unknown>
+        );
+        const nextParentName = assetDisplayName(nextParent as unknown as Record<string, unknown>);
+        await insertActivityLog(supabase, {
+          tenantId,
+          companyId,
+          entityType: "asset",
+          entityId: id,
+          actionType: "asset_sub_asset_moved",
+          performedBy: actorId,
+          metadata: {
+            message: `${assetName} was moved from ${previousParentName} to ${nextParentName}.`,
+            previous_parent_asset_id: beforeParentAssetId,
+            parent_asset_id: afterParentAssetId,
+          },
+          beforeState: { parent_asset_id: beforeParentAssetId },
+          afterState: { parent_asset_id: afterParentAssetId },
+        });
+      } else if (beforeParentAssetId && !afterParentAssetId) {
+        const previousParent = await getAssetHierarchyNode(supabase, beforeParentAssetId);
+        const previousParentName = assetDisplayName(
+          previousParent as unknown as Record<string, unknown>
+        );
+        await insertActivityLog(supabase, {
+          tenantId,
+          companyId,
+          entityType: "asset",
+          entityId: id,
+          actionType: "asset_sub_asset_unlinked",
+          performedBy: actorId,
+          metadata: {
+            message: `${assetName} was removed from parent asset ${previousParentName}.`,
+            previous_parent_asset_id: beforeParentAssetId,
+          },
+          beforeState: { parent_asset_id: beforeParentAssetId },
+          afterState: { parent_asset_id: null },
+        });
+      }
+      if (beforeParentAssetId) revalidatePath(`/assets/${beforeParentAssetId}`);
+      if (afterParentAssetId) revalidatePath(`/assets/${afterParentAssetId}`);
+    }
     revalidatePath(`/assets/${id}`);
     try {
       await calculateAssetHealth(id);
@@ -169,6 +305,26 @@ export async function saveAsset(
       performedBy: actorId,
       afterState: inserted as Record<string, unknown>,
     });
+    if (parentAssetId) {
+      const insertedRecord = inserted as Record<string, unknown>;
+      const parent = await getAssetHierarchyNode(supabase, parentAssetId);
+      const parentName = assetDisplayName(parent as unknown as Record<string, unknown>);
+      await insertActivityLog(supabase, {
+        tenantId,
+        companyId,
+        entityType: "asset",
+        entityId: (inserted as { id: string }).id,
+        actionType: "asset_sub_asset_linked",
+        performedBy: actorId,
+        metadata: {
+          message: `${assetDisplayName(insertedRecord)} was added as a sub-asset of ${parentName}.`,
+          parent_asset_id: parentAssetId,
+        },
+        beforeState: { parent_asset_id: null },
+        afterState: { parent_asset_id: parentAssetId },
+      });
+      revalidatePath(`/assets/${parentAssetId}`);
+    }
     try {
       await calculateAssetHealth((inserted as { id: string }).id);
     } catch {
@@ -189,13 +345,31 @@ export async function deleteAsset(id: string): Promise<AssetFormState> {
   if (!tenantId) return { error: "Unauthorized." };
 
   const supabase = await createClient();
-  const { data: row } = await supabase.from("assets").select("company_id").eq("id", id).maybeSingle();
+  const { data: row } = await supabase
+    .from("assets")
+    .select("company_id, parent_asset_id")
+    .eq("id", id)
+    .maybeSingle();
   if (!row) return { error: "Asset not found." };
   const allowed = await companyBelongsToTenant(row.company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
 
+  const { data: childAsset } = await supabase
+    .from("assets")
+    .select("id")
+    .eq("parent_asset_id", id)
+    .limit(1)
+    .maybeSingle();
+  if (childAsset?.id) {
+    return {
+      error:
+        "This asset has sub-assets. Reassign or unlink child assets before deleting the parent asset.",
+    };
+  }
+
   const { error } = await supabase.from("assets").delete().eq("id", id);
   if (error) return { error: error.message };
+  if (row.parent_asset_id) revalidatePath(`/assets/${row.parent_asset_id}`);
   revalidateAssetIntelligenceCaches({ assetId: id, companyId: row.company_id });
   revalidatePath("/assets");
   revalidatePath("/assets/intelligence");

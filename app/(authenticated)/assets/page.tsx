@@ -16,6 +16,7 @@ export const metadata = {
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 type HealthStatusFilter = "excellent" | "good" | "warning" | "poor" | "critical";
+type HierarchyFilter = "parents" | "sub_assets";
 const VALID_HEALTH_FILTERS = new Set<HealthStatusFilter>([
   "excellent",
   "good",
@@ -23,6 +24,7 @@ const VALID_HEALTH_FILTERS = new Set<HealthStatusFilter>([
   "poor",
   "critical",
 ]);
+const VALID_HIERARCHY_FILTERS = new Set<HierarchyFilter>(["parents", "sub_assets"]);
 
 function getStringParam(
   params: SearchParams | null,
@@ -66,9 +68,14 @@ export default async function AssetsPage({
   const conditionFilter = getStringParam(params ?? {}, "condition");
   const statusFilter = getStringParam(params ?? {}, "status");
   const rawHealthStatus = getStringParam(params ?? {}, "health_status");
+  const rawHierarchy = getStringParam(params ?? {}, "hierarchy");
   const healthStatusFilter =
     rawHealthStatus && VALID_HEALTH_FILTERS.has(rawHealthStatus as HealthStatusFilter)
       ? (rawHealthStatus as HealthStatusFilter)
+      : null;
+  const hierarchyFilter =
+    rawHierarchy && VALID_HIERARCHY_FILTERS.has(rawHierarchy as HierarchyFilter)
+      ? (rawHierarchy as HierarchyFilter)
       : null;
 
   const { data: companies } = await supabase
@@ -155,13 +162,10 @@ export default async function AssetsPage({
     .select("id, name, company_id, service_type")
     .in("company_id", companyIds)
     .order("name");
-
-  const { data: assetsForWO } = await supabase
+  const { data: hierarchyRowsRaw } = await supabase
     .from("assets")
-    .select("id, asset_name, name, company_id, property_id, building_id, unit_id")
-    .in("company_id", companyIds)
-    .order("asset_name")
-    .order("name");
+    .select("id, company_id, parent_asset_id, asset_name, name, property_id, building_id, unit_id")
+    .in("company_id", companyIds);
 
   const companyOptions = (companies ?? []).map((c) => ({
     id: (c as { id: string }).id,
@@ -191,12 +195,107 @@ export default async function AssetsPage({
       (u as { id: string }).id,
     building_id: (u as { building_id: string }).building_id,
   }));
+  const propertyNameById = new Map(propertyOptions.map((option) => [option.id, option.name]));
+  const buildingNameById = new Map(buildingOptions.map((option) => [option.id, option.name]));
+  const unitNameById = new Map(unitOptions.map((option) => [option.id, option.name]));
+  const hierarchyRows = (hierarchyRowsRaw ?? []) as Array<{
+    id: string;
+    company_id: string;
+    parent_asset_id: string | null;
+    asset_name: string | null;
+    name: string | null;
+    property_id: string | null;
+    building_id: string | null;
+    unit_id: string | null;
+  }>;
+  const hierarchyById = new Map(hierarchyRows.map((row) => [row.id, row]));
+  const assetNameById = new Map(
+    hierarchyRows.map((row) => [row.id, row.asset_name ?? row.name ?? row.id])
+  );
+  const parentAssetIds = Array.from(
+    new Set(
+      hierarchyRows
+        .map((row) => row.parent_asset_id)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+  const childCountByParent = new Map<string, number>();
+  for (const row of hierarchyRows) {
+    if (!row.parent_asset_id) continue;
+    childCountByParent.set(
+      row.parent_asset_id,
+      (childCountByParent.get(row.parent_asset_id) ?? 0) + 1
+    );
+  }
+  const effectiveLocationByAssetId = new Map<
+    string,
+    { property_id: string | null; building_id: string | null; unit_id: string | null }
+  >();
+  const resolveEffectiveLocation = (
+    assetId: string,
+    visited: Set<string> = new Set()
+  ): { property_id: string | null; building_id: string | null; unit_id: string | null } => {
+    const cached = effectiveLocationByAssetId.get(assetId);
+    if (cached) return cached;
+    const row = hierarchyById.get(assetId);
+    if (!row) {
+      return { property_id: null, building_id: null, unit_id: null };
+    }
+    if (visited.has(assetId)) {
+      const fallback = {
+        property_id: row.property_id,
+        building_id: row.building_id,
+        unit_id: row.unit_id,
+      };
+      effectiveLocationByAssetId.set(assetId, fallback);
+      return fallback;
+    }
+    visited.add(assetId);
+    const parentLocation = row.parent_asset_id
+      ? resolveEffectiveLocation(row.parent_asset_id, visited)
+      : { property_id: null, building_id: null, unit_id: null };
+    const resolved = {
+      property_id: row.property_id ?? parentLocation.property_id ?? null,
+      building_id: row.building_id ?? parentLocation.building_id ?? null,
+      unit_id: row.unit_id ?? parentLocation.unit_id ?? null,
+    };
+    effectiveLocationByAssetId.set(assetId, resolved);
+    return resolved;
+  };
+  for (const row of hierarchyRows) {
+    resolveEffectiveLocation(row.id);
+  }
+  const assetOptionsForWO = [...hierarchyRows]
+    .sort((left, right) =>
+      (left.asset_name ?? left.name ?? "").localeCompare(right.asset_name ?? right.name ?? "")
+    )
+    .map((row) => {
+      const effectiveLocation = effectiveLocationByAssetId.get(row.id) ?? {
+        property_id: null,
+        building_id: null,
+        unit_id: null,
+      };
+      return {
+        id: row.id,
+        name: row.asset_name ?? row.name ?? row.id,
+        company_id: row.company_id,
+        property_id: effectiveLocation.property_id,
+        building_id: effectiveLocation.building_id,
+        unit_id: effectiveLocation.unit_id,
+      };
+    });
+  const parentCandidates = hierarchyRows.map((row) => ({
+    id: row.id,
+    name: row.asset_name ?? row.name ?? row.id,
+    company_id: row.company_id,
+    parent_asset_id: row.parent_asset_id ?? null,
+  }));
 
   let assetsQuery = supabase
     .from("assets")
     .select(
       `
-      id, asset_name, name, company_id, property_id, building_id, unit_id,
+      id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id,
       asset_tag, asset_type, category, manufacturer, model, serial_number,
       install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months,
       health_score, failure_risk, last_health_calculation,
@@ -214,6 +313,11 @@ export default async function AssetsPage({
   if (typeFilter) assetsQuery = assetsQuery.eq("asset_type", typeFilter);
   if (conditionFilter) assetsQuery = assetsQuery.eq("condition", conditionFilter);
   if (statusFilter) assetsQuery = assetsQuery.eq("status", statusFilter);
+  if (hierarchyFilter === "sub_assets") {
+    assetsQuery = assetsQuery.not("parent_asset_id", "is", null);
+  } else if (hierarchyFilter === "parents" && parentAssetIds.length > 0) {
+    assetsQuery = assetsQuery.in("id", parentAssetIds);
+  }
   if (healthStatusFilter === "excellent") {
     assetsQuery = assetsQuery.gte("health_score", 90);
   } else if (healthStatusFilter === "good") {
@@ -233,9 +337,14 @@ export default async function AssetsPage({
     );
   }
 
-  const { data: assetsRaw, error } = await assetsQuery
-    .order("asset_name", { ascending: true, nullsFirst: false })
-    .order("name");
+  const assetsResponse =
+    hierarchyFilter === "parents" && parentAssetIds.length === 0
+      ? { data: [] as unknown[], error: null as { message?: string } | null }
+      : await assetsQuery
+          .order("asset_name", { ascending: true, nullsFirst: false })
+          .order("name");
+  const assetsRaw = assetsResponse.data;
+  const error = assetsResponse.error;
 
   const assets = (assetsRaw ?? []).map((a) => {
     const row = a as Record<string, unknown>;
@@ -257,12 +366,29 @@ export default async function AssetsPage({
         : null;
     const company_name =
       comp && typeof comp === "object" && "name" in comp ? (comp as { name?: string }).name : null;
+    const assetId = row.id as string;
+    const parentAssetId = (row.parent_asset_id as string | null) ?? null;
+    const effectiveLocation = effectiveLocationByAssetId.get(assetId) ?? {
+      property_id: null,
+      building_id: null,
+      unit_id: null,
+    };
+    const inheritedPropertyName =
+      effectiveLocation.property_id ? propertyNameById.get(effectiveLocation.property_id) ?? null : null;
+    const inheritedBuildingName =
+      effectiveLocation.building_id ? buildingNameById.get(effectiveLocation.building_id) ?? null : null;
+    const inheritedUnitName =
+      effectiveLocation.unit_id ? unitNameById.get(effectiveLocation.unit_id) ?? null : null;
     return {
       ...row,
-      property_name: property_name ?? undefined,
-      building_name: building_name ?? undefined,
-      unit_name: unit_name ?? undefined,
+      property_name: property_name ?? inheritedPropertyName ?? undefined,
+      building_name: building_name ?? inheritedBuildingName ?? undefined,
+      unit_name: unit_name ?? inheritedUnitName ?? undefined,
       company_name: company_name ?? undefined,
+      parent_asset_id: parentAssetId,
+      parent_asset_name: parentAssetId ? assetNameById.get(parentAssetId) ?? null : null,
+      is_parent_asset: childCountByParent.has(assetId),
+      child_count: childCountByParent.get(assetId) ?? 0,
     };
   });
 
@@ -301,15 +427,6 @@ export default async function AssetsPage({
     company_id: (vendor as { company_id: string }).company_id,
     service_type: (vendor as { service_type?: string | null }).service_type ?? null,
   }));
-  const assetOptionsForWO = (assetsForWO ?? []).map((a) => ({
-    id: (a as { id: string }).id,
-    name: (a as { asset_name?: string }).asset_name ?? (a as { name?: string }).name ?? (a as { id: string }).id,
-    company_id: (a as { company_id: string }).company_id,
-    property_id: (a as { property_id?: string }).property_id ?? null,
-    building_id: (a as { building_id?: string }).building_id ?? null,
-    unit_id: (a as { unit_id?: string }).unit_id ?? null,
-  }));
-
   const { count: pmPlanCount } = await supabase
     .from("preventive_maintenance_plans")
     .select("id", { count: "exact", head: true })
@@ -347,6 +464,7 @@ export default async function AssetsPage({
           condition: conditionFilter ?? "",
           status: statusFilter ?? "",
           health_status: healthStatusFilter ?? "",
+          hierarchy: hierarchyFilter ?? "",
         }}
         error={error?.message ?? null}
         saveAction={saveAsset}
@@ -369,6 +487,7 @@ export default async function AssetsPage({
           vendors: vendorOptions,
           saveWorkOrder,
         }}
+        parentCandidates={parentCandidates}
       />
     </div>
   );

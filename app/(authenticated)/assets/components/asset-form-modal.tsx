@@ -8,6 +8,7 @@ export type Asset = {
   asset_name: string | null;
   name?: string;
   company_id: string;
+  parent_asset_id?: string | null;
   property_id: string | null;
   building_id: string | null;
   unit_id: string | null;
@@ -32,6 +33,12 @@ type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id?: string };
 type BuildingOption = { id: string; name: string; property_id?: string };
 type UnitOption = { id: string; name: string; building_id?: string };
+type ParentAssetOption = {
+  id: string;
+  name: string;
+  company_id: string;
+  parent_asset_id: string | null;
+};
 
 type AssetFormModalProps = {
   open: boolean;
@@ -41,6 +48,7 @@ type AssetFormModalProps = {
   properties: PropertyOption[];
   buildings: BuildingOption[];
   units: UnitOption[];
+  parentCandidates: ParentAssetOption[];
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
 };
 
@@ -57,6 +65,7 @@ const emptyAsset: Asset = {
   id: "",
   asset_name: "",
   company_id: "",
+  parent_asset_id: null,
   property_id: null,
   building_id: null,
   unit_id: null,
@@ -83,6 +92,7 @@ export function AssetFormModal({
   properties,
   buildings,
   units,
+  parentCandidates,
   saveAction,
 }: AssetFormModalProps) {
   const isEdit = !!asset?.id;
@@ -93,6 +103,8 @@ export function AssetFormModal({
   const [propertyId, setPropertyId] = useState(a.property_id ?? "");
   const [buildingId, setBuildingId] = useState(a.building_id ?? "");
   const [unitId, setUnitId] = useState(a.unit_id ?? "");
+  const [parentAssetId, setParentAssetId] = useState(a.parent_asset_id ?? "");
+  const [parentSearch, setParentSearch] = useState("");
   const [assetTypeSelect, setAssetTypeSelect] = useState(
     () => (a.asset_type ?? a.category ?? "").trim()
   );
@@ -103,9 +115,20 @@ export function AssetFormModal({
       setPropertyId(a.property_id ?? "");
       setBuildingId(a.building_id ?? "");
       setUnitId(a.unit_id ?? "");
+      setParentAssetId(a.parent_asset_id ?? "");
+      setParentSearch("");
       setAssetTypeSelect((a.asset_type ?? a.category ?? "").trim());
     }
-  }, [open, a.company_id, a.property_id, a.building_id, a.unit_id, a.asset_type, a.category]);
+  }, [
+    open,
+    a.company_id,
+    a.property_id,
+    a.building_id,
+    a.unit_id,
+    a.parent_asset_id,
+    a.asset_type,
+    a.category,
+  ]);
 
   const typeDropdownOptions = useMemo(() => {
     const current = (a.asset_type ?? a.category ?? "").trim();
@@ -143,6 +166,51 @@ export function AssetFormModal({
     () => units.find((unit) => unit.id === unitId)?.name ?? null,
     [units, unitId]
   );
+  const parentNameById = useMemo(
+    () =>
+      new Map(parentCandidates.map((candidate) => [candidate.id, candidate.name])),
+    [parentCandidates]
+  );
+  const excludedParentIds = useMemo(() => {
+    if (!isEdit || !a.id) return new Set<string>();
+    const childrenByParent = new Map<string, string[]>();
+    for (const candidate of parentCandidates) {
+      if (!candidate.parent_asset_id) continue;
+      const list = childrenByParent.get(candidate.parent_asset_id) ?? [];
+      list.push(candidate.id);
+      childrenByParent.set(candidate.parent_asset_id, list);
+    }
+
+    const excluded = new Set<string>([a.id]);
+    const stack = [a.id];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) continue;
+      const children = childrenByParent.get(current) ?? [];
+      for (const childId of children) {
+        if (excluded.has(childId)) continue;
+        excluded.add(childId);
+        stack.push(childId);
+      }
+    }
+    return excluded;
+  }, [isEdit, a.id, parentCandidates]);
+  const parentCandidatesFiltered = useMemo(() => {
+    if (!companyId) return [];
+    const query = parentSearch.trim().toLowerCase();
+    return parentCandidates
+      .filter((candidate) => candidate.company_id === companyId)
+      .filter((candidate) => !excludedParentIds.has(candidate.id))
+      .filter((candidate) => {
+        if (!query) return true;
+        return candidate.name.toLowerCase().includes(query);
+      })
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [companyId, excludedParentIds, parentCandidates, parentSearch]);
+  const selectedParentName = useMemo(
+    () => (parentAssetId ? parentNameById.get(parentAssetId) ?? null : null),
+    [parentAssetId, parentNameById]
+  );
 
   useEffect(() => {
     if (companyId && propertyId && !propertiesFiltered.some((p) => p.id === propertyId))
@@ -150,6 +218,13 @@ export function AssetFormModal({
     if (propertyId && buildingId && !buildingsFiltered.some((b) => b.id === buildingId))
       setBuildingId("");
   }, [companyId, propertyId, buildingId, propertiesFiltered, buildingsFiltered]);
+
+  useEffect(() => {
+    if (!parentAssetId) return;
+    if (!parentCandidatesFiltered.some((candidate) => candidate.id === parentAssetId)) {
+      setParentAssetId("");
+    }
+  }, [parentAssetId, parentCandidatesFiltered]);
 
   useEffect(() => {
     if (state?.success) onClose();
@@ -284,6 +359,41 @@ export function AssetFormModal({
             building={selectedBuildingName}
             unit={selectedUnitName}
           />
+          <div>
+            <label htmlFor="parent_asset_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+              Parent asset
+            </label>
+            <input
+              type="search"
+              value={parentSearch}
+              onChange={(e) => setParentSearch(e.target.value)}
+              placeholder="Search parent assets..."
+              className={`${inputClass} mb-2`}
+            />
+            <select
+              id="parent_asset_id"
+              name="parent_asset_id"
+              value={parentAssetId}
+              onChange={(e) => setParentAssetId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">None</option>
+              {parentCandidatesFiltered.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+            {selectedParentName ? (
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                This asset will be linked under {selectedParentName}.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Optional. Leave empty to keep this as a top-level asset.
+              </p>
+            )}
+          </div>
           <div>
             <label htmlFor="asset_tag" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Asset tag
