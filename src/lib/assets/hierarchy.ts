@@ -1,5 +1,5 @@
 type SupabaseLike = {
-  from: (table: string) => any;
+  from: (table: string) => unknown;
 };
 
 const MAX_HIERARCHY_DEPTH = 25;
@@ -44,8 +44,14 @@ export async function getAssetHierarchyNode(
   supabase: SupabaseLike,
   assetId: string
 ): Promise<AssetHierarchyNode | null> {
-  const { data } = await supabase
-    .from("assets")
+  const query = supabase.from("assets") as {
+    select: (columns: string) => {
+      eq: (column: string, value: string) => {
+        maybeSingle: () => PromiseLike<{ data: Record<string, unknown> | null }>;
+      };
+    };
+  };
+  const { data } = await query
     .select("id, tenant_id, company_id, parent_asset_id, property_id, building_id, unit_id, asset_name, name")
     .eq("id", assetId)
     .maybeSingle();
