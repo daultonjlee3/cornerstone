@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { fetchPexelsImage } from "@/src/lib/images/pexels";
+import { getPexelsQueryForAssetType } from "@/src/lib/images/assetImageQueries";
 
 export type AssetImportRowInput = {
   property: string;
@@ -250,7 +252,17 @@ function parseRowsPayload(formData: FormData): AssetImportRowInput[] {
   });
 }
 
-async function performAssetImport(scope: Scope, rows: AssetImportRowInput[]): Promise<AssetImportSummary> {
+export type AssetImportOptions = {
+  /** When set, demo seed can attach one image URL per asset_type to imported assets. */
+  imageUrlByType?: Record<string, string>;
+};
+
+async function performAssetImport(
+  scope: Scope,
+  rows: AssetImportRowInput[],
+  options?: AssetImportOptions
+): Promise<AssetImportSummary> {
+  const imageUrlByType = options?.imageUrlByType ?? {};
   const rowsReceived = rows.length;
   const validRows = rows.filter(
     (row) => row.property.trim() && row.building.trim() && row.asset_name.trim()
@@ -385,6 +397,7 @@ async function performAssetImport(scope: Scope, rows: AssetImportRowInput[]): Pr
       continue;
     }
     seenIncomingKeys.add(dedupeKey);
+    const assetType = row.asset_type || null;
     pendingAssetRows.push({
       tenant_id: scope.tenantId,
       company_id: scope.companyId,
@@ -392,7 +405,7 @@ async function performAssetImport(scope: Scope, rows: AssetImportRowInput[]): Pr
       building_id: buildingId,
       name: row.asset_name,
       asset_name: row.asset_name,
-      asset_type: row.asset_type || null,
+      asset_type: assetType,
       manufacturer: row.manufacturer || null,
       model: row.model || null,
       serial_number: row.serial_number || null,
@@ -401,6 +414,7 @@ async function performAssetImport(scope: Scope, rows: AssetImportRowInput[]): Pr
       notes: row.notes || null,
       criticality: normalizeCriticality(row.criticality),
       status: "active",
+      ...(imageUrlByType[assetType ?? ""] ? { image_url: imageUrlByType[assetType ?? ""] } : {}),
     });
   }
 
@@ -511,6 +525,52 @@ export async function generateDemoDataAction(
     { name: "Electrical Panel A", type: "Electrical" },
   ];
 
+  const hierarchyExamples: Array<{
+    property: string;
+    building: string;
+    parentName: string;
+    parentType: string;
+    children: string[];
+  }> = [
+    {
+      property: "Sunset Towers",
+      building: "Building A",
+      parentName: "RTU-4",
+      parentType: "HVAC",
+      children: ["Compressor A", "Fan Motor", "Thermostat Controller"],
+    },
+    {
+      property: "Lakeside Commons",
+      building: "North Wing",
+      parentName: "Generator G-1",
+      parentType: "Generator",
+      children: ["Battery Bank", "Transfer Switch", "Control Module"],
+    },
+    {
+      property: "Harbor View Plaza",
+      building: "East Block",
+      parentName: "Elevator E-2",
+      parentType: "Elevator",
+      children: ["Door Operator", "Motor Assembly", "Control Panel"],
+    },
+  ];
+
+  const uniqueTypes = new Set<string>([
+    ...assetSeeds.map((s) => s.type),
+    ...hierarchyExamples.map((e) => e.parentType),
+    "Component",
+  ]);
+  const imageUrlByType: Record<string, string> = {};
+  for (const type of uniqueTypes) {
+    try {
+      const query = getPexelsQueryForAssetType(type);
+      const url = await fetchPexelsImage(query);
+      if (url) imageUrlByType[type] = url;
+    } catch {
+      // continue without image for this type
+    }
+  }
+
   let seedIndex = 0;
   for (const pair of propertyBuildingPairs) {
     for (const seed of assetSeeds) {
@@ -533,36 +593,7 @@ export async function generateDemoDataAction(
   }
 
   try {
-    const importSummary = await performAssetImport(scope, demoRows);
-    const hierarchyExamples: Array<{
-      property: string;
-      building: string;
-      parentName: string;
-      parentType: string;
-      children: string[];
-    }> = [
-      {
-        property: "Sunset Towers",
-        building: "Building A",
-        parentName: "RTU-4",
-        parentType: "HVAC",
-        children: ["Compressor A", "Fan Motor", "Thermostat Controller"],
-      },
-      {
-        property: "Lakeside Commons",
-        building: "North Wing",
-        parentName: "Generator G-1",
-        parentType: "Generator",
-        children: ["Battery Bank", "Transfer Switch", "Control Module"],
-      },
-      {
-        property: "Harbor View Plaza",
-        building: "East Block",
-        parentName: "Elevator E-2",
-        parentType: "Elevator",
-        children: ["Door Operator", "Motor Assembly", "Control Panel"],
-      },
-    ];
+    const importSummary = await performAssetImport(scope, demoRows, { imageUrlByType });
     const { data: propertiesForHierarchy } = await scope.supabase
       .from("properties")
       .select("id, property_name, name")
@@ -633,6 +664,7 @@ export async function generateDemoDataAction(
         model: "Demo Platform",
         status: "active",
         notes: "Generated demo parent asset",
+        ...(imageUrlByType[example.parentType] ? { image_url: imageUrlByType[example.parentType] } : {}),
       });
     }
     const insertedParents = await insertInBatches(
@@ -671,6 +703,7 @@ export async function generateDemoDataAction(
           model: "Demo Component",
           status: "active",
           notes: `Generated demo sub-asset for ${example.parentName}`,
+          ...(imageUrlByType["Component"] ? { image_url: imageUrlByType["Component"] } : {}),
         });
       }
     }

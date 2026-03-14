@@ -60,7 +60,7 @@ export default async function AssetDetailPage({
   const { data: assetRaw, error } = await supabase
     .from("assets")
     .select(
-      "id, tenant_id, company_id, parent_asset_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months, health_score, failure_risk, last_health_calculation, warranty_expires, description, location_notes, notes, last_serviced_at, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+      "id, tenant_id, company_id, parent_asset_id, property_id, building_id, unit_id, asset_name, name, asset_type, category, manufacturer, model, serial_number, status, condition, install_date, expected_life_years, replacement_cost, maintenance_cost_last_12_months, health_score, failure_risk, last_health_calculation, warranty_expires, description, location_notes, notes, last_serviced_at, image_url, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -105,6 +105,7 @@ export default async function AssetDetailPage({
     location_notes: (row.location_notes as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
     last_serviced_at: (row.last_serviced_at as string | null) ?? null,
+    image_url: (row.image_url as string | null) ?? null,
     company_name:
       company && typeof company === "object"
         ? ((company as { name?: string }).name ?? null)
@@ -459,7 +460,17 @@ export default async function AssetDetailPage({
 
       <header className="ui-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          {asset.image_url ? (
+            <div className="mb-4 w-full shrink-0 overflow-hidden rounded-lg bg-[var(--muted)]/20 sm:mb-0 sm:mr-4 sm:w-48">
+              <img
+                src={asset.image_url}
+                alt=""
+                className="h-36 w-full object-cover object-center"
+                sizes="192px"
+              />
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-semibold text-[var(--foreground)]">{asset.name}</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">
               {asset.company_name ?? "—"} •{" "}
