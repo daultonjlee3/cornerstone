@@ -1189,7 +1189,7 @@ export function DispatchView({
                       </div>
                     </div>
                     {!combinedMapVisible && (
-                      <Button variant="outline" size="sm" className="h-8 w-full text-[11px]" onClick={() => setCombinedMapVisible(true)}>
+                      <Button variant="secondary" size="sm" className="h-8 w-full text-[11px]" onClick={() => setCombinedMapVisible(true)}>
                         Show map
                       </Button>
                     )}

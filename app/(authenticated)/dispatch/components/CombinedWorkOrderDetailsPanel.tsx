@@ -85,7 +85,7 @@ export function CombinedWorkOrderDetailsPanel({
               assigning={assigning}
             />
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="h-7 w-full text-[11px]"
               onClick={() => onOpenWorkOrder(selectedWorkOrder.id)}

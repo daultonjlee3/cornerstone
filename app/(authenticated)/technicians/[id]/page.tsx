@@ -67,7 +67,7 @@ export default async function TechnicianProfilePage({
   const isPortalOnly = Boolean(userInfo?.is_portal_only);
   const hasLinkedLogin = Boolean(row.user_id);
   const displayName = row.technician_name ?? row.name ?? "Technician";
-  const canImpersonate = isAdminRole(membership.role);
+  const canImpersonate = membership != null ? isAdminRole(membership.role) : false;
 
   return (
     <div className="space-y-4">

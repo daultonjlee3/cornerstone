@@ -722,12 +722,13 @@ async function topUpTechniciansAndWorkOrders(
     .select("id, sku")
     .eq("company_id", companyId)
     .or("default_vendor_id.is.null,default_cost.is.null,reorder_point_default.is.null");
-  if ((productsNeedingBackfill?.length ?? 0) > 0) {
+  const productsToBackfill = productsNeedingBackfill ?? [];
+  if (productsToBackfill.length > 0) {
     const { data: vendorRows } = await supabase.from("vendors").select("id").eq("company_id", companyId);
     const backfillVendorIds = ((vendorRows ?? []) as { id: string }[]).map((r) => r.id);
     const skuToConfig = new Map(cfg.products.map((p) => [p.sku, p]));
-    for (let i = 0; i < productsNeedingBackfill.length; i++) {
-      const row = productsNeedingBackfill[i] as { id: string; sku: string | null };
+    for (let i = 0; i < productsToBackfill.length; i++) {
+      const row = productsToBackfill[i] as { id: string; sku: string | null };
       const p = row.sku ? skuToConfig.get(row.sku) : undefined;
       if (!p) continue;
       const defaultVendorId = backfillVendorIds.length ? backfillVendorIds[i % backfillVendorIds.length]! : null;
@@ -740,7 +741,7 @@ async function topUpTechniciansAndWorkOrders(
         })
         .eq("id", row.id);
     }
-    console.log(`  Products backfilled (default vendor/cost/reorder): ${productsNeedingBackfill.length}`);
+    console.log(`  Products backfilled (default vendor/cost/reorder): ${productsToBackfill.length}`);
   }
 
   const { data: existingTech } = await supabase

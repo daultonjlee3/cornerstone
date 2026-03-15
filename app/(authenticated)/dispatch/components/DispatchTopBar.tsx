@@ -440,7 +440,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
           </div>
           <div className="relative lg:hidden" ref={filtersRef}>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="h-7 gap-1 px-2 text-[10px]"
               onClick={(e) => { e.stopPropagation(); setFiltersOpen((o) => !o); }}

@@ -346,14 +346,37 @@ export default async function AssetsPage({
     );
   }
 
-  const countQuery =
-    hierarchyFilter === "parents" && parentAssetIds.length === 0
-      ? null
-      : assetsQuery;
-  const { count: totalCount } =
-    countQuery != null
-      ? await (countQuery as { select: (columns: string, options: { count: "exact"; head: true }) => Promise<{ count: number | null }> }).select("id", { count: "exact", head: true })
-      : { count: 0 };
+  // Separate count query so .select("id", { count: "exact", head: true }) is the first select (valid Supabase typing).
+  let totalCount = 0;
+  if (!(hierarchyFilter === "parents" && parentAssetIds.length === 0)) {
+    let countQuery = supabase
+      .from("assets")
+      .select("id", { count: "exact", head: true })
+      .in("company_id", companyIds);
+    if (companyId) countQuery = countQuery.eq("company_id", companyId);
+    if (propertyId) countQuery = countQuery.eq("property_id", propertyId);
+    if (typeFilter) countQuery = countQuery.eq("asset_type", typeFilter);
+    if (conditionFilter) countQuery = countQuery.eq("condition", conditionFilter);
+    if (statusFilter) countQuery = countQuery.eq("status", statusFilter);
+    if (hierarchyFilter === "sub_assets") {
+      countQuery = countQuery.not("parent_asset_id", "is", null);
+    } else if (hierarchyFilter === "parents" && parentAssetIds.length > 0) {
+      countQuery = countQuery.in("id", parentAssetIds);
+    }
+    if (healthStatusFilter === "excellent") countQuery = countQuery.gte("health_score", 90);
+    else if (healthStatusFilter === "good") countQuery = countQuery.gte("health_score", 70).lt("health_score", 90);
+    else if (healthStatusFilter === "warning") countQuery = countQuery.gte("health_score", 50).lt("health_score", 70);
+    else if (healthStatusFilter === "poor") countQuery = countQuery.gte("health_score", 30).lt("health_score", 50);
+    else if (healthStatusFilter === "critical") countQuery = countQuery.lt("health_score", 30);
+    if (q && q.trim()) {
+      const term = q.trim().replace(/%/g, "\\%").replace(/_/g, "\\_");
+      countQuery = countQuery.or(
+        `asset_name.ilike.%${term}%,name.ilike.%${term}%,asset_tag.ilike.%${term}%,model.ilike.%${term}%,serial_number.ilike.%${term}%`
+      );
+    }
+    const { count } = await countQuery;
+    totalCount = count ?? 0;
+  }
 
   const assetsResponse =
     hierarchyFilter === "parents" && parentAssetIds.length === 0

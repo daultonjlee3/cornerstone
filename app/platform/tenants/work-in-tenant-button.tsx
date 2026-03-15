@@ -18,7 +18,7 @@ export function WorkInTenantButton({ tenantId, label = "Work in this tenant" }: 
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="secondary"
       size="sm"
       onClick={handleClick}
       disabled={pending}
