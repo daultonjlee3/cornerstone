@@ -9,11 +9,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
-import { getTourForPath, tourConfigs } from "@/src/lib/tours/config";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getTourForPath, tourConfigs, demoGuidedTourConfig } from "@/src/lib/tours/config";
 import { tourStepSelector } from "@/src/lib/tours/types";
-import type { TourConfig } from "@/src/lib/tours/types";
+import type { TourConfig, TourStep } from "@/src/lib/tours/types";
 import { getCompletedTourIds, markTourComplete } from "@/app/(authenticated)/tours/actions";
+
+function pathnameMatchesStep(pathname: string, step: TourStep): boolean {
+  const path = step.path?.replace(/\/$/, "") || "";
+  if (!path) return true;
+  const norm = pathname.replace(/\/$/, "") || "/";
+  return norm === path || (path !== "/" && norm.startsWith(path + "/"));
+}
 
 type TourContextValue = {
   /** Currently running tour or null. */
@@ -58,8 +65,11 @@ export function TourProvider({
   completedTourIds?: string[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTour, setActiveTour] = useState<TourConfig | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
+  const [pendingStepIndex, setPendingStepIndex] = useState<number | null>(null);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [completedTourIds, setCompletedTourIds] = useState<Set<string>>(
     () => new Set(initialCompleted)
@@ -74,20 +84,31 @@ export function TourProvider({
   const runTour = useCallback((config: TourConfig) => {
     setActiveTour(config);
     setStepIndex(0);
+    setPendingStepIndex(null);
     setTargetRect(null);
   }, []);
 
   const startTour = useCallback(
     (tourId: string) => {
+      const c = tourConfigs.find((t) => t.id === tourId);
+      if (!c) return;
+      if (c.id === "demo-guided") {
+        runTour(c);
+        const step0 = c.steps[0];
+        if (step0?.path && !pathnameMatchesStep(pathname, step0)) {
+          setPendingStepIndex(0);
+          router.push(step0.path);
+        }
+        return;
+      }
       const config = getTourForPath(pathname);
       if (config?.id === tourId) {
         runTour(config);
         return;
       }
-      const c = tourConfigs.find((t) => t.id === tourId);
-      if (c) runTour(c);
+      runTour(c);
     },
-    [pathname, runTour]
+    [pathname, runTour, router]
   );
 
   const endTour = useCallback(
@@ -146,18 +167,32 @@ export function TourProvider({
       return;
     }
     const nextIndex = stepIndex + 1;
+    const nextStep = activeTour.steps[nextIndex];
+    const isCrossRoute = activeTour.id === "demo-guided" && nextStep?.path;
+    if (isCrossRoute && nextStep && !pathnameMatchesStep(pathname, nextStep)) {
+      setPendingStepIndex(nextIndex);
+      router.push(nextStep.path!);
+      return;
+    }
     setStepIndex(nextIndex);
     scrollToStep(activeTour, nextIndex);
     requestAnimationFrame(() => updateTargetRect(activeTour, nextIndex));
-  }, [activeTour, stepIndex, endTour, scrollToStep, updateTargetRect]);
+  }, [activeTour, stepIndex, pathname, endTour, scrollToStep, updateTargetRect, router]);
 
   const back = useCallback(() => {
     if (!activeTour || stepIndex <= 0) return;
     const prevIndex = stepIndex - 1;
+    const prevStep = activeTour.steps[prevIndex];
+    const isCrossRoute = activeTour.id === "demo-guided" && prevStep?.path;
+    if (isCrossRoute && prevStep && !pathnameMatchesStep(pathname, prevStep)) {
+      setPendingStepIndex(prevIndex);
+      router.push(prevStep.path!);
+      return;
+    }
     setStepIndex(prevIndex);
     scrollToStep(activeTour, prevIndex);
     requestAnimationFrame(() => updateTargetRect(activeTour, prevIndex));
-  }, [activeTour, stepIndex, scrollToStep, updateTargetRect]);
+  }, [activeTour, stepIndex, pathname, scrollToStep, updateTargetRect, router]);
 
   const skip = useCallback(() => {
     if (!activeTour) return;
@@ -166,10 +201,18 @@ export function TourProvider({
 
   const restartCurrent = useCallback(() => {
     if (!activeTour) return;
+    const step0 = activeTour.steps[0];
+    if (activeTour.id === "demo-guided" && step0?.path && !pathnameMatchesStep(pathname, step0)) {
+      setPendingStepIndex(0);
+      setStepIndex(0);
+      router.push(step0.path);
+      return;
+    }
     setStepIndex(0);
+    setPendingStepIndex(null);
     scrollToStep(activeTour, 0);
     requestAnimationFrame(() => updateTargetRect(activeTour, 0));
-  }, [activeTour, scrollToStep, updateTargetRect]);
+  }, [activeTour, pathname, scrollToStep, updateTargetRect, router]);
 
   // When step index or active tour changes, update target rect (after a tick so DOM is ready).
   useEffect(() => {
@@ -194,9 +237,10 @@ export function TourProvider({
     if (!config) hasAutoStarted.current = null;
   }, [pathname]);
 
-  // When navigating away from the tour's path, end the active tour so it doesn't block the new page.
+  // When navigating away from the tour's path, end the active tour (except cross-route demo-guided).
   useEffect(() => {
     if (!activeTour) return;
+    if (activeTour.id === "demo-guided") return;
     const config = getTourForPath(pathname);
     if (!config || config.id !== activeTour.id) {
       setActiveTour(null);
@@ -204,6 +248,26 @@ export function TourProvider({
       setTargetRect(null);
     }
   }, [pathname, activeTour]);
+
+  // Cross-route demo-guided: after navigating, land on the step when pathname matches.
+  useEffect(() => {
+    if (!activeTour || activeTour.id !== "demo-guided" || pendingStepIndex === null) return;
+    const step = activeTour.steps[pendingStepIndex];
+    if (!step || !pathnameMatchesStep(pathname, step)) return;
+    setStepIndex(pendingStepIndex);
+    setPendingStepIndex(null);
+    scrollToStep(activeTour, pendingStepIndex);
+    const t = setTimeout(() => updateTargetRect(activeTour, pendingStepIndex), 150);
+    return () => clearTimeout(t);
+  }, [pathname, activeTour, pendingStepIndex, scrollToStep, updateTargetRect]);
+
+  // Start demo-guided from URL param (e.g. Settings "Start tour" -> /dashboard?startTour=demo-guided).
+  useEffect(() => {
+    const startParam = searchParams.get("startTour");
+    if (pathname.replace(/\/$/, "") !== "/dashboard" || startParam !== "demo-guided") return;
+    runTour(demoGuidedTourConfig);
+    router.replace("/dashboard", { scroll: false });
+  }, [pathname, searchParams, runTour, router]);
 
   const value: TourContextValue = {
     activeTour,

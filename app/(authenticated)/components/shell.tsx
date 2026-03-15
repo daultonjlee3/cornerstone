@@ -6,6 +6,7 @@ import { endImpersonation } from "@/app/platform/impersonate/actions";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { ImpersonationBanner } from "./impersonation-banner";
+import { DemoWelcomeModal } from "./demo-welcome-modal";
 import { TooltipProvider } from "@/src/components/ui/tooltip";
 import { TourProvider, TourOverlay } from "@/src/components/ui/tour";
 
@@ -18,6 +19,7 @@ type ShellProps = {
   showPlatformAdmin?: boolean;
   impersonationBanner?: { actingAsName: string; companyName: string } | null;
   completedTourIds?: string[];
+  isDemoGuest?: boolean;
 };
 
 export function Shell({
@@ -27,6 +29,7 @@ export function Shell({
   showPlatformAdmin = false,
   impersonationBanner = null,
   completedTourIds = [],
+  isDemoGuest = false,
 }: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -52,6 +55,7 @@ export function Shell({
     <TooltipProvider>
       <TourProvider completedTourIds={completedTourIds}>
         <TourOverlay />
+        {isDemoGuest && <DemoWelcomeModal isDemoGuest={isDemoGuest} />}
         <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
         {!isDispatchFullscreen ? (
           <Sidebar
@@ -60,6 +64,7 @@ export function Shell({
             collapsed={sidebarCollapsed}
             onToggleCollapse={handleToggleCollapse}
             showPlatformAdmin={showPlatformAdmin}
+            isDemoGuest={isDemoGuest}
           />
         ) : null}
         {/* Main panel: fills remaining width, column layout, scrollable content */}

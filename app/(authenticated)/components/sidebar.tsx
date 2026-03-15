@@ -79,6 +79,7 @@ type SidebarProps = {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   showPlatformAdmin?: boolean;
+  isDemoGuest?: boolean;
 };
 
 function isActive(href: string, pathname: string): boolean {
@@ -92,8 +93,12 @@ export function Sidebar({
   collapsed = false,
   onToggleCollapse,
   showPlatformAdmin = false,
+  isDemoGuest = false,
 }: SidebarProps) {
   const pathname = usePathname();
+  const navGroups = isDemoGuest
+    ? navConfig.filter((g) => g.label !== "Organization")
+    : navConfig;
 
   return (
     <>
@@ -164,7 +169,7 @@ export function Sidebar({
 
         <nav className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-y-auto py-3 scrollbar-thin">
-            {navConfig.map((group) => (
+            {navGroups.map((group) => (
               <NavGroupBlock
                 key={group.label}
                 group={group}

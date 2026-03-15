@@ -84,6 +84,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8" data-tour="dashboard:overview">
+      <div data-tour="demo-guided:command-center" className="space-y-8">
       <PageHeader
         icon={<LayoutDashboard className="size-5" />}
         title="Operations Command Center"
@@ -513,6 +514,7 @@ export default async function DashboardPage() {
           icon={Calendar}
         />
       </section>
+      </div>
     </div>
   );
 }

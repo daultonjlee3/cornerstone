@@ -1,7 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Shell } from "./components/shell";
-import { isPlatformSuperAdmin } from "@/src/lib/auth-context";
+import { isPlatformSuperAdmin, isDemoGuestUser } from "@/src/lib/auth-context";
 import { getCompletedTourIds } from "./tours/actions";
 import { getImpersonationStateFromCookie } from "@/src/lib/impersonation";
 import { getImpersonationSession } from "@/src/lib/portal/access";
@@ -48,6 +48,7 @@ export default async function AuthenticatedLayout({
       .from("tenant_memberships")
       .select("tenant_id, tenants(name)")
       .eq("user_id", effectiveUserId)
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
       .then((r) => r.data);
@@ -107,6 +108,7 @@ export default async function AuthenticatedLayout({
   }
 
   const completedTourIds = await getCompletedTourIds();
+  const isDemoGuest = await isDemoGuestUser(supabase, user.id);
 
   return (
     <Shell
@@ -115,6 +117,7 @@ export default async function AuthenticatedLayout({
       showPlatformAdmin={showPlatformAdmin}
       impersonationBanner={impersonationBanner}
       completedTourIds={completedTourIds}
+      isDemoGuest={isDemoGuest}
     >
       {children}
     </Shell>

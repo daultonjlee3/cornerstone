@@ -3,9 +3,8 @@
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTour } from "./TourContext";
-import { Button } from "@/src/components/ui/button";
 
-const CARD_HEIGHT_ESTIMATE = 220;
+const CARD_HEIGHT_ESTIMATE = 260;
 const VIEWPORT_PADDING = 16;
 
 /** Spotlight overlay and step card. Renders via portal when a tour is active. */
@@ -27,6 +26,8 @@ export function TourOverlay() {
 
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === stepCount - 1;
+  const progressPct = stepCount > 0 ? ((stepIndex + 1) / stepCount) * 100 : 0;
+  const nextLabel = step.cta ?? (isLast ? "Finish Tour" : "Next");
 
   const overlay = (
     <div
@@ -36,19 +37,19 @@ export function TourOverlay() {
       aria-labelledby="tour-step-title"
       aria-describedby="tour-step-content"
     >
-      {/* Always-visible Skip in corner so user can exit even if step card is off-screen */}
+      {/* Skip — top right, subtle */}
       <div className="fixed right-4 top-4 z-[202] pointer-events-auto">
         <button
           type="button"
           onClick={skip}
-          className="rounded-md border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
+          className="rounded-lg border border-[var(--card-border)] bg-[var(--card)]/95 px-3 py-2 text-sm font-medium text-[var(--muted)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)] hover:text-[var(--foreground)] transition-colors"
           aria-label="Skip tour"
         >
-          Skip tour
+          Skip
         </button>
       </div>
 
-      {/* Backdrop with spotlight cutout: transparent rect with huge box-shadow */}
+      {/* Backdrop with spotlight cutout */}
       {targetRect && (
         <div
           className="fixed pointer-events-none"
@@ -58,63 +59,65 @@ export function TourOverlay() {
             width: targetRect.width,
             height: targetRect.height,
             background: "transparent",
-            boxShadow: `0 0 0 2px var(--accent), 0 0 0 9999px rgba(0,0,0,0.55)`,
-            borderRadius: "var(--radius-card)",
+            boxShadow: `0 0 0 2px var(--accent), 0 0 0 9999px rgba(0,0,0,0.6)`,
+            borderRadius: "12px",
           }}
         />
       )}
 
-      {/* Step card: positioned so it always stays in viewport */}
+      {/* Step card — polished B2B style */}
       <div
-        className="fixed z-[201] w-full max-w-sm px-4 pointer-events-auto"
+        className="fixed z-[201] w-full max-w-[28rem] px-4 pointer-events-auto"
         style={getStepCardPosition(targetRect)}
       >
-        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-[var(--shadow-card)] p-4">
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.06)] p-6">
+          {/* Progress bar */}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--background)]">
+              <div
+                className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-[var(--muted)] tabular-nums">
+              {stepIndex + 1} of {stepCount}
+            </span>
+          </div>
+
           <h2
             id="tour-step-title"
-            className="text-base font-semibold text-[var(--foreground)]"
+            className="text-lg font-semibold tracking-tight text-[var(--foreground)]"
           >
             {step.title}
           </h2>
           <p
             id="tour-step-content"
-            className="mt-1.5 text-sm text-[var(--muted)] leading-relaxed"
+            className="mt-2 text-[15px] leading-relaxed text-[var(--muted)]"
           >
             {step.content}
           </p>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Button
+              <button
                 type="button"
-                variant="secondary"
-                size="sm"
                 onClick={back}
                 disabled={isFirst}
+                className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--background)]/80 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                 aria-label="Previous step"
               >
                 Back
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant="primary"
-                size="sm"
                 onClick={next}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(59,130,246,0.4)] hover:bg-[var(--accent-hover)] transition-colors"
                 aria-label={isLast ? "Finish tour" : "Next step"}
               >
-                {isLast ? "Finish" : "Next"}
-              </Button>
+                {nextLabel}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={skip}
-              className="text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
-            >
-              Skip tour
-            </button>
           </div>
-          <p className="mt-2 text-xs text-[var(--muted)]">
-            {stepIndex + 1} of {stepCount}
-          </p>
         </div>
       </div>
     </div>

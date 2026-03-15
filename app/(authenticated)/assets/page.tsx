@@ -476,6 +476,7 @@ export default async function AssetsPage({
 
   return (
     <div className="space-y-8" data-tour="assets:asset-list">
+      <div data-tour="demo-guided:asset-history" className="space-y-8">
       <PageHeader
         icon={<Factory className="size-5" />}
         title="Assets"
@@ -534,6 +535,7 @@ export default async function AssetsPage({
         }}
         parentCandidates={parentCandidates}
       />
+      </div>
     </div>
   );
 }

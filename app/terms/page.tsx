@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import { LegalPageLayout, LegalSection } from "../components/legal-page-layout";
 
-export const metadata = {
-  title: "Terms of Service | Cornerstone OS",
+export const metadata: Metadata = {
+  title: "Terms of Service",
   description:
-    "Terms of Service for Cornerstone OS — The Operations System for Maintenance Teams",
+    "Terms of Service for Cornerstone OS. Description of service, eligibility, acceptable use, and more. The Operations System for Maintenance Teams.",
 };
 
 function getLastUpdated(): string {

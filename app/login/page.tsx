@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { DEMO_LOGIN_CONFIG } from "@/lib/marketing-site";
 import { CalendarCheck, LayoutGrid, Users } from "lucide-react";
 import { LoginForm } from "./login-form";
 
@@ -11,9 +12,12 @@ export const metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; demo?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, demo } = await searchParams;
+  const demoConfig = demo ? DEMO_LOGIN_CONFIG[demo] : null;
+  const demoPassword =
+    demoConfig && process.env.DEMO_PASSWORD ? process.env.DEMO_PASSWORD : undefined;
 
   return (
     <div className="flex min-h-screen min-h-[100dvh] flex-col lg:flex-row lg:items-start">
@@ -123,7 +127,12 @@ export default async function LoginPage({
                 Enter your credentials to access your account
               </p>
             </div>
-            <LoginForm next={next} />
+            <LoginForm
+              next={next}
+              demoEmail={demoConfig?.demoEmail}
+              demoLabel={demoConfig?.label}
+              demoPassword={demoPassword}
+            />
           </div>
           <p className="mt-6 text-center text-xs leading-relaxed text-[var(--muted)] sm:mt-8">
             By signing in, you agree to our{" "}

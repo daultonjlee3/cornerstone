@@ -87,6 +87,7 @@ export async function getTenantIdForUser(
     .from("tenant_memberships")
     .select("tenant_id")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   return (data as { tenant_id?: string } | null)?.tenant_id ?? null;
@@ -136,6 +137,24 @@ export async function getMembershipRoleForUser(
   if (!role) return null;
   if (["owner", "admin", "member", "viewer"].includes(role)) return role as TenantMembershipRole;
   return null;
+}
+
+/** True if the user has any tenant_membership with role demo_guest (temporary live demo access). */
+export async function isDemoGuestUser(
+  supabase?: Awaited<ReturnType<typeof createClient>>,
+  effectiveUserId?: string | null
+): Promise<boolean> {
+  const client = supabase ?? (await getSupabaseClient());
+  const userId = effectiveUserId ?? (await getEffectiveUserId(client));
+  if (!userId) return false;
+  const { data } = await client
+    .from("tenant_memberships")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "demo_guest")
+    .limit(1)
+    .maybeSingle();
+  return !!data;
 }
 
 /** True if the given user id is in platform_super_admins. Use real auth user id, not acting. */

@@ -411,7 +411,8 @@ export function WorkOrdersList({
           }
         />
       )}
-      <div data-tour="work-orders:statuses">
+      <div data-tour="demo-guided:completion">
+        <div data-tour="work-orders:statuses">
         <WorkOrderKpiBar
           stats={{
             open: stats.open,
@@ -422,6 +423,7 @@ export function WorkOrdersList({
             completedToday: stats.completedToday,
           }}
         />
+        </div>
       </div>
       <Suspense fallback={null}>
         <WorkOrderSavedViews />
@@ -511,6 +513,7 @@ export function WorkOrdersList({
           </button>
         </div>
       ) : (
+        <div data-tour="demo-guided:execution">
         <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/90 shadow-[var(--shadow-soft)]" data-tour="work-orders:assignment">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] text-left text-sm">
@@ -618,6 +621,7 @@ export function WorkOrdersList({
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 

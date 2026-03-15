@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import { LegalPageLayout, LegalSection } from "../components/legal-page-layout";
 
-export const metadata = {
-  title: "Privacy Policy | Cornerstone OS",
+export const metadata: Metadata = {
+  title: "Privacy Policy",
   description:
-    "Privacy Policy for Cornerstone OS — The Operations System for Maintenance Teams",
+    "Privacy Policy for Cornerstone OS. How we collect, use, store, and protect your information. The Operations System for Maintenance Teams.",
 };
 
 function getLastUpdated(): string {

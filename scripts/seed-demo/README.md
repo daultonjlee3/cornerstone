@@ -32,17 +32,30 @@ npx tsx scripts/seed-demo/run.ts
 - **Idempotent**: If a tenant with the same slug and company name already exists, that tenant is skipped (no duplicate data).
 - **One Pexels image per asset type** per run; images are reused across all assets of that type.
 - Work order and PM dates are relative to **today** (overdue, due today, this week, completed recently) so demos feel current when reseeded; work request and activity log timestamps are spread over the past weeks/months so history feels real.
-- No auth users are created; use Supabase Dashboard or your auth flow to create demo users and link them to tenants via `tenant_memberships`.
+- No auth users are created by the seed; use the **demo users** script (see below) or Supabase Dashboard to create one user per demo and link them to tenants.
 
-## Demo user accounts (optional)
+## Demo user accounts (one per demo)
 
-To allow self-serve demo login, create users in Supabase Auth and then:
+To allow self-serve demo login (“See How It Works” → industry → sign in with pre-filled credentials), create **one Supabase Auth user per demo account**. All four share the same password (`DEMO_PASSWORD` in `.env.local`).
 
-1. Insert into `public.users` (or rely on the `handle_new_auth_user` trigger).
-2. Insert into `public.tenant_memberships` (tenant_id, user_id, role e.g. 'admin').
-3. Optionally insert into `public.company_memberships` (company_id, user_id, role).
+**Option A — Script (recommended)**
 
-Example emails you could create and document:
+1. Add to `.env.local`: `DEMO_PASSWORD=your-secure-demo-password`
+2. Run the demo seed if you haven’t: `npm run seed:demo`
+3. Create the four demo users and tenant memberships:
+
+   ```bash
+   npm run seed:demo:users
+   ```
+
+   This creates (or reuses) Auth users for the emails in `DEMO_LOGIN_CONFIG` and links each to its tenant with role `admin`. Idempotent: safe to run again.
+
+**Option B — Manual (Supabase Dashboard)**
+
+1. Create four users in Supabase Auth with the emails below and the same password; set it in `.env.local` as `DEMO_PASSWORD`.
+2. Insert into `public.tenant_memberships` (tenant_id, user_id, role = 'admin') for each. `public.users` rows are created by the `handle_new_auth_user` trigger.
+
+**Demo emails (one user each):**
 
 - facility-demo@cornerstonecmms.com → Summit Facility Services (tenant slug: summit-facility-demo)
 - manufacturing-demo@cornerstonecmms.com → Northstar (slug: northstar-manufacturing-demo)

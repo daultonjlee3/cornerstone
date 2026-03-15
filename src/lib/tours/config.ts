@@ -1,5 +1,63 @@
 import type { TourConfig } from "./types";
 
+/** 6-step guided demo tour: workflow narrative across dashboard → work orders → dispatch → execution → completion → assets. */
+export const demoGuidedTourConfig: TourConfig = {
+  id: "demo-guided",
+  name: "2-Minute Guided Tour",
+  path: "/dashboard",
+  autoStart: false,
+  steps: [
+    {
+      id: "command-center",
+      path: "/dashboard",
+      title: "Your maintenance operation, in one place",
+      content:
+        "The Command Center gives you real-time visibility into open work orders, technician activity, overdue work, and scheduled maintenance.",
+      cta: "Next: See how work starts",
+    },
+    {
+      id: "work-orders",
+      path: "/work-orders",
+      title: "Every job starts as a work order",
+      content:
+        "Track maintenance requests from creation through completion. Work orders help your team stay organized, accountable, and on schedule.",
+      cta: "Next: Dispatch the right technician",
+    },
+    {
+      id: "dispatch",
+      path: "/dispatch",
+      title: "Dispatch the right technician at the right time",
+      content:
+        "Assign work, manage schedules, and keep field teams moving efficiently with full visibility into the day's workload.",
+      cta: "Next: See the technician workflow",
+    },
+    {
+      id: "execution",
+      path: "/work-orders",
+      title: "Technicians get the context they need to execute",
+      content:
+        "Each work order gives technicians the job details, asset context, history, and updates they need to complete work efficiently.",
+      cta: "Next: Track completion automatically",
+    },
+    {
+      id: "completion",
+      path: "/work-orders",
+      title: "Completion updates the system automatically",
+      content:
+        "As work is completed, status changes, timestamps, and activity logs are captured for operational visibility and accountability.",
+      cta: "Next: Build asset history",
+    },
+    {
+      id: "asset-history",
+      path: "/assets",
+      title: "Every completed job builds asset history",
+      content:
+        "Cornerstone helps teams track maintenance history, equipment performance, and service trends so they can make smarter decisions over time.",
+      cta: "Finish Tour",
+    },
+  ],
+};
+
 export const tourConfigs: TourConfig[] = [
   {
     id: "dashboard",
@@ -206,17 +264,19 @@ export const tourConfigs: TourConfig[] = [
       },
     ],
   },
+  demoGuidedTourConfig,
 ];
 
-/** Get tour config for a pathname. Uses exact match first, then path prefix. */
+/** Get tour config for a pathname. Uses exact match first, then path prefix. Skips tours with autoStart: false. */
 export function getTourForPath(pathname: string): TourConfig | null {
   const normalized = pathname.replace(/\/$/, "") || "/";
-  const exact = tourConfigs.find((t) => {
+  const autoStartable = tourConfigs.filter((t) => t.autoStart !== false);
+  const exact = autoStartable.find((t) => {
     const p = t.path.replace(/\/$/, "") || "/";
     return p === normalized;
   });
   if (exact) return exact;
-  const prefix = tourConfigs.find((t) => {
+  const prefix = autoStartable.find((t) => {
     const p = t.path.replace(/\/$/, "") || "/";
     return p !== "/" && normalized.startsWith(p);
   });

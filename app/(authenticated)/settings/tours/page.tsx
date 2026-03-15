@@ -21,8 +21,14 @@ export default function SettingsToursPage() {
   };
 
   const handleStartTour = (tourId: string) => {
+    const config = tourConfigs.find((t) => t.id === tourId);
+    const path = config?.path ?? "/dashboard";
+    if (tourId === "demo-guided") {
+      router.push(path + "?startTour=demo-guided");
+      return;
+    }
     startTour(tourId);
-    router.push(tourConfigs.find((t) => t.id === tourId)?.path ?? "/dashboard");
+    router.push(path);
   };
 
   return (

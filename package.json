@@ -10,6 +10,7 @@
     "seed:demo": "tsx scripts/seed-demo/run.ts",
     "seed:demo:reset": "tsx scripts/seed-demo/reset.ts",
     "seed:demo:refresh": "tsx scripts/seed-demo/reset.ts && tsx scripts/seed-demo/run.ts",
+    "seed:demo:users": "tsx scripts/seed-demo/create-demo-users.ts",
     "make-super-admin": "tsx scripts/make-super-admin.ts"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/leaflet": "^1.9.21",

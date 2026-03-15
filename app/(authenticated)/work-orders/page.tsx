@@ -426,7 +426,7 @@ export default async function WorkOrdersPage({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="demo-guided:work-orders">
       <WorkOrdersList
         workOrders={workOrders}
         stats={stats}

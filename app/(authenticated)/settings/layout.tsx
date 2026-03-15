@@ -2,7 +2,7 @@ import { Settings } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser, getTenantIdForUser, getMembershipRoleForUser } from "@/src/lib/auth-context";
+import { getCurrentUser, getTenantIdForUser, getMembershipRoleForUser, isDemoGuestUser } from "@/src/lib/auth-context";
 import { PageHeader } from "@/src/components/ui/page-header";
 
 const settingsNav = [
@@ -24,6 +24,9 @@ export default async function SettingsLayout({
 
   const tenantId = await getTenantIdForUser(supabase, user.id);
   if (!tenantId) redirect("/onboarding");
+
+  const isDemoGuest = await isDemoGuestUser(supabase, user.id);
+  if (isDemoGuest) redirect("/dashboard");
 
   const role = await getMembershipRoleForUser(supabase, user.id);
   const canAccess = role === "owner" || role === "admin";

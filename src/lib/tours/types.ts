@@ -7,6 +7,10 @@ export type TourStep = {
   id: string;
   title: string;
   content: string;
+  /** Optional CTA for the Next button (e.g. "Next: See how work starts"). */
+  cta?: string;
+  /** For cross-route tours: route to be on for this step (navigate here before showing step). */
+  path?: string;
 };
 
 export type TourConfig = {
@@ -15,6 +19,8 @@ export type TourConfig = {
   /** Path pattern: exact path (e.g. /dashboard) or prefix (e.g. /work-orders). Tour runs when pathname matches. */
   path: string;
   steps: TourStep[];
+  /** If false, tour is only started manually (e.g. welcome modal); never auto-started by path. Default true. */
+  autoStart?: boolean;
 };
 
 /** Build data-tour attribute value for a step. */
