@@ -10,13 +10,13 @@ type LoginFormProps = {
 };
 
 const inputBase =
-  "w-full min-h-[48px] rounded-xl border bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder:text-slate-500 transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 focus:border-[var(--accent)] dark:bg-slate-700/80 dark:text-slate-100 dark:placeholder:text-slate-400 dark:border-slate-600 dark:hover:border-slate-500 sm:min-h-0 sm:text-[15px]";
+  "w-full min-h-[52px] rounded-xl border bg-white py-3.5 pl-11 pr-4 text-base text-slate-900 placeholder:text-slate-500 transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 focus:border-[var(--accent)] dark:bg-slate-700/80 dark:text-slate-100 dark:placeholder:text-slate-400 dark:border-slate-600 dark:hover:border-slate-500 sm:min-h-0 sm:text-[15px]";
 
 export function LoginForm({ next }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, {});
 
   return (
-    <form action={formAction} className="space-y-5 sm:space-y-6 transition-colors duration-200">
+    <form action={formAction} className="space-y-6 sm:space-y-6">
       {next ? <input type="hidden" name="next" value={next} /> : null}
       {state?.error && (
         <div
@@ -82,7 +82,7 @@ export function LoginForm({ next }: LoginFormProps) {
       </div>
       <button
         type="submit"
-        className="w-full min-h-[52px] rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-sm transition-[background-color,transform,box-shadow] duration-200 ease-out hover:bg-[var(--accent-hover)] hover:shadow-[0_4px_14px_rgba(47,120,255,0.35)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:transition-none active:scale-[0.99] sm:min-h-0"
+        className="w-full min-h-[52px] rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 ease-out hover:-translate-y-px hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:transition-none active:scale-[0.99] sm:min-h-0"
       >
         Sign in
       </button>
