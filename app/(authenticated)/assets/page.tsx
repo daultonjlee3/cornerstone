@@ -352,7 +352,7 @@ export default async function AssetsPage({
       : assetsQuery;
   const { count: totalCount } =
     countQuery != null
-      ? await countQuery.select("id", { count: "exact", head: true })
+      ? await (countQuery as { select: (columns: string, options: { count: "exact"; head: true }) => Promise<{ count: number | null }> }).select("id", { count: "exact", head: true })
       : { count: 0 };
 
   const assetsResponse =
