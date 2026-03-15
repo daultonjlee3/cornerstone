@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { TechnicianExecutionView } from "../components/technician-execution-view";
 
 export const metadata = {
@@ -20,13 +21,8 @@ export default async function TechnicianExecutionPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: workOrderRaw, error } = await supabase
     .from("work_orders")
@@ -53,7 +49,7 @@ export default async function TechnicianExecutionPage({
     .from("companies")
     .select("id")
     .eq("id", companyId)
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!company) notFound();
 

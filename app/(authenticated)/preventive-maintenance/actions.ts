@@ -10,6 +10,7 @@ import {
   type PreventiveMaintenanceFrequencyType,
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 const FREQUENCY_TYPES = [
   "daily",
@@ -53,21 +54,6 @@ type PlanRow = {
   instructions: string | null;
   status: "active" | "paused" | "archived";
 };
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
-}
 
 async function getActorId(
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -373,7 +359,8 @@ export async function savePreventiveMaintenancePlan(
   _prev: PreventiveMaintenanceFormState,
   formData: FormData
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string | null)?.trim() || null;
@@ -429,7 +416,6 @@ export async function savePreventiveMaintenancePlan(
     formData.get("auto_create_work_order") !== null &&
     formData.get("auto_create_work_order") !== "off";
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   let beforeState: Record<string, unknown> | null = null;
 
@@ -523,10 +509,9 @@ export async function savePreventiveMaintenancePlan(
 export async function deletePreventiveMaintenancePlan(
   id: string
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("preventive_maintenance_plans")
     .select("id, company_id, asset_id")
@@ -557,10 +542,10 @@ export async function updatePreventiveMaintenancePlanStatus(
   id: string,
   status: "active" | "paused" | "archived"
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("preventive_maintenance_plans")
@@ -611,11 +596,11 @@ export async function updatePreventiveMaintenancePlanStatus(
 export async function duplicatePreventiveMaintenancePlan(
   id: string
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const today = formatDateOnly(new Date());
-  const supabase = await createClient();
   const { data: row } = await supabase
     .from("preventive_maintenance_plans")
     .select("*")
@@ -661,7 +646,8 @@ export async function savePreventiveMaintenanceTemplate(
   _prev: PreventiveMaintenanceFormState,
   formData: FormData
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string | null)?.trim() || null;
@@ -697,7 +683,6 @@ export async function savePreventiveMaintenanceTemplate(
     instructions: (formData.get("instructions") as string | null)?.trim() || null,
   };
 
-  const supabase = await createClient();
   if (id) {
     const { data: existing } = await supabase
       .from("preventive_maintenance_templates")
@@ -730,10 +715,9 @@ export async function savePreventiveMaintenanceTemplate(
 export async function deletePreventiveMaintenanceTemplate(
   id: string
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("preventive_maintenance_templates")
     .select("company_id")
@@ -761,7 +745,8 @@ export async function bulkCreatePlansFromTemplate(
   _prev: PreventiveMaintenanceFormState,
   formData: FormData
 ): Promise<PreventiveMaintenanceFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const templateId = (formData.get("template_id") as string | null)?.trim();
@@ -781,7 +766,6 @@ export async function bulkCreatePlansFromTemplate(
   const allowed = await companyBelongsToTenant(companyId, tenantId);
   if (!allowed) return { error: "Invalid company." };
 
-  const supabase = await createClient();
   const { data: template } = await supabase
     .from("preventive_maintenance_templates")
     .select("*")
@@ -848,10 +832,10 @@ export async function bulkCreatePlansFromTemplate(
 export async function generatePreventiveMaintenanceNow(
   planId: string
 ): Promise<PreventiveMaintenanceGenerationState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("preventive_maintenance_plans")
@@ -896,12 +880,12 @@ export async function generatePreventiveMaintenanceNow(
 export async function generateDuePreventiveMaintenanceRuns(
   targetDate?: string
 ): Promise<PreventiveMaintenanceGenerationState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const runDate = targetDate ? formatDateOnly(targetDate) : formatDateOnly(new Date());
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: companies } = await supabase
     .from("companies")

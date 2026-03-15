@@ -5,6 +5,7 @@ import { isPlatformSuperAdmin } from "@/src/lib/auth-context";
 import { getCompletedTourIds } from "./tours/actions";
 import { getImpersonationStateFromCookie } from "@/src/lib/impersonation";
 import { getImpersonationSession } from "@/src/lib/portal/access";
+import { getActingTenantIdFromCookie } from "@/src/lib/acting-tenant";
 
 export default async function AuthenticatedLayout({
   children,
@@ -20,14 +21,42 @@ export default async function AuthenticatedLayout({
   const impersonationState = await getImpersonationStateFromCookie();
   const effectiveUserId = impersonationState?.actingAsUserId ?? user.id;
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id, tenants(name)")
-    .eq("user_id", effectiveUserId)
-    .limit(1)
-    .maybeSingle();
+  const isSuperAdmin = await isPlatformSuperAdmin(supabase);
 
-  if (!membership) redirect("/onboarding");
+  let membership: { tenant_id: string; tenants: { name: string } | { name: string }[] | null } | null = null;
+
+  // Super admin "work in this tenant": prefer acting-tenant cookie when set (so you can leave your home tenant)
+  if (isSuperAdmin) {
+    const actingTenantId = await getActingTenantIdFromCookie();
+    if (actingTenantId) {
+      const { data: tenant } = await supabase
+        .from("tenants")
+        .select("id, name")
+        .eq("id", actingTenantId)
+        .maybeSingle();
+      if (tenant?.id) {
+        membership = {
+          tenant_id: tenant.id,
+          tenants: { name: (tenant as { name?: string }).name ?? "Tenant" },
+        };
+      }
+    }
+  }
+
+  if (!membership) {
+    membership = await supabase
+      .from("tenant_memberships")
+      .select("tenant_id, tenants(name)")
+      .eq("user_id", effectiveUserId)
+      .limit(1)
+      .maybeSingle()
+      .then((r) => r.data);
+  }
+
+  if (!membership) {
+    if (isSuperAdmin) redirect("/platform/tenants?switch=1");
+    redirect("/onboarding");
+  }
 
   const { data: profile } = await supabase
     .from("users")

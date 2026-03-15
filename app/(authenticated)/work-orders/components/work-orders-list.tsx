@@ -20,6 +20,7 @@ import { PageHeader } from "@/src/components/ui/page-header";
 import { ActionBar } from "@/src/components/ui/action-bar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 import { Hint } from "@/src/components/ui/hint";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id: string };
@@ -143,7 +144,6 @@ export function WorkOrdersList({
   const [prefill, setPrefill] = useState<WorkOrderPrefill | null>(initialPrefill);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [assigningWorkOrder, setAssigningWorkOrder] = useState<WorkOrderListRow | null>(null);
-  const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailDrawerRow, setDetailDrawerRow] = useState<WorkOrderListRow | null>(null);
   const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
@@ -221,7 +221,6 @@ export function WorkOrdersList({
     router.refresh();
   };
   const setStatusForRow = (wo: WorkOrderListRow, newStatus: string) => {
-    setStatusDropdownId(null);
     startTransition(async () => {
       const result = await updateWorkOrderStatus(wo.id, newStatus);
       if (result.error) setMessage({ type: "error", text: result.error });
@@ -598,70 +597,21 @@ export function WorkOrdersList({
                     <td className="px-4 py-3.5 text-[var(--muted)]">{assignedDisplay(wo)}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
                     <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link
-                          href={`/work-orders/${wo.id}`}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          View
-                        </Link>
-                        <span className="text-[var(--muted)]">|</span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); setAssigningWorkOrder(wo); }}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Assign
-                        </button>
-                        <span className="text-[var(--muted)]">|</span>
-                        <div className="relative inline-block">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); setStatusDropdownId((id) => (id === wo.id ? null : wo.id)); }}
-                            className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                          >
-                            Change status
-                          </button>
-                          {statusDropdownId === wo.id && (
-                            <>
-                              <div className="absolute left-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
-                                {STATUS_OPTIONS_QUICK.map((s) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => setStatusForRow(wo, s)}
-                                    disabled={isPending}
-                                    className="block w-full px-3 py-1.5 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
-                                  >
-                                    {s.replace(/_/g, " ")}
-                                  </button>
-                                ))}
-                              </div>
-                              <div
-                                className="fixed inset-0 z-0"
-                                aria-hidden
-                                onClick={() => setStatusDropdownId(null)}
-                              />
-                            </>
-                          )}
-                        </div>
-                        <span className="text-[var(--muted)]">|</span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); openEdit(wo); }}
-                          className="rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); handleDelete(wo.id, wo.title); }}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <ActionsDropdown
+                        align="right"
+                        items={[
+                          { type: "link", label: "View", href: `/work-orders/${wo.id}` },
+                          { type: "button", label: "Assign", onClick: () => setAssigningWorkOrder(wo) },
+                          ...STATUS_OPTIONS_QUICK.map((s) => ({
+                            type: "button" as const,
+                            label: `Mark ${s.replace(/_/g, " ")}`,
+                            onClick: () => setStatusForRow(wo, s),
+                            disabled: isPending,
+                          })),
+                          { type: "button", label: "Edit", onClick: () => openEdit(wo) },
+                          { type: "button", label: "Delete", onClick: () => handleDelete(wo.id, wo.title), disabled: isPending, destructive: true },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

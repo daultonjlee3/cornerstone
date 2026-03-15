@@ -3,23 +3,9 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress } from "@/src/lib/geocoding";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type BuildingFormState = { error?: string; success?: boolean };
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
-}
 
 async function propertyBelongsToTenant(propertyId: string, tenantId: string): Promise<boolean> {
   const supabase = await createClient();
@@ -42,7 +28,8 @@ export async function saveBuilding(
   _prev: BuildingFormState,
   formData: FormData
 ): Promise<BuildingFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -103,7 +90,6 @@ export async function saveBuilding(
     notes: (formData.get("notes") as string)?.trim() || null,
   };
 
-  const supabase = await createClient();
   if (id) {
     const { data: row } = await supabase
       .from("buildings")
@@ -124,10 +110,9 @@ export async function saveBuilding(
 }
 
 export async function deleteBuilding(id: string): Promise<BuildingFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("buildings")
     .select("property_id")

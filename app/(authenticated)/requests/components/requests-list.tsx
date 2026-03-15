@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { approveWorkRequest, convertWorkRequestToWorkOrder, rejectWorkRequest } from "../actions";
 import { Button } from "@/src/components/ui/button";
 import { DataTable, Table, TableHead, TBody, Tr, Th, Td } from "@/src/components/ui/data-table";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 
@@ -222,41 +223,14 @@ export function RequestsList({ requests }: { requests: WorkRequestListItem[] }) 
                     {new Date(request.created_at).toLocaleString()}
                   </Td>
                   <Td>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={pending || !canApprove}
-                        onClick={() =>
-                          runAction(approveWorkRequest, request.id, "Request approved.")
-                        }
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={pending || !canReject}
-                        onClick={() =>
-                          runAction(rejectWorkRequest, request.id, "Request rejected.")
-                        }
-                      >
-                        Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={pending || !canConvert}
-                        onClick={() =>
-                          runAction(
-                            convertWorkRequestToWorkOrder,
-                            request.id,
-                            "Request converted to work order."
-                          )
-                        }
-                      >
-                        Convert
-                      </Button>
-                    </div>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "button", label: "Approve", onClick: () => runAction(approveWorkRequest, request.id, "Request approved."), disabled: pending || !canApprove },
+                        { type: "button", label: "Reject", onClick: () => runAction(rejectWorkRequest, request.id, "Request rejected."), disabled: pending || !canReject },
+                        { type: "button", label: "Convert to WO", onClick: () => runAction(convertWorkRequestToWorkOrder, request.id, "Request converted to work order."), disabled: pending || !canConvert },
+                      ]}
+                    />
                   </Td>
                 </Tr>
               );

@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition, useState, useCallback } from "react";
 import { deleteProperty } from "../actions";
 import type { Property } from "./property-form-modal";
 import { PropertyFormModal } from "./property-form-modal";
 import { saveProperty } from "../actions";
 import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
 import {
   DataTable,
   Table,
@@ -26,10 +28,22 @@ type PropertiesListProps = {
   companies: CompanyOption[];
   error?: string | null;
   mapboxToken?: string | null;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
 };
 
 function propertyDisplayName(p: Property): string {
   return p.property_name ?? (p as { name?: string }).name ?? "—";
+}
+
+function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
+  const next = new URLSearchParams(searchParams.toString());
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === "" || value == null) next.delete(key);
+    else next.set(key, value);
+  });
+  return next.toString();
 }
 
 export function PropertiesList({
@@ -37,9 +51,20 @@ export function PropertiesList({
   companies,
   error: initialError,
   mapboxToken,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
 }: PropertiesListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const applyParams = useCallback(
+    (updates: Record<string, string>) => {
+      const query = buildParams(searchParams, updates);
+      startTransition(() => router.push(`/properties${query ? `?${query}` : ""}`));
+    },
+    [router, searchParams]
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -128,34 +153,29 @@ export function PropertiesList({
                     <StatusBadge status={p.status} />
                   </Td>
                   <Td>
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/work-orders?new=1&company_id=${encodeURIComponent(p.company_id)}&property_id=${encodeURIComponent(p.id)}`}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Create Work Order
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(p)}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(p.id, propertyDisplayName(p))}
-                        disabled={isPending}
-                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "link", label: "Create Work Order", href: `/work-orders?new=1&company_id=${encodeURIComponent(p.company_id)}&property_id=${encodeURIComponent(p.id)}` },
+                        { type: "button", label: "Edit", onClick: () => openEdit(p) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(p.id, propertyDisplayName(p)), disabled: isPending, destructive: true },
+                      ]}
+                    />
                   </Td>
                 </Tr>
               ))}
             </TBody>
           </Table>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyParams({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyParams({ page_size: String(size), page: "1" })}
+            />
+          )}
         </DataTable>
       )}
 

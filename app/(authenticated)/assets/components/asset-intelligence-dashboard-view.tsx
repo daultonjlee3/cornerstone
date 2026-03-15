@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Package, Percent, AlertTriangle, AlertOctagon } from "lucide-react";
 import { MetricCard } from "@/src/components/ui/metric-card";
 import type {
   AssetInsightSeverity,
@@ -90,23 +91,27 @@ export function AssetIntelligenceDashboardView({
           title="Total Assets"
           value={data.portfolio.totalAssets}
           description="In current tenant scope"
+          icon={Package}
         />
         <MetricCard
           title="PM Compliance Rate"
           value={`${data.portfolio.pmComplianceRate.toFixed(1)}%`}
           description="Active PM plans on schedule"
+          icon={Percent}
         />
         <MetricCard
           title="Assets Nearing End of Life"
           value={data.portfolio.assetsNearingEndOfLife}
           description=">= 85% of expected lifecycle"
           className="border-amber-200/80 bg-amber-50/40"
+          icon={AlertTriangle}
         />
         <MetricCard
           title="High Failure Risk Assets"
           value={data.highFailureRiskAssets.filter((row) => (row.failureRisk ?? 0) >= 70).length}
           description="Risk score >= 70"
           className="border-red-200/80 bg-red-50/40"
+          icon={AlertOctagon}
         />
       </section>
 

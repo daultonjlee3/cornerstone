@@ -382,17 +382,30 @@ export async function generateAssetInsightForAsset(
 
 export async function generateAssetInsights(
   tenantId: string,
-  options?: { companyId?: string | null; limit?: number; supabase?: SupabaseClient }
+  options?: {
+    companyId?: string | null;
+    companyIds?: string[];
+    limit?: number;
+    supabase?: SupabaseClient;
+  }
 ): Promise<AssetIntelligenceInsight[]> {
   const scopedSupabase =
     options?.supabase ?? ((await createClient()) as unknown as SupabaseClient);
-  const scope = await resolveTenantScope(scopedSupabase);
-  if (scope.tenantId !== tenantId) throw new Error("Unauthorized.");
 
-  const scopedCompanyIds =
-    options?.companyId && scope.companyIds.includes(options.companyId)
-      ? [options.companyId]
-      : scope.companyIds;
+  let scopedCompanyIds: string[];
+  if (options?.companyIds != null && options.companyIds.length > 0) {
+    scopedCompanyIds =
+      options?.companyId && options.companyIds.includes(options.companyId)
+        ? [options.companyId]
+        : options.companyIds;
+  } else {
+    const scope = await resolveTenantScope(scopedSupabase);
+    if (scope.tenantId !== tenantId) throw new Error("Unauthorized.");
+    scopedCompanyIds =
+      options?.companyId && scope.companyIds.includes(options.companyId)
+        ? [options.companyId]
+        : scope.companyIds;
+  }
   const limit = Math.max(1, Math.min(options?.limit ?? 50, 200));
   const todayDateOnly = new Date().toISOString().slice(0, 10);
   const sixMonthsAgo = new Date();
@@ -686,7 +699,12 @@ export async function generateAssetInsights(
 
 export async function getPortfolioFailurePatterns(
   tenantId: string,
-  options?: { companyId?: string | null; limit?: number; supabase?: SupabaseClient }
+  options?: {
+    companyId?: string | null;
+    companyIds?: string[];
+    limit?: number;
+    supabase?: SupabaseClient;
+  }
 ): Promise<
   Array<{
     patternKey: string;
@@ -699,13 +717,22 @@ export async function getPortfolioFailurePatterns(
 > {
   const scopedSupabase =
     options?.supabase ?? ((await createClient()) as unknown as SupabaseClient);
-  const scope = await resolveTenantScope(scopedSupabase);
-  if (scope.tenantId !== tenantId) throw new Error("Unauthorized.");
 
-  const scopedCompanyIds =
-    options?.companyId && scope.companyIds.includes(options.companyId)
-      ? [options.companyId]
-      : scope.companyIds;
+  let scopedCompanyIds: string[];
+  if (options?.companyIds != null && options.companyIds.length > 0) {
+    scopedCompanyIds =
+      options?.companyId && options.companyIds.includes(options.companyId)
+        ? [options.companyId]
+        : options.companyIds;
+  } else {
+    const scope = await resolveTenantScope(scopedSupabase);
+    if (scope.tenantId !== tenantId) throw new Error("Unauthorized.");
+    scopedCompanyIds =
+      options?.companyId && scope.companyIds.includes(options.companyId)
+        ? [options.companyId]
+        : scope.companyIds;
+  }
+
   const limit = Math.max(1, Math.min(options?.limit ?? 10, 25));
 
   const loader = unstable_cache(

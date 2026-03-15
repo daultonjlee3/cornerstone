@@ -11,6 +11,7 @@ import {
   getImpersonationStateFromCookie,
   getEffectiveUserId as getEffectiveUserIdFromCookie,
 } from "@/src/lib/impersonation";
+import { getActingTenantIdFromCookie } from "@/src/lib/acting-tenant";
 
 export type TenantMembershipRole = "owner" | "admin" | "member" | "viewer";
 
@@ -65,14 +66,22 @@ export async function getImpersonationState(): Promise<{
   return { originalUserId: user.id, actingAsUserId: fromCookie.actingAsUserId, startedAt: fromCookie.startedAt };
 }
 
-/** Tenant ID for the effective user (first membership). Null if not in any tenant. */
+/** Tenant ID for the effective user (first membership). Super admins can use acting-tenant cookie to work in any tenant. */
 export async function getTenantIdForUser(
   supabase?: Awaited<ReturnType<typeof createClient>>,
   effectiveUserId?: string | null
 ): Promise<string | null> {
   const client = supabase ?? (await getSupabaseClient());
-  const userId =
-    effectiveUserId ?? (await getEffectiveUserId(client));
+  const {
+    data: { user: authUser },
+  } = await client.auth.getUser();
+  if (!authUser) return null;
+  // Super admin "jump tenant": use acting-tenant cookie when set
+  if (await isUserPlatformSuperAdmin(authUser.id, client)) {
+    const actingTenantId = await getActingTenantIdFromCookie();
+    if (actingTenantId) return actingTenantId;
+  }
+  const userId = effectiveUserId ?? (await getEffectiveUserId(client));
   if (!userId) return null;
   const { data } = await client
     .from("tenant_memberships")

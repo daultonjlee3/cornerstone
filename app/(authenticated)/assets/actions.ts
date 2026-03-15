@@ -7,23 +7,9 @@ import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelli
 import { getAssetHierarchyNode, wouldCreateAssetCycle } from "@/src/lib/assets/hierarchy";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import { revalidatePath } from "next/cache";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type AssetFormState = { error?: string; success?: boolean };
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
-}
 
 async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
   const supabase = await createClient();
@@ -103,7 +89,8 @@ export async function saveAsset(
   _prev: AssetFormState,
   formData: FormData
 ): Promise<AssetFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -130,7 +117,6 @@ export async function saveAsset(
       ? "inactive"
       : "active";
 
-  const supabase = await createClient();
   const hierarchyError = await validateLocationHierarchy(supabase, {
     companyId,
     propertyId,
@@ -340,10 +326,9 @@ export async function saveAsset(
 }
 
 export async function deleteAsset(id: string): Promise<AssetFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("assets")
     .select("company_id, parent_asset_id")
@@ -380,10 +365,9 @@ export async function updateAssetStatus(
   id: string,
   status: "active" | "inactive" | "retired"
 ): Promise<AssetFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("assets")

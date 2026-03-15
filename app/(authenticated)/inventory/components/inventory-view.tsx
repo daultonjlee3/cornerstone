@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Package, AlertTriangle, MapPin } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/src/components/ui/button";
@@ -25,9 +26,9 @@ import {
   type StockLocationRecord,
 } from "./stock-location-form-modal";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { Hint } from "@/src/components/ui/hint";
 import { HelperTip } from "@/src/components/ui/helper-tip";
-import Link from "next/link";
 
 type InventoryBalanceRow = {
   id: string;
@@ -210,13 +211,14 @@ export function InventoryView({
         />
       )}
       <div className="grid gap-3 sm:grid-cols-3" data-tour="inventory:products">
-        <MetricCard title="Inventory rows" value={rows.length} />
+        <MetricCard title="Inventory rows" value={rows.length} icon={Package} />
         <MetricCard
           title="Low stock alerts"
           value={lowStockCount}
           trend={lowStockCount > 0 ? { label: "Needs replenishment", tone: "bad" } : { label: "No alerts", tone: "good" }}
+          icon={AlertTriangle}
         />
-        <MetricCard title="Tracked locations" value={locations.length} />
+        <MetricCard title="Tracked locations" value={locations.length} icon={MapPin} />
       </div>
 
       <div data-tour="inventory:stock-locations">
@@ -314,35 +316,20 @@ export function InventoryView({
                     )}
                   </Td>
                   <Td>
-                    <div className="flex flex-wrap gap-2">
-                      <Tooltip placement="top">
-                        <TooltipTrigger>
-                      <button
-                        className="text-[var(--accent)] hover:underline"
-                        onClick={() =>
-                          setAdjustment({
-                            productId: row.product_id,
-                            stockLocationId: row.stock_location_id,
-                            productName: row.product_name,
-                            locationName: row.location_name,
-                          })
-                        }
-                      >
-                        Adjust
-                      </button>
-                        </TooltipTrigger>
-                        <TooltipContent>Change stock level</TooltipContent>
-                      </Tooltip>
-                      <button
-                        className="text-[var(--accent)] hover:underline"
-                        onClick={() => {
-                          const location = locations.find((entry) => entry.id === row.stock_location_id);
-                          if (location) openLocationEdit(location);
-                        }}
-                      >
-                        Edit location
-                      </button>
-                    </div>
+                    <Tooltip placement="top">
+                      <TooltipTrigger asChild>
+                        <div>
+                          <ActionsDropdown
+                            align="right"
+                            items={[
+                              { type: "button", label: "Adjust", onClick: () => setAdjustment({ productId: row.product_id, stockLocationId: row.stock_location_id, productName: row.product_name, locationName: row.location_name }) },
+                              { type: "button", label: "Edit location", onClick: () => { const location = locations.find((entry) => entry.id === row.stock_location_id); if (location) openLocationEdit(location); } },
+                            ]}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Change stock level / edit location</TooltipContent>
+                    </Tooltip>
                   </Td>
                 </Tr>
               );

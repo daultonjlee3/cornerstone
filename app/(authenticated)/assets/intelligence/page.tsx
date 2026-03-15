@@ -3,6 +3,7 @@ import { Cpu } from "lucide-react";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { getAssetIntelligenceDashboard } from "@/src/lib/assets/assetIntelligenceService";
 import { AssetIntelligenceDashboardView } from "../components/asset-intelligence-dashboard-view";
 import { PageHeader } from "@/src/components/ui/page-header";
@@ -32,13 +33,8 @@ export default async function AssetIntelligencePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const params =
     typeof (searchParams as Promise<SearchParams>)?.then === "function"
@@ -49,7 +45,7 @@ export default async function AssetIntelligencePage({
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
 
   const dashboardData = await getAssetIntelligenceDashboard({

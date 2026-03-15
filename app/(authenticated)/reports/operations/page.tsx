@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, CheckCircle, Clock, AlertTriangle, Percent } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { MetricCard } from "@/src/components/ui/metric-card";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
@@ -95,18 +96,13 @@ export default async function OperationsReportsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
   const companyIds = (companies ?? []).map((row) => row.id);
 
   const intelligence = await loadOperationsIntelligenceData({
@@ -145,21 +141,25 @@ export default async function OperationsReportsPage() {
           title="PM On-Time"
           value={intelligence.pmCompliance.completedOnTime}
           description="Completed on or before scheduled date"
+          icon={require("lucide-react").CheckCircle}
         />
         <MetricCard
           title="PM Late"
           value={intelligence.pmCompliance.completedLate}
           description="Completed after scheduled date"
+          icon={Clock}
         />
         <MetricCard
           title="PM Missed"
           value={intelligence.pmCompliance.missed}
           description="Past due without completion"
+          icon={require("lucide-react").AlertTriangle}
         />
         <MetricCard
           title="PM Compliance"
           value={intelligence.pmCompliance.compliancePercentage != null ? formatPercent(intelligence.pmCompliance.compliancePercentage) : "—"}
           description={intelligence.pmCompliance.compliancePercentage != null ? "On-time completions / due PM runs" : "No PM runs in range yet"}
+          icon={Percent}
         />
       </section>
 

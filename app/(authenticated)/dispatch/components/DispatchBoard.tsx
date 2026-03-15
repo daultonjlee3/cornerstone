@@ -414,7 +414,11 @@ export function DispatchBoard({
   }
 
   return (
-    <div ref={dayScrollRef} className="flex h-full flex-col overflow-auto bg-[var(--background)]">
+    <div
+      ref={dayScrollRef}
+      className="flex h-full flex-col overflow-auto bg-[var(--background)] overscroll-contain"
+      style={{ touchAction: "pan-y" }}
+    >
       {/* Single horizontal scroll container so header and body stay in sync */}
       <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-x-auto">
         {/* Sticky header row: time column + lane headers */}

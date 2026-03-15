@@ -2,6 +2,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImpersonateButton } from "./impersonate-button";
+import { WorkInTenantButton } from "../work-in-tenant-button";
 
 export default async function PlatformTenantDetailPage({
   params,
@@ -67,9 +68,12 @@ export default async function PlatformTenantDetailPage({
         </Link>
       </div>
       <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Tenant
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Tenant
+          </h2>
+          <WorkInTenantButton tenantId={tenantId} />
+        </div>
         <p className="font-medium text-[var(--foreground)]">{tenantName}</p>
         {(tenant as { slug?: string }).slug ? (
           <p className="text-xs text-[var(--muted)]">Slug: {(tenant as { slug: string }).slug}</p>

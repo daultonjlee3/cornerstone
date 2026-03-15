@@ -4,32 +4,33 @@ import { redirect } from "next/navigation";
 import { BuildingsList } from "./components/buildings-list";
 import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
 import { PageHeader } from "@/src/components/ui/page-header";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export const metadata = {
   title: "Buildings | Cornerstone Tech",
   description: "Manage buildings",
 };
 
-export default async function BuildingsPage() {
+type SearchParams = { [key: string]: string | string[] | undefined };
+
+export default async function BuildingsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams | Promise<SearchParams>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
 
   const companyIds = (companies ?? []).map((c) => c.id);
   if (companyIds.length === 0) {
@@ -74,12 +75,20 @@ export default async function BuildingsPage() {
     name: (p as { property_name?: string }).property_name ?? (p as { name?: string }).name ?? p.id,
   }));
 
-  const { data: buildings, error } = await supabase
+  const params = typeof (searchParams as Promise<SearchParams>)?.then === "function"
+    ? await (searchParams as Promise<SearchParams>)
+    : (searchParams as SearchParams);
+  const page = Math.max(1, parseInt(typeof params?.page === "string" ? params.page : "", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(typeof params?.page_size === "string" ? params.page_size : "", 10) || 25));
+
+  const baseQuery = supabase
     .from("buildings")
-    .select("id, building_name, name, property_id, building_code, address, city, state, postal_code, country, latitude, longitude, status, year_built, floors, square_feet, notes, properties(name, property_name, company_id)")
+    .select("id, building_name, name, property_id, building_code, address, city, state, postal_code, country, latitude, longitude, status, year_built, floors, square_feet, notes, properties(name, property_name, company_id)", { count: "exact" })
     .in("property_id", propertyIds)
     .order("building_name")
     .order("name");
+
+  const { data: buildings, error, count } = await baseQuery.range((page - 1) * pageSize, page * pageSize - 1);
 
   const normalized = (buildings ?? []).map((b) => {
     const raw = b as { properties?: { name?: string; property_name?: string; company_id?: string } | { name?: string; property_name?: string; company_id?: string }[] };
@@ -96,16 +105,19 @@ export default async function BuildingsPage() {
 
   return (
     <div className="space-y-8">
-<PageHeader
-          icon={<Landmark className="size-5" />}
-          title="Buildings"
-          subtitle="Manage buildings at each property."
-        />
+      <PageHeader
+        icon={<Landmark className="size-5" />}
+        title="Buildings"
+        subtitle="Manage buildings at each property."
+      />
       <BuildingsList
         buildings={normalized}
         properties={propertyOptions}
         error={error?.message ?? null}
         mapboxToken={mapboxToken}
+        totalCount={count ?? 0}
+        page={page}
+        pageSize={pageSize}
       />
     </div>
   );

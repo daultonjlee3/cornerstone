@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { isAdminRole } from "@/src/lib/portal/access";
 import { TechnicianImpersonationCard } from "../components/technician-impersonation-card";
 
@@ -21,13 +22,16 @@ export default async function TechnicianProfilePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
+
   const { data: membership } = await supabase
     .from("tenant_memberships")
-    .select("tenant_id, role")
+    .select("role")
     .eq("user_id", user.id)
+    .eq("tenant_id", tenantId)
     .limit(1)
     .maybeSingle();
-  if (!membership?.tenant_id) redirect("/onboarding");
 
   const { data: technician } = await supabase
     .from("technicians")
@@ -35,7 +39,7 @@ export default async function TechnicianProfilePage({
       "id, technician_name, name, company_id, email, phone, trade, status, hourly_cost, notes, user_id, companies(name), users(is_portal_only)"
     )
     .eq("id", id)
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .limit(1)
     .maybeSingle();
   if (!technician) notFound();

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Factory } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { saveAsset } from "./actions";
 import { ASSET_TYPE_OPTIONS } from "./constants";
 import { AssetsList, type AssetRow } from "./components/assets-list";
@@ -47,14 +48,8 @@ export default async function AssetsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const params =
     typeof (searchParams as Promise<SearchParams>)?.then === "function"
@@ -69,6 +64,10 @@ export default async function AssetsPage({
   const statusFilter = getStringParam(params ?? {}, "status");
   const rawHealthStatus = getStringParam(params ?? {}, "health_status");
   const rawHierarchy = getStringParam(params ?? {}, "hierarchy");
+  const pageParam = getStringParam(params ?? {}, "page");
+  const pageSizeParam = getStringParam(params ?? {}, "page_size");
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeParam ?? "25", 10) || 25));
   const healthStatusFilter =
     rawHealthStatus && VALID_HEALTH_FILTERS.has(rawHealthStatus as HealthStatusFilter)
       ? (rawHealthStatus as HealthStatusFilter)
@@ -81,7 +80,7 @@ export default async function AssetsPage({
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
 
   const companyIds = (companies ?? []).map((c) => (c as { id: string }).id);
@@ -148,7 +147,7 @@ export default async function AssetsPage({
   const { data: crewsData } = await supabase
     .from("crews")
     .select("id, name, company_id")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .eq("is_active", true)
     .order("name");
 
@@ -347,12 +346,22 @@ export default async function AssetsPage({
     );
   }
 
+  const countQuery =
+    hierarchyFilter === "parents" && parentAssetIds.length === 0
+      ? null
+      : assetsQuery;
+  const { count: totalCount } =
+    countQuery != null
+      ? await countQuery.select("id", { count: "exact", head: true })
+      : { count: 0 };
+
   const assetsResponse =
     hierarchyFilter === "parents" && parentAssetIds.length === 0
       ? { data: [] as unknown[], error: null as { message?: string } | null }
       : await assetsQuery
           .order("asset_name", { ascending: true, nullsFirst: false })
-          .order("name");
+          .order("name")
+          .range((page - 1) * pageSize, page * pageSize - 1);
   const assetsRaw = assetsResponse.data;
   const error = assetsResponse.error;
 
@@ -476,6 +485,9 @@ export default async function AssetsPage({
           health_status: healthStatusFilter ?? "",
           hierarchy: hierarchyFilter ?? "",
         }}
+        totalCount={totalCount ?? 0}
+        page={page}
+        pageSize={pageSize}
         error={error?.message ?? null}
         saveAction={saveAsset}
         pmPlanCount={pmPlanCount ?? 0}

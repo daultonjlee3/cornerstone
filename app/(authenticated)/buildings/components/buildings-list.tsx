@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition, useState, useCallback } from "react";
 import { deleteBuilding } from "../actions";
 import type { Building } from "./building-form-modal";
 import { BuildingFormModal } from "./building-form-modal";
 import { saveBuilding } from "../actions";
 import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
 import {
   DataTable,
   Table,
@@ -26,10 +27,22 @@ type BuildingsListProps = {
   properties: PropertyOption[];
   error?: string | null;
   mapboxToken?: string | null;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
 };
 
 function buildingDisplayName(b: Building): string {
   return b.building_name ?? b.name ?? "—";
+}
+
+function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
+  const next = new URLSearchParams(searchParams.toString());
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === "" || value == null) next.delete(key);
+    else next.set(key, value);
+  });
+  return next.toString();
 }
 
 export function BuildingsList({
@@ -37,9 +50,20 @@ export function BuildingsList({
   properties,
   error: initialError,
   mapboxToken,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
 }: BuildingsListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const applyParams = useCallback(
+    (updates: Record<string, string>) => {
+      const query = buildParams(searchParams, updates);
+      startTransition(() => router.push(`/buildings${query ? `?${query}` : ""}`));
+    },
+    [router, searchParams]
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -128,34 +152,29 @@ export function BuildingsList({
                     <StatusBadge status={b.status} />
                   </Td>
                   <Td>
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/work-orders?new=1&company_id=${encodeURIComponent((b.property as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent(b.property_id)}&building_id=${encodeURIComponent(b.id)}`}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Create Work Order
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(b)}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(b.id, buildingDisplayName(b))}
-                        disabled={isPending}
-                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "link", label: "Create Work Order", href: `/work-orders?new=1&company_id=${encodeURIComponent((b.property as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent(b.property_id)}&building_id=${encodeURIComponent(b.id)}` },
+                        { type: "button", label: "Edit", onClick: () => openEdit(b) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(b.id, buildingDisplayName(b)), disabled: isPending, destructive: true },
+                      ]}
+                    />
                   </Td>
                 </Tr>
               ))}
             </TBody>
           </Table>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyParams({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyParams({ page_size: String(size), page: "1" })}
+            />
+          )}
         </DataTable>
       )}
 

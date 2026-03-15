@@ -21,6 +21,7 @@ export const ASSET_TYPE_TO_PEXELS_QUERY: Record<string, string> = {
   Appliance: "commercial appliance",
   Compressor: "industrial air compressor",
   "Cooling Tower": "cooling tower",
+  Conveyor: "industrial conveyor system",
   "Air Handler": "commercial air handler",
   Component: "industrial control panel",
   Other: "industrial equipment",

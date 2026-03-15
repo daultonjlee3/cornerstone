@@ -1,13 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition, useState, useCallback } from "react";
 import { deleteCompany } from "../actions";
 import type { Company } from "./company-form-modal";
 import { CompanyFormModal } from "./company-form-modal";
 import { saveCompany } from "../actions";
 import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
 import {
   DataTable,
   Table,
@@ -21,11 +23,39 @@ import {
 type CompaniesListProps = {
   companies: Company[];
   error?: string | null;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
 };
 
-export function CompaniesList({ companies: initialCompanies, error: initialError }: CompaniesListProps) {
+function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
+  const next = new URLSearchParams(searchParams.toString());
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === "" || value == null) next.delete(key);
+    else next.set(key, value);
+  });
+  return next.toString();
+}
+
+export function CompaniesList({
+  companies: initialCompanies,
+  error: initialError,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
+}: CompaniesListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const applyParams = useCallback(
+    (updates: Record<string, string>) => {
+      const query = buildParams(searchParams, updates);
+      startTransition(() => {
+        router.push(`/companies${query ? `?${query}` : ""}`);
+      });
+    },
+    [router, searchParams]
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -114,28 +144,28 @@ export function CompaniesList({ companies: initialCompanies, error: initialError
                     {c.primary_contact_name ?? c.primary_contact_email ?? "—"}
                   </Td>
                   <Td>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(c)}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(c.id, c.name)}
-                        disabled={isPending}
-                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "button", label: "Edit", onClick: () => openEdit(c) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(c.id, c.name), disabled: isPending, destructive: true },
+                      ]}
+                    />
                   </Td>
                 </Tr>
               ))}
             </TBody>
           </Table>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyParams({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyParams({ page_size: String(size), page: "1" })}
+            />
+          )}
         </DataTable>
       )}
 

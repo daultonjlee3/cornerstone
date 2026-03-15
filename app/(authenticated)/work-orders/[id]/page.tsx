@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { WorkOrderDetailView, type PartUsageForDetail } from "../components/work-order-detail-view";
 import {
   calculateWorkOrderSlaSnapshot,
@@ -25,13 +26,8 @@ export default async function WorkOrderDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: woRaw, error } = await supabase
     .from("work_orders")
@@ -72,7 +68,7 @@ export default async function WorkOrderDetailPage({
     .from("companies")
     .select("id")
     .eq("id", companyId)
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!companyRow) notFound();
 
@@ -242,7 +238,7 @@ export default async function WorkOrderDetailPage({
   const { data: crewsData } = await supabase
     .from("crews")
     .select("id, name, company_id")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .eq("is_active", true)
     .order("name");
   const { data: vendorsData } = await supabase

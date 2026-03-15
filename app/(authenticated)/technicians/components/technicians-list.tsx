@@ -8,6 +8,7 @@ import type { Technician } from "./technician-form-modal";
 import { TechnicianFormModal } from "./technician-form-modal";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { Button } from "@/src/components/ui/button";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import {
   DataTable,
   Table,
@@ -137,23 +138,14 @@ export function TechniciansList({
                     <StatusBadge status={t.status} />
                   </Td>
                   <Td>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(t)}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(t.id, technicianDisplayName(t))}
-                        disabled={isPending}
-                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "link", label: "View", href: `/technicians/${t.id}` },
+                        { type: "button", label: "Edit", onClick: () => openEdit(t) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(t.id, technicianDisplayName(t)), disabled: isPending, destructive: true },
+                      ]}
+                    />
                   </Td>
                 </Tr>
               ))}

@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition, useState, useCallback } from "react";
 import { deleteUnit } from "../actions";
 import type { Unit } from "./unit-form-modal";
 import { UnitFormModal } from "./unit-form-modal";
 import { saveUnit } from "../actions";
 import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
 import {
   DataTable,
   Table,
@@ -25,6 +26,9 @@ type UnitsListProps = {
   units: Unit[];
   buildings: BuildingOption[];
   error?: string | null;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
 };
 
 function unitDisplayName(u: Unit): string {
@@ -37,13 +41,33 @@ function buildingDisplayName(u: Unit): string {
   return (b as { building_name?: string }).building_name ?? (b as { name?: string }).name ?? "—";
 }
 
+function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
+  const next = new URLSearchParams(searchParams.toString());
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === "" || value == null) next.delete(key);
+    else next.set(key, value);
+  });
+  return next.toString();
+}
+
 export function UnitsList({
   units: initialUnits,
   buildings,
   error: initialError,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
 }: UnitsListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const applyParams = useCallback(
+    (updates: Record<string, string>) => {
+      const query = buildParams(searchParams, updates);
+      startTransition(() => router.push(`/units${query ? `?${query}` : ""}`));
+    },
+    [router, searchParams]
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -130,34 +154,29 @@ export function UnitsList({
                     <StatusBadge status={u.status} />
                   </Td>
                   <Td>
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/work-orders?new=1&company_id=${encodeURIComponent((u.building as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent((u.building as { property_id?: string })?.property_id ?? "")}&building_id=${encodeURIComponent(u.building_id)}&unit_id=${encodeURIComponent(u.id)}`}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Create Work Order
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(u)}
-                        className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(u.id, unitDisplayName(u))}
-                        disabled={isPending}
-                        className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "link", label: "Create Work Order", href: `/work-orders?new=1&company_id=${encodeURIComponent((u.building as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent((u.building as { property_id?: string })?.property_id ?? "")}&building_id=${encodeURIComponent(u.building_id)}&unit_id=${encodeURIComponent(u.id)}` },
+                        { type: "button", label: "Edit", onClick: () => openEdit(u) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(u.id, unitDisplayName(u)), disabled: isPending, destructive: true },
+                      ]}
+                    />
                   </Td>
                 </Tr>
               ))}
             </TBody>
           </Table>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyParams({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyParams({ page_size: String(size), page: "1" })}
+            />
+          )}
         </DataTable>
       )}
 

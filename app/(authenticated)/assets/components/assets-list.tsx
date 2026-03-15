@@ -10,6 +10,8 @@ import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components
 import type { WorkOrderPrefill } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { Hint } from "@/src/components/ui/hint";
+import { ActionsDropdown, type ActionsDropdownItem } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
 import { PreventiveMaintenancePlanFormModal } from "@/app/(authenticated)/preventive-maintenance/components/pm-plan-form-modal";
 
 type CompanyOption = { id: string; name: string };
@@ -145,6 +147,9 @@ export function AssetsList({
   pmPlanCount = 0,
   pmModalData = null,
   parentCandidates,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
 }: AssetsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -167,9 +172,20 @@ export function AssetsList({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const nextQ = String(formData.get("q") ?? "").trim();
-    applyFilters({ q: nextQ });
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const get = (key: string) => (formData.get(key) != null ? String(formData.get(key)).trim() : "");
+    applyFilters({
+      q: get("q"),
+      company_id: get("company_id"),
+      property_id: get("property_id"),
+      type: get("type"),
+      condition: get("condition"),
+      status: get("status"),
+      health_status: get("health_status"),
+      hierarchy: get("hierarchy"),
+      page: "1",
+    });
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -288,6 +304,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-company"
+              name="company_id"
               value={filterParams.company_id}
               onChange={(e) =>
                 applyFilters({ company_id: e.target.value, property_id: "" })
@@ -326,6 +343,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-type"
+              name="type"
               value={filterParams.type}
               onChange={(e) => applyFilters({ type: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -344,6 +362,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-condition"
+              name="condition"
               value={filterParams.condition}
               onChange={(e) => applyFilters({ condition: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -362,6 +381,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-status"
+              name="status"
               value={filterParams.status}
               onChange={(e) => applyFilters({ status: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -398,6 +418,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-hierarchy"
+              name="hierarchy"
               value={filterParams.hierarchy}
               onChange={(e) => applyFilters({ hierarchy: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -477,7 +498,7 @@ export function AssetsList({
                   <th className="px-4 py-3 font-semibold">Model</th>
                   <th className="px-4 py-3 font-semibold">Condition</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="w-40 px-4 py-3 font-semibold">Actions</th>
+                  <th className="w-28 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody data-tour="assets:maintenance-history">
@@ -563,79 +584,41 @@ export function AssetsList({
                     <td className="px-4 py-3.5">
                       <StatusBadge status={a.status} />
                     </td>
-                    <td className="px-4 py-3.5" data-tour="assets:create-wo">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/assets/${a.id}`}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          View
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(a)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        {a.status === "active" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(a.id, "inactive", assetDisplayName(a))}
-                              disabled={isPending}
-                              className="rounded text-amber-600 hover:underline disabled:opacity-50 dark:text-amber-400"
-                            >
-                              Set inactive
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(a.id, "retired", assetDisplayName(a))}
-                              disabled={isPending}
-                              className="rounded text-[var(--muted)] hover:underline disabled:opacity-50"
-                            >
-                              Retire
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => openCreateWO(a)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Create WO
-                        </button>
-                        {pmModalData ? (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAssetForPM(a)}
-                            className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                          >
-                            Schedule PM
-                          </button>
-                        ) : (
-                          <Link
-                            href={`/preventive-maintenance?new=1&company_id=${encodeURIComponent(a.company_id)}&asset_id=${encodeURIComponent(a.id)}`}
-                            className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                          >
-                            Schedule PM
-                          </Link>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(a.id, assetDisplayName(a))}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <td className="px-4 py-3.5" data-tour="assets:create-wo" onClick={(e) => e.stopPropagation()}>
+                      <ActionsDropdown
+                        align="right"
+                        items={[
+                          { type: "link", label: "View", href: `/assets/${a.id}` },
+                          { type: "button", label: "Edit", onClick: () => openEdit(a) },
+                          ...(a.status === "active"
+                            ? [
+                                { type: "button" as const, label: "Set inactive", onClick: () => handleStatusChange(a.id, "inactive", assetDisplayName(a)), disabled: isPending },
+                                { type: "button" as const, label: "Retire", onClick: () => handleStatusChange(a.id, "retired", assetDisplayName(a)), disabled: isPending },
+                              ]
+                            : []),
+                          { type: "button", label: "Create WO", onClick: () => openCreateWO(a) },
+                          ...(pmModalData
+                            ? [{ type: "button" as const, label: "Schedule PM", onClick: () => setSelectedAssetForPM(a) }]
+                            : [{ type: "link" as const, label: "Schedule PM", href: `/preventive-maintenance?new=1&company_id=${encodeURIComponent(a.company_id)}&asset_id=${encodeURIComponent(a.id)}` }]),
+                          { type: "button", label: "Delete", onClick: () => handleDelete(a.id, assetDisplayName(a)), disabled: isPending, destructive: true },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyFilters({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyFilters({ page_size: String(size), page: "1" })}
+            />
+          )}
         </div>
       )}
 

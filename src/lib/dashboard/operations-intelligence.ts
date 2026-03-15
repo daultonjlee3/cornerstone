@@ -630,16 +630,16 @@ export async function loadOperationsIntelligenceData({
     }
   }
   const complianceDenominator = completedOnTime + completedLate + missed;
-  const compliancePercentage: number | null =
+  let compliancePercentage: number | null =
     complianceDenominator > 0
       ? Number(((completedOnTime / complianceDenominator) * 100).toFixed(2))
       : null;
 
-  const upcomingTasks = pmPlans
+  const overdueTasks = pmPlans
     .filter((row) => {
       const status = (row.status as string | null | undefined) ?? null;
       const nextRunDate = (row.next_run_date as string | null | undefined) ?? null;
-      return status === "active" && nextRunDate != null && nextRunDate >= today && nextRunDate <= pmUpcomingUntil;
+      return status === "active" && nextRunDate != null && nextRunDate < today;
     })
     .sort((a, b) =>
       String((a.next_run_date as string | null | undefined) ?? "").localeCompare(
@@ -657,11 +657,17 @@ export async function loadOperationsIntelligenceData({
       };
     });
 
-  const overdueTasks = pmPlans
+  const overdueCount = overdueTasks.length;
+  const missedAligned = Math.max(missed, overdueCount);
+  if (overdueCount > 0 && complianceDenominator === 0) {
+    compliancePercentage = 0;
+  }
+
+  const upcomingTasks = pmPlans
     .filter((row) => {
       const status = (row.status as string | null | undefined) ?? null;
       const nextRunDate = (row.next_run_date as string | null | undefined) ?? null;
-      return status === "active" && nextRunDate != null && nextRunDate < today;
+      return status === "active" && nextRunDate != null && nextRunDate >= today && nextRunDate <= pmUpcomingUntil;
     })
     .sort((a, b) =>
       String((a.next_run_date as string | null | undefined) ?? "").localeCompare(
@@ -713,7 +719,7 @@ export async function loadOperationsIntelligenceData({
     pmCompliance: {
       completedOnTime,
       completedLate,
-      missed,
+      missed: missedAligned,
       compliancePercentage,
       upcomingTasks,
       overdueTasks,

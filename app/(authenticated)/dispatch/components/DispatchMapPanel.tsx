@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   Marker,
@@ -101,6 +101,8 @@ const technicianPinIcon = divIcon({
   iconAnchor: [14, 14],
 });
 
+const ROUTE_POLYLINE_OPTIONS = { color: "#1d4ed8", weight: 4, opacity: 0.7 };
+
 function clusterPinIcon(count: number) {
   return divIcon({
     className: "dispatch-map-pin-shell",
@@ -135,6 +137,127 @@ function locationFreshness(lastLocationAt: string | null | undefined): {
   };
 }
 
+// --- Stable map hook components (module-level so they are not recreated each render and do not remount) ---
+
+function MapZoomWatcher({
+  setZoomLevel,
+}: {
+  setZoomLevel: React.Dispatch<React.SetStateAction<number>>;
+}) {
+  const map = useMapEvents({
+    zoomend: (event) => {
+      const z = event.target.getZoom();
+      setZoomLevel((prev) => (prev === z ? prev : z));
+    },
+  });
+  useEffect(() => {
+    const z = map.getZoom();
+    setZoomLevel((prev) => (prev === z ? prev : z));
+  }, [map, setZoomLevel]);
+  return null;
+}
+
+const RESIZE_DEBOUNCE_MS = 250;
+
+function MapResizeOnMount() {
+  const map = useMap();
+  const lastSizeRef = useRef<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    let rafId: number | null = null;
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+    const container = map.getContainer();
+    const runInvalidate = () => {
+      if (!mounted) return;
+      try {
+        const c = map.getContainer();
+        if (!c?.isConnected) return;
+        const w = c.offsetWidth;
+        const h = c.offsetHeight;
+        const last = lastSizeRef.current;
+        if (last != null && last.w === w && last.h === h) return;
+        lastSizeRef.current = { w, h };
+        map.invalidateSize();
+      } catch {
+        // Map may be torn down
+      }
+    };
+    const scheduleInvalidate = () => {
+      if (debounceId != null) clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        debounceId = null;
+        if (rafId != null) cancelAnimationFrame(rafId);
+        rafId = window.requestAnimationFrame(() => {
+          rafId = null;
+          runInvalidate();
+        });
+      }, RESIZE_DEBOUNCE_MS);
+    };
+    const t = setTimeout(scheduleInvalidate, 150);
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(scheduleInvalidate)
+      : null;
+    if (ro && container) ro.observe(container);
+    return () => {
+      mounted = false;
+      clearTimeout(t);
+      if (debounceId != null) clearTimeout(debounceId);
+      if (rafId != null) cancelAnimationFrame(rafId);
+      if (ro && container) ro.unobserve(container);
+    };
+  }, [map]);
+  return null;
+}
+
+function PanToSelectedWorkOrder({
+  selectedLatLng,
+}: {
+  selectedLatLng: [number, number] | null;
+}) {
+  const map = useMap();
+  const lastPannedRef = useRef<string>("");
+  useEffect(() => {
+    if (!selectedLatLng) return;
+    const key = `${selectedLatLng[0].toFixed(5)},${selectedLatLng[1].toFixed(5)}`;
+    if (lastPannedRef.current === key) return;
+    lastPannedRef.current = key;
+    map.setView(
+      [selectedLatLng[0], selectedLatLng[1]],
+      Math.max(map.getZoom(), 14),
+      { animate: true, duration: 0.35 }
+    );
+  }, [map, selectedLatLng]);
+  return null;
+}
+
+function FitBoundsToDispatchPoints({
+  points,
+}: {
+  points: Array<{ latitude: number; longitude: number }>;
+}) {
+  const map = useMap();
+  const signature = useMemo(
+    () =>
+      points
+        .map((p) => `${p.latitude.toFixed(4)}:${p.longitude.toFixed(4)}`)
+        .join("|"),
+    [points]
+  );
+  const appliedSignatureRef = useRef<string>("");
+  useEffect(() => {
+    if (points.length === 0) return;
+    if (signature === appliedSignatureRef.current) return;
+    appliedSignatureRef.current = signature;
+    const bounds = latLngBounds(
+      points.map((p) => [p.latitude, p.longitude] as [number, number])
+    );
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 13 });
+  }, [map, points, signature]);
+  return null;
+}
+
+// --- End stable map hook components ---
+
 export function DispatchMapPanel({
   workOrders,
   workforce,
@@ -152,72 +275,27 @@ export function DispatchMapPanel({
   onAssignFromMap,
   onPatchFilters,
 }: DispatchMapPanelProps) {
-  function MapZoomWatcher() {
-    const map = useMapEvents({
-      zoomend: (event) => {
-        setZoomLevel(event.target.getZoom());
-      },
-    });
-    useEffect(() => {
-      setZoomLevel(map.getZoom());
-    }, [map]);
-    return null;
-  }
-
-  /** After mount, tell Leaflet to re-measure the container (fixes blank map in combined view / dynamic layout). */
-  function MapResizeOnMount() {
-    const map = useMap();
-    useEffect(() => {
-      const t = setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
-      return () => clearTimeout(t);
-    }, [map]);
-    return null;
-  }
-
-  /** Pan map to selected work order when selection changes from list or map. */
-  function PanToSelectedWorkOrder() {
-    const map = useMap();
-    const selected = selectedWorkOrderId
-      ? workOrderCoordinates.find((wo) => wo.id === selectedWorkOrderId)
-      : null;
-    useEffect(() => {
-      if (!selected?.latitude || !selected?.longitude) return;
-      map.setView(
-        [selected.latitude as number, selected.longitude as number],
-        Math.max(map.getZoom(), 14),
-        { animate: true, duration: 0.35 }
-      );
-    }, [selected?.id, map]);
-    return null;
-  }
-
-  function FitBoundsToDispatchPoints({
-    points,
-  }: {
-    points: Array<{ latitude: number; longitude: number }>;
-  }) {
-    const map = useMap();
-    const signature = points
-      .map((point) => `${point.latitude.toFixed(4)}:${point.longitude.toFixed(4)}`)
-      .join("|");
-    const [appliedSignature, setAppliedSignature] = useState<string>("");
-    useEffect(() => {
-      if (points.length === 0) return;
-      if (signature === appliedSignature) return;
-      const bounds = latLngBounds(
-        points.map((point) => [point.latitude, point.longitude] as [number, number])
-      );
-      map.fitBounds(bounds, { padding: [28, 28], maxZoom: 13 });
-      setAppliedSignature(signature);
-    }, [appliedSignature, map, points, signature]);
-    return null;
-  }
-
   const [zoomLevel, setZoomLevel] = useState(11);
   const [mapMounted, setMapMounted] = useState(false);
-  useEffect(() => setMapMounted(true), []);
+  useEffect(() => {
+    setMapMounted(true);
+    return () => setMapMounted(false);
+  }, []);
+  const onMarkerSelect = useCallback(
+    (workOrderId: string) => {
+      onSelectWorkOrder(workOrderId);
+      onOpenWorkOrderDrawer(workOrderId);
+    },
+    [onSelectWorkOrder, onOpenWorkOrderDrawer]
+  );
+  const onMarkerHover = useCallback(
+    (workOrderId: string | null) => onHoverWorkOrder?.(workOrderId),
+    [onHoverWorkOrder]
+  );
+  const onMarkerAssign = useCallback(
+    (workOrderId: string, technicianId: string) => onAssignFromMap(workOrderId, technicianId),
+    [onAssignFromMap]
+  );
 
   const propertyOptions = useMemo(() => {
     if (!filterState.companyId) return filterOptions.properties;
@@ -238,6 +316,12 @@ export function DispatchMapPanel({
       ),
     [workforce.technicians]
   );
+  const selectedLatLng = useMemo((): [number, number] | null => {
+    if (!selectedWorkOrderId) return null;
+    const wo = workOrderCoordinates.find((w) => w.id === selectedWorkOrderId);
+    if (!wo?.latitude || !wo?.longitude) return null;
+    return [wo.latitude as number, wo.longitude as number];
+  }, [selectedWorkOrderId, workOrderCoordinates]);
   const mapCenter = useMemo(() => {
     const coordinatePool: Array<{ latitude: number; longitude: number }> = [];
     workOrderCoordinates.forEach((workOrder) => {
@@ -261,6 +345,11 @@ export function DispatchMapPanel({
       coordinatePool.length;
     return { latitude, longitude };
   }, [technicianCoordinates, workOrderCoordinates]);
+
+  const mapCenterTuple = useMemo(
+    (): [number, number] => [mapCenter.latitude, mapCenter.longitude],
+    [mapCenter.latitude, mapCenter.longitude]
+  );
 
   const clusters = useMemo(
     () => clusterWorkOrders(workOrderCoordinates, zoomLevel),
@@ -293,6 +382,17 @@ export function DispatchMapPanel({
     if (!selectedTechnician) return null;
     return buildTechnicianRoute(selectedTechnician, workOrders, filterState.selectedDate);
   }, [filterState.selectedDate, selectedTechnician, workOrders]);
+
+  const routePolylinePositions = useMemo((): [number, number][] | null => {
+    if (!selectedRoute || selectedRoute.orderedJobs.length === 0) return null;
+    return [
+      [selectedRoute.start.latitude, selectedRoute.start.longitude],
+      ...selectedRoute.orderedJobs.map((wo) => [
+        wo.latitude as number,
+        wo.longitude as number,
+      ] as [number, number]),
+    ];
+  }, [selectedRoute]);
 
   const canAssignFromMap = Boolean(
     selectedWorkOrder &&
@@ -346,23 +446,23 @@ export function DispatchMapPanel({
           ))}
         </select>
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50" style={{ minHeight: 350 }}>
+      <div className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50" style={{ minHeight: 280, height: "100%" }}>
         {!mapMounted ? (
           <div className="flex h-full min-h-[350px] items-center justify-center text-[11px] text-[var(--muted)]">
             Loading map…
           </div>
         ) : (
         <MapContainer
-          center={[mapCenter.latitude, mapCenter.longitude]}
-          zoom={zoomLevel}
+          center={mapCenterTuple}
+          zoom={11}
           minZoom={3}
           maxZoom={19}
           scrollWheelZoom
           className="h-full w-full"
         >
-          <MapZoomWatcher />
+          <MapZoomWatcher setZoomLevel={setZoomLevel} />
           <MapResizeOnMount />
-          <PanToSelectedWorkOrder />
+          <PanToSelectedWorkOrder selectedLatLng={selectedLatLng} />
           <FitBoundsToDispatchPoints points={fitBoundsPoints} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -383,12 +483,9 @@ export function DispatchMapPanel({
                     hoveredWorkOrderId === workOrder.id
                   )}
                   eventHandlers={{
-                    click: () => {
-                      onSelectWorkOrder(workOrder.id);
-                      onOpenWorkOrderDrawer(workOrder.id);
-                    },
-                    mouseover: () => onHoverWorkOrder?.(workOrder.id),
-                    mouseout: () => onHoverWorkOrder?.(null),
+                    click: () => onMarkerSelect(workOrder.id),
+                    mouseover: () => onMarkerHover(workOrder.id),
+                    mouseout: () => onMarkerHover(null),
                   }}
                 >
                   <Popup>
@@ -423,7 +520,7 @@ export function DispatchMapPanel({
                           <button
                             type="button"
                             className="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
-                            onClick={() => onAssignFromMap(workOrder.id, selectedTechnician.id)}
+                            onClick={() => onMarkerAssign(workOrder.id, selectedTechnician.id)}
                           >
                             Assign to {selectedTechnician.name}
                           </button>
@@ -451,12 +548,9 @@ export function DispatchMapPanel({
                           key={workOrder.id}
                           type="button"
                           className="block w-full rounded border border-slate-200 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-100"
-                          onClick={() => {
-                            onSelectWorkOrder(workOrder.id);
-                            onOpenWorkOrderDrawer(workOrder.id);
-                          }}
-                          onMouseEnter={() => onHoverWorkOrder?.(workOrder.id)}
-                          onMouseLeave={() => onHoverWorkOrder?.(null)}
+                          onClick={() => onMarkerSelect(workOrder.id)}
+                          onMouseEnter={() => onMarkerHover(workOrder.id)}
+                          onMouseLeave={() => onMarkerHover(null)}
                         >
                           {shortWorkOrderLabel(workOrder)} · {workOrder.priority ?? "medium"} ·{" "}
                           {workOrder.status ?? "new"}
@@ -505,21 +599,10 @@ export function DispatchMapPanel({
             </Marker>
           ))}
 
-          {selectedRoute && selectedRoute.orderedJobs.length > 0 ? (
+          {routePolylinePositions ? (
             <Polyline
-              positions={
-                [
-                  [selectedRoute.start.latitude, selectedRoute.start.longitude],
-                  ...selectedRoute.orderedJobs.map(
-                    (workOrder) =>
-                      [
-                        workOrder.latitude as number,
-                        workOrder.longitude as number,
-                      ] as [number, number]
-                  ),
-                ] as [number, number][]
-              }
-              pathOptions={{ color: "#1d4ed8", weight: 4, opacity: 0.7 }}
+              positions={routePolylinePositions}
+              pathOptions={ROUTE_POLYLINE_OPTIONS}
             />
           ) : null}
         </MapContainer>

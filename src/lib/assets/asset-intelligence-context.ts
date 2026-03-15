@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type AssetIntelligenceContext = {
   supabase: SupabaseClient;
@@ -17,22 +18,17 @@ export async function resolveTenantScope(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized.");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership?.tenant_id) throw new Error("Tenant membership not found.");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) throw new Error("Tenant membership not found.");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
 
   return {
     userId: user.id,
-    tenantId: membership.tenant_id,
+    tenantId,
     companyIds: (companies ?? []).map((row) => row.id),
   };
 }

@@ -1,5 +1,6 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { loadDispatchData } from "./dispatch-data";
 import { parseFilterStateFromParams } from "./filter-state";
 import { DispatchViewClient } from "./components/DispatchViewClient";
@@ -22,16 +23,8 @@ export default async function DispatchPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
-
-  const tenantId = membership.tenant_id;
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")

@@ -125,6 +125,10 @@ export function WorkOrderDetailView({
   const status = (workOrder.status as string) ?? "new";
   const priority = (workOrder.priority as string) ?? "medium";
   const isCompleted = status === "completed";
+  const showUnassignedTip =
+    !isCompleted &&
+    !(workOrder.assigned_technician_id as string | null) &&
+    !(workOrder.assigned_crew_id as string | null);
 
   const formatDuration = (minutes: number | null) => {
     if (minutes == null) return "—";

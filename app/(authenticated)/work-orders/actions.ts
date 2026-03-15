@@ -14,6 +14,7 @@ import {
   type PreventiveMaintenanceFrequencyType,
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type WorkOrderFormState = {
   error?: string;
@@ -76,21 +77,6 @@ function canTransitionStatus(currentRaw: string | null | undefined, targetRaw: s
 function isSupportedStatus(input: string | null | undefined): boolean {
   if (!input) return false;
   return (ALL_SUPPORTED_STATUSES as readonly string[]).includes(input);
-}
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
 }
 
 async function getActorId(
@@ -480,6 +466,7 @@ export async function saveWorkOrder(
   formData: FormData,
   options?: SaveWorkOrderOptions
 ): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
   const id = (formData.get("id") as string)?.trim() || null;
   const companyId = (formData.get("company_id") as string)?.trim();
   const title = (formData.get("title") as string)?.trim();
@@ -494,7 +481,7 @@ export async function saveWorkOrder(
     const allowed = await companyBelongsToTenant(companyId, tenantId);
     if (!allowed) return { error: "Invalid company." };
   } else {
-    const resolvedTenantId = await getTenantId();
+    const resolvedTenantId = await getTenantIdForUser(supabase);
     if (!resolvedTenantId) return { error: "Unauthorized." };
     tenantId = resolvedTenantId;
     const allowed = await companyBelongsToTenant(companyId, tenantId);
@@ -511,7 +498,6 @@ export async function saveWorkOrder(
     : null;
   const customerIdForm = (formData.get("customer_id") as string)?.trim() || null;
 
-  const supabase = await createClient();
   if (customerIdForm) {
     const { data: cust } = await supabase
       .from("customers")
@@ -870,10 +856,9 @@ export async function saveWorkOrder(
 }
 
 export async function deleteWorkOrder(id: string): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("work_orders")
     .select("company_id, assigned_technician_id, assigned_crew_id")
@@ -893,7 +878,8 @@ export async function updateWorkOrderStatus(
   id: string,
   newStatus: string
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (!isSupportedStatus(newStatus)) return { error: "Invalid status." };
   const normalizedStatus = normalizeStatus(newStatus);
@@ -901,7 +887,6 @@ export async function updateWorkOrderStatus(
     return { error: "Use Complete Work Order to mark work orders as completed." };
   }
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
@@ -1101,9 +1086,9 @@ export async function logDispatchRebalance(
   selectedDate: string,
   companyId: string | null
 ): Promise<{ error?: string }> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
   await insertActivityLog(supabase, {
     tenantId,
@@ -1130,13 +1115,12 @@ export async function upsertWorkOrderSlaPolicies(
   companyId: string,
   policies: WorkOrderSlaPolicyInput[]
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (!companyId) return { error: "Company is required." };
   const allowed = await companyBelongsToTenant(companyId, tenantId);
   if (!allowed) return { error: "Unauthorized." };
-
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
 
   const incoming = new Map<SlaPriority, number>();
@@ -1192,10 +1176,9 @@ export async function updateWorkOrderAssignment(
   id: string,
   payload: WorkOrderAssignmentPayload
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
@@ -1475,13 +1458,12 @@ export async function completeWorkOrder(
   id: string,
   payload: WorkOrderCompletionPayload
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const resolutionSummary = (payload.resolution_summary ?? "").trim();
   if (!resolutionSummary) return { error: "Resolution summary is required." };
-
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
@@ -1807,10 +1789,9 @@ export async function logWorkOrderLabor(
   workOrderId: string,
   payload: WorkOrderLaborLogPayload
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
   const { data: workOrder } = await supabase
     .from("work_orders")
@@ -1924,9 +1905,9 @@ export async function addWorkOrderNote(
   noteType: "internal" | "customer_visible" | "completion" = "internal",
   technicianId: string | null = null
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
@@ -2008,10 +1989,10 @@ export async function uploadWorkOrderAttachment(
     restrictToImages?: boolean;
   }
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: row } = await supabase
     .from("work_orders")
@@ -2146,9 +2127,9 @@ export async function toggleWorkOrderChecklistItem(
   itemId: string,
   completed: boolean
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
   const { data: item } = await supabase
     .from("work_order_checklist_items")
@@ -2207,11 +2188,11 @@ export async function addWorkOrderChecklistItem(
   workOrderId: string,
   label: string
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const trimmed = (label ?? "").trim();
   if (!trimmed) return { error: "Label is required." };
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: wo } = await supabase
     .from("work_orders")
@@ -2285,11 +2266,10 @@ export async function addWorkOrderPartUsage(
   workOrderId: string,
   payload: AddPartUsagePayload
 ): Promise<WorkOrderFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (payload.quantity_used <= 0) return { error: "Quantity must be greater than zero." };
-
-  const supabase = await createClient();
   const actorId = await getActorId(supabase);
   const { data: wo } = await supabase
     .from("work_orders")
@@ -2504,9 +2484,9 @@ export async function exportWorkOrdersCsv(
   ids: string[]
 ): Promise<{ data?: string; error?: string }> {
   if (ids.length === 0) return { error: "No work orders to export." };
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: companies } = await supabase
     .from("companies")
     .select("id")

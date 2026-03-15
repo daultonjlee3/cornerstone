@@ -61,8 +61,10 @@ export function Tooltip({
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement | null>(null);
-  const contentId = useId();
-  const triggerId = useId();
+  // Single useId + suffix so server/client stay in sync (avoids hydration mismatch when tree differs)
+  const baseId = useId();
+  const contentId = `${baseId}-content`;
+  const triggerId = `${baseId}-trigger`;
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleShow = useCallback(() => {

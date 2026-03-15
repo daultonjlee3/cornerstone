@@ -6,6 +6,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { createAdminClient } from "@/src/lib/supabase/admin";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { revalidatePath } from "next/cache";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type TechnicianFormState = { error?: string; success?: boolean };
 
@@ -20,16 +21,11 @@ async function getActorContext(): Promise<ActorContext | null> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.id) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!data?.tenant_id) return null;
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return null;
   return {
     userId: user.id,
-    tenantId: data.tenant_id,
+    tenantId,
   };
 }
 

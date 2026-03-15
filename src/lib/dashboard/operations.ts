@@ -13,6 +13,7 @@ export type OperationsDashboardData = {
     overdueWorkOrders: number;
     scheduledToday: number;
     activeTechnicians: number;
+    unassignedWorkOrders: number;
   };
   backlog: {
     openWorkOrders: number;
@@ -143,6 +144,7 @@ export async function loadOperationsDashboardData({
     overdueCount,
     scheduledTodayCount,
     activeTechniciansCount,
+    unassignedCount,
     pmNotScheduledCount,
     upcomingPmCount,
   ] = await Promise.all([
@@ -180,6 +182,12 @@ export async function loadOperationsDashboardData({
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds)
       .eq("status", "active"),
+    supabase
+      .from("work_orders")
+      .select("id", { count: "exact", head: true })
+      .in("company_id", companyIds)
+      .in("status", ["new", "ready_to_schedule", "scheduled", "in_progress", "on_hold"])
+      .is("assigned_technician_id", null),
     supabase
       .from("preventive_maintenance_plans")
       .select("id", { count: "exact", head: true })
@@ -448,6 +456,7 @@ export async function loadOperationsDashboardData({
       overdueWorkOrders: overdueCount.count ?? 0,
       scheduledToday: scheduledTodayCount.count ?? 0,
       activeTechnicians: activeTechniciansCount.count ?? 0,
+      unassignedWorkOrders: unassignedCount.count ?? 0,
     },
     backlog: {
       openWorkOrders: openWorkOrdersCount.count ?? 0,

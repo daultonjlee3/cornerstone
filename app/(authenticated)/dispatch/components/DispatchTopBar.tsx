@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import type { DispatchFilterState } from "../filter-state";
 import { filterStateToParams, hasActiveFilters } from "../filter-state";
 import type { DispatchFilterOptions, DispatchInsights } from "../dispatch-data";
 import { Button } from "@/src/components/ui/button";
-import { Filter } from "lucide-react";
+import { Filter, ChevronLeft, ChevronRight } from "lucide-react";
 
 export type DispatchTopBarProps = {
   filterState: DispatchFilterState;
@@ -21,12 +22,137 @@ function formatDisplayDate(dateStr: string): string {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
+function toYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+type DispatchCalendarPopoverProps = {
+  selectedDate: string;
+  onSelect: (date: string) => void;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
+};
+
+function DispatchCalendarPopover({ selectedDate, onSelect, onClose, anchorRef }: DispatchCalendarPopoverProps) {
+  const [viewDate, setViewDate] = useState(() => new Date(selectedDate + "T12:00:00"));
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const update = () => {
+      const rect = anchor.getBoundingClientRect();
+      setPosition({ top: rect.bottom + 4, left: rect.left });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [anchorRef]);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      onClose();
+    };
+    document.addEventListener("click", close, true);
+    return () => document.removeEventListener("click", close, true);
+  }, [onClose, anchorRef]);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const start = new Date(year, month, 1);
+  const startDay = start.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = toYYYYMMDD(new Date());
+
+  const prevMonth = () => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  const nextMonth = () => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+
+  const days: (number | null)[] = [];
+  for (let i = 0; i < startDay; i++) days.push(null);
+  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+
+  const calendarEl = (
+    <div
+      ref={popoverRef}
+      className="fixed z-[99999] rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-2 shadow-lg"
+      style={{ top: position.top, left: position.left }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between gap-2 pb-2">
+        <button
+          type="button"
+          onClick={prevMonth}
+          className="rounded p-1 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+        <span className="min-w-[100px] text-center text-xs font-medium text-[var(--foreground)]">
+          {viewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        </span>
+        <button
+          type="button"
+          onClick={nextMonth}
+          className="rounded p-1 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+          aria-label="Next month"
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          <div key={d} className="py-0.5 text-[10px] font-medium text-[var(--muted)]">
+            {d}
+          </div>
+        ))}
+        {days.map((day, i) => {
+          if (day === null) return <div key={`empty-${i}`} />;
+          const dateStr = toYYYYMMDD(new Date(year, month, day));
+          const isSelected = dateStr === selectedDate;
+          const isToday = dateStr === today;
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              onClick={() => onSelect(dateStr)}
+              className={`h-7 w-7 rounded text-[11px] ${
+                isSelected
+                  ? "bg-[var(--accent)] text-white"
+                  : isToday
+                    ? "bg-[var(--background)] font-semibold text-[var(--foreground)]"
+                    : "text-[var(--foreground)] hover:bg-[var(--background)]"
+              }`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(calendarEl, document.body);
+}
+
 export function DispatchTopBar({ filterState, filterOptions, insights, opsMode = false }: DispatchTopBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [searchText, setSearchText] = useState(filterState.search);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
+  const dateButtonRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!filtersOpen) return;
     const close = (e: MouseEvent) => {
@@ -220,7 +346,7 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
     <div className="shrink-0 border-b border-[var(--card-border)] bg-white/88 px-2 py-1 backdrop-blur">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {/* Left: Date + view toggle */}
-        <div className="flex items-center gap-1">
+        <div className="relative flex items-center gap-1" ref={dateButtonRef}>
           <button
             type="button"
             onClick={() => shiftDate(-1)}
@@ -231,9 +357,15 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="min-w-[120px] text-[11px] font-medium text-[var(--foreground)]">
+          <button
+            type="button"
+            onClick={() => setCalendarOpen((o) => !o)}
+            className="min-w-[120px] rounded px-1 py-0.5 text-left text-[11px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/40"
+            aria-label="Choose date"
+            aria-expanded={calendarOpen}
+          >
             {formatDisplayDate(filterState.selectedDate)}
-          </span>
+          </button>
           <button
             type="button"
             onClick={() => shiftDate(1)}
@@ -244,6 +376,17 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+          {calendarOpen && (
+            <DispatchCalendarPopover
+              selectedDate={filterState.selectedDate}
+              onSelect={(date) => {
+                patchState({ selectedDate: date });
+                setCalendarOpen(false);
+              }}
+              onClose={() => setCalendarOpen(false)}
+              anchorRef={dateButtonRef}
+            />
+          )}
         </div>
         <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)]/70 p-0.5" role="tablist" aria-label="View">
           {(["day", "week", "month", "map"] as const).map((mode) => (

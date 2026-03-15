@@ -1160,10 +1160,10 @@ export function DispatchView({
               <div className="flex min-h-0 flex-1 flex-col">
                 {/* SECTION 1 (Top): Map ~38% + Work Order Details Panel; map collapses to toggle on small screens */}
                 <section
-                  className="grid grid-cols-1 shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
-                  style={{ minHeight: 0, flex: "0 0 38%" }}
+                  className="grid min-h-[300px] grid-cols-1 shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+                  style={{ minHeight: 320, flex: "0 0 38%" }}
                 >
-                  <div className="flex min-h-0 flex-col overflow-hidden">
+                  <div className="flex min-h-[280px] min-h-0 flex-col overflow-hidden">
                     {combinedMapVisible ? (
                       <>
                         <div className="flex items-center justify-between gap-2 border-b border-[var(--card-border)] pb-1 xl:hidden">
@@ -1172,7 +1172,7 @@ export function DispatchView({
                             Hide map
                           </Button>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-hidden" data-tour="dispatch:routing">
+                        <div className="min-h-[260px] flex-1 overflow-hidden" data-tour="dispatch:routing">
                           <DispatchMapPanel
                             workOrders={optimisticWorkOrders}
                             workforce={workforce}
@@ -1215,7 +1215,7 @@ export function DispatchView({
                   </div>
                 </section>
                 {/* SECTION 2 (Bottom): Queue + Dispatch Board ~62% */}
-                <section className="min-h-0 flex-1 border-t border-[var(--card-border)]">
+                <section className="min-h-0 flex-1 border-t border-[var(--card-border)]" style={{ minHeight: 280 }}>
                   <div className="flex h-full min-h-0">
                     <DispatchSidebarQueue
                       unscheduled={dispatchData.unscheduled}
@@ -1350,7 +1350,7 @@ export function DispatchView({
                             </p>
                           </div>
                         ) : (
-                          <div className="min-h-0 flex-1" data-tour="dispatch:technician-columns">
+                          <div className="min-h-0 flex-1 overflow-hidden" data-tour="dispatch:technician-columns">
                             <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
                             <DispatchBoard
                               lanes={filteredLanes}

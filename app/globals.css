@@ -220,6 +220,7 @@ body {
   font-size: clamp(1.4rem, 2.2vw, 2rem);
   font-weight: 650;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .leaflet-container {

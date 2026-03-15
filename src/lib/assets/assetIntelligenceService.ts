@@ -500,11 +500,13 @@ export async function getAssetIntelligenceDashboard(
           .in("company_id", scopedCompanyIds)
           .eq("status", "active"),
         generateAssetInsights(scope.tenantId, {
+          companyIds: scope.companyIds,
           companyId: options?.companyId ?? null,
           limit: 5,
           supabase: scopedSupabase,
         }),
         getPortfolioFailurePatterns(scope.tenantId, {
+          companyIds: scope.companyIds,
           companyId: options?.companyId ?? null,
           limit: 8,
           supabase: scopedSupabase,

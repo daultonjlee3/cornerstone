@@ -1,7 +1,23 @@
 import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  Wrench,
+  CheckCircle,
+  AlertTriangle,
+  Calendar,
+  CalendarCheck,
+  UserCog,
+  UserMinus,
+  Clock,
+  Percent,
+  CalendarClock,
+  BadgeCheck,
+  Flame,
+} from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { loadOperationsDashboardData } from "@/src/lib/dashboard/operations";
 import { loadOperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -26,6 +42,11 @@ function formatDate(value: string | null | undefined): string {
   }
 }
 
+const PRIORITY_URGENCY_ORDER: Record<string, number> = { emergency: 0, urgent: 1, high: 2 };
+function priorityUrgency(priority: string | null | undefined): number {
+  return PRIORITY_URGENCY_ORDER[String(priority ?? "").toLowerCase()] ?? 3;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -33,18 +54,13 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
   const companyIds = (companies ?? []).map((row) => row.id);
 
   const operations = await loadOperationsDashboardData({
@@ -67,7 +83,7 @@ export default async function DashboardPage() {
     intelligence.pmCompliance.overdueTasks.length === 0;
 
   return (
-    <div className="space-y-6" data-tour="dashboard:overview">
+    <div className="space-y-8" data-tour="dashboard:overview">
       <PageHeader
         icon={<LayoutDashboard className="size-5" />}
         title="Operations Command Center"
@@ -86,36 +102,134 @@ export default async function DashboardPage() {
           title="Open Work Orders"
           value={operations.kpis.openWorkOrders}
           description={operations.kpis.openWorkOrders === 0 ? "No open work orders yet" : "New, ready, scheduled, in progress, on hold"}
+          icon={ClipboardList}
         />
         <MetricCard
           title="In Progress Work Orders"
           value={operations.kpis.inProgressWorkOrders}
           description={operations.kpis.inProgressWorkOrders === 0 ? "None in progress" : "Actively being executed right now"}
+          icon={Wrench}
         />
         <MetricCard
           title="Completed Today"
           value={operations.kpis.completedToday}
           description={operations.kpis.completedToday === 0 ? "No completions today yet" : "Jobs completed in current day window"}
+          icon={CheckCircle}
+          variant={operations.kpis.completedToday > 0 ? "success" : "default"}
         />
         <MetricCard
           title="Overdue Work Orders"
           value={operations.kpis.overdueWorkOrders}
           description="Due date has passed without completion"
           trend={operations.kpis.overdueWorkOrders > 0 ? { label: "Needs immediate attention", tone: "bad" } : { label: "No overdue jobs", tone: "good" }}
+          icon={AlertTriangle}
+          variant={operations.kpis.overdueWorkOrders > 0 ? "danger" : "default"}
+          className={operations.kpis.overdueWorkOrders > 0 ? "ring-1 ring-red-200/50" : undefined}
         />
         <MetricCard
           title="Scheduled Today"
           value={operations.kpis.scheduledToday}
           description={operations.kpis.scheduledToday === 0 ? "Nothing scheduled for today" : "Jobs scheduled for today"}
+          icon={CalendarCheck}
         />
         <MetricCard
           title="Active Technicians"
           value={operations.kpis.activeTechnicians}
           description={operations.kpis.activeTechnicians === 0 ? "No active technicians" : "Technicians with active status"}
+          icon={UserCog}
+        />
+        <MetricCard
+          title="Unassigned Work Orders"
+          value={operations.kpis.unassignedWorkOrders}
+          description={operations.kpis.unassignedWorkOrders === 0 ? "All open work orders have an assignee" : "Open work orders with no technician assigned"}
+          icon={UserMinus}
+          trend={operations.kpis.unassignedWorkOrders > 0 ? { label: "Assign to schedule", tone: "neutral" } : undefined}
         />
       </section>
 
-      <section className="space-y-4">
+      <section className="grid gap-4 lg:grid-cols-3" data-tour="dashboard:technicians">
+        <Card>
+          <CardHeader>
+            <CardTitle>Asset Health</CardTitle>
+            <CardDescription>
+              {operations.assetHealth.assetsWithMultipleFailures30d === 0 &&
+              operations.assetHealth.assetsOverdueForPm === 0 &&
+              operations.assetHealth.assetsNotServicedIn6Months === 0
+                ? "Risk signals from maintenance history — none detected yet"
+                : "Risk signals from maintenance history"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
+              <span className="text-sm text-[var(--muted)]">Multiple failures (30d)</span>
+              <span className="text-lg font-semibold text-[var(--foreground)]">
+                {operations.assetHealth.assetsWithMultipleFailures30d}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
+              <span className="text-sm text-[var(--muted)]">Assets overdue for PM</span>
+              <span className="text-lg font-semibold text-[var(--foreground)]">
+                {operations.assetHealth.assetsOverdueForPm}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
+              <span className="text-sm text-[var(--muted)]">Not serviced in 6+ months</span>
+              <span className="text-lg font-semibold text-[var(--foreground)]">
+                {operations.assetHealth.assetsNotServicedIn6Months}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Technician Activity</CardTitle>
+              <CardDescription>Completed work, active assignments, and labor hours for today</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {operations.technicianActivity.length === 0 ? (
+                <DashboardSectionEmpty
+                  message="No active technicians."
+                  subtext="Add technicians and set status to active to see completed work and assignments here."
+                  cta={{ label: "Technicians", href: "/technicians" }}
+                />
+              ) : (
+                <DataTable className="shadow-none">
+                  <Table>
+                    <TableHead>
+                      <Th>Technician</Th>
+                      <Th>Status</Th>
+                      <Th>Completed Today</Th>
+                      <Th>Current Assignments</Th>
+                      <Th>Labor Hours Today</Th>
+                    </TableHead>
+                    <TBody>
+                      {operations.technicianActivity.map((row) => (
+                        <Tr key={row.technician_id}>
+                          <Td>{row.technician_name}</Td>
+                          <Td>
+                            <span className="inline-flex items-center rounded-full border border-emerald-200/60 bg-emerald-50/40 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                              Active
+                            </span>
+                          </Td>
+                          <Td className="text-[var(--muted)]">{row.completed_today}</Td>
+                          <Td className="text-[var(--muted)]">{row.current_assignments}</Td>
+                          <Td className="text-[var(--muted)]">
+                            {row.labor_hours_today.toFixed(1)} / 8 hrs
+                          </Td>
+                        </Tr>
+                      ))}
+                    </TBody>
+                  </Table>
+                </DataTable>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-4 pt-1">
         <div>
           <h2 className="text-lg font-semibold text-[var(--foreground)]">PM Compliance Engine</h2>
           <p className="text-sm text-[var(--muted)]">
@@ -127,21 +241,29 @@ export default async function DashboardPage() {
             title="Completed On-Time"
             value={intelligence.pmCompliance.completedOnTime}
             description="Completed by scheduled PM date"
+            icon={BadgeCheck}
           />
           <MetricCard
             title="Completed Late"
             value={intelligence.pmCompliance.completedLate}
             description="Completed after scheduled PM date"
+            icon={Clock}
           />
           <MetricCard
             title="Missed PM"
             value={intelligence.pmCompliance.missed}
             description="Past due without completion"
+            icon={AlertTriangle}
           />
           <MetricCard
             title="Compliance %"
             value={intelligence.pmCompliance.compliancePercentage != null ? `${intelligence.pmCompliance.compliancePercentage.toFixed(2)}%` : "—"}
-            description={intelligence.pmCompliance.compliancePercentage != null ? "On-time / due PM runs" : "No PM runs yet — create schedules to see compliance"}
+            description={
+              intelligence.pmCompliance.compliancePercentage != null
+                ? "On-time completions vs. due PM runs"
+                : "Create PM plans and complete runs to see compliance here."
+            }
+            icon={Percent}
           />
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -226,7 +348,8 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <AlertTriangle className="size-3.5 shrink-0 text-red-500/80" aria-hidden />
                 Overdue work orders
               </p>
               {operations.alerts.overdueWorkOrders.length === 0 ? (
@@ -251,24 +374,32 @@ export default async function DashboardPage() {
               )}
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <Flame className="size-3.5 shrink-0 text-amber-500/80" aria-hidden />
                 High priority not started
               </p>
               {operations.alerts.highPriorityNotStarted.length === 0 ? (
                 <DashboardSectionEmpty message="No high-priority jobs waiting to start." subtext="Urgent or high-priority work orders not yet started will appear here." cta={{ label: "Work orders", href: "/work-orders" }} className="mt-1" />
               ) : (
                 <ul className="mt-2 space-y-2">
-                  {operations.alerts.highPriorityNotStarted.slice(0, 4).map((row) => (
-                    <li key={row.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 px-3 py-2">
-                      <Link href={`/work-orders/${row.id}`} className="truncate text-sm font-medium text-[var(--accent)] hover:underline">
-                        {row.work_order_number ?? row.title}
-                      </Link>
-                      <div className="flex items-center gap-2">
-                        <PriorityBadge priority={row.priority} />
-                        <StatusBadge status={row.status} />
-                      </div>
-                    </li>
-                  ))}
+                  {[...operations.alerts.highPriorityNotStarted]
+                    .sort((a, b) => {
+                      const byPriority = priorityUrgency(a.priority) - priorityUrgency(b.priority);
+                      if (byPriority !== 0) return byPriority;
+                      return (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? "");
+                    })
+                    .slice(0, 4)
+                    .map((row) => (
+                      <li key={row.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 px-3 py-2">
+                        <Link href={`/work-orders/${row.id}`} className="truncate text-sm font-medium text-[var(--accent)] hover:underline">
+                          {row.work_order_number ?? row.title}
+                        </Link>
+                        <div className="flex items-center gap-2">
+                          <PriorityBadge priority={row.priority} />
+                          <StatusBadge status={row.status} />
+                        </div>
+                      </li>
+                    ))}
                 </ul>
               )}
             </div>
@@ -282,7 +413,8 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <Wrench className="size-3.5 shrink-0 text-[var(--muted)]" aria-hidden />
                 PM tasks due soon
               </p>
               {operations.alerts.pmDueSoon.length === 0 ? (
@@ -360,96 +492,26 @@ export default async function DashboardPage() {
           title="Backlog: Open"
           value={operations.backlog.openWorkOrders}
           description={operations.backlog.openWorkOrders === 0 ? "No open backlog" : "Open maintenance backlog"}
+          icon={ClipboardList}
         />
         <MetricCard
           title="Backlog: Overdue"
           value={operations.backlog.overdueWorkOrders}
           description={operations.backlog.overdueWorkOrders === 0 ? "No overdue backlog" : "Overdue workload"}
+          icon={AlertTriangle}
         />
         <MetricCard
           title="PM Not Scheduled"
           value={operations.backlog.pmNotScheduled}
           description={operations.backlog.pmNotScheduled === 0 ? "No PM past due unscheduled" : "Due PM tasks waiting scheduling"}
+          icon={CalendarClock}
         />
         <MetricCard
           title="Upcoming PM Tasks"
           value={operations.backlog.upcomingPmTasks}
           description={operations.backlog.upcomingPmTasks === 0 ? "No PM in next 14 days" : "PM tasks due in next 14 days"}
+          icon={Calendar}
         />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Asset Health</CardTitle>
-            <CardDescription>
-              {operations.assetHealth.assetsWithMultipleFailures30d === 0 &&
-              operations.assetHealth.assetsOverdueForPm === 0 &&
-              operations.assetHealth.assetsNotServicedIn6Months === 0
-                ? "Risk signals from maintenance history — none detected yet"
-                : "Risk signals from maintenance history"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
-              <span className="text-sm text-[var(--muted)]">Multiple failures (30d)</span>
-              <span className="text-lg font-semibold text-[var(--foreground)]">
-                {operations.assetHealth.assetsWithMultipleFailures30d}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
-              <span className="text-sm text-[var(--muted)]">Assets overdue for PM</span>
-              <span className="text-lg font-semibold text-[var(--foreground)]">
-                {operations.assetHealth.assetsOverdueForPm}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2">
-              <span className="text-sm text-[var(--muted)]">Not serviced in 6+ months</span>
-              <span className="text-lg font-semibold text-[var(--foreground)]">
-                {operations.assetHealth.assetsNotServicedIn6Months}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Technician Activity</CardTitle>
-              <CardDescription>Completed work, active assignments, and labor hours for today</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {operations.technicianActivity.length === 0 ? (
-                <DashboardSectionEmpty
-                  message="No active technicians."
-                  subtext="Add technicians and set status to active to see completed work and assignments here."
-                  cta={{ label: "Technicians", href: "/technicians" }}
-                />
-              ) : (
-                <DataTable className="shadow-none">
-                  <Table>
-                    <TableHead>
-                      <Th>Technician</Th>
-                      <Th>Completed Today</Th>
-                      <Th>Current Assignments</Th>
-                      <Th>Labor Hours Today</Th>
-                    </TableHead>
-                    <TBody>
-                      {operations.technicianActivity.map((row) => (
-                        <Tr key={row.technician_id}>
-                          <Td>{row.technician_name}</Td>
-                          <Td className="text-[var(--muted)]">{row.completed_today}</Td>
-                          <Td className="text-[var(--muted)]">{row.current_assignments}</Td>
-                          <Td className="text-[var(--muted)]">{row.labor_hours_today.toFixed(2)}</Td>
-                        </Tr>
-                      ))}
-                    </TBody>
-                  </Table>
-                </DataTable>
-              )}
-            </CardContent>
-          </Card>
-        </div>
       </section>
     </div>
   );

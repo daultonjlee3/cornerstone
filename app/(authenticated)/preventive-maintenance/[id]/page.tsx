@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { PreventiveMaintenanceDetailActions } from "../components/pm-detail-actions";
 
 export const metadata = {
@@ -31,13 +32,8 @@ export default async function PreventiveMaintenanceDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: planRaw, error } = await supabase
     .from("preventive_maintenance_plans")
@@ -48,7 +44,7 @@ export default async function PreventiveMaintenanceDetailPage({
     .maybeSingle();
   if (error || !planRaw) notFound();
 
-  if ((planRaw as { tenant_id: string }).tenant_id !== membership.tenant_id) notFound();
+  if ((planRaw as { tenant_id: string }).tenant_id !== tenantId) notFound();
 
   const row = planRaw as Record<string, unknown>;
   const company = Array.isArray(row.companies) ? row.companies[0] : row.companies;

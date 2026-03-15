@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ListChecks } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PageHeader } from "@/src/components/ui/page-header";
@@ -63,18 +64,13 @@ export default async function TechnicianWorkQueuePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
   const companyIds = (companies ?? []).map((row) => row.id);
 

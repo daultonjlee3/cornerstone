@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type ProcurementCompanyScope = {
   id: string;
@@ -25,20 +26,15 @@ export async function resolveProcurementScope(
     throw new Error("Unauthorized.");
   }
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership?.tenant_id) {
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) {
     throw new Error("Tenant membership not found.");
   }
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
 
   const normalized = (companies ?? []).map((row) => ({
@@ -49,7 +45,7 @@ export async function resolveProcurementScope(
   return {
     supabase,
     userId: user.id,
-    tenantId: membership.tenant_id,
+    tenantId,
     companies: normalized,
     companyIds: normalized.map((row) => row.id),
   };

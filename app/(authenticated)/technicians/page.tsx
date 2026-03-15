@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Wrench } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import type { Technician } from "./components/technician-form-modal";
 import { TechniciansList } from "./components/technicians-list";
 import { PageHeader } from "@/src/components/ui/page-header";
@@ -18,19 +19,13 @@ export default async function TechniciansPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
 
   const companyIds = (companies ?? []).map((c) => c.id);

@@ -1,6 +1,7 @@
 import { Repeat } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { PreventiveMaintenancePlansList } from "./components/pm-plans-list";
 import type { PreventiveMaintenanceTemplate } from "./components/pm-template-form-modal";
 import type { PreventiveMaintenancePlan } from "./components/pm-plan-form-modal";
@@ -32,13 +33,8 @@ export default async function PreventiveMaintenancePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const params =
     typeof (searchParams as Promise<SearchParams>)?.then === "function"
@@ -62,7 +58,7 @@ export default async function PreventiveMaintenancePage({
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
 
   const companyOptions = (companies ?? []).map((company) => ({

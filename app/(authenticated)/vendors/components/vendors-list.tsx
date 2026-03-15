@@ -16,6 +16,7 @@ import {
   TableEmptyState,
   TablePagination,
 } from "@/src/components/ui/data-table";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { deleteVendor, saveVendor } from "../actions";
 import { VendorFormModal, type VendorRecord } from "./vendor-form-modal";
 
@@ -198,23 +199,14 @@ export function VendorsList({ vendors, companies }: VendorsListProps) {
                 </Td>
                 <Td className="text-[var(--muted)]">{new Date(vendor.updated_at).toLocaleDateString()}</Td>
                 <Td>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(vendor)}
-                      className="text-[var(--accent)] hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => onDelete(vendor)}
-                      className="text-red-600 hover:underline disabled:opacity-60"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  <ActionsDropdown
+                    align="right"
+                    items={[
+                      { type: "link", label: "View", href: `/vendors/${vendor.id}` },
+                      { type: "button", label: "Edit", onClick: () => openEdit(vendor) },
+                      { type: "button", label: "Delete", onClick: () => onDelete(vendor), disabled: isPending, destructive: true },
+                    ]}
+                  />
                 </Td>
               </Tr>
             ))}

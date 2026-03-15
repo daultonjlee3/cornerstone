@@ -1,5 +1,14 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
+import {
+  ClipboardList,
+  Wrench,
+  Pause,
+  AlertTriangle,
+  Calendar,
+  CheckCircle,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { MetricCard } from "@/src/components/ui/metric-card";
@@ -17,13 +26,19 @@ type WorkOrderKpiBarProps = {
   stats: WorkOrderKpiStats;
 };
 
-const KPI_ITEMS: { key: keyof WorkOrderKpiStats; label: string; view: string; tone?: "neutral" | "good" | "bad" }[] = [
-  { key: "open", label: "Open", view: "open" },
-  { key: "inProgress", label: "In Progress", view: "in_progress" },
-  { key: "onHold", label: "On Hold", view: "on_hold" },
-  { key: "overdue", label: "Overdue", view: "overdue", tone: "bad" },
-  { key: "dueToday", label: "Due Today", view: "due_today", tone: "bad" },
-  { key: "completedToday", label: "Completed Today", view: "completed_today", tone: "good" },
+const KPI_ITEMS: {
+  key: keyof WorkOrderKpiStats;
+  label: string;
+  view: string;
+  tone?: "neutral" | "good" | "bad";
+  icon: LucideIcon;
+}[] = [
+  { key: "open", label: "Open", view: "open", icon: ClipboardList },
+  { key: "inProgress", label: "In Progress", view: "in_progress", icon: Wrench },
+  { key: "onHold", label: "On Hold", view: "on_hold", icon: Pause },
+  { key: "overdue", label: "Overdue", view: "overdue", tone: "bad", icon: AlertTriangle },
+  { key: "dueToday", label: "Due Today", view: "due_today", tone: "bad", icon: Calendar },
+  { key: "completedToday", label: "Completed Today", view: "completed_today", tone: "good", icon: CheckCircle },
 ];
 
 export function WorkOrderKpiBar({ stats }: WorkOrderKpiBarProps) {
@@ -41,7 +56,7 @@ export function WorkOrderKpiBar({ stats }: WorkOrderKpiBarProps) {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-      {KPI_ITEMS.map(({ key, label, view, tone }) => (
+      {KPI_ITEMS.map(({ key, label, view, tone, icon }) => (
         <button
           key={key}
           type="button"
@@ -53,6 +68,7 @@ export function WorkOrderKpiBar({ stats }: WorkOrderKpiBarProps) {
             title={label}
             value={stats[key]}
             trend={tone ? { label: `View ${label}`, tone } : undefined}
+            icon={icon}
           />
         </button>
       ))}

@@ -27,6 +27,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/too
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { Hint } from "@/src/components/ui/hint";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 
 type CompanyOption = { id: string; name: string };
 type AssetOption = {
@@ -468,64 +469,18 @@ export function PreventiveMaintenancePlansList({
                       <StatusBadge status={plan.status} />
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/preventive-maintenance/${plan.id}`}
-                          className="rounded text-[var(--accent)] hover:underline"
-                        >
-                          View
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPlan(plan);
-                            setPlanModalOpen(true);
-                          }}
-                          className="rounded text-[var(--accent)] hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleStatusToggle(plan)}
-                          disabled={isPending || plan.status === "archived"}
-                          className="rounded text-[var(--accent)] hover:underline disabled:opacity-50"
-                        >
-                          {plan.status === "active" ? "Pause" : "Resume"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleGenerateNow(plan.id)}
-                          disabled={isPending}
-                          className="rounded text-[var(--accent)] hover:underline disabled:opacity-50"
-                        >
-                          Generate Now
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDuplicate(plan.id)}
-                          disabled={isPending}
-                          className="rounded text-[var(--accent)] hover:underline disabled:opacity-50"
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleArchive(plan.id)}
-                          disabled={isPending || plan.status === "archived"}
-                          className="rounded text-[var(--muted)] hover:underline disabled:opacity-50"
-                        >
-                          Archive
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePlan(plan.id, plan.name)}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <ActionsDropdown
+                        align="right"
+                        items={[
+                          { type: "link", label: "View", href: `/preventive-maintenance/${plan.id}` },
+                          { type: "button", label: "Edit", onClick: () => { setEditingPlan(plan); setPlanModalOpen(true); } },
+                          { type: "button", label: plan.status === "active" ? "Pause" : "Resume", onClick: () => handleStatusToggle(plan), disabled: isPending || plan.status === "archived" },
+                          { type: "button", label: "Generate Now", onClick: () => handleGenerateNow(plan.id), disabled: isPending },
+                          { type: "button", label: "Duplicate", onClick: () => handleDuplicate(plan.id), disabled: isPending },
+                          { type: "button", label: "Archive", onClick: () => handleArchive(plan.id), disabled: isPending || plan.status === "archived" },
+                          { type: "button", label: "Delete", onClick: () => handleDeletePlan(plan.id, plan.name), disabled: isPending, destructive: true },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -573,26 +528,13 @@ export function PreventiveMaintenancePlansList({
                       <PriorityBadge priority={template.priority} />
                     </td>
                     <td className="px-2 py-2">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingTemplate(template);
-                            setTemplateModalOpen(true);
-                          }}
-                          className="rounded text-[var(--accent)] hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTemplate(template)}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <ActionsDropdown
+                        align="right"
+                        items={[
+                          { type: "button", label: "Edit", onClick: () => { setEditingTemplate(template); setTemplateModalOpen(true); } },
+                          { type: "button", label: "Delete", onClick: () => handleDeleteTemplate(template), disabled: isPending, destructive: true },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

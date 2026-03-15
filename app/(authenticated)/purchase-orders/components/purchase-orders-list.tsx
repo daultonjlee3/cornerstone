@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/src/components/ui/button";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { deletePurchaseOrder, savePurchaseOrder } from "../actions";
 import {
   PurchaseOrderFormModal,
@@ -168,18 +169,14 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
                 <Td>{row.expected_delivery_date ?? "—"}</Td>
                 <Td className="text-right">${Number(row.total_cost ?? 0).toFixed(2)}</Td>
                 <Td>
-                  <div className="flex gap-2">
-                    <button className="text-[var(--accent)] hover:underline" onClick={() => openEdit(row)}>
-                      Edit
-                    </button>
-                    <button
-                      className="text-red-600 hover:underline disabled:opacity-60"
-                      disabled={isPending}
-                      onClick={() => onDelete(row)}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  <ActionsDropdown
+                    align="right"
+                    items={[
+                      { type: "link", label: "View", href: `/purchase-orders/${row.id}` },
+                      { type: "button", label: "Edit", onClick: () => openEdit(row) },
+                      { type: "button", label: "Delete", onClick: () => onDelete(row), disabled: isPending, destructive: true },
+                    ]}
+                  />
                 </Td>
               </Tr>
             ))}

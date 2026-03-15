@@ -175,30 +175,55 @@ export function Sidebar({
             ))}
           </div>
             {showPlatformAdmin && (
-              <div className="shrink-0 border-t border-[var(--card-border)] px-2 py-2">
+              <div className="shrink-0 border-t border-[var(--card-border)] px-2 py-2 space-y-1">
                 {collapsed ? (
-                  <SidebarTooltip label="Platform Admin" side="right">
+                  <>
+                    <SidebarTooltip label="Platform Admin" side="right">
+                      <Link
+                        href="/platform"
+                        onClick={onClose}
+                        className="group flex cursor-pointer items-center justify-center rounded-full px-2 py-2 text-sm transition-all duration-150 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                      >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105 bg-[var(--accent)]/10 text-[var(--accent)]">
+                          <Settings className="size-4" />
+                        </span>
+                      </Link>
+                    </SidebarTooltip>
+                    <SidebarTooltip label="Switch tenant" side="right">
+                      <Link
+                        href="/platform/tenants?switch=1"
+                        onClick={onClose}
+                        className="group flex cursor-pointer items-center justify-center rounded-full px-2 py-2 text-sm transition-all duration-150 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                      >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105 bg-[var(--muted)]/20 text-[var(--muted)]">
+                          <Building2 className="size-4" />
+                        </span>
+                      </Link>
+                    </SidebarTooltip>
+                  </>
+                ) : (
+                  <>
                     <Link
                       href="/platform"
                       onClick={onClose}
-                      className="group flex cursor-pointer items-center justify-center rounded-full px-2 py-2 text-sm transition-all duration-150 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                      className="group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                     >
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105 bg-[var(--accent)]/10 text-[var(--accent)]">
                         <Settings className="size-4" />
                       </span>
+                      <span>Platform Admin</span>
                     </Link>
-                  </SidebarTooltip>
-                ) : (
-                  <Link
-                    href="/platform"
-                    onClick={onClose}
-                    className="group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105 bg-[var(--accent)]/10 text-[var(--accent)]">
-                      <Settings className="size-4" />
-                    </span>
-                    <span>Platform Admin</span>
-                  </Link>
+                    <Link
+                      href="/platform/tenants?switch=1"
+                      onClick={onClose}
+                      className="group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105 bg-[var(--muted)]/20 text-[var(--muted)]">
+                        <Building2 className="size-4" />
+                      </span>
+                      <span>Switch tenant</span>
+                    </Link>
+                  </>
                 )}
               </div>
             )}

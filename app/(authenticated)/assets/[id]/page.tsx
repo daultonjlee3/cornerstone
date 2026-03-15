@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { AssetHealthIndicator } from "../components/asset-health-indicator";
 import { AssetIntelligencePanel } from "../components/asset-intelligence-panel";
 import { AssetTimeline } from "../components/asset-timeline";
@@ -49,13 +50,8 @@ export default async function AssetDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: assetRaw, error } = await supabase
     .from("assets")
@@ -66,7 +62,7 @@ export default async function AssetDetailPage({
     .maybeSingle();
 
   if (error || !assetRaw) notFound();
-  if ((assetRaw as { tenant_id: string }).tenant_id !== membership.tenant_id) notFound();
+  if ((assetRaw as { tenant_id: string }).tenant_id !== tenantId) notFound();
 
   const row = assetRaw as Record<string, unknown>;
   const company = Array.isArray(row.companies) ? row.companies[0] : row.companies;
