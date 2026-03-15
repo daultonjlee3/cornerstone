@@ -7,20 +7,9 @@ import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelli
 import { getAssetHierarchyNode, wouldCreateAssetCycle } from "@/src/lib/assets/hierarchy";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import { revalidatePath } from "next/cache";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 
 export type AssetFormState = { error?: string; success?: boolean };
-
-async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  return !!data;
-}
 
 async function getActorId(
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -100,7 +89,7 @@ export async function saveAsset(
   if (!assetName) return { error: "Asset name is required." };
   if (!companyId) return { error: "Company is required." };
 
-  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  const allowed = await companyBelongsToTenant(companyId, tenantId, supabase);
   if (!allowed) return { error: "Invalid company." };
 
   const propertyId = (formData.get("property_id") as string)?.trim() || null;

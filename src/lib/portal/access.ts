@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 export const IMPERSONATION_COOKIE = "cs_impersonation";
 
+/** Portal technician impersonation session. company_id is server-derived from the technician record when starting impersonation; never trust client-provided company_id for portal scope. */
 export type ImpersonationSession = {
   admin_user_id: string;
   technician_user_id: string;

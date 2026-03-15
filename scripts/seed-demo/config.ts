@@ -16,6 +16,34 @@ export type TechnicianConfig = {
   email: string;
   phone: string;
   trade: string;
+  /** Optional role for demo (e.g. Maintenance Manager, Lead Technician). Shown in notes. */
+  role?: string;
+};
+
+/** Company-level profile for demo: HQ address, contact, website. */
+export type CompanyProfile = {
+  addressLine1: string;
+  city: string;
+  state: string;
+  zip: string;
+  phone: string;
+  website: string;
+};
+
+export type DemoTenantConfig = {
+  tenantName: string;
+  slug: string;
+  companyName: string;
+  /** HQ / primary contact for the company. Used for companies.address, .phone, .website. */
+  companyProfile?: CompanyProfile;
+  locations: LocationConfig[];
+  technicians: TechnicianConfig[];
+  vendors: VendorConfig[];
+  products: ProductConfig[];
+  assetPatterns: AssetPatternConfig[];
+  workOrderTitles: string[];
+  requestTitles: string[];
+  pmTemplateNames: Array<{ name: string; frequency: "weekly" | "monthly" | "quarterly" | "annual" }>;
 };
 
 export type VendorConfig = {
@@ -44,25 +72,19 @@ export type AssetPatternConfig = {
   countPerBuilding: number;
 };
 
-export type DemoTenantConfig = {
-  tenantName: string;
-  slug: string;
-  companyName: string;
-  locations: LocationConfig[];
-  technicians: TechnicianConfig[];
-  vendors: VendorConfig[];
-  products: ProductConfig[];
-  assetPatterns: AssetPatternConfig[];
-  workOrderTitles: string[];
-  requestTitles: string[];
-  pmTemplateNames: Array<{ name: string; frequency: "weekly" | "monthly" | "quarterly" }>;
-};
-
 export const DEMO_TENANTS: DemoTenantConfig[] = [
   {
     tenantName: "Summit Facility Services",
     slug: "summit-facility-demo",
     companyName: "Summit Facility Services",
+    companyProfile: {
+      addressLine1: "1845 Sherman St",
+      city: "Denver",
+      state: "CO",
+      zip: "80203",
+      phone: "(303) 555-0100",
+      website: "https://summitfacilityservices.demo",
+    },
     locations: [
       {
         propertyName: "Downtown Office Tower",
@@ -100,8 +122,8 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       },
     ],
     technicians: [
-      { name: "James Wilson", email: "j.wilson@summit-facility.demo", phone: "(555) 201-1001", trade: "HVAC" },
-      { name: "Elena Rodriguez", email: "e.rodriguez@summit-facility.demo", phone: "(555) 201-1002", trade: "Electrical" },
+      { name: "James Wilson", email: "j.wilson@summit-facility.demo", phone: "(555) 201-1001", trade: "HVAC", role: "Maintenance Manager" },
+      { name: "Elena Rodriguez", email: "e.rodriguez@summit-facility.demo", phone: "(555) 201-1002", trade: "Electrical", role: "Lead Technician" },
       { name: "Marcus Chen", email: "m.chen@summit-facility.demo", phone: "(555) 201-1003", trade: "General Maintenance" },
       { name: "Sarah Mitchell", email: "s.mitchell@summit-facility.demo", phone: "(555) 201-1004", trade: "Plumbing" },
       { name: "David Park", email: "d.park@summit-facility.demo", phone: "(555) 201-1005", trade: "HVAC" },
@@ -180,12 +202,21 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       { name: "Weekly generator test", frequency: "weekly" },
       { name: "Quarterly elevator safety inspection", frequency: "quarterly" },
       { name: "Monthly boiler pressure check", frequency: "monthly" },
+      { name: "Annual fire system inspection and certification", frequency: "annual" },
     ],
   },
   {
     tenantName: "Northstar Industrial Manufacturing",
     slug: "northstar-manufacturing-demo",
     companyName: "Northstar Industrial Manufacturing",
+    companyProfile: {
+      addressLine1: "4500 Industrial Pkwy",
+      city: "Detroit",
+      state: "MI",
+      zip: "48211",
+      phone: "(313) 555-0200",
+      website: "https://northstarindustrial.demo",
+    },
     locations: [
       {
         propertyName: "Plant A",
@@ -297,12 +328,21 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       { name: "Quarterly compressor inspection", frequency: "quarterly" },
       { name: "Monthly boiler inspection", frequency: "monthly" },
       { name: "Quarterly electrical panel thermography", frequency: "quarterly" },
+      { name: "Annual cooling tower shutdown and cleaning", frequency: "annual" },
     ],
   },
   {
     tenantName: "Riverside Unified School District",
     slug: "riverside-schools-demo",
     companyName: "Riverside Unified School District",
+    companyProfile: {
+      addressLine1: "3380 14th St",
+      city: "Riverside",
+      state: "CA",
+      zip: "92501",
+      phone: "(951) 555-0300",
+      website: "https://riversideunified.edu.demo",
+    },
     locations: [
       {
         propertyName: "Riverside High School",
@@ -338,8 +378,8 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       },
     ],
     technicians: [
-      { name: "Tom Bradley", email: "t.bradley@riverside.edu.demo", phone: "(555) 203-3001", trade: "HVAC" },
-      { name: "Maria Garcia", email: "m.garcia@riverside.edu.demo", phone: "(555) 203-3002", trade: "General Maintenance" },
+      { name: "Tom Bradley", email: "t.bradley@riverside.edu.demo", phone: "(555) 203-3001", trade: "HVAC", role: "Director of Facilities" },
+      { name: "Maria Garcia", email: "m.garcia@riverside.edu.demo", phone: "(555) 203-3002", trade: "General Maintenance", role: "Lead Technician" },
       { name: "Steve Norton", email: "s.norton@riverside.edu.demo", phone: "(555) 203-3003", trade: "Electrical" },
       { name: "Linda Foster", email: "l.foster@riverside.edu.demo", phone: "(555) 203-3004", trade: "Plumbing" },
       { name: "Joe Martinez", email: "j.martinez@riverside.edu.demo", phone: "(555) 203-3005", trade: "PM Specialist" },
@@ -405,6 +445,7 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       { name: "Weekly generator test", frequency: "weekly" },
       { name: "Quarterly kitchen equipment sanitation", frequency: "quarterly" },
       { name: "Monthly boiler inspection", frequency: "monthly" },
+      { name: "Annual playground and grounds safety inspection", frequency: "annual" },
     ],
   },
   {
@@ -445,8 +486,8 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       },
     ],
     technicians: [
-      { name: "Jennifer Walsh", email: "j.walsh@mercy.demo", phone: "(555) 204-4001", trade: "HVAC" },
-      { name: "Michael Torres", email: "m.torres@mercy.demo", phone: "(555) 204-4002", trade: "Electrical" },
+      { name: "Jennifer Walsh", email: "j.walsh@mercy.demo", phone: "(555) 204-4001", trade: "HVAC", role: "Facilities Manager" },
+      { name: "Michael Torres", email: "m.torres@mercy.demo", phone: "(555) 204-4002", trade: "Electrical", role: "Lead Technician" },
       { name: "Susan Kim", email: "s.kim@mercy.demo", phone: "(555) 204-4003", trade: "General Maintenance" },
       { name: "David Lopez", email: "d.lopez@mercy.demo", phone: "(555) 204-4004", trade: "PM Specialist" },
       { name: "Emily Chen", email: "e.chen@mercy.demo", phone: "(555) 204-4005", trade: "Facilities Technician" },
@@ -513,6 +554,7 @@ export const DEMO_TENANTS: DemoTenantConfig[] = [
       { name: "Quarterly medical gas compliance", frequency: "quarterly" },
       { name: "Monthly cooling tower treatment", frequency: "monthly" },
       { name: "Quarterly elevator inspection", frequency: "quarterly" },
+      { name: "Annual sterilization equipment certification", frequency: "annual" },
     ],
   },
 ];

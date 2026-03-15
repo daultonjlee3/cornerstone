@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { dateOnlyUTC } from "@/src/lib/date-utils";
 
 type DashboardContext = {
   supabase: SupabaseClient;
@@ -118,10 +119,6 @@ export type ReportDataset = {
   rows: Record<string, string | number | null>[];
 };
 
-function dateOnly(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
 function parseDateOnly(
   raw: string | null | undefined,
   fallback: string
@@ -134,7 +131,7 @@ function parseDateOnly(
 function addDays(baseDate: string, days: number): string {
   const base = new Date(`${baseDate}T00:00:00.000Z`);
   base.setUTCDate(base.getUTCDate() + days);
-  return dateOnly(base);
+  return dateOnlyUTC(base);
 }
 
 function monthKeyFromIso(raw: string | null | undefined): string | null {
@@ -193,12 +190,12 @@ export async function loadOperationsIntelligenceData({
   startDate,
   endDate,
 }: DashboardContext): Promise<OperationsIntelligenceData> {
-  const today = dateOnly(new Date());
+  const today = dateOnlyUTC(new Date());
   const defaultEnd = today;
   const startBase = new Date();
   startBase.setUTCDate(1);
   startBase.setUTCMonth(startBase.getUTCMonth() - 11);
-  const defaultStart = dateOnly(startBase);
+  const defaultStart = dateOnlyUTC(startBase);
   const resolvedStartDate = parseDateOnly(startDate, defaultStart);
   const resolvedEndDate = parseDateOnly(endDate, defaultEnd);
 

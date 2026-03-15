@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { dateOnlyUTC } from "@/src/lib/date-utils";
 
 export type NotificationType =
   | "maintenance_request_created"
@@ -28,16 +29,16 @@ export type NotificationListItem = {
   read_at: string | null;
 };
 
-function dateOnly(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
 function addDays(baseDate: string, days: number): string {
   const base = new Date(`${baseDate}T00:00:00.000Z`);
   base.setUTCDate(base.getUTCDate() + days);
-  return dateOnly(base);
+  return dateOnlyUTC(base);
 }
 
+/**
+ * Create in-app notifications for the given users. Idempotent per (event_type, entity_type, entity_id, user_id):
+ * we skip users who already have an unread notification for the same event/entity, so duplicate triggers do not create duplicate notifications.
+ */
 export async function createNotifications(
   supabase: SupabaseClient,
   payload: NotificationPayload
@@ -180,6 +181,10 @@ export async function markNotificationRead(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Create overdue and PM-due-soon notifications for the user (called on-demand when fetching notifications, e.g. GET /api/notifications).
+ * Idempotent: createNotifications skips users who already have an unread notification for the same work order or PM plan.
+ */
 export async function syncDueNotificationsForUser(
   supabase: SupabaseClient,
   {
@@ -194,7 +199,7 @@ export async function syncDueNotificationsForUser(
     return { overdueCreated: 0, pmDueSoonCreated: 0 };
   }
 
-  const today = dateOnly(new Date());
+  const today = dateOnlyUTC(new Date());
   const pmDueSoonUntil = addDays(today, 3);
 
   const [overdueResult, pmDueSoonResult] = await Promise.all([
@@ -275,6 +280,10 @@ export async function getCompanyAlertRecipients(
   return Array.from(recipients);
 }
 
+/**
+ * Send an email alert via Resend. Best-effort; callers should not block on this.
+ * Logs when config is missing or send fails so failures are visible in server logs.
+ */
 export async function sendEmailAlert(
   {
     subject,
@@ -290,6 +299,11 @@ export async function sendEmailAlert(
   const fromEmail = process.env.NOTIFICATION_FROM_EMAIL?.trim();
   const validRecipients = recipients.filter((email) => email.includes("@"));
   if (!apiKey || !fromEmail || validRecipients.length === 0) {
+    if (process.env.NODE_ENV !== "test" && validRecipients.length > 0) {
+      console.warn(
+        "[notifications] sendEmailAlert skipped: missing RESEND_API_KEY or NOTIFICATION_FROM_EMAIL, or no valid recipients."
+      );
+    }
     return false;
   }
 
@@ -307,8 +321,18 @@ export async function sendEmailAlert(
         text: message,
       }),
     });
+    if (!response.ok && process.env.NODE_ENV !== "test") {
+      const body = await response.text();
+      console.warn(
+        `[notifications] sendEmailAlert failed: ${response.status} ${response.statusText}`,
+        body.slice(0, 200)
+      );
+    }
     return response.ok;
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn("[notifications] sendEmailAlert error:", err instanceof Error ? err.message : err);
+    }
     return false;
   }
 }

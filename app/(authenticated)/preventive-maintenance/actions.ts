@@ -10,7 +10,7 @@ import {
   type PreventiveMaintenanceFrequencyType,
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 
 const FREQUENCY_TYPES = [
   "daily",
@@ -62,17 +62,6 @@ async function getActorId(
     data: { user },
   } = await supabase.auth.getUser();
   return user?.id ?? null;
-}
-
-async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  return !!data;
 }
 
 async function loadAssetContext(assetId: string): Promise<{
@@ -240,6 +229,7 @@ async function processPlanRun(
 ): Promise<{ status: "generated" | "skipped" | "failed"; workOrderGenerated: boolean; error?: string }> {
   const scheduled = formatDateOnly(scheduledDate);
 
+  // Idempotency: unique constraint on (plan_id, scheduled_date) prevents duplicate runs; 23505 = unique violation.
   const { data: runRow, error: runInsertError } = await supabase
     .from("preventive_maintenance_runs")
     .insert({

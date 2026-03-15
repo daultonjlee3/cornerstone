@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { createClient } from "@/src/lib/supabase/server";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import {
   getReportDataset,
   loadOperationsIntelligenceData,
@@ -100,20 +101,15 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) {
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) {
     return NextResponse.json({ error: "No tenant membership found." }, { status: 403 });
   }
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
   const companyIds = (companies ?? []).map((row) => row.id);
   if (companyIds.length === 0) {
     return NextResponse.json({ error: "No company scope available." }, { status: 400 });

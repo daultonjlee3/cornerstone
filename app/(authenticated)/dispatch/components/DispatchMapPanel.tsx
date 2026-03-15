@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   Marker,
@@ -102,6 +102,92 @@ const technicianPinIcon = divIcon({
 });
 
 const ROUTE_POLYLINE_OPTIONS = { color: "#1d4ed8", weight: 4, opacity: 0.7 };
+
+/** Memoized single work order marker so icon and eventHandlers are stable and do not trigger full layer rebuilds on hover/selection. */
+const WorkOrderMarker = React.memo(function WorkOrderMarker({
+  workOrder,
+  selectedDate,
+  isSelected,
+  isHovered,
+  onSelect,
+  onHover,
+  onOpenDrawer,
+  onOpen,
+  onAssign,
+  selectedTechnician,
+}: {
+  workOrder: DispatchWorkOrder;
+  selectedDate: string;
+  isSelected: boolean;
+  isHovered: boolean;
+  onSelect: (id: string) => void;
+  onHover: (id: string | null) => void;
+  onOpenDrawer: (id: string) => void;
+  onOpen: (id: string) => void;
+  onAssign: (workOrderId: string, technicianId: string) => void;
+  selectedTechnician: { id: string; name: string } | null;
+}) {
+  const icon = useMemo(
+    () => workOrderPinIcon(workOrder, selectedDate, isSelected, isHovered),
+    [workOrder.id, workOrder.status, workOrder.due_date, workOrder.scheduled_date, workOrder.assigned_technician_id, workOrder.assigned_crew_id, selectedDate, isSelected, isHovered]
+  );
+  const eventHandlers = useMemo(
+    () => ({
+      click: () => onSelect(workOrder.id),
+      mouseover: () => onHover(workOrder.id),
+      mouseout: () => onHover(null),
+    }),
+    [workOrder.id, onSelect, onHover]
+  );
+  return (
+    <Marker
+      position={[workOrder.latitude as number, workOrder.longitude as number]}
+      icon={icon}
+      eventHandlers={eventHandlers}
+    >
+      <Popup>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-slate-800">
+            {shortWorkOrderLabel(workOrder)}
+          </p>
+          <p className="text-xs text-slate-700">
+            {workOrder.title ?? "Work order"}
+          </p>
+          <p className="text-xs text-slate-600">
+            {workOrder.priority ?? "medium"} · {workOrder.status ?? "new"}
+          </p>
+          <p className="text-xs text-slate-600">{locationLine(workOrder)}</p>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+              onClick={() => onOpenDrawer(workOrder.id)}
+            >
+              View details
+            </button>
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+              onClick={() => onOpen(workOrder.id)}
+            >
+              Open work order
+            </button>
+            {selectedTechnician &&
+            selectedTechnician.id !== workOrder.assigned_technician_id ? (
+              <button
+                type="button"
+                className="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
+                onClick={() => onAssign(workOrder.id, selectedTechnician.id)}
+              >
+                Assign to {selectedTechnician.name}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
 
 function clusterPinIcon(count: number) {
   return divIcon({
@@ -453,6 +539,7 @@ export function DispatchMapPanel({
           </div>
         ) : (
         <MapContainer
+          key="dispatch-map"
           center={mapCenterTuple}
           zoom={11}
           minZoom={3}
@@ -473,62 +560,19 @@ export function DispatchMapPanel({
             if (cluster.workOrders.length === 1) {
               const workOrder = cluster.workOrders[0];
               return (
-                <Marker
+                <WorkOrderMarker
                   key={workOrder.id}
-                  position={[workOrder.latitude as number, workOrder.longitude as number]}
-                  icon={workOrderPinIcon(
-                    workOrder,
-                    filterState.selectedDate,
-                    selectedWorkOrderId === workOrder.id,
-                    hoveredWorkOrderId === workOrder.id
-                  )}
-                  eventHandlers={{
-                    click: () => onMarkerSelect(workOrder.id),
-                    mouseover: () => onMarkerHover(workOrder.id),
-                    mouseout: () => onMarkerHover(null),
-                  }}
-                >
-                  <Popup>
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-slate-800">
-                        {shortWorkOrderLabel(workOrder)}
-                      </p>
-                      <p className="text-xs text-slate-700">
-                        {workOrder.title ?? "Work order"}
-                      </p>
-                      <p className="text-xs text-slate-600">
-                        {workOrder.priority ?? "medium"} · {workOrder.status ?? "new"}
-                      </p>
-                      <p className="text-xs text-slate-600">{locationLine(workOrder)}</p>
-                      <div className="flex flex-wrap gap-1">
-                        <button
-                          type="button"
-                          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                          onClick={() => onOpenWorkOrderDrawer(workOrder.id)}
-                        >
-                          View details
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                          onClick={() => onOpenWorkOrder(workOrder.id)}
-                        >
-                          Open work order
-                        </button>
-                        {selectedTechnician &&
-                        selectedTechnician.id !== workOrder.assigned_technician_id ? (
-                          <button
-                            type="button"
-                            className="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
-                            onClick={() => onMarkerAssign(workOrder.id, selectedTechnician.id)}
-                          >
-                            Assign to {selectedTechnician.name}
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
+                  workOrder={workOrder}
+                  selectedDate={filterState.selectedDate}
+                  isSelected={selectedWorkOrderId === workOrder.id}
+                  isHovered={hoveredWorkOrderId === workOrder.id}
+                  onSelect={onMarkerSelect}
+                  onHover={onMarkerHover}
+                  onOpenDrawer={onOpenWorkOrderDrawer}
+                  onOpen={onOpenWorkOrder}
+                  onAssign={onMarkerAssign}
+                  selectedTechnician={selectedTechnician}
+                />
               );
             }
             return (

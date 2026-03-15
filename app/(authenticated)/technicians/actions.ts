@@ -6,7 +6,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { createAdminClient } from "@/src/lib/supabase/admin";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { revalidatePath } from "next/cache";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 
 export type TechnicianFormState = { error?: string; success?: boolean };
 
@@ -27,17 +27,6 @@ async function getActorContext(): Promise<ActorContext | null> {
     userId: user.id,
     tenantId,
   };
-}
-
-async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  return !!data;
 }
 
 const FULL_APP_ROLES = ["owner", "admin", "member", "viewer"] as const;

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const companyId = url.searchParams.get("company_id");
+  const companyId = url.searchParams.get("company_id"); // Validated inside getPortfolioFailurePatterns against tenant scope
   const limitRaw = Number(url.searchParams.get("limit") ?? 10);
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 25)) : 10;
 

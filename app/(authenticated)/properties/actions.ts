@@ -3,21 +3,9 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress } from "@/src/lib/geocoding";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 
 export type PropertyFormState = { error?: string; success?: boolean };
-
-/** Verify company belongs to current tenant */
-async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  return !!data;
-}
 
 export async function saveProperty(
   _prev: PropertyFormState,
@@ -34,7 +22,7 @@ export async function saveProperty(
   if (!propertyName) return { error: "Property name is required." };
   if (!companyId) return { error: "Company is required." };
 
-  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  const allowed = await companyBelongsToTenant(companyId, tenantId, supabase);
   if (!allowed) return { error: "Invalid company." };
 
   let addressLine1 = (formData.get("address_line1") as string)?.trim() || null;

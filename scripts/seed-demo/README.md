@@ -31,7 +31,7 @@ npx tsx scripts/seed-demo/run.ts
 
 - **Idempotent**: If a tenant with the same slug and company name already exists, that tenant is skipped (no duplicate data).
 - **One Pexels image per asset type** per run; images are reused across all assets of that type.
-- Data is backdated (work orders, requests, activity logs) so timelines look 6–12 months old.
+- Work order and PM dates are relative to **today** (overdue, due today, this week, completed recently) so demos feel current when reseeded; work request and activity log timestamps are spread over the past weeks/months so history feels real.
 - No auth users are created; use Supabase Dashboard or your auth flow to create demo users and link them to tenants via `tenant_memberships`.
 
 ## Demo user accounts (optional)
@@ -76,6 +76,8 @@ The seed is designed to be **sales-ready** and **QA-useful**: key visible fields
 - **Vendors**: contact_name, email, phone, service_type; optional website
 - **Products/inventory**: default_vendor_id, default_cost, reorder_point_default; balances with quantity_on_hand, minimum_stock, reorder_point
 - **Purchase orders**: expected_delivery_date, total_cost; lines with product_id, quantity, unit_price, line_total
-- **Work requests**: some linked to asset_id, property_id, building_id
+- **Work requests**: some linked to asset_id; location text (property_id/building_id not in schema)
+
+See **[DEMO_IMPROVEMENTS.md](./DEMO_IMPROVEMENTS.md)** for a summary of improvements per demo company, date logic, and schema/UI gaps.
 
 After seeding, a **post-seed validation summary** reports counts of important blank fields by entity so you can quickly spot demo quality issues. Run `npm run seed:demo` and check the “Demo seed validation” section at the end of the output.

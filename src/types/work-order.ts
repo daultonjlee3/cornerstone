@@ -5,10 +5,15 @@
 
 import type { BaseEntity } from "./common";
 
+/** Canonical and legacy work order statuses. Prefer canonical (new, ready_to_schedule, scheduled, in_progress, on_hold, completed, cancelled). */
 export type WorkOrderStatus =
   | "draft"
   | "open"
   | "assigned"
+  | "closed"
+  | "new"
+  | "ready_to_schedule"
+  | "scheduled"
   | "in_progress"
   | "on_hold"
   | "completed"

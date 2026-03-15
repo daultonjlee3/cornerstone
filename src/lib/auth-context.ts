@@ -164,7 +164,11 @@ export async function isPlatformSuperAdmin(
   return isUserPlatformSuperAdmin(user.id, client);
 }
 
-/** True if company belongs to the given tenant. */
+/**
+ * True if company belongs to the given tenant.
+ * Use when validating client-provided company_id in server actions and API handlers:
+ * resolve tenant via getTenantIdForUser, then call this before using company_id in writes or scoped queries.
+ */
 export async function companyBelongsToTenant(
   companyId: string,
   tenantId: string,
@@ -178,6 +182,18 @@ export async function companyBelongsToTenant(
     .eq("tenant_id", tenantId)
     .maybeSingle();
   return !!data;
+}
+
+/**
+ * Throws if the given company is not in the current user's scope (tenant or super-admin).
+ * Use in server actions after reading company_id from formData/params to enforce tenant isolation.
+ */
+export async function ensureCompanyInScope(
+  companyId: string,
+  supabase?: Awaited<ReturnType<typeof createClient>>
+): Promise<void> {
+  const allowed = await canAccessCompany(companyId, supabase);
+  if (!allowed) throw new Error("Unauthorized.");
 }
 
 /** Full auth context for the current request. Throws if not authenticated or no tenant. Uses effective user for tenant/role when impersonating. */
@@ -223,7 +239,10 @@ export async function requireAuth(
   return getAuthContext(supabase);
 }
 
-/** Check if current user can access the given company (either in their tenant or super admin). */
+/**
+ * Check if current user can access the given company (either in their tenant or super admin).
+ * Use to validate client-provided company_id before using it in queries or writes.
+ */
 export async function canAccessCompany(
   companyId: string,
   supabase?: Awaited<ReturnType<typeof createClient>>

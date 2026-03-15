@@ -14,7 +14,14 @@ import {
   type PreventiveMaintenanceFrequencyType,
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
+import {
+  TERMINAL_STATUSES,
+  normalizeStatus,
+  toComparableStatus,
+  canTransitionStatus,
+  isSupportedStatus,
+} from "@/src/lib/work-orders/status";
 
 export type WorkOrderFormState = {
   error?: string;
@@ -22,62 +29,6 @@ export type WorkOrderFormState = {
   workOrderId?: string;
   workOrderNumber?: string;
 };
-
-const LEGACY_STATUS_MAP: Record<string, string> = {
-  open: "new",
-  assigned: "ready_to_schedule",
-  closed: "completed",
-};
-
-const ALL_SUPPORTED_STATUSES = [
-  "draft",
-  "open",
-  "assigned",
-  "closed",
-  "new",
-  "ready_to_schedule",
-  "scheduled",
-  "in_progress",
-  "on_hold",
-  "completed",
-  "cancelled",
-] as const;
-
-const TERMINAL_STATUSES = new Set(["completed", "cancelled", "closed"]);
-
-const TRANSITIONS: Record<string, ReadonlySet<string>> = {
-  draft: new Set(["new", "cancelled"]),
-  new: new Set(["ready_to_schedule", "scheduled", "in_progress", "on_hold", "cancelled"]),
-  ready_to_schedule: new Set(["new", "scheduled", "in_progress", "on_hold", "cancelled"]),
-  scheduled: new Set(["ready_to_schedule", "in_progress", "on_hold", "cancelled"]),
-  in_progress: new Set(["on_hold", "completed", "cancelled"]),
-  on_hold: new Set(["ready_to_schedule", "scheduled", "in_progress", "cancelled"]),
-  completed: new Set(["completed"]),
-  cancelled: new Set(["cancelled"]),
-};
-
-function normalizeStatus(input: string | null | undefined): string {
-  const value = (input ?? "").trim();
-  if (!value) return "new";
-  return LEGACY_STATUS_MAP[value] ?? value;
-}
-
-function toComparableStatus(input: string | null | undefined): string {
-  const value = normalizeStatus(input);
-  return value === "draft" ? "new" : value;
-}
-
-function canTransitionStatus(currentRaw: string | null | undefined, targetRaw: string): boolean {
-  const current = toComparableStatus(currentRaw);
-  const target = toComparableStatus(targetRaw);
-  const allowed = TRANSITIONS[current] ?? new Set();
-  return allowed.has(target);
-}
-
-function isSupportedStatus(input: string | null | undefined): boolean {
-  if (!input) return false;
-  return (ALL_SUPPORTED_STATUSES as readonly string[]).includes(input);
-}
 
 async function getActorId(
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -181,17 +132,6 @@ async function getCompanyAlertRecipients(
       )
     )
   );
-}
-
-async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  return !!data;
 }
 
 async function generateWorkOrderNumber(

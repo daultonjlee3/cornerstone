@@ -336,6 +336,57 @@ const DEMO_COORDINATES_BY_SLUG: Record<
   "mercy-healthcare-demo": { latitude: 41.4993, longitude: -81.6944 },
 };
 
+/** Market-appropriate asset manufacturers for demo realism. */
+function getManufacturerForAsset(tenantSlug: string, assetType: string, index: number): string {
+  const bySlug: Record<string, Record<string, string[]>> = {
+    "summit-facility-demo": {
+      HVAC: ["Trane", "Carrier", "Lennox", "York"],
+      Boiler: ["Cleaver-Brooks", "Weil-McLain", "Burnham"],
+      Electrical: ["Eaton", "Square D", "Siemens"],
+      Elevator: ["Otis", "ThyssenKrupp", "Kone"],
+      "Fire Safety": ["Edwards", "Notifier", "Siemens"],
+      Pump: ["Grundfos", "Taco", "Armstrong"],
+      Fan: ["Greenheck", "Loren Cook", "Trane"],
+      Lighting: ["Cree", "Philips", "Acuity"],
+    },
+    "northstar-manufacturing-demo": {
+      Compressor: ["Ingersoll Rand", "Atlas Copco", "Kaeser"],
+      Pump: ["Grundfos", "Gorman-Rupp", "Goulds"],
+      Generator: ["Caterpillar", "Kohler", "Generac"],
+      Boiler: ["Cleaver-Brooks", "Columbia", "Hurst"],
+      Electrical: ["Eaton", "ABB", "Siemens"],
+      HVAC: ["Trane", "Carrier", "York"],
+      "Cooling Tower": ["BAC", "Evapco", "SPX"],
+      "Air Handler": ["Trane", "Carrier", "Daikin"],
+      Other: ["Various", "OEM", "Custom"],
+    },
+    "riverside-schools-demo": {
+      HVAC: ["Trane", "Carrier", "Lennox"],
+      Boiler: ["Weil-McLain", "Burnham", "Lochinvar"],
+      "Fire Safety": ["Notifier", "Edwards", "Honeywell"],
+      Electrical: ["Eaton", "Square D", "GE"],
+      Plumbing: ["Kohler", "Sloan", "Zurn"],
+      Lighting: ["Philips", "Cree", "Acuity"],
+      Appliance: ["Hobart", "True", "Turbo Air"],
+      Generator: ["Generac", "Kohler", "Briggs & Stratton"],
+    },
+    "mercy-healthcare-demo": {
+      "Air Handler": ["Trane", "Carrier", "Johnson Controls"],
+      HVAC: ["Trane", "Carrier", "Daikin"],
+      Generator: ["Caterpillar", "Kohler", "Cummins"],
+      Elevator: ["Otis", "ThyssenKrupp", "Kone"],
+      "Cooling Tower": ["BAC", "Evapco"],
+      Electrical: ["Eaton", "Siemens", "Schneider"],
+      Lighting: ["Philips", "Cree", "Acuity"],
+      Other: ["Various", "OEM", "Steris"],
+    },
+  };
+  const market = bySlug[tenantSlug];
+  if (!market) return "Demo Industrial";
+  const list = market[assetType] ?? market["Other"] ?? ["Demo Industrial"];
+  return list[index % list.length] ?? "Demo Industrial";
+}
+
 function getDemoAddress(propertyIndex: number, tenantSlug: string): {
   address_line1: string;
   city: string;
@@ -699,19 +750,23 @@ async function topUpTechniciansAndWorkOrders(
   let technicianIds: string[] = ((existingTech ?? []) as { id: string }[]).map((r) => r.id);
 
   if (technicianIds.length === 0) {
-    // Leave email null so the ensure_technician_user trigger doesn't try to create auth.users
-    // (that can fail from seed context). Store contact email in notes for display.
-    const techRows = cfg.technicians.map((t) => ({
-      tenant_id: tenantId,
-      company_id: companyId,
-      name: t.name,
-      technician_name: t.name,
-      email: null as string | null,
-      phone: t.phone,
-      trade: t.trade,
-      status: "active",
-      notes: t.email ? `Contact: ${t.email}` : null,
-    }));
+    // Leave email null so the ensure_technician_user trigger doesn't create auth.users from seed.
+    const techRows = cfg.technicians.map((t) => {
+      const noteParts: string[] = [];
+      if (t.role) noteParts.push(`Role: ${t.role}.`);
+      if (t.email) noteParts.push(`Contact: ${t.email}`);
+      return {
+        tenant_id: tenantId,
+        company_id: companyId,
+        name: t.name,
+        technician_name: t.name,
+        email: null as string | null,
+        phone: t.phone,
+        trade: t.trade,
+        status: "active",
+        notes: noteParts.length ? noteParts.join(" ") : null,
+      };
+    });
     const { data: techInsert, error: techErr } = await supabase
       .from("technicians")
       .insert(techRows)
@@ -851,6 +906,13 @@ export async function seedTenant(
     tenantId = t.id as string;
   }
 
+  const companyProfileFields = cfg.companyProfile
+    ? {
+        address: `${cfg.companyProfile.addressLine1}, ${cfg.companyProfile.city}, ${cfg.companyProfile.state} ${cfg.companyProfile.zip}`,
+        phone: cfg.companyProfile.phone,
+        website: cfg.companyProfile.website,
+      }
+    : {};
   const { data: existingCompany } = await supabase
     .from("companies")
     .select("id")
@@ -868,6 +930,7 @@ export async function seedTenant(
         company_code: cfg.slug.replace(/-/g, "").slice(0, 8).toUpperCase(),
         primary_contact_name: "Operations",
         primary_contact_email: "ops@demo.local",
+        ...companyProfileFields,
       })
       .eq("id", companyId);
     await topUpTechniciansAndWorkOrders(supabase, cfg, tenantId, companyId);
@@ -884,6 +947,7 @@ export async function seedTenant(
         company_code: companyCode,
         primary_contact_name: "Operations",
         primary_contact_email: "ops@demo.local",
+        ...companyProfileFields,
       })
       .select("id")
       .single();
@@ -978,17 +1042,22 @@ export async function seedTenant(
   console.log(`  Locations: ${propertyIdByKey.size} properties, ${buildingIds.length} buildings`);
 
   // 3) Technicians (email null so ensure_technician_user trigger doesn't create auth.users from seed)
-  const techRows = cfg.technicians.map((t) => ({
-    tenant_id: tenantId,
-    company_id: companyId,
-    name: t.name,
-    technician_name: t.name,
-    email: null as string | null,
-    phone: t.phone,
-    trade: t.trade,
-    status: "active",
-    notes: t.email ? `Contact: ${t.email}` : null,
-  }));
+  const techRows = cfg.technicians.map((t) => {
+    const noteParts: string[] = [];
+    if (t.role) noteParts.push(`Role: ${t.role}.`);
+    if (t.email) noteParts.push(`Contact: ${t.email}`);
+    return {
+      tenant_id: tenantId,
+      company_id: companyId,
+      name: t.name,
+      technician_name: t.name,
+      email: null as string | null,
+      phone: t.phone,
+      trade: t.trade,
+      status: "active",
+      notes: noteParts.length ? noteParts.join(" ") : null,
+    };
+  });
   const { data: techInsert, error: techErr } = await supabase.from("technicians").insert(techRows).select("id");
   if (techErr) console.warn("  Technicians insert warning:", techErr.message);
   const technicianIds = ((techInsert ?? []) as { id: string }[]).map((r) => r.id);
@@ -1114,7 +1183,7 @@ export async function seedTenant(
               asset_name: name,
               asset_type: pat.type,
               status: "active",
-              manufacturer: "Demo Industrial",
+              manufacturer: getManufacturerForAsset(cfg.slug, pat.type, assetIndex),
               model: `M-${String(assetIndex + 1).padStart(3, "0")}`,
               serial_number: `SN-${cfg.slug.slice(0, 4).toUpperCase()}-${assetIndex + 1}`,
               install_date: backdateMonths(randomInRange(12, 36)).toISOString().slice(0, 10),
@@ -1173,9 +1242,9 @@ export async function seedTenant(
   // 10) PM templates (description, instructions, estimated_duration_minutes)
   const templateIdByName = new Map<string, string>();
   for (const tmpl of cfg.pmTemplateNames) {
-    const freqInterval = tmpl.frequency === "weekly" ? 1 : tmpl.frequency === "monthly" ? 1 : 3;
-    const freqType = tmpl.frequency === "weekly" ? "weekly" : tmpl.frequency === "monthly" ? "monthly" : "quarterly";
-    const estMins = tmpl.frequency === "weekly" ? 30 : tmpl.frequency === "monthly" ? 45 : 60;
+    const freqInterval = tmpl.frequency === "weekly" ? 1 : tmpl.frequency === "monthly" ? 1 : tmpl.frequency === "annual" ? 1 : 3;
+    const freqType = tmpl.frequency === "weekly" ? "weekly" : tmpl.frequency === "monthly" ? "monthly" : tmpl.frequency === "annual" ? "yearly" : "quarterly";
+    const estMins = tmpl.frequency === "weekly" ? 30 : tmpl.frequency === "monthly" ? 45 : tmpl.frequency === "annual" ? 90 : 60;
     const { data: pt } = await supabase
       .from("preventive_maintenance_templates")
       .insert({
@@ -1386,19 +1455,24 @@ export async function seedTenant(
   }
   if (latestByAsset.size > 0) console.log(`  Asset last_serviced_at: ${latestByAsset.size} updated`);
 
-  // 13) Work requests (some linked to asset; location text)
-  const requestBatch = cfg.requestTitles.slice(0, 15).map((title, i) => ({
-    tenant_id: tenantId,
-    company_id: companyId,
-    requester_name: DEMO_REQUESTERS[i % DEMO_REQUESTERS.length].name,
-    requester_email: DEMO_REQUESTERS[i % DEMO_REQUESTERS.length].email,
-    location: "Main building",
-    description: title,
-    priority: i % 3 === 0 ? "high" : "medium",
-    status: i % 4 === 0 ? "converted_to_work_order" : "submitted",
-    asset_id: allAssetIds.length ? allAssetIds[i % allAssetIds.length] ?? null : null,
-    created_at: backdateMonths(randomInRange(0, 6)).toISOString(),
-  }));
+  // 13) Work requests (some linked to asset; location text; created_at spread over last 2 months so demo feels active)
+  const todayReq = new Date(todayISO() + "T12:00:00");
+  const requestBatch = cfg.requestTitles.slice(0, 15).map((title, i) => {
+    const daysAgo = 3 + (i * 5) % 58;
+    const created = addDays(todayReq, -daysAgo);
+    return {
+      tenant_id: tenantId,
+      company_id: companyId,
+      requester_name: DEMO_REQUESTERS[i % DEMO_REQUESTERS.length].name,
+      requester_email: DEMO_REQUESTERS[i % DEMO_REQUESTERS.length].email,
+      location: i % 3 === 0 ? "Main building" : i % 3 === 1 ? "North wing" : "Mechanical room",
+      description: title,
+      priority: i % 3 === 0 ? "high" : "medium",
+      status: i % 4 === 0 ? "converted_to_work_order" : "submitted",
+      asset_id: allAssetIds.length ? allAssetIds[i % allAssetIds.length] ?? null : null,
+      created_at: created.toISOString(),
+    };
+  });
   if (requestBatch.length) await supabase.from("work_requests").insert(requestBatch);
   console.log(`  Work requests: ${requestBatch.length}`);
 
@@ -1456,12 +1530,12 @@ export async function seedTenant(
   }
   console.log("  Purchase orders: 6");
 
-  // 15) Activity logs (for work orders and assets)
+  // 15) Activity logs (work orders: created + completed; assets: updated) — backdated so history feels like months of use
   const { data: recentWos } = await supabase
     .from("work_orders")
     .select("id, company_id")
     .eq("tenant_id", tenantId)
-    .limit(20);
+    .limit(25);
   for (const wo of recentWos ?? []) {
     const performedAt = backdateMonths(randomInRange(0, 5));
     await supabase.from("activity_logs").insert({
@@ -1474,7 +1548,25 @@ export async function seedTenant(
       metadata: {},
     });
   }
-  for (let i = 0; i < Math.min(15, allAssetIds.length); i++) {
+  const { data: completedWosForLogs } = await supabase
+    .from("work_orders")
+    .select("id, company_id, completed_at")
+    .eq("tenant_id", tenantId)
+    .eq("status", "completed")
+    .not("completed_at", "is", null)
+    .limit(30);
+  for (const wo of (completedWosForLogs ?? []) as { id: string; company_id: string; completed_at: string }[]) {
+    await supabase.from("activity_logs").insert({
+      tenant_id: tenantId,
+      company_id: wo.company_id,
+      entity_type: "work_order",
+      entity_id: wo.id,
+      action_type: "work_order_completed",
+      performed_at: wo.completed_at,
+      metadata: {},
+    });
+  }
+  for (let i = 0; i < Math.min(20, allAssetIds.length); i++) {
     await supabase.from("activity_logs").insert({
       tenant_id: tenantId,
       company_id: companyId,

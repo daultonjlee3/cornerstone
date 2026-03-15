@@ -1,3 +1,7 @@
+/**
+ * Notifications API: GET lists notifications and runs on-demand sync (overdue + PM due soon); POST marks read.
+ * Sync is idempotent: createNotifications dedupes by (event_type, entity_id, user_id, unread).
+ */
 import { NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import {

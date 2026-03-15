@@ -33,6 +33,7 @@ import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components
 import { RebalanceSuggestionsModal } from "./RebalanceSuggestionsModal";
 import { computeRebalanceSuggestions } from "../rebalance-utils";
 import { buildTechnicianRoute, haversineMiles, estimateTravelMinutes, hasCoordinate } from "../dispatch-map-utils";
+import { normalizeStatus as normalizeWorkOrderStatus } from "@/src/lib/work-orders/status";
 import { SuggestedTechniciansPanel } from "./SuggestedTechniciansPanel";
 import { DispatchSpeedActions } from "./DispatchSpeedActions";
 import { CombinedWorkOrderDetailsPanel } from "./CombinedWorkOrderDetailsPanel";
@@ -63,14 +64,6 @@ function addHours(iso: string, hours: number): string {
   const d = new Date(iso);
   d.setTime(d.getTime() + hours * 60 * 60 * 1000);
   return d.toISOString();
-}
-
-function normalizeStatus(value: string | null | undefined): string {
-  if (!value) return "";
-  if (value === "open") return "new";
-  if (value === "assigned") return "ready_to_schedule";
-  if (value === "closed") return "completed";
-  return value;
 }
 
 function queuePriorityRank(p: string | null | undefined): number {
@@ -240,7 +233,7 @@ export function DispatchView({
     for (const wo of optimisticWorkOrders) {
       const scheduled = wo.scheduled_date ?? null;
       const due = wo.due_date ?? null;
-      const comparableStatus = normalizeStatus(wo.status ?? "");
+      const comparableStatus = normalizeWorkOrderStatus(wo.status ?? "");
       const isTerminal = comparableStatus === "completed" || comparableStatus === "cancelled";
       const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
 
@@ -479,7 +472,7 @@ export function DispatchView({
 
   const operationsListWorkOrders = useMemo(() => {
     const filtered = optimisticWorkOrders.filter((workOrder) => {
-      const comparableStatus = normalizeStatus(workOrder.status ?? "");
+      const comparableStatus = normalizeWorkOrderStatus(workOrder.status ?? "");
       if (comparableStatus === "completed" || comparableStatus === "cancelled") return false;
       return !workOrder.scheduled_date || workOrder.scheduled_date === filterState.selectedDate;
     });
@@ -663,7 +656,7 @@ export function DispatchView({
         overId.startsWith("queue-wo-");
 
       if (isQueueUnscheduleTarget) {
-        const normalized = normalizeStatus(workOrder.status ?? "");
+        const normalized = normalizeWorkOrderStatus(workOrder.status ?? "");
         const optimisticStatus =
           normalized === "completed" || normalized === "cancelled"
             ? workOrder.status ?? normalized
@@ -790,7 +783,7 @@ export function DispatchView({
       if (action === "unschedule") {
         const workOrder = optimisticWorkOrders.find((row) => row.id === id);
         if (!workOrder) return;
-        const normalized = normalizeStatus(workOrder.status ?? "");
+        const normalized = normalizeWorkOrderStatus(workOrder.status ?? "");
         const optimisticStatus =
           normalized === "completed" || normalized === "cancelled"
             ? workOrder.status ?? normalized
@@ -1163,36 +1156,39 @@ export function DispatchView({
                   className="grid min-h-[300px] grid-cols-1 shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
                   style={{ minHeight: 320, flex: "0 0 38%" }}
                 >
-                  <div className="flex min-h-[280px] min-h-0 flex-col overflow-hidden">
-                    {combinedMapVisible ? (
-                      <>
-                        <div className="flex items-center justify-between gap-2 border-b border-[var(--card-border)] pb-1 xl:hidden">
-                          <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">Map</span>
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setCombinedMapVisible(false)}>
-                            Hide map
-                          </Button>
-                        </div>
-                        <div className="min-h-[260px] flex-1 overflow-hidden" data-tour="dispatch:routing">
-                          <DispatchMapPanel
-                            workOrders={optimisticWorkOrders}
-                            workforce={workforce}
-                            filterState={filterState}
-                            filterOptions={filterOptions}
-                            selectedTechnicianId={selectedMapTechnicianId}
-                            selectedWorkOrderId={selectedMapWorkOrderId}
-                            hoveredWorkOrderId={hoveredWorkOrderId}
-                            assignmentPending={mapAssigning}
-                            onSelectTechnician={setSelectedMapTechnicianId}
-                            onSelectWorkOrder={setSelectedMapWorkOrderId}
-                            onHoverWorkOrder={setHoveredWorkOrderId}
-                            onOpenWorkOrderDrawer={openWorkOrderDrawer}
-                            onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                            onAssignFromMap={handleAssignFromMap}
-                            onPatchFilters={patchFilterState}
-                          />
-                        </div>
-                      </>
-                    ) : (
+                  <div className="flex min-h-[280px] min-h-0 flex-col overflow-hidden relative">
+                    {/* Keep map mounted when hidden so it does not remount on toggle (avoids jitter/flicker) */}
+                    <div
+                      className={combinedMapVisible ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "hidden"}
+                      aria-hidden={!combinedMapVisible}
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-[var(--card-border)] pb-1 xl:hidden">
+                        <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">Map</span>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setCombinedMapVisible(false)}>
+                          Hide map
+                        </Button>
+                      </div>
+                      <div className="min-h-[260px] flex-1 overflow-hidden" data-tour="dispatch:routing">
+                        <DispatchMapPanel
+                          workOrders={optimisticWorkOrders}
+                          workforce={workforce}
+                          filterState={filterState}
+                          filterOptions={filterOptions}
+                          selectedTechnicianId={selectedMapTechnicianId}
+                          selectedWorkOrderId={selectedMapWorkOrderId}
+                          hoveredWorkOrderId={hoveredWorkOrderId}
+                          assignmentPending={mapAssigning}
+                          onSelectTechnician={setSelectedMapTechnicianId}
+                          onSelectWorkOrder={setSelectedMapWorkOrderId}
+                          onHoverWorkOrder={setHoveredWorkOrderId}
+                          onOpenWorkOrderDrawer={openWorkOrderDrawer}
+                          onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                          onAssignFromMap={handleAssignFromMap}
+                          onPatchFilters={patchFilterState}
+                        />
+                      </div>
+                    </div>
+                    {!combinedMapVisible && (
                       <Button variant="outline" size="sm" className="h-8 w-full text-[11px]" onClick={() => setCombinedMapVisible(true)}>
                         Show map
                       </Button>

@@ -1,4 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { dateOnlyUTC } from "@/src/lib/date-utils";
+import {
+  OPEN_ACTIVE_STATUSES,
+  TERMINAL_STATUSES_ARRAY,
+} from "@/src/lib/work-orders/status";
 
 type DashboardContext = {
   supabase: SupabaseClient;
@@ -72,10 +77,6 @@ export type OperationsDashboardData = {
   }[];
 };
 
-function dateOnly(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
 function startOfTodayIso(): string {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -101,6 +102,7 @@ export async function loadOperationsDashboardData({
         overdueWorkOrders: 0,
         scheduledToday: 0,
         activeTechnicians: 0,
+        unassignedWorkOrders: 0,
       },
       backlog: {
         openWorkOrders: 0,
@@ -124,7 +126,7 @@ export async function loadOperationsDashboardData({
     };
   }
 
-  const today = dateOnly(new Date());
+  const today = dateOnlyUTC(new Date());
   const now = new Date();
   const dueSoonDate = new Date(now);
   dueSoonDate.setDate(dueSoonDate.getDate() + 7);
@@ -136,6 +138,8 @@ export async function loadOperationsDashboardData({
   staleServiceWindow.setMonth(staleServiceWindow.getMonth() - 6);
   const startToday = startOfTodayIso();
   const endToday = endOfTodayIso();
+
+  const notTerminalStatus = `(${TERMINAL_STATUSES_ARRAY.join(",")})`;
 
   const [
     openWorkOrdersCount,
@@ -152,7 +156,7 @@ export async function loadOperationsDashboardData({
       .from("work_orders")
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds)
-      .in("status", ["new", "ready_to_schedule", "scheduled", "in_progress", "on_hold"]),
+      .in("status", [...OPEN_ACTIVE_STATUSES]),
     supabase
       .from("work_orders")
       .select("id", { count: "exact", head: true })
@@ -170,13 +174,13 @@ export async function loadOperationsDashboardData({
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds)
       .lt("due_date", today)
-      .not("status", "in", "(completed,cancelled)"),
+      .not("status", "in", notTerminalStatus),
     supabase
       .from("work_orders")
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds)
       .eq("scheduled_date", today)
-      .not("status", "in", "(completed,cancelled)"),
+      .not("status", "in", notTerminalStatus),
     supabase
       .from("technicians")
       .select("id", { count: "exact", head: true })
@@ -186,7 +190,7 @@ export async function loadOperationsDashboardData({
       .from("work_orders")
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds)
-      .in("status", ["new", "ready_to_schedule", "scheduled", "in_progress", "on_hold"])
+      .in("status", [...OPEN_ACTIVE_STATUSES])
       .is("assigned_technician_id", null),
     supabase
       .from("preventive_maintenance_plans")
@@ -200,7 +204,7 @@ export async function loadOperationsDashboardData({
       .in("company_id", companyIds)
       .eq("status", "active")
       .gte("next_run_date", today)
-      .lte("next_run_date", dateOnly(backlogPmWindow)),
+      .lte("next_run_date", dateOnlyUTC(backlogPmWindow)),
   ]);
 
   const [overdueRows, highPriorityRows, pmDueSoonRows, failureRows, staleAssetsRows, techniciansRows, assignmentRows, completionRows, overduePmAssetsRows] =
@@ -210,7 +214,7 @@ export async function loadOperationsDashboardData({
         .select("id, work_order_number, title, due_date, priority, status")
         .in("company_id", companyIds)
         .lt("due_date", today)
-        .not("status", "in", "(completed,cancelled)")
+        .not("status", "in", notTerminalStatus)
         .order("due_date", { ascending: true })
         .limit(8),
       supabase
@@ -227,7 +231,7 @@ export async function loadOperationsDashboardData({
         .in("company_id", companyIds)
         .eq("status", "active")
         .gte("next_run_date", today)
-        .lte("next_run_date", dateOnly(dueSoonDate))
+        .lte("next_run_date", dateOnlyUTC(dueSoonDate))
         .order("next_run_date", { ascending: true })
         .limit(8),
       supabase

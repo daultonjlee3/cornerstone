@@ -82,6 +82,10 @@ type AssetsListProps = {
   } | null;
   workOrderFormData?: WorkOrderFormData | null;
   parentCandidates: { id: string; name: string; company_id: string; parent_asset_id: string | null }[];
+  /** When set, pagination is shown. Omit when not using server-side pagination. */
+  totalCount?: number | null;
+  page?: number;
+  pageSize?: number;
 };
 
 function assetDisplayName(a: AssetRow): string {
