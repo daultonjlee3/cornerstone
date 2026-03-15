@@ -1,0 +1,17 @@
+# Normalize line endings to LF for all text files (Windows + macOS safe).
+# Git will store and checkout LF; CRLF conversion warnings are suppressed.
+* text=auto eol=lf
+
+# Explicit binaries: never normalize or alter.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.snap binary
