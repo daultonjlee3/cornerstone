@@ -184,7 +184,7 @@ export const FEATURE_CONTENT: Record<FeatureSlug, FeatureContent> = {
       "No visibility into request volume or SLAs",
     ],
     workflow:
-      "Requesters submit via a simple portal (or form); you get a ticket that becomes a work order with one click. They can see status; you assign, execute, and close in the same CMMS. All requests are tracked for reporting.",
+      "Requesters submit through a dedicated portal URL—no login required. You receive a structured ticket that converts to a work order in one click. Requesters see status updates automatically; you assign, execute, and close in the same system.",
     workflowSteps: [
       "Submit request via portal or form",
       "Request becomes work order in CMMS",
@@ -206,18 +206,18 @@ export const FEATURE_CONTENT: Record<FeatureSlug, FeatureContent> = {
       "Teams spend too much time on repetitive tasks: creating work orders from requests, rekeying data, and building reports. Patterns that could prevent failures or optimize schedules go unnoticed.",
     problemBullets: [
       "Repetitive data entry and manual work order creation",
-      "Scheduling and assignment done by guesswork",
+      "Assignment decisions made without workload or skill data",
       "Insights buried in data; reactive decisions",
       "Reporting and alerts require manual setup",
     ],
     workflow:
-      "Automation rules create work orders from requests or triggers; suggest assignments or due dates. Dashboards and alerts highlight exceptions and trends. Over time, the system helps prioritize work and reduce manual steps.",
+      "Automation rules convert requests into work orders based on type, location, or asset. Exception dashboards surface overdue work and high-priority items automatically. Reports run on schedule so leadership always has current data without manual exports.",
     workflowSteps: [
       "Rules to create work from requests or triggers",
-      "Suggestions for assignment and scheduling",
-      "Alerts and exception reporting",
-      "Trends and patterns for planning",
-      "Less manual work, more focus on execution",
+      "Automated assignment routing by skill or location",
+      "Exception alerts for overdue and high-priority work",
+      "Scheduled reports for operations and leadership",
+      "Fewer manual steps, more focus on execution",
     ],
     benefits: [
       "Fewer manual steps and less rekeying",

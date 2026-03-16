@@ -50,7 +50,7 @@ export default function HowItWorksPage() {
           iconName="play"
         />
         <Link
-          href={ROUTES.signup}
+          href={ROUTES.product}
           className="flex gap-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 transition-all hover:border-[var(--accent)] hover:shadow-md"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
@@ -58,10 +58,10 @@ export default function HowItWorksPage() {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
-              Explore the product tour
+              Explore the product
             </h2>
             <p className="mt-2 text-[var(--muted)]">
-              Take a self-guided tour inside the app. No demo booking required—jump in and click around.
+              Browse every module—work orders, PM, assets, dispatch, inventory, vendors, and reporting—to see what&apos;s possible before you sign up.
             </p>
           </div>
           <ArrowRight className="h-5 w-5 shrink-0 text-[var(--muted)]" aria-hidden />

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ROUTES, SEO, SITE_NAME, buildMarketingMetadata } from "@/lib/marketing-site";
-import { ArrowRight, Mail, MessageSquare } from "lucide-react";
+import { ArrowRight, Mail, Rocket } from "lucide-react";
 
 const seo = SEO[ROUTES.contact];
 
@@ -51,7 +51,7 @@ export default function ContactPage() {
           className="flex gap-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 transition-all hover:border-[var(--accent)] hover:shadow-md"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
-            <MessageSquare className="h-6 w-6" aria-hidden />
+            <Rocket className="h-6 w-6" aria-hidden />
           </div>
           <div className="min-w-0">
             <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">

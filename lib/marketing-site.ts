@@ -164,6 +164,21 @@ export const FEATURE_SCREENSHOTS: Partial<Record<FeatureSlug, string>> = {
   "ai-automation": "/screenshots/operations-dashboard.png",
 };
 
+/**
+ * Secondary screenshot for feature detail pages (shown below the workflow section).
+ * A different view of the platform so the feature page doesn't show the same image twice.
+ */
+export const FEATURE_SECONDARY_SCREENSHOTS: Partial<Record<FeatureSlug, string>> = {
+  "work-order-management": "/screenshots/dispatch.png",
+  "preventive-maintenance": "/screenshots/assets.png",
+  "asset-management": "/screenshots/operations-dashboard.png",
+  "dispatch-scheduling": "/screenshots/technician-mobile.png",
+  "technician-mobile": "/screenshots/work-orders.png",
+  "reporting-dashboards": "/screenshots/dashboard.png",
+  "request-portal": "/screenshots/work-orders.png",
+  "ai-automation": "/screenshots/dashboard.png",
+};
+
 /** Hero screenshot paths (full, under /public/screenshots/). */
 export const HERO_SCREENSHOTS = {
   dashboard: "/screenshots/dashboard.png",

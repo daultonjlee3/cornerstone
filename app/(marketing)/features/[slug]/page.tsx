@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import {
   FEATURES,
   FEATURE_SCREENSHOTS,
+  FEATURE_SECONDARY_SCREENSHOTS,
   INDUSTRIES,
   ROUTES,
   SEO_FEATURES,
@@ -93,12 +94,16 @@ export default async function FeaturePage({ params }: Props) {
         )}
       </section>
 
-        {/* Secondary screenshot */}
+        {/* Secondary screenshot — a complementary view of the platform */}
         <div className="mt-12">
           <ScreenshotContainer
-            src={FEATURE_SCREENSHOTS[slug as FeatureSlug] ?? undefined}
-            alt={`${feature.title} workflow in action`}
-            caption="Workflow in action"
+            src={
+              FEATURE_SECONDARY_SCREENSHOTS[slug as FeatureSlug] ??
+              FEATURE_SCREENSHOTS[slug as FeatureSlug] ??
+              undefined
+            }
+            alt={`${feature.title} — connected platform view`}
+            caption="Connected maintenance operations platform"
             aspectRatio="video"
             width={1920}
             height={1080}
@@ -121,23 +126,12 @@ export default async function FeaturePage({ params }: Props) {
         {/* CTA */}
         <section className="mt-16 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8 shadow-[var(--shadow-soft)]">
           <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
-            Ready to try {feature.title} in one platform?
+            See {feature.title} in the full platform
           </h2>
         <p className="mt-2 text-[var(--muted)]">
-          Cornerstone OS brings work orders, assets, dispatch, and reporting together. Built for{" "}
-          {INDUSTRIES.slice(0, -1).map((i) => (
-            <span key={i.slug}>
-              <Link href={i.href} className="font-medium text-[var(--accent)] hover:underline">
-                {i.title.toLowerCase()}
-              </Link>
-              {", "}
-            </span>
-          ))}
-          and{" "}
-          <Link href={INDUSTRIES[INDUSTRIES.length - 1].href} className="font-medium text-[var(--accent)] hover:underline">
-            {INDUSTRIES[INDUSTRIES.length - 1].title.toLowerCase()}
-          </Link>
-          .
+          {feature.title} is one module in a connected maintenance operations platform. Start a
+          free trial to see how it works alongside work orders, PM, dispatch, assets, inventory,
+          and operations reporting—or browse the full product overview.
         </p>
         <div className="mt-6 flex flex-wrap gap-4">
           <Link
@@ -148,16 +142,16 @@ export default async function FeaturePage({ params }: Props) {
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link
+            href={ROUTES.product}
+            className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-5 py-3 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            Product overview
+          </Link>
+          <Link
             href={ROUTES.pricing}
             className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-5 py-3 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             View pricing
-          </Link>
-          <Link
-            href="/industries"
-            className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-5 py-3 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
-          >
-            Industries
           </Link>
         </div>
         </section>

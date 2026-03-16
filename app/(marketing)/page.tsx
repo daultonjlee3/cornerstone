@@ -22,7 +22,7 @@ import {
   SeeHowItWorksButton,
   WorkflowSection,
 } from "../components/marketing";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Cloud, Settings2, Users2, Layers } from "lucide-react";
 
 const seo = SEO[ROUTES.home];
 
@@ -41,12 +41,23 @@ const WORKFLOW_STEPS = [
   "Operational Reporting",
 ] as const;
 
+const FEATURE_DESCRIPTIONS: Record<string, string> = {
+  "work-order-management": "Create, assign, and close work orders with full status tracking and asset history.",
+  "preventive-maintenance": "Automate recurring schedules and keep compliance records without spreadsheets.",
+  "asset-management": "Track every asset, its maintenance history, and condition in one register.",
+  "dispatch-scheduling": "Assign work to technicians by skill, location, or load—and keep the board live.",
+  "technician-mobile": "Technicians see their queue, update status, add photos, and close work from the field.",
+  "reporting-dashboards": "Real-time dashboards for backlog, labor, PM compliance, and asset performance.",
+  "request-portal": "Tenants and staff submit requests that convert to work orders in one click.",
+  "ai-automation": "Automate work order creation, surface exceptions, and reduce manual steps.",
+};
+
 export default function HomePage() {
   return (
     <>
       <HeroSection
         headline="Maintenance operations software built for teams that run real facilities"
-        subheadline="Manage work orders, preventive maintenance, assets, dispatch, technicians, inventory, vendors, purchase orders, and operational reporting in one platform built for modern maintenance teams."
+        subheadline="Most maintenance teams manage work across too many disconnected systems. Cornerstone brings work orders, PM, assets, dispatch, inventory, and operations intelligence into one platform—so your team runs operations instead of chasing information."
         actions={
           <>
             <Link
@@ -108,8 +119,14 @@ export default function HomePage() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
             <div className="order-2 min-w-0 md:order-1">
               <h2 className="mk-section-headline">
-                Run your entire maintenance operation from one dashboard
+                Every open job, overdue task, and urgent alert—visible in one place
               </h2>
+              <p className="mt-4 mk-body-lg">
+                Stop checking multiple tools to understand your operation. The Cornerstone
+                command center gives dispatchers and operations leaders real-time visibility
+                into open work, overdue jobs, technician activity, and upcoming PM—so you can
+                act before problems escalate.
+              </p>
               <ul className="mt-6 space-y-3 text-[var(--foreground)] mk-body-lg">
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
@@ -117,15 +134,15 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
-                  <span>Dispatch technicians instantly</span>
+                  <span>Dispatch technicians instantly from the same interface</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
-                  <span>Track asset service history</span>
+                  <span>Track asset service history tied to every job</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
-                  <span>Monitor response times and SLAs</span>
+                  <span>Monitor response times and operational KPIs</span>
                 </li>
               </ul>
             </div>
@@ -142,17 +159,43 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
-        <div className="mx-auto min-w-0 max-w-3xl text-center">
-          <h2 className="mk-section-headline">
-            Run maintenance operations from one system
-          </h2>
-          <p className="mt-4 mk-body-lg">
-            {SITE_NAME} unifies work orders, preventive maintenance, asset
-            tracking, dispatch, and reporting so your team can move faster with
-            full visibility and control—no more spreadsheets or disconnected
-            tools.
-          </p>
+      {/* Platform depth strip */}
+      <section className="min-w-0 border-t border-[var(--card-border)] px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-7xl">
+          <div className="grid grid-cols-2 gap-6 sm:gap-8 lg:grid-cols-4">
+            {[
+              {
+                Icon: Layers,
+                stat: "9 modules",
+                label: "One platform from requests to reporting",
+              },
+              {
+                Icon: Users2,
+                stat: "Every role",
+                label: "Technicians, dispatchers, and leadership in one system",
+              },
+              {
+                Icon: Cloud,
+                stat: "Cloud-hosted",
+                label: "No servers to manage. Up and running in days.",
+              },
+              {
+                Icon: Settings2,
+                stat: "Full lifecycle",
+                label: "Work orders, PM, assets, inventory, and analytics connected",
+              },
+            ].map(({ Icon, stat, label }) => (
+              <div key={stat} className="flex flex-col gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                  <Icon className="h-5 w-5" aria-hidden />
+                </div>
+                <p className="mt-1 text-lg font-bold tracking-tight text-[var(--foreground)]">
+                  {stat}
+                </p>
+                <p className="text-sm text-[var(--muted)] leading-snug">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -249,6 +292,7 @@ export default function HomePage() {
       >
         {CORE_FEATURES_HOME.map((feature) => {
           const screenshot = FEATURE_SCREENSHOTS[feature.slug];
+          const description = FEATURE_DESCRIPTIONS[feature.slug];
           return (
             <FeatureCard key={feature.slug} title={feature.title} href={feature.href}>
               <ScreenshotContainer
@@ -260,6 +304,11 @@ export default function HomePage() {
                 width={1920}
                 height={1080}
               />
+              {description && (
+                <p className="mt-3 text-sm text-[var(--muted)] leading-relaxed">
+                  {description}
+                </p>
+              )}
             </FeatureCard>
           );
         })}
@@ -397,36 +446,47 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Built for Modern Maintenance Teams — capability tags */}
+      {/* Platform trust section */}
       <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
-        <div className="mx-auto min-w-0 max-w-4xl">
-          <h2 className="text-center mk-section-headline">
-            Built for Modern Maintenance Teams
-          </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-center mk-body-lg">
-            A full maintenance operations platform—CMMS, work orders, PM, assets, dispatch, inventory, vendor management, purchase orders, and reporting.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:mt-10 sm:gap-3">
+        <div className="mx-auto min-w-0 max-w-5xl">
+          <div className="text-center">
+            <h2 className="mk-section-headline">
+              Designed for teams that run real operations
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl mk-body-lg">
+              Built with input from maintenance professionals across facility management,
+              industrial operations, education, and healthcare—organizations that manage
+              hundreds of assets and need software that works for the whole team.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              "Work Orders",
-              "Preventive Maintenance",
-              "Asset Tracking",
-              "Technician Dispatch",
-              "Vendor Management",
-              "Products Catalog",
-              "Inventory Tracking",
-              "Purchase Orders",
-              "Procurement Workflows",
-              "Maintenance Reporting",
-              "Asset History",
-              "Operational Dashboards",
-            ].map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)]"
+              {
+                title: "Every role, one platform",
+                body: "Technicians, dispatchers, supervisors, and leadership all work in the same system—no separate apps, no manual syncing.",
+              },
+              {
+                title: "Role-based access",
+                body: "Control what each person sees and does. Assign roles, set permissions, and keep sensitive data where it belongs.",
+              },
+              {
+                title: "Cloud-hosted security",
+                body: "No servers to manage. Enterprise-grade infrastructure, data encrypted in transit and at rest, and role-controlled access.",
+              },
+              {
+                title: "Quick to implement",
+                body: "Pre-built workflows and templates get your team running in days—not the weeks or months typical of legacy CMMS platforms.",
+              },
+            ].map(({ title, body }) => (
+              <div
+                key={title}
+                className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-[var(--shadow-soft)]"
               >
-                {tag}
-              </span>
+                <h3 className="font-semibold tracking-tight text-[var(--foreground)]">
+                  {title}
+                </h3>
+                <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">{body}</p>
+              </div>
             ))}
           </div>
         </div>
@@ -483,8 +543,8 @@ export default function HomePage() {
       </section>
 
       <CTASection
-        title="Explore the product"
-        description={`Try ${SITE_NAME} yourself. Start a free trial, try the live demo, or see how it works.`}
+        title="Ready to run better maintenance operations?"
+        description={`Start a free trial or talk to us about your team's needs. ${SITE_NAME} is free to try—no credit card required.`}
         actions={
           <>
             <Link
@@ -494,12 +554,11 @@ export default function HomePage() {
               Start Free Trial
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
-            <SeeHowItWorksButton className="w-full min-h-[44px] sm:w-auto sm:min-h-[48px]" data-testid="live-demo-cta-footer" variant="secondary" />
             <Link
-              href={ROUTES.howItWorks}
+              href={ROUTES.contact}
               className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-4 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] sm:w-auto sm:min-h-[48px]"
             >
-              See How It Works
+              Talk to us
             </Link>
           </>
         }

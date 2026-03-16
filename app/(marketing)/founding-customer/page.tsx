@@ -95,13 +95,13 @@ export default function FoundingCustomerPage() {
           Limited to the first 25 customers. We’ll reach out to discuss your needs and get you started.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <Link
-            href={ROUTES.contact}
+          <a
+            href="mailto:support@cornerstonecmms.com?subject=Founding%20Customer%20Application"
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
             Apply for Founding Customer Access
             <ArrowRight className="h-5 w-5" aria-hidden />
-          </Link>
+          </a>
           <Link
             href={ROUTES.signup}
             className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-4 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"

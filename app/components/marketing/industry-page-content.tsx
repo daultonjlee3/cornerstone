@@ -4,6 +4,7 @@ import {
   INDUSTRY_ROUTE_TO_CONTENT_KEY,
   INDUSTRY_SCREENSHOTS,
   ROUTES,
+  SITE_NAME,
   type IndustrySlug,
 } from "@/lib/marketing-site";
 import { INDUSTRY_CONTENT } from "@/lib/industry-content";
@@ -137,10 +138,10 @@ export function IndustryPageContent({ industrySlug }: Props) {
       {/* CTA */}
       <section className="mt-16 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8">
         <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
-          Built for {industry.title}
+          See {SITE_NAME} in action for {industry.title.toLowerCase()}
         </h2>
         <p className="mt-2 text-[var(--muted)]">
-          One platform for work orders, PM, assets, dispatch, and reporting.
+          {content.heroSubheading} Start a free trial or talk to us about your team&apos;s needs.
         </p>
         <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
           <Link
