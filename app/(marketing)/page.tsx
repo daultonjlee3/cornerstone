@@ -130,9 +130,13 @@ export default function HomePage() {
               </ul>
             </div>
             <div className="order-1 min-w-0 md:order-2">
-              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
-                Product Screenshot Placeholder
-              </div>
+              <ScreenshotContainer
+                src="/marketing/screenshots/cornerstone-work-orders.png"
+                alt="Cornerstone OS work order management dashboard"
+                aspectRatio="video"
+                width={1920}
+                height={1080}
+              />
             </div>
           </div>
         </div>
@@ -157,9 +161,13 @@ export default function HomePage() {
         <div className="mx-auto min-w-0 max-w-7xl">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
             <div className="min-w-0">
-              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
-                Product Screenshot Placeholder
-              </div>
+              <ScreenshotContainer
+                src="/marketing/screenshots/cornerstone-pm.png"
+                alt="Cornerstone OS preventive maintenance schedule"
+                aspectRatio="video"
+                width={1920}
+                height={1080}
+              />
             </div>
             <div className="min-w-0">
               <h2 className="mk-section-headline">
@@ -222,9 +230,13 @@ export default function HomePage() {
               </ul>
             </div>
             <div className="min-w-0 mx-auto max-w-sm md:order-1 md:mx-0">
-              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
-                Product Screenshot Placeholder
-              </div>
+              <ScreenshotContainer
+                src="/marketing/screenshots/cornerstone-mobile-field.png"
+                alt="Cornerstone OS technician mobile interface"
+                aspectRatio="video"
+                width={1920}
+                height={1080}
+              />
             </div>
           </div>
         </div>
@@ -258,9 +270,13 @@ export default function HomePage() {
         <div className="mx-auto min-w-0 max-w-7xl">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
             <div className="min-w-0">
-              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
-                Product Screenshot Placeholder
-              </div>
+              <ScreenshotContainer
+                src="/marketing/screenshots/cornerstone-inventory.png"
+                alt="Cornerstone OS inventory and procurement management"
+                aspectRatio="video"
+                width={1920}
+                height={1080}
+              />
             </div>
             <div className="min-w-0">
               <h2 className="mk-section-headline">
@@ -350,9 +366,13 @@ export default function HomePage() {
             </ul>
           </div>
           <div className="mt-10 min-w-0">
-            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
-              Product Screenshot Placeholder
-            </div>
+            <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-reporting.png"
+              alt="Cornerstone OS operations intelligence and reporting dashboard"
+              aspectRatio="video"
+              width={1920}
+              height={1080}
+            />
           </div>
         </div>
       </section>

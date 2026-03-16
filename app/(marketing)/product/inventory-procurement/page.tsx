@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CTASection, HeroSection, Section, SeeHowItWorksButton } from "@/app/components/marketing";
+import { CTASection, HeroSection, ScreenshotContainer, Section, SeeHowItWorksButton } from "@/app/components/marketing";
 import { ROUTES, SEO, SITE_NAME, buildMarketingMetadata } from "@/lib/marketing-site";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
@@ -33,9 +33,14 @@ export default function InventoryProcurementPage() {
           </>
         }
       >
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[260px] sm:min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm">
-          Product Screenshot Placeholder
-        </div>
+        <ScreenshotContainer
+          src="/marketing/screenshots/cornerstone-inventory.png"
+          alt="Cornerstone OS inventory and procurement management"
+          aspectRatio="video"
+          variant="hero"
+          width={1920}
+          height={1080}
+        />
       </HeroSection>
 
       {/* Section 1: Track inventory across locations */}
@@ -61,9 +66,13 @@ export default function InventoryProcurementPage() {
             </ul>
           </div>
           <div className="min-w-0">
-            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[260px] sm:min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm">
-              Inventory Screenshot Placeholder
-            </div>
+            <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-inventory.png"
+              alt="Cornerstone OS inventory tracking across locations"
+              aspectRatio="video"
+              width={1920}
+              height={1080}
+            />
           </div>
         </div>
       </Section>
@@ -72,9 +81,13 @@ export default function InventoryProcurementPage() {
       <Section>
         <div className="grid min-w-0 grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
           <div className="order-2 min-w-0 md:order-1">
-            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[260px] sm:min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm">
-              Vendors Screenshot Placeholder
-            </div>
+            <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-vendors.png"
+              alt="Cornerstone OS vendor management"
+              aspectRatio="video"
+              width={1920}
+              height={1080}
+            />
           </div>
           <div className="order-1 min-w-0 md:order-2">
             <h2 className="mk-section-headline">Manage vendor relationships</h2>
@@ -121,9 +134,13 @@ export default function InventoryProcurementPage() {
             </ul>
           </div>
           <div className="min-w-0">
-            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[260px] sm:min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm">
-              Purchase Orders Screenshot Placeholder
-            </div>
+            <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-purchase-orders.png"
+              alt="Cornerstone OS purchase order management"
+              aspectRatio="video"
+              width={1920}
+              height={1080}
+            />
           </div>
         </div>
       </Section>
@@ -132,9 +149,13 @@ export default function InventoryProcurementPage() {
       <Section>
         <div className="grid min-w-0 grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
           <div className="order-2 min-w-0 md:order-1">
-            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[260px] sm:min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm">
-              Connected Workflows Screenshot Placeholder
-            </div>
+            <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-work-orders.png"
+              alt="Cornerstone OS materials connected to maintenance workflows"
+              aspectRatio="video"
+              width={1920}
+              height={1080}
+            />
           </div>
           <div className="order-1 min-w-0 md:order-2">
             <h2 className="mk-section-headline">Connect materials to maintenance workflows</h2>
