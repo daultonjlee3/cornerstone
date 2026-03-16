@@ -105,10 +105,14 @@ export async function enterDemoAction(
     industry_slug: industrySlug,
   });
 
+  const envUrl =
+    typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_SITE_URL?.trim() : undefined;
+
   const baseUrl =
-    (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SITE_URL?.trim()) ||
+    envUrl ||
     SITE_URL ||
-    "http://localhost:3000";
+    // Localhost is only used as a last resort in non-production environments.
+    (process.env.NODE_ENV === "production" ? "https://cornerstoneos.com" : "http://localhost:3000");
   const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=/dashboard`;
 
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
