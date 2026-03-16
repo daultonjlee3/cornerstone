@@ -181,8 +181,9 @@ export const NAV = {
     href: ROUTES.product,
     children: [
       { label: "Product Overview", href: ROUTES.product },
+      ...FEATURES.filter((f) => f.slug !== "ai-automation").map((f) => ({ label: f.title, href: f.href })),
       { label: "Inventory & Procurement", href: ROUTES.productInventoryProcurement },
-      ...FEATURES.map((f) => ({ label: f.title, href: f.href })),
+      ...FEATURES.filter((f) => f.slug === "ai-automation").map((f) => ({ label: f.title, href: f.href })),
     ],
   },
   industries: {
