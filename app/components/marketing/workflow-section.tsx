@@ -16,9 +16,9 @@ export function WorkflowSection({
 }: Props) {
   return (
     <section
-      className={`px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20 ${className}`}
+      className={`min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24 ${className}`}
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto min-w-0 max-w-7xl">
         <h2 className="text-center mk-section-headline">{title}</h2>
         {subtitle && (
           <p className="mx-auto mt-4 max-w-2xl text-center mk-body-lg">

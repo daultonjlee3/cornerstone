@@ -18,12 +18,12 @@ export function FeatureSection({
   return (
     <section
       className={[
-        "px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20",
+        "min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24",
         variant === "alt" ? "mk-section-alt" : "",
         className,
       ].filter(Boolean).join(" ")}
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto min-w-0 max-w-7xl">
         <div className="text-center">
           <h2 className="mk-section-headline">{title}</h2>
           {subtitle && (

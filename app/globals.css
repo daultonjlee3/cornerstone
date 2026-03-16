@@ -74,6 +74,7 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .ui-label {
@@ -341,7 +342,7 @@ body {
 /* ===== Marketing design system ===== */
 /* Typography */
 .mk-hero-headline {
-  font-size: clamp(2.25rem, 5vw, 3.75rem);
+  font-size: clamp(1.875rem, 5vw, 3.75rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.1;
@@ -349,22 +350,34 @@ body {
 }
 
 .mk-section-headline {
-  font-size: clamp(1.875rem, 3vw, 2.25rem);
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--foreground);
 }
 
 .mk-subheadline {
-  font-size: 1.125rem;
+  font-size: 1rem;
   line-height: 1.6;
   color: var(--muted);
 }
 
+@media (min-width: 768px) {
+  .mk-subheadline {
+    font-size: 1.125rem;
+  }
+}
+
 .mk-body-lg {
-  font-size: 1.125rem;
+  font-size: 1rem;
   line-height: 1.65;
   color: var(--muted);
+}
+
+@media (min-width: 768px) {
+  .mk-body-lg {
+    font-size: 1.125rem;
+  }
 }
 
 .mk-caption {

@@ -12,7 +12,7 @@ export const metadata: Metadata = buildMarketingMetadata(
 
 export default function IndustriesIndexPage() {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+    <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-12 sm:px-6 md:py-16">
       <h1 className="text-3xl font-bold tracking-tight">Industries</h1>
       <p className="mt-2 text-[var(--muted)]">
         {SITE_NAME} serves maintenance and operations teams across these markets.{" "}

@@ -16,11 +16,11 @@ export function MarketingHeader() {
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--card-border)] bg-[var(--card)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--card)]/80">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full max-w-full border-b border-[var(--card-border)] bg-[var(--card)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--card)]/80">
+      <div className="mx-auto flex h-16 min-w-0 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8">
         <Link
           href={ROUTES.home}
-          className="flex shrink-0 items-center gap-2.5 text-lg font-semibold tracking-tight text-[var(--foreground)] transition-opacity hover:opacity-90"
+          className="flex min-w-0 shrink items-center gap-2.5 text-lg font-semibold tracking-tight text-[var(--foreground)] transition-opacity hover:opacity-90"
           onClick={closeMobile}
         >
           <Image
@@ -28,9 +28,9 @@ export function MarketingHeader() {
             alt=""
             width={32}
             height={32}
-            className="h-8 w-8 rounded-lg object-contain"
+            className="h-8 w-8 shrink-0 rounded-lg object-contain"
           />
-          <span>{SITE_NAME}</span>
+          <span className="truncate">{SITE_NAME}</span>
         </Link>
 
         {/* Desktop nav */}
@@ -126,24 +126,12 @@ export function MarketingHeader() {
           </Link>
         </div>
 
-        {/* Mobile: hamburger + CTAs */}
-        <div className="flex shrink-0 items-center gap-2 md:hidden">
-          <Link
-            href={ROUTES.signup}
-            className="rounded-lg bg-[var(--accent)] px-3 py-2.5 text-sm font-semibold text-white min-h-[44px] inline-flex items-center justify-center"
-          >
-            Start Free Trial
-          </Link>
-          <Link
-            href={ROUTES.login}
-            className="rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--foreground)] min-h-[44px] inline-flex items-center justify-center"
-          >
-            Sign In
-          </Link>
+        {/* Mobile: hamburger only (CTAs in menu) so it's always visible without overflow */}
+        <div className="flex shrink-0 items-center md:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen((o) => !o)}
-            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--foreground)] hover:bg-[var(--background)]"
+            className="flex h-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--foreground)] hover:bg-[var(--background)]"
             aria-expanded={mobileOpen}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
@@ -152,16 +140,19 @@ export function MarketingHeader() {
         </div>
       </div>
 
-      {/* Mobile nav panel */}
+      {/* Mobile nav panel: full-width, vertical menu with Home, Product, Industries, Pricing, About, Login, Start Free Trial */}
       {mobileOpen && (
         <div
           className="border-t border-[var(--card-border)] bg-[var(--card)] md:hidden"
           role="dialog"
           aria-label="Mobile navigation"
         >
-          <nav className="mx-auto max-w-7xl px-4 py-4 sm:px-6" aria-label="Main">
-            <div className="flex flex-col gap-1">
-              <span className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+          <nav className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8" aria-label="Main">
+            <div className="flex flex-col gap-6 text-lg">
+              <Link href={ROUTES.home} className={touchLinkClass} onClick={closeMobile}>
+                Home
+              </Link>
+              <span className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
                 Product
               </span>
               {NAV.product.children.map((item) => (
@@ -174,7 +165,7 @@ export function MarketingHeader() {
                   {item.label}
                 </Link>
               ))}
-              <span className="mt-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <span className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
                 Industries
               </span>
               {NAV.industries.children.map((item) => (
@@ -187,14 +178,8 @@ export function MarketingHeader() {
                   {item.label}
                 </Link>
               ))}
-              <span className="mt-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Company
-              </span>
               <Link href={NAV.pricing.href} className={touchLinkClass} onClick={closeMobile}>
                 Pricing
-              </Link>
-              <Link href={NAV.foundingCustomer.href} className={touchLinkClass} onClick={closeMobile}>
-                Founding Customer
               </Link>
               <SeeHowItWorksButton
                 className={touchLinkClass}
@@ -203,12 +188,31 @@ export function MarketingHeader() {
               >
                 How It Works
               </SeeHowItWorksButton>
+              <Link href={NAV.foundingCustomer.href} className={touchLinkClass} onClick={closeMobile}>
+                Founding Customer
+              </Link>
               <Link href={NAV.about.href} className={touchLinkClass} onClick={closeMobile}>
                 About
               </Link>
               <Link href={NAV.contact.href} className={touchLinkClass} onClick={closeMobile}>
                 Contact
               </Link>
+              <div className="mt-4 flex flex-col gap-3 border-t border-[var(--card-border)] pt-6">
+                <Link
+                  href={ROUTES.login}
+                  className="flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--card-border)] px-6 font-semibold text-[var(--foreground)] hover:bg-[var(--background)] hover:text-[var(--accent)]"
+                  onClick={closeMobile}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href={ROUTES.signup}
+                  className="flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--accent)] px-6 font-semibold text-white hover:bg-[var(--accent-hover)]"
+                  onClick={closeMobile}
+                >
+                  Start Free Trial
+                </Link>
+              </div>
             </div>
           </nav>
         </div>

@@ -25,9 +25,9 @@ const linkClass =
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-[var(--card-border)] bg-[var(--card)]">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="grid gap-10 sm:grid-cols-2 sm:gap-12 lg:grid-cols-5">
+    <footer className="min-w-0 border-t border-[var(--card-border)] bg-[var(--card)]">
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-12 lg:grid-cols-5">
           <div className="sm:col-span-2 lg:col-span-1">
             <Link
               href={ROUTES.home}

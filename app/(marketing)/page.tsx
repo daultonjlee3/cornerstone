@@ -96,8 +96,8 @@ export default function HomePage() {
         />
       </HeroSection>
 
-      <section className="mk-section-alt border-t border-[var(--card-border)] px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="mx-auto max-w-3xl text-center">
+      <section className="mk-section-alt border-t border-[var(--card-border)] min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto min-w-0 max-w-3xl text-center">
           <h2 className="mk-section-headline">
             Run maintenance operations from one system
           </h2>
@@ -169,8 +169,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mk-section-alt border-t border-[var(--card-border)] px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="mk-section-alt border-t border-[var(--card-border)] min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto min-w-0 max-w-7xl">
           <h2 className="text-center mk-section-headline">
             Built for your industry
           </h2>
@@ -189,8 +189,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="mx-auto max-w-3xl text-center">
+      <section className="min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto min-w-0 max-w-3xl text-center">
           <h2 className="mk-section-headline">Founding Customer Program</h2>
           <p className="mt-4 mk-body-lg">
             {SITE_NAME} is opening the platform to the first 25 founding
@@ -219,8 +219,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mk-section-alt border-t border-[var(--card-border)] px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="mx-auto w-full max-w-2xl text-center">
+      <section className="mk-section-alt border-t border-[var(--card-border)] min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto w-full min-w-0 max-w-2xl text-center">
           <h2 className="mk-section-headline">Simple, transparent pricing</h2>
           <PricingCard
             price="$75"

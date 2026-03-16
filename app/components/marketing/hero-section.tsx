@@ -25,9 +25,9 @@ export function HeroSection({
 }: Props) {
   return (
     <section
-      className={`relative overflow-hidden px-4 py-12 sm:px-6 sm:py-20 lg:px-8 lg:py-28 ${className}`}
+      className={`relative min-w-0 overflow-hidden px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-28 ${className}`}
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto min-w-0 max-w-7xl">
         {/* Hero copy: constrained width for readability (750–900px) */}
         <div
           className={

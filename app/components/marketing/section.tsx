@@ -34,12 +34,12 @@ export function Section({
     <section
       id={id}
       className={[
-        "px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20",
+        "min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24",
         variantClasses[variant],
         className,
       ].filter(Boolean).join(" ")}
     >
-      <div className={`mx-auto ${maxWidthClasses[variant]}`}>{children}</div>
+      <div className={`mx-auto min-w-0 ${maxWidthClasses[variant]}`}>{children}</div>
     </section>
   );
 }

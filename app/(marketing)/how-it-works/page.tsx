@@ -14,10 +14,10 @@ export const metadata: Metadata = buildMarketingMetadata(
 
 export default function HowItWorksPage() {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+    <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-12 sm:px-6 md:py-16">
       {/* Hero */}
       <header className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl">
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl">
           How it works
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--muted)]">

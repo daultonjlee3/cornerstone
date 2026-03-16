@@ -52,7 +52,7 @@ const PRICING_FAQ_SCHEMA = {
 
 export default function PricingPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+    <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(PRICING_FAQ_SCHEMA) }}

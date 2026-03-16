@@ -148,8 +148,8 @@ export default function ProductPage() {
 
       {/* Section 4: Work order management */}
       <Section>
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div>
+        <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="min-w-0">
             <h2 className="mk-section-headline">
               Powerful work order management for real operations.
             </h2>
@@ -159,7 +159,7 @@ export default function ProductPage() {
               technicians always know what’s next.
             </p>
           </div>
-          <div className="overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
               src="/marketing/screenshots/cornerstone-work-orders.png"
               alt="Work order management — create, assign, track, and complete"
@@ -174,8 +174,8 @@ export default function ProductPage() {
 
       {/* Section 5: Preventive maintenance */}
       <Section variant="alt">
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div className="order-2 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
+        <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="order-2 min-w-0 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
               src="/marketing/screenshots/cornerstone-pm.png"
               alt="Preventive maintenance — schedules and asset history"
@@ -185,7 +185,7 @@ export default function ProductPage() {
               height={675}
             />
           </div>
-          <div className="order-1 lg:order-2">
+          <div className="order-1 min-w-0 lg:order-2">
             <h2 className="mk-section-headline">
               Automate preventive maintenance schedules.
             </h2>
@@ -199,8 +199,8 @@ export default function ProductPage() {
 
       {/* Section 6: Asset management */}
       <Section>
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div>
+        <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="min-w-0">
             <h2 className="mk-section-headline">
               Complete asset visibility.
             </h2>
@@ -210,7 +210,7 @@ export default function ProductPage() {
               plan ahead.
             </p>
           </div>
-          <div className="overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
               src="/marketing/screenshots/cornerstone-assets-list.png"
               alt="Asset management — track assets, history, and condition"
@@ -225,8 +225,8 @@ export default function ProductPage() {
 
       {/* Section 7: Dispatch & technician workflows */}
       <Section variant="alt">
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div className="order-2 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
+        <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="order-2 min-w-0 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
               src="/marketing/screenshots/cornerstone-dispatch.png"
               alt="Dispatch and technician workflows — assign and schedule work"
@@ -236,7 +236,7 @@ export default function ProductPage() {
               height={675}
             />
           </div>
-          <div className="order-1 lg:order-2">
+          <div className="order-1 min-w-0 lg:order-2">
             <h2 className="mk-section-headline">
               Coordinate work and empower technicians.
             </h2>
@@ -251,8 +251,8 @@ export default function ProductPage() {
 
       {/* Section 8: Reporting & operational visibility */}
       <Section>
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div>
+        <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="min-w-0">
             <h2 className="mk-section-headline">
               Custom reporting built around how your business runs.
             </h2>
@@ -260,7 +260,7 @@ export default function ProductPage() {
               Every maintenance team operates differently. Cornerstone OS lets you build dashboards and reports around the metrics that matter most—work order performance, preventive maintenance compliance, asset health, and technician productivity—so leadership always has clear operational visibility.
             </p>
           </div>
-          <div className="overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
               src="/marketing/screenshots/cornerstone-reporting.png"
               alt="Reporting and operational visibility — dashboards and insights"

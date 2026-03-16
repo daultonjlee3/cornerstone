@@ -12,10 +12,10 @@ export const metadata: Metadata = buildMarketingMetadata(
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+    <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-12 sm:px-6 md:py-16">
       {/* Hero */}
       <header>
-        <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl">
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl">
           About {SITE_NAME}
         </h1>
         <p className="mt-6 text-xl text-[var(--muted)]">{SITE_TAGLINE}</p>
