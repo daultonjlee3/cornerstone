@@ -77,14 +77,7 @@ function IndustryDemoModalContent({
 
   useEffect(() => {
     if (state?.redirectUrl) {
-      try {
-        const url = new URL(state.redirectUrl);
-        const origin = window.location.origin;
-        const fixed = `${origin}${url.pathname}${url.search}${url.hash}`;
-        window.location.href = fixed;
-      } catch {
-        window.location.href = state.redirectUrl;
-      }
+      window.location.href = state.redirectUrl;
     }
   }, [state?.redirectUrl]);
 
