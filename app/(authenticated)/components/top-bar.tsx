@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Menu, Bell } from "lucide-react";
+import { Search, Menu, Bell, MapPin } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
+import { useGuidedTour } from "@/hooks/useGuidedTour";
 
 type NotificationItem = {
   id: string;
@@ -51,6 +52,7 @@ export function TopBar({
   onReturnToProfile,
 }: TopBarProps) {
   const router = useRouter();
+  const { openWelcome } = useGuidedTour();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -272,7 +274,7 @@ export function TopBar({
           </button>
           {accountOpen ? (
             <div
-              className="absolute right-0 top-full z-50 mt-1.5 min-w-[180px] rounded-xl border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-[var(--shadow-card)]"
+              className="absolute right-0 top-full z-50 mt-1.5 min-w-[200px] rounded-xl border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-[var(--shadow-card)]"
               role="menu"
             >
               {isImpersonating && onReturnToProfile ? (
@@ -288,13 +290,19 @@ export function TopBar({
                   Return to My Profile
                 </button>
               ) : null}
-              <div
-                className={
-                  isImpersonating && onReturnToProfile
-                    ? "border-t border-[var(--card-border)] px-3 py-2"
-                    : "px-3 py-2"
-                }
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+                onClick={() => {
+                  setAccountOpen(false);
+                  openWelcome();
+                }}
               >
+                <MapPin className="size-4 text-[var(--accent)]" aria-hidden />
+                Start Product Tour
+              </button>
+              <div className="border-t border-[var(--card-border)] px-3 py-2">
                 <SignOutButton />
               </div>
             </div>

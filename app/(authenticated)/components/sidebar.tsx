@@ -274,6 +274,7 @@ function NavGroupBlock({
             <Link
               href={item.href}
               onClick={onClose}
+              {...(item.tourId ? { "data-tour": item.tourId } : {})}
               className={`
                 group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150
                 ${collapsed ? "justify-center px-2" : ""}
