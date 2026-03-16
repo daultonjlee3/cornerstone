@@ -10,8 +10,9 @@ import { WorkOrderCompletionModal } from "@/app/(authenticated)/work-orders/comp
 import { WorkOrderChecklistCard } from "@/app/(authenticated)/work-orders/components/work-order-checklist-card";
 import { WorkOrderNotesCard } from "@/app/(authenticated)/work-orders/components/work-order-notes-card";
 import { WorkOrderPartsCard } from "@/app/(authenticated)/work-orders/components/work-order-parts-card";
-import { WorkOrderPriorityBadge } from "@/app/(authenticated)/work-orders/components/work-order-priority-badge";
-import { WorkOrderStatusBadge } from "@/app/(authenticated)/work-orders/components/work-order-status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { formatDateTime } from "@/src/lib/date-utils";
 
 type Note = { id: string; body: string; note_type: string | null; created_at: string };
 type ChecklistItem = { id: string; label: string; completed: boolean; sort_order: number };
@@ -79,17 +80,6 @@ type TechnicianExecutionViewProps = {
   technicians: TechnicianOption[];
 };
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 export function TechnicianExecutionView({
   workOrder,
@@ -170,8 +160,8 @@ export function TechnicianExecutionView({
               {workOrder.asset_name ?? "No asset"} • {workOrder.location ?? "No location"}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <WorkOrderStatusBadge status={workOrder.status} />
-              <WorkOrderPriorityBadge priority={workOrder.priority} />
+              <StatusBadge status={workOrder.status} />
+              <PriorityBadge priority={workOrder.priority} />
               <span className="rounded bg-[var(--muted)]/20 px-2 py-0.5 text-xs text-[var(--muted)]">
                 {workOrder.source_type === "preventive_maintenance" ||
                 workOrder.category === "preventive_maintenance"

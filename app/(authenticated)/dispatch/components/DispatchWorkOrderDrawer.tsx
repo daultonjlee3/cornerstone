@@ -3,6 +3,7 @@
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import type { DispatchWorkOrder } from "../types";
+import { formatDate } from "@/src/lib/date-utils";
 
 type DispatchWorkOrderDrawerProps = {
   workOrder: DispatchWorkOrder | null;
@@ -10,15 +11,6 @@ type DispatchWorkOrderDrawerProps = {
   onOpenFullWorkOrder: (workOrderId: string) => void;
   onReassign: (workOrderId: string) => void;
 };
-
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    return new Date(`${val}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" });
-  } catch {
-    return "—";
-  }
-}
 
 function formatTime(val: string | null | undefined): string {
   if (!val) return "";

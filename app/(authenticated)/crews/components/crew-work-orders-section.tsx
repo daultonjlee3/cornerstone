@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatDate } from "@/src/lib/date-utils";
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";
 const cardTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)]";
@@ -19,15 +20,6 @@ type WorkOrderRow = {
 type CrewWorkOrdersSectionProps = {
   workOrders: WorkOrderRow[];
 };
-
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    return new Date(val).toLocaleDateString(undefined, { dateStyle: "short" });
-  } catch {
-    return "—";
-  }
-}
 
 export function CrewWorkOrdersSection({ workOrders }: CrewWorkOrdersSectionProps) {
   return (

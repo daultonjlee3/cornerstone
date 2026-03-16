@@ -1,4 +1,7 @@
-export type WorkOrderSlaPriority = "low" | "medium" | "high" | "urgent" | "emergency";
+// Use the canonical type from the domain model so priorities stay in sync.
+import type { WorkOrderPriority } from "@/src/types/work-order";
+/** @deprecated Use WorkOrderPriority from src/types/work-order directly. */
+export type WorkOrderSlaPriority = WorkOrderPriority;
 
 export type WorkOrderSlaPolicyRow = {
   company_id: string;

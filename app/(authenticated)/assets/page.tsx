@@ -15,7 +15,8 @@ export const metadata = {
   description: "Manage assets",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
+import { resolveSearchParams, getStringParam, type SearchParams } from "@/src/lib/page-utils";
+
 type HealthStatusFilter = "excellent" | "good" | "warning" | "poor" | "critical";
 type HierarchyFilter = "parents" | "sub_assets";
 const VALID_HEALTH_FILTERS = new Set<HealthStatusFilter>([
@@ -26,16 +27,6 @@ const VALID_HEALTH_FILTERS = new Set<HealthStatusFilter>([
   "critical",
 ]);
 const VALID_HIERARCHY_FILTERS = new Set<HierarchyFilter>(["parents", "sub_assets"]);
-
-function getStringParam(
-  params: SearchParams | null,
-  key: string
-): string | null {
-  const v = params?.[key];
-  if (v == null) return null;
-  const s = typeof v === "string" ? v : Array.isArray(v) ? v[0] : null;
-  return s?.trim() || null;
-}
 
 export default async function AssetsPage({
   searchParams,
@@ -51,10 +42,7 @@ export default async function AssetsPage({
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
 
-  const params =
-    typeof (searchParams as Promise<SearchParams>)?.then === "function"
-      ? await (searchParams as Promise<SearchParams>)
-      : (searchParams as SearchParams);
+  const params = await resolveSearchParams(searchParams);
 
   const q = getStringParam(params ?? {}, "q");
   const companyId = getStringParam(params ?? {}, "company_id");

@@ -19,7 +19,8 @@ export type WorkOrderStatus =
   | "completed"
   | "cancelled";
 
-export type WorkOrderPriority = "low" | "medium" | "high" | "urgent";
+/** All valid work order priority levels. "emergency" is the highest — included for SLA routing. */
+export type WorkOrderPriority = "low" | "medium" | "high" | "urgent" | "emergency";
 
 export interface WorkOrder extends BaseEntity {
   companyId: string;

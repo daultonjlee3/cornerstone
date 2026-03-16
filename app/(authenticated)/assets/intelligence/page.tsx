@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/src/lib/supabase/server";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 import { getAssetIntelligenceDashboard } from "@/src/lib/assets/assetIntelligenceService";
 import { AssetIntelligenceDashboardView } from "../components/asset-intelligence-dashboard-view";
 import { PageHeader } from "@/src/components/ui/page-header";
@@ -14,7 +15,6 @@ export const metadata = {
   description: "Portfolio-level asset intelligence dashboard",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
 
 function firstParam(value: string | string[] | undefined): string | null {
   if (typeof value === "string") return value;
@@ -36,10 +36,7 @@ export default async function AssetIntelligencePage({
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
 
-  const params =
-    typeof (searchParams as Promise<SearchParams>)?.then === "function"
-      ? await (searchParams as Promise<SearchParams>)
-      : (searchParams as SearchParams);
+  const params = await resolveSearchParams(searchParams);
   const selectedCompanyId = firstParam(params.company_id);
 
   const { data: companies } = await supabase

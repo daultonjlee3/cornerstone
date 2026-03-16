@@ -1,5 +1,8 @@
 "use client";
 
+import { formatDate } from "@/src/lib/date-utils";
+import type { CompanyOption, TechnicianOption } from "@/src/types/common";
+
 export type CrewRow = {
   id: string;
   name?: string | null;
@@ -15,9 +18,6 @@ export type CrewRow = {
   active_work_orders?: number;
 };
 
-type CompanyOption = { id: string; name: string };
-type TechnicianOption = { id: string; name: string; company_id?: string | null };
-
 export type CrewsListProps = {
   crews: CrewRow[];
   companies: CompanyOption[];
@@ -25,14 +25,6 @@ export type CrewsListProps = {
   searchQuery: string;
 };
 
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    return new Date(val).toLocaleDateString(undefined, { dateStyle: "short" });
-  } catch {
-    return "—";
-  }
-}
 
 export function CrewsList({ crews, searchQuery }: CrewsListProps) {
   return (

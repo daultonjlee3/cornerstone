@@ -12,15 +12,7 @@ export const metadata = {
   description: "Recurring service plans",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
-
-function getStringParam(params: SearchParams | null, key: string): string | null {
-  const value = params?.[key];
-  if (value == null) return null;
-  const output =
-    typeof value === "string" ? value : Array.isArray(value) ? value[0] : null;
-  return output?.trim() || null;
-}
+import { resolveSearchParams, getStringParam, type SearchParams } from "@/src/lib/page-utils";
 
 export default async function PreventiveMaintenancePage({
   searchParams,
@@ -36,10 +28,7 @@ export default async function PreventiveMaintenancePage({
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
 
-  const params =
-    typeof (searchParams as Promise<SearchParams>)?.then === "function"
-      ? await (searchParams as Promise<SearchParams>)
-      : (searchParams as SearchParams);
+  const params = await resolveSearchParams(searchParams);
 
   const q = getStringParam(params ?? {}, "q");
   const frequency = getStringParam(params ?? {}, "frequency");

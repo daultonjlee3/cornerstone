@@ -12,8 +12,8 @@ import { WorkOrderCompletionModal } from "@/app/(authenticated)/work-orders/comp
 import { WorkOrderChecklistCard } from "@/app/(authenticated)/work-orders/components/work-order-checklist-card";
 import { WorkOrderPartsCard } from "@/app/(authenticated)/work-orders/components/work-order-parts-card";
 import { toggleWorkOrderChecklistItem } from "@/app/(authenticated)/work-orders/actions";
-import { WorkOrderStatusBadge } from "@/app/(authenticated)/work-orders/components/work-order-status-badge";
-import { WorkOrderPriorityBadge } from "@/app/(authenticated)/work-orders/components/work-order-priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { PhotoUploader } from "@/src/components/ui/photo-uploader";
 import { Button } from "@/src/components/ui/button";
 import { NotesTimeline } from "./notes-timeline";
@@ -358,8 +358,8 @@ export function TechnicianJobExecutionView({
           {workOrder.title}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
-          <WorkOrderStatusBadge status={workOrder.status} />
-          <WorkOrderPriorityBadge priority={workOrder.priority} />
+          <StatusBadge status={workOrder.status} />
+          <PriorityBadge priority={workOrder.priority} />
           <span className="rounded-full border border-[var(--card-border)] bg-[var(--background)] px-2 py-0.5 text-xs font-medium text-[var(--muted-strong)]">
             {workOrder.source_type === "preventive_maintenance" ||
             workOrder.category === "preventive_maintenance"

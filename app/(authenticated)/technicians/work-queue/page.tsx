@@ -7,6 +7,7 @@ import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PageHeader } from "@/src/components/ui/page-header";
 import { Button } from "@/src/components/ui/button";
+import { formatDate, formatDateTime } from "@/src/lib/date-utils";
 
 export const metadata = {
   title: "Technician Work Queue | Cornerstone Tech",
@@ -30,28 +31,6 @@ function checkedParam(
   return defaultValue;
 }
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value + "T12:00:00").toLocaleDateString(undefined, {
-      dateStyle: "medium",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 export default async function TechnicianWorkQueuePage({
   searchParams,

@@ -10,8 +10,8 @@ import { WorkOrderFormModal } from "./work-order-form-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
 import { WorkOrderKpiBar, type WorkOrderKpiStats } from "./work-order-kpi-bar";
 import { WorkOrderSavedViews } from "./work-order-saved-views";
-import { WorkOrderStatusBadge } from "./work-order-status-badge";
-import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
 import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
 import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
@@ -22,25 +22,16 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/too
 import { Hint } from "@/src/components/ui/hint";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 
-type CompanyOption = { id: string; name: string };
-type PropertyOption = { id: string; name: string; company_id: string };
-type BuildingOption = { id: string; name: string; property_id: string };
-type UnitOption = { id: string; name: string; building_id: string };
-type AssetOption = {
-  id: string;
-  name: string;
-  company_id: string;
-  property_id: string | null;
-  building_id: string | null;
-  unit_id: string | null;
-};
-type TechnicianOption = { id: string; name: string };
-type VendorOption = {
-  id: string;
-  name: string;
-  company_id: string;
-  service_type?: string | null;
-};
+import { formatDate } from "@/src/lib/date-utils";
+import type {
+  CompanyOption,
+  PropertyOption,
+  BuildingOption,
+  UnitOption,
+  AssetOption,
+  TechnicianOption,
+  VendorOption,
+} from "@/src/types/common";
 
 export type WorkOrderListStats = WorkOrderKpiStats & {
   new: number;
@@ -106,16 +97,6 @@ function assignedDisplay(wo: WorkOrderListRow): string {
   if (crew) return crew;
   if (vendor) return vendor;
   return "—";
-}
-
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    const d = new Date(val);
-    return d.toLocaleDateString(undefined, { dateStyle: "short" });
-  } catch {
-    return "—";
-  }
 }
 
 export function WorkOrdersList({
@@ -591,10 +572,10 @@ export function WorkOrdersList({
                       )}
                     </td>
                     <td className="px-4 py-3.5">
-                      <WorkOrderPriorityBadge priority={wo.priority ?? "medium"} />
+                      <PriorityBadge priority={wo.priority ?? "medium"} />
                     </td>
                     <td className="px-4 py-3.5">
-                      <WorkOrderStatusBadge status={wo.status ?? "new"} />
+                      <StatusBadge status={wo.status ?? "new"} />
                     </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{assignedDisplay(wo)}</td>

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { UnitsList } from "./components/units-list";
 import { PageHeader } from "@/src/components/ui/page-header";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, getStringParam } from "@/src/lib/page-utils";
 
 export const metadata = {
   title: "Units | Cornerstone Tech",
@@ -26,11 +27,9 @@ export default async function UnitsPage({
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
 
-  const params = typeof (searchParams as Promise<SearchParams>)?.then === "function"
-    ? await (searchParams as Promise<SearchParams>)
-    : (searchParams as SearchParams);
-  const page = Math.max(1, parseInt(params?.page ?? "1", 10) || 1);
-  const pageSize = Math.min(100, Math.max(1, parseInt(params?.page_size ?? "25", 10) || 25));
+  const params = await resolveSearchParams(searchParams);
+  const page = Math.max(1, parseInt(getStringParam(params, "page") ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(getStringParam(params, "page_size") ?? "25", 10) || 25));
 
   const { data: companies } = await supabase
     .from("companies")

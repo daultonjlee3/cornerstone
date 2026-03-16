@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useCallback } from "react";
-import { WorkOrderStatusBadge } from "./work-order-status-badge";
-import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
+import { formatDate } from "@/src/lib/date-utils";
 
 export type WorkOrderListRow = {
   id: string;
@@ -31,15 +32,6 @@ type WorkOrderDetailDrawerProps = {
   onAssign: () => void;
   onEdit: () => void;
 };
-
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    return new Date(val).toLocaleDateString(undefined, { dateStyle: "short" });
-  } catch {
-    return "—";
-  }
-}
 
 function assignedDisplay(wo: WorkOrderListRow): string {
   const tech = wo.technician_name;
@@ -93,8 +85,8 @@ export function WorkOrderDetailDrawer({
           <div>
             <h3 className="text-sm font-medium text-[var(--foreground)]">{workOrder.title}</h3>
             <div className="mt-2 flex flex-wrap gap-2">
-              <WorkOrderStatusBadge status={workOrder.status ?? "new"} />
-              <WorkOrderPriorityBadge priority={workOrder.priority ?? "medium"} />
+              <StatusBadge status={workOrder.status ?? "new"} />
+              <PriorityBadge priority={workOrder.priority ?? "medium"} />
             </div>
           </div>
           <dl className="grid gap-2 text-sm">

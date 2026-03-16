@@ -30,17 +30,7 @@ import { DashboardHeaderActions } from "./components/dashboard-header-actions";
 import { DashboardHelperTips } from "./components/dashboard-helper-tips";
 import { DashboardSectionEmpty } from "./components/dashboard-section-empty";
 import { DashboardSetupGuidance } from "./components/dashboard-setup-guidance";
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
-      dateStyle: "medium",
-    });
-  } catch {
-    return "—";
-  }
-}
+import { formatDate } from "@/src/lib/date-utils";
 
 const PRIORITY_URGENCY_ORDER: Record<string, number> = { emergency: 0, urgent: 1, high: 2 };
 function priorityUrgency(priority: string | null | undefined): number {

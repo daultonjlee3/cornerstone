@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 import { loadDispatchData } from "./dispatch-data";
 import { parseFilterStateFromParams } from "./filter-state";
 import { DispatchViewClient } from "./components/DispatchViewClient";
@@ -10,7 +11,6 @@ export const metadata = {
   description: "Scheduling & routing operations",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
 
 export default async function DispatchPage({
   searchParams,
@@ -32,10 +32,7 @@ export default async function DispatchPage({
     .eq("tenant_id", tenantId);
   const companyIds = (companies ?? []).map((c) => (c as { id: string }).id);
 
-  // Next.js 15+ may pass searchParams as a Promise
-  const params = typeof (searchParams as Promise<SearchParams>).then === "function"
-    ? await (searchParams as Promise<SearchParams>)
-    : (searchParams as SearchParams);
+  const params = await resolveSearchParams(searchParams);
 
   const filterState = parseFilterStateFromParams(params ?? {});
 

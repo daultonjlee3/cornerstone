@@ -3,22 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { PreventiveMaintenanceDetailActions } from "../components/pm-detail-actions";
+import { formatDate } from "@/src/lib/date-utils";
 
 export const metadata = {
   title: "Preventive Maintenance Plan | Cornerstone Tech",
   description: "Preventive maintenance plan details",
 };
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value + "T12:00:00").toLocaleDateString(undefined, {
-      dateStyle: "medium",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 export default async function PreventiveMaintenanceDetailPage({
   params,

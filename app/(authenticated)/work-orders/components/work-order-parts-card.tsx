@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addWorkOrderPartUsage, type AddPartUsagePayload } from "../actions";
+import { formatDate } from "@/src/lib/date-utils";
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";
 const cardTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)]";
@@ -44,15 +45,6 @@ type WorkOrderPartsCardProps = {
   onPartsChange: () => void;
   inventoryItems: InventoryItemOption[];
 };
-
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    return new Date(val).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
-  } catch {
-    return "—";
-  }
-}
 
 export function WorkOrderPartsCard({
   workOrderId,

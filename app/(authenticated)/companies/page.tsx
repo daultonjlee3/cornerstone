@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import { CompaniesList } from "./components/companies-list";
 import { PageHeader } from "@/src/components/ui/page-header";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 
 export const metadata = {
   title: "Companies | Cornerstone Tech",
   description: "Manage companies",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
 
 export default async function CompaniesPage({
   searchParams,
@@ -26,9 +26,7 @@ export default async function CompaniesPage({
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
 
-  const params = typeof (searchParams as Promise<SearchParams>)?.then === "function"
-    ? await (searchParams as Promise<SearchParams>)
-    : (searchParams as SearchParams);
+  const params = await resolveSearchParams(searchParams);
   const pageParam = params?.page;
   const pageSizeParam = params?.page_size;
   const page = Math.max(1, parseInt(typeof pageParam === "string" ? pageParam : "", 10) || 1);

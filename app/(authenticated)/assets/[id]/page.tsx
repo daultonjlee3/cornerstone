@@ -9,34 +9,12 @@ import { AssetDetailHelperTip } from "../components/asset-detail-helper-tip";
 import { getAssetIntelligenceSnapshot } from "@/src/lib/assets/assetIntelligenceService";
 import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
+import { formatDate, formatDateTime } from "@/src/lib/date-utils";
 
 export const metadata = {
   title: "Asset | Cornerstone Tech",
   description: "Asset detail and preventive maintenance",
 };
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value + "T12:00:00").toLocaleDateString(undefined, {
-      dateStyle: "medium",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 export default async function AssetDetailPage({
   params,

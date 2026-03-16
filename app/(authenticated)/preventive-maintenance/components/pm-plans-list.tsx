@@ -28,8 +28,12 @@ import { StatusBadge } from "@/src/components/ui/status-badge";
 import { Hint } from "@/src/components/ui/hint";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { formatDate } from "@/src/lib/date-utils";
+import type { CompanyOption } from "@/src/types/common";
 
-type CompanyOption = { id: string; name: string };
+// PM plans require company_id to be non-null for form interactions.
+type TechnicianOption = { id: string; name: string; company_id: string };
+
 type AssetOption = {
   id: string;
   name: string;
@@ -41,7 +45,6 @@ type AssetOption = {
   building_name?: string | null;
   unit_name?: string | null;
 };
-type TechnicianOption = { id: string; name: string; company_id: string };
 
 type PMListRow = PreventiveMaintenancePlan & {
   asset_name?: string | null;
@@ -77,17 +80,6 @@ function buildParams(
     else next.set(key, value);
   });
   return next.toString();
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value + "T12:00:00").toLocaleDateString(undefined, {
-      dateStyle: "medium",
-    });
-  } catch {
-    return "—";
-  }
 }
 
 function frequencyDisplay(plan: PMListRow): string {

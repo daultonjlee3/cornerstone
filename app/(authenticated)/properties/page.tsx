@@ -5,13 +5,13 @@ import { PropertiesList } from "./components/properties-list";
 import { resolveMapboxPublicTokenFromEnv } from "@/src/lib/mapbox-token";
 import { PageHeader } from "@/src/components/ui/page-header";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 
 export const metadata = {
   title: "Properties | Cornerstone Tech",
   description: "Manage properties",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
 
 export default async function PropertiesPage({
   searchParams,
@@ -49,9 +49,7 @@ export default async function PropertiesPage({
     );
   }
 
-  const params = typeof (searchParams as Promise<SearchParams>)?.then === "function"
-    ? await (searchParams as Promise<SearchParams>)
-    : (searchParams as SearchParams);
+  const params = await resolveSearchParams(searchParams);
   const page = Math.max(1, parseInt(typeof params?.page === "string" ? params.page : "", 10) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(typeof params?.page_size === "string" ? params.page_size : "", 10) || 25));
 
