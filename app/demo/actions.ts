@@ -105,14 +105,22 @@ export async function enterDemoAction(
     industry_slug: industrySlug,
   });
 
-  const envUrl =
+  const rawEnvUrl =
     typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_SITE_URL?.trim() : undefined;
 
-  const baseUrl =
-    envUrl ||
-    SITE_URL ||
-    // Localhost is only used as a last resort in non-production environments.
-    (process.env.NODE_ENV === "production" ? "https://cornerstonecmms.com" : "http://localhost:3000");
+  const isProd = process.env.NODE_ENV === "production";
+  const defaultProdUrl = "https://cornerstonecmms.com";
+  const defaultDevUrl = "http://localhost:3000";
+
+  // In production, never allow localhost; prefer NEXT_PUBLIC_SITE_URL when it is
+  // set to a non-localhost value, otherwise fall back to the canonical domain.
+  // In development, prefer NEXT_PUBLIC_SITE_URL (often http://localhost:3000),
+  // with a final fallback to the local default.
+  const baseUrl = isProd
+    ? rawEnvUrl && !rawEnvUrl.includes("localhost")
+      ? rawEnvUrl
+      : defaultProdUrl
+    : rawEnvUrl || SITE_URL || defaultDevUrl;
   const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=/dashboard`;
 
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
