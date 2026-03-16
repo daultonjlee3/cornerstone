@@ -60,7 +60,10 @@ export async function generateMetadata() {
 }
 
 export default async function RequestPage() {
+  const tenantId = process.env.PORTAL_TENANT_ID?.trim();
   const companyId = process.env.PORTAL_COMPANY_ID?.trim();
+  const configured = Boolean(tenantId && companyId);
+
   const locale = await getRequestPageLocale();
   const [properties, assets] = await Promise.all([
     getPortalProperties(companyId),
@@ -72,6 +75,7 @@ export default async function RequestPage() {
       initialLocale={locale}
       properties={properties}
       assets={assets}
+      configured={configured}
     />
   );
 }

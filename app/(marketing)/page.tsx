@@ -45,8 +45,8 @@ export default function HomePage() {
   return (
     <>
       <HeroSection
-        headline="Maintenance operations software built for teams that need speed, visibility, and control."
-        subheadline={`${SITE_NAME} brings work orders, preventive maintenance, assets, dispatch, technician workflows, and reporting together in one platform.`}
+        headline="Maintenance operations software built for teams that run real facilities"
+        subheadline="Manage work orders, preventive maintenance, assets, dispatch, technicians, inventory, vendors, purchase orders, and operational reporting in one platform built for modern maintenance teams."
         actions={
           <>
             <Link
@@ -56,7 +56,13 @@ export default function HomePage() {
               Start Free Trial
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
-            <SeeHowItWorksButton className="w-full sm:w-auto" data-testid="live-demo-cta" />
+            <SeeHowItWorksButton className="w-full sm:w-auto min-h-[44px] sm:min-h-[48px]" data-testid="live-demo-cta" variant="secondary" />
+            <Link
+              href={ROUTES.howItWorks}
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-4 text-base font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] sm:w-auto sm:min-h-[48px]"
+            >
+              See How It Works
+            </Link>
           </>
         }
         credibilityStrip={
@@ -96,7 +102,43 @@ export default function HomePage() {
         />
       </HeroSection>
 
-      <section className="mk-section-alt border-t border-[var(--card-border)] min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+      {/* Section 1 — Work Order Command Center: text left, screenshot right */}
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-7xl">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
+            <div className="order-2 min-w-0 md:order-1">
+              <h2 className="mk-section-headline">
+                Run your entire maintenance operation from one dashboard
+              </h2>
+              <ul className="mt-6 space-y-3 text-[var(--foreground)] mk-body-lg">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Prioritize work orders across all locations</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Dispatch technicians instantly</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Track asset service history</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Monitor response times and SLAs</span>
+                </li>
+              </ul>
+            </div>
+            <div className="order-1 min-w-0 md:order-2">
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
+                Product Screenshot Placeholder
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="mx-auto min-w-0 max-w-3xl text-center">
           <h2 className="mk-section-headline">
             Run maintenance operations from one system
@@ -110,14 +152,86 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Section 2 — Preventive Maintenance: screenshot left, text right */}
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-7xl">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
+            <div className="min-w-0">
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
+                Product Screenshot Placeholder
+              </div>
+            </div>
+            <div className="min-w-0">
+              <h2 className="mk-section-headline">
+                Prevent failures before they disrupt operations
+              </h2>
+              <ul className="mt-6 space-y-3 text-[var(--foreground)] mk-body-lg">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Automate recurring maintenance schedules</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Trigger work by calendar, usage, or asset hours</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Eliminate spreadsheet-based PM tracking</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Keep critical equipment on schedule</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <WorkflowSection
         title="How maintenance operations flow"
         subtitle={`From request to reporting—one continuous loop in ${SITE_NAME}.`}
         steps={[...WORKFLOW_STEPS]}
       />
 
+      {/* Section 3 — Technician Mobile: narrower screenshot to imply mobile */}
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-7xl">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
+            <div className="min-w-0 md:order-2">
+              <h2 className="mk-section-headline">
+                Field teams that actually adopt the software
+              </h2>
+              <ul className="mt-6 space-y-3 text-[var(--foreground)] mk-body-lg">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Mobile-first technician interface</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Offline-friendly job execution</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Photo documentation and notes</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Real-time status updates for dispatch</span>
+                </li>
+              </ul>
+            </div>
+            <div className="min-w-0 mx-auto max-w-sm md:order-1 md:mx-0">
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[320px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
+                Product Screenshot Placeholder
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <FeatureSection
-        variant="alt"
+        variant="default"
         title="Core features"
         subtitle="Everything your team needs to manage maintenance operations in one platform."
       >
@@ -139,7 +253,47 @@ export default function HomePage() {
         })}
       </FeatureSection>
 
-      <section className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+      {/* Section 4 — Inventory, Vendors, Purchase Orders: screenshot left, text right */}
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-7xl">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
+            <div className="min-w-0">
+              <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
+                Product Screenshot Placeholder
+              </div>
+            </div>
+            <div className="min-w-0">
+              <h2 className="mk-section-headline">
+                Control inventory, vendors, and purchasing in one system
+              </h2>
+              <ul className="mt-6 space-y-3 text-[var(--foreground)] mk-body-lg">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Maintain a centralized products catalog</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Track inventory across locations</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Manage vendor relationships and supplier records</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Create and track purchase orders for maintenance materials</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden />
+                  <span>Maintain purchasing history tied to assets and work orders</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="min-w-0 px-4 py-16 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center mk-section-headline">
             Only technicians are billed
@@ -169,7 +323,41 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mk-section-alt border-t border-[var(--card-border)] min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+      {/* Section 5 — Operations Intelligence: text above, large centered screenshot */}
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-5xl">
+          <div className="text-center">
+            <h2 className="mk-section-headline">
+              See everything happening across your maintenance operation
+            </h2>
+            <ul className="mx-auto mt-6 max-w-2xl space-y-3 text-left text-[var(--foreground)] mk-body-lg sm:space-y-2 md:flex md:flex-wrap md:justify-center md:gap-x-8 md:gap-y-2 md:text-center">
+              <li className="flex items-start gap-3 md:items-center md:gap-2">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5 md:mt-0" aria-hidden />
+                <span>Maintenance backlog trends</span>
+              </li>
+              <li className="flex items-start gap-3 md:items-center md:gap-2">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5 md:mt-0" aria-hidden />
+                <span>Technician productivity metrics</span>
+              </li>
+              <li className="flex items-start gap-3 md:items-center md:gap-2">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5 md:mt-0" aria-hidden />
+                <span>Asset failure patterns</span>
+              </li>
+              <li className="flex items-start gap-3 md:items-center md:gap-2">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)] mt-0.5 md:mt-0" aria-hidden />
+                <span>Cost visibility across equipment and locations</span>
+              </li>
+            </ul>
+          </div>
+          <div className="mt-10 min-w-0">
+            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-border)]/20 min-h-[280px] flex items-center justify-center text-[var(--muted)] text-sm md:h-[420px]">
+              Product Screenshot Placeholder
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="mx-auto min-w-0 max-w-7xl">
           <h2 className="text-center mk-section-headline">
             Built for your industry
@@ -189,7 +377,42 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+      {/* Built for Modern Maintenance Teams — capability tags */}
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-4xl">
+          <h2 className="text-center mk-section-headline">
+            Built for Modern Maintenance Teams
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-center mk-body-lg">
+            A full maintenance operations platform—CMMS, work orders, PM, assets, dispatch, inventory, vendor management, purchase orders, and reporting.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:mt-10 sm:gap-3">
+            {[
+              "Work Orders",
+              "Preventive Maintenance",
+              "Asset Tracking",
+              "Technician Dispatch",
+              "Vendor Management",
+              "Products Catalog",
+              "Inventory Tracking",
+              "Purchase Orders",
+              "Procurement Workflows",
+              "Maintenance Reporting",
+              "Asset History",
+              "Operational Dashboards",
+            ].map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)]"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="min-w-0 px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="mx-auto min-w-0 max-w-3xl text-center">
           <h2 className="mk-section-headline">Founding Customer Program</h2>
           <p className="mt-4 mk-body-lg">
@@ -219,7 +442,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mk-section-alt border-t border-[var(--card-border)] min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24">
+      <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="mx-auto w-full min-w-0 max-w-2xl text-center">
           <h2 className="mk-section-headline">Simple, transparent pricing</h2>
           <PricingCard
@@ -241,21 +464,22 @@ export default function HomePage() {
 
       <CTASection
         title="Explore the product"
-        description={`Try ${SITE_NAME} yourself. Start a free trial, see how it works, or take a product tour—no demo required.`}
+        description={`Try ${SITE_NAME} yourself. Start a free trial, try the live demo, or see how it works.`}
         actions={
           <>
             <Link
               href={ROUTES.signup}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-[var(--accent)] px-6 py-4 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] sm:w-auto sm:min-h-[48px]"
             >
               Start Free Trial
+              <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
-            <SeeHowItWorksButton className="w-full sm:w-auto" />
+            <SeeHowItWorksButton className="w-full min-h-[44px] sm:w-auto sm:min-h-[48px]" data-testid="live-demo-cta-footer" variant="secondary" />
             <Link
-              href={ROUTES.signup}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-4 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] sm:w-auto"
+              href={ROUTES.howItWorks}
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-4 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] sm:w-auto sm:min-h-[48px]"
             >
-              Explore Product Tour
+              See How It Works
             </Link>
           </>
         }

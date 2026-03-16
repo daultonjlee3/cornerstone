@@ -16,6 +16,7 @@ export const SITE_URL =
 export const ROUTES = {
   home: "/",
   product: "/product",
+  productInventoryProcurement: "/product/inventory-procurement",
   pricing: "/pricing",
   foundingCustomer: "/founding-customer",
   howItWorks: "/how-it-works",
@@ -180,6 +181,7 @@ export const NAV = {
     href: ROUTES.product,
     children: [
       { label: "Product Overview", href: ROUTES.product },
+      { label: "Inventory & Procurement", href: ROUTES.productInventoryProcurement },
       ...FEATURES.map((f) => ({ label: f.title, href: f.href })),
     ],
   },
@@ -203,12 +205,17 @@ export const SEO: Record<string, { title: string; description: string }> = {
   [ROUTES.home]: {
     title: "CMMS & Maintenance Management Software | Cornerstone OS",
     description:
-      "Maintenance management software and CMMS for teams that need speed, visibility, and control. Work order management, preventive maintenance software, assets, dispatch, and reporting in one facility maintenance platform.",
+      "Maintenance management software and CMMS for teams that need speed, visibility, and control. Work orders, preventive maintenance, assets, dispatch, inventory management, vendor management, purchase orders, maintenance procurement, and reporting in one facility maintenance platform.",
   },
   [ROUTES.product]: {
     title: "Product Overview | CMMS Software & Maintenance Management",
     description:
-      "Cornerstone OS brings work order management, preventive maintenance, asset management, dispatch, technician workflows, and reporting together in one maintenance management software platform.",
+      "Cornerstone OS brings work order management, preventive maintenance, asset management, dispatch, technician workflows, inventory, vendors, purchase orders, and reporting together in one maintenance operations platform.",
+  },
+  [ROUTES.productInventoryProcurement]: {
+    title: "Inventory & Procurement Software for Maintenance Teams | Cornerstone OS",
+    description:
+      "Inventory management software and maintenance procurement software for CMMS teams. Cornerstone OS connects inventory tracking, vendor management, products, and purchase order software directly to maintenance operations.",
   },
   [ROUTES.pricing]: {
     title: "Pricing | Work Order Management Software That Bills Per Technician",

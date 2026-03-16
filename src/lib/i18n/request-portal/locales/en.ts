@@ -7,6 +7,7 @@ export const en = {
   "requestPortal.title": "Maintenance Request",
   "requestPortal.subtitle": "Submit a request and we'll get back to you.",
   "requestPortal.footer": "Cornerstone OS",
+  "requestPortal.notConfiguredHint": "Contact your administrator to enable the request portal.",
 
   // Form labels
   "requestPortal.yourName": "Your name",

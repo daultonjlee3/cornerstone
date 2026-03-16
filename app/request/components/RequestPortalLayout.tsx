@@ -11,9 +11,18 @@ type RequestPortalLayoutProps = {
   initialLocale: RequestPortalLocaleCode;
   properties: PropertyOption[];
   assets: AssetOption[];
+  configured?: boolean;
 };
 
-function RequestPortalContent({ properties, assets }: { properties: PropertyOption[]; assets: AssetOption[] }) {
+function RequestPortalContent({
+  properties,
+  assets,
+  configured = true,
+}: {
+  properties: PropertyOption[];
+  assets: AssetOption[];
+  configured: boolean;
+}) {
   const { t } = useRequestPortalTranslations();
 
   return (
@@ -30,21 +39,46 @@ function RequestPortalContent({ properties, assets }: { properties: PropertyOpti
             {t("requestPortal.subtitle")}
           </p>
         </header>
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] sm:p-10">
-          <RequestForm properties={properties} assets={assets} />
-        </div>
-        <p className="mt-8 text-center text-xs text-[var(--muted)]">
-          {t("requestPortal.footer")}
-        </p>
+        {configured ? (
+          <>
+            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] sm:p-10">
+              <RequestForm properties={properties} assets={assets} />
+            </div>
+            <p className="mt-8 text-center text-xs text-[var(--muted)]">
+              {t("requestPortal.footer")}
+            </p>
+          </>
+        ) : (
+          <div
+            className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-800/50 dark:bg-red-950/40 sm:p-10"
+            role="alert"
+          >
+            <p className="font-medium text-red-700 dark:text-red-300">
+              {t("validation.portalNotConfigured")}
+            </p>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {t("requestPortal.notConfiguredHint")}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export function RequestPortalLayout({ initialLocale, properties, assets }: RequestPortalLayoutProps) {
+export function RequestPortalLayout({
+  initialLocale,
+  properties,
+  assets,
+  configured = true,
+}: RequestPortalLayoutProps) {
   return (
     <RequestPortalI18nProvider initialLocale={initialLocale}>
-      <RequestPortalContent properties={properties} assets={assets} />
+      <RequestPortalContent
+        properties={properties}
+        assets={assets}
+        configured={configured}
+      />
     </RequestPortalI18nProvider>
   );
 }

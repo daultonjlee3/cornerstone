@@ -7,6 +7,7 @@ export const es: Record<keyof RequestPortalLocaleEn, string> = {
   "requestPortal.title": "Solicitud de mantenimiento",
   "requestPortal.subtitle": "Envíe una solicitud y le responderemos.",
   "requestPortal.footer": "Cornerstone OS",
+  "requestPortal.notConfiguredHint": "Contacte a su administrador para habilitar el portal de solicitudes.",
 
   "requestPortal.yourName": "Su nombre",
   "requestPortal.email": "Correo electrónico",
