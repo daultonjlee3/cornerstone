@@ -48,16 +48,12 @@ export default async function FeaturePage({ params }: Props) {
         {/* Main screenshot */}
         <div className="mt-12">
           <ScreenshotContainer
-            src={
-              FEATURE_SCREENSHOTS[slug as FeatureSlug]
-                ? `/marketing/screenshots/${FEATURE_SCREENSHOTS[slug as FeatureSlug]}`
-                : undefined
-            }
+            src={FEATURE_SCREENSHOTS[slug as FeatureSlug] ?? undefined}
             alt={`${feature.title} — Cornerstone OS`}
             caption={`${feature.title} — product screenshot`}
             aspectRatio="wide"
-            width={1200}
-            height={675}
+            width={1920}
+            height={1080}
           />
         </div>
 
@@ -100,16 +96,12 @@ export default async function FeaturePage({ params }: Props) {
         {/* Secondary screenshot */}
         <div className="mt-12">
           <ScreenshotContainer
-            src={
-              FEATURE_SCREENSHOTS[slug as FeatureSlug]
-                ? `/marketing/screenshots/${FEATURE_SCREENSHOTS[slug as FeatureSlug]}`
-                : undefined
-            }
+            src={FEATURE_SCREENSHOTS[slug as FeatureSlug] ?? undefined}
             alt={`${feature.title} workflow in action`}
             caption="Workflow in action"
             aspectRatio="video"
-            width={1200}
-            height={675}
+            width={1920}
+            height={1080}
           />
         </div>
 

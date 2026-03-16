@@ -129,46 +129,46 @@ export const INDUSTRY_ROUTE_TO_CONTENT_KEY: Record<
   "healthcare-maintenance-software": "healthcare",
 };
 
-/** Screenshots per industry route (main + optional secondary). Filenames under /marketing/screenshots/. */
+/** Screenshots per industry route (full paths under /public/). */
 export const INDUSTRY_SCREENSHOTS: Record<
   IndustrySlug,
   { main: string; secondary: string }
 > = {
   "facility-maintenance-software": {
-    main: "cornerstone-dispatch.png",
-    secondary: "cornerstone-asset-intelligence.png",
+    main: "/screenshots/dispatch.png",
+    secondary: "/screenshots/asset-intelligence.png",
   },
   "industrial-maintenance-software": {
-    main: "cornerstone-assets-list.png",
-    secondary: "cornerstone-pm.png",
+    main: "/screenshots/assets.png",
+    secondary: "/screenshots/preventive-maintenance.png",
   },
   "school-maintenance-software": {
-    main: "cornerstone-work-orders.png",
-    secondary: "cornerstone-assets-list.png",
+    main: "/screenshots/work-orders.png",
+    secondary: "/screenshots/assets.png",
   },
   "healthcare-maintenance-software": {
-    main: "cornerstone-reporting.png",
-    secondary: "cornerstone-pm.png",
+    main: "/screenshots/operations-dashboard.png",
+    secondary: "/screenshots/preventive-maintenance.png",
   },
 };
 
-/** Screenshot filename (under /marketing/screenshots/) per feature slug. Used for marketing pages. */
+/** Screenshot paths (full, under /public/screenshots/) per feature slug. */
 export const FEATURE_SCREENSHOTS: Partial<Record<FeatureSlug, string>> = {
-  "work-order-management": "cornerstone-work-orders.png",
-  "preventive-maintenance": "cornerstone-pm.png",
-  "asset-management": "cornerstone-assets-list.png",
-  "dispatch-scheduling": "cornerstone-dispatch.png",
-  "technician-mobile": "cornerstone-mobile-field.png",
-  "reporting-dashboards": "cornerstone-reporting.png",
-  "request-portal": "cornerstone-request-portal.png",
-  "ai-automation": "cornerstone-dashboard.png",
+  "work-order-management": "/screenshots/work-orders.png",
+  "preventive-maintenance": "/screenshots/preventive-maintenance.png",
+  "asset-management": "/screenshots/assets.png",
+  "dispatch-scheduling": "/screenshots/dispatch.png",
+  "technician-mobile": "/screenshots/technician-mobile.png",
+  "reporting-dashboards": "/screenshots/operations-dashboard.png",
+  "request-portal": "/screenshots/request-portal.png",
+  "ai-automation": "/screenshots/operations-dashboard.png",
 };
 
-/** Hero screenshot options for above-the-fold. */
+/** Hero screenshot paths (full, under /public/screenshots/). */
 export const HERO_SCREENSHOTS = {
-  dashboard: "cornerstone-hero-dashboard.png",
-  dispatch: "cornerstone-hero-dispatch.png",
-  workOrders: "cornerstone-hero-work-orders.png",
+  dashboard: "/screenshots/dashboard.png",
+  dispatch: "/screenshots/dispatch.png",
+  workOrders: "/screenshots/work-orders.png",
 } as const;
 
 /** Core features highlighted on homepage (subset of FEATURES). */

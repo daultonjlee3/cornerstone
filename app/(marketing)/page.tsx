@@ -92,13 +92,13 @@ export default function HomePage() {
         }
       >
         <ScreenshotContainer
-          src={`/marketing/screenshots/${HERO_SCREENSHOTS.dashboard}`}
+          src={HERO_SCREENSHOTS.dashboard}
           alt="Cornerstone OS operations dashboard"
           caption="Operations dashboard — work orders, assets, and visibility in one place"
           aspectRatio="wide"
           variant="hero"
-          width={1600}
-          height={900}
+          width={1920}
+          height={1080}
         />
       </HeroSection>
 
@@ -131,7 +131,7 @@ export default function HomePage() {
             </div>
             <div className="order-1 min-w-0 md:order-2">
               <ScreenshotContainer
-                src="/marketing/screenshots/cornerstone-work-orders.png"
+                src="/screenshots/work-orders.png"
                 alt="Cornerstone OS work order management dashboard"
                 aspectRatio="video"
                 width={1920}
@@ -162,7 +162,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
             <div className="min-w-0">
               <ScreenshotContainer
-                src="/marketing/screenshots/cornerstone-pm.png"
+                src="/screenshots/preventive-maintenance.png"
                 alt="Cornerstone OS preventive maintenance schedule"
                 aspectRatio="video"
                 width={1920}
@@ -231,9 +231,9 @@ export default function HomePage() {
             </div>
             <div className="min-w-0 mx-auto max-w-md md:max-w-xl md:mx-0">
               <ScreenshotContainer
-                src="/marketing/screenshots/cornerstone-mobile-field.png"
+                src="/screenshots/technician-mobile.png"
                 alt="Cornerstone OS technician work queue and mobile interface"
-                aspectRatio="dashboard"
+                aspectRatio="video"
                 width={1920}
                 height={1080}
               />
@@ -252,13 +252,13 @@ export default function HomePage() {
           return (
             <FeatureCard key={feature.slug} title={feature.title} href={feature.href}>
               <ScreenshotContainer
-                src={screenshot ? `/marketing/screenshots/${screenshot}` : undefined}
+                src={screenshot ?? undefined}
                 alt={`${feature.title} — Cornerstone OS`}
                 caption=""
                 aspectRatio="video"
                 className="opacity-90"
-                width={1200}
-                height={675}
+                width={1920}
+                height={1080}
               />
             </FeatureCard>
           );
@@ -271,7 +271,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
             <div className="min-w-0">
               <ScreenshotContainer
-                src="/marketing/screenshots/cornerstone-inventory.png"
+                src="/screenshots/inventory.png"
                 alt="Cornerstone OS inventory and procurement management"
                 aspectRatio="video"
                 width={1920}
@@ -367,7 +367,7 @@ export default function HomePage() {
           </div>
           <div className="mt-10 min-w-0">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-reporting.png"
+              src="/screenshots/operations-dashboard.png"
               alt="Cornerstone OS operations intelligence and reporting dashboard"
               aspectRatio="video"
               width={1920}

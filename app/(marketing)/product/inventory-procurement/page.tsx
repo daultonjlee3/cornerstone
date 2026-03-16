@@ -34,7 +34,7 @@ export default function InventoryProcurementPage() {
         }
       >
         <ScreenshotContainer
-          src="/marketing/screenshots/cornerstone-inventory.png"
+          src="/screenshots/inventory.png"
           alt="Cornerstone OS inventory and procurement management"
           aspectRatio="video"
           variant="hero"
@@ -67,7 +67,7 @@ export default function InventoryProcurementPage() {
           </div>
           <div className="min-w-0">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-inventory.png"
+              src="/screenshots/inventory.png"
               alt="Cornerstone OS inventory tracking across locations"
               aspectRatio="video"
               width={1920}
@@ -82,7 +82,7 @@ export default function InventoryProcurementPage() {
         <div className="grid min-w-0 grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
           <div className="order-2 min-w-0 md:order-1">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-vendors.png"
+              src="/screenshots/vendors.png"
               alt="Cornerstone OS vendor management"
               aspectRatio="video"
               width={1920}
@@ -135,7 +135,7 @@ export default function InventoryProcurementPage() {
           </div>
           <div className="min-w-0">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-purchase-orders.png"
+              src="/screenshots/purchase-orders.png"
               alt="Cornerstone OS purchase order management"
               aspectRatio="video"
               width={1920}
@@ -150,7 +150,7 @@ export default function InventoryProcurementPage() {
         <div className="grid min-w-0 grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
           <div className="order-2 min-w-0 md:order-1">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-work-orders.png"
+              src="/screenshots/work-orders.png"
               alt="Cornerstone OS materials connected to maintenance workflows"
               aspectRatio="video"
               width={1920}

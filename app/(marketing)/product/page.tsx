@@ -96,13 +96,13 @@ export default function ProductPage() {
         }
       >
         <ScreenshotContainer
-          src={`/marketing/screenshots/${HERO_SCREENSHOTS.dashboard}`}
+          src={HERO_SCREENSHOTS.dashboard}
           alt="Cornerstone OS product overview — operations dashboard"
           caption="One platform for work orders, PM, assets, dispatch, and reporting"
           aspectRatio="wide"
           variant="hero"
-          width={1600}
-          height={900}
+          width={1920}
+          height={1080}
         />
       </HeroSection>
 
@@ -161,12 +161,12 @@ export default function ProductPage() {
           </div>
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-work-orders.png"
+              src="/screenshots/work-orders.png"
               alt="Work order management — create, assign, track, and complete"
               caption="Work order management"
               aspectRatio="video"
-              width={1200}
-              height={675}
+              width={1920}
+              height={1080}
             />
           </div>
         </div>
@@ -177,12 +177,12 @@ export default function ProductPage() {
         <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
           <div className="order-2 min-w-0 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-pm.png"
+              src="/screenshots/preventive-maintenance.png"
               alt="Preventive maintenance — schedules and asset history"
               caption="Preventive maintenance"
               aspectRatio="video"
-              width={1200}
-              height={675}
+              width={1920}
+              height={1080}
             />
           </div>
           <div className="order-1 min-w-0 lg:order-2">
@@ -212,12 +212,12 @@ export default function ProductPage() {
           </div>
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-assets-list.png"
+              src="/screenshots/assets.png"
               alt="Asset management — track assets, history, and condition"
               caption="Asset management"
               aspectRatio="video"
-              width={1200}
-              height={675}
+              width={1920}
+              height={1080}
             />
           </div>
         </div>
@@ -228,12 +228,12 @@ export default function ProductPage() {
         <div className="grid grid-cols-1 min-w-0 gap-12 lg:grid-cols-2 lg:items-center">
           <div className="order-2 min-w-0 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-dispatch.png"
+              src="/screenshots/dispatch.png"
               alt="Dispatch and technician workflows — assign and schedule work"
               caption="Dispatch and technician workflows"
               aspectRatio="video"
-              width={1200}
-              height={675}
+              width={1920}
+              height={1080}
             />
           </div>
           <div className="order-1 min-w-0 lg:order-2">
@@ -262,12 +262,12 @@ export default function ProductPage() {
           </div>
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
-              src="/marketing/screenshots/cornerstone-reporting.png"
+              src="/screenshots/operations-dashboard.png"
               alt="Reporting and operational visibility — dashboards and insights"
               caption="Reporting and dashboards"
               aspectRatio="video"
-              width={1200}
-              height={675}
+              width={1920}
+              height={1080}
             />
           </div>
         </div>

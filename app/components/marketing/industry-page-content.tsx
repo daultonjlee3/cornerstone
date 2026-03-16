@@ -29,7 +29,7 @@ export function IndustryPageContent({ industrySlug }: Props) {
       {/* Main screenshot (industry-specific) */}
       <div className="mt-10 w-full sm:mt-12">
         <ScreenshotContainer
-          src={`/marketing/screenshots/${screenshots.main}`}
+          src={screenshots.main}
           alt={`${industry.title} — Cornerstone OS platform`}
           caption={`${industry.title} — platform in use`}
           aspectRatio="wide"
@@ -125,7 +125,7 @@ export function IndustryPageContent({ industrySlug }: Props) {
       {/* Secondary screenshot (industry-specific) */}
       <div className="mt-12">
         <ScreenshotContainer
-          src={`/marketing/screenshots/${screenshots.secondary}`}
+          src={screenshots.secondary}
           alt={`${industry.title} — operations and workflow`}
           caption="Operations and workflow"
           aspectRatio="video"

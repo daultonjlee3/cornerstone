@@ -16,7 +16,7 @@ type Props = {
   alt?: string;
   /** Custom placeholder label when no src */
   placeholderLabel?: string;
-  /** Path to screenshot image (e.g. /marketing/screenshots/cornerstone-dashboard.png). When set, renders Image instead of placeholder. */
+  /** Path to screenshot image (e.g. /screenshots/dashboard.png). When set, renders Image instead of placeholder. */
   src?: string;
   /** Width for Next/Image (recommended for layout). */
   width?: number;

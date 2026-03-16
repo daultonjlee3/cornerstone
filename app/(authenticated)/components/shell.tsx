@@ -53,6 +53,10 @@ export function Shell({
   const isDispatchFullscreen =
     pathname === "/dispatch" && searchParams.get("dispatch_fullscreen") === "1";
 
+  // When ?screenshotMode=true is present, suppress all tours, modals, and
+  // onboarding overlays so Playwright captures clean product UI.
+  const isScreenshotMode = searchParams.get("screenshotMode") === "true";
+
   const handleToggleCollapse = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -61,13 +65,34 @@ export function Shell({
     });
   };
 
+  // In screenshot mode, pass all known tour IDs as completed so page-level
+  // tours never auto-start regardless of what the server fetched from Supabase.
+  const ALL_TOUR_IDS = [
+    "dashboard",
+    "assets",
+    "work-orders",
+    "dispatch",
+    "preventive-maintenance",
+    "inventory",
+    "purchase-orders",
+    "demo-guided",
+  ];
+  const effectiveCompletedIds = isScreenshotMode
+    ? ALL_TOUR_IDS
+    : completedTourIds;
+
   return (
     <TooltipProvider>
-      <GuidedTourProvider autoShow={isDemoGuest} onTourActive={handleTourActive}>
-        <TourProvider completedTourIds={completedTourIds}>
+      <GuidedTourProvider
+        autoShow={isDemoGuest && !isScreenshotMode}
+        onTourActive={handleTourActive}
+      >
+        <TourProvider completedTourIds={effectiveCompletedIds}>
           <TourOverlay />
-          <GuidedTour />
-          {isDemoGuest && <DemoWelcomeModal isDemoGuest={isDemoGuest} />}
+          {!isScreenshotMode && <GuidedTour />}
+          {isDemoGuest && !isScreenshotMode && (
+            <DemoWelcomeModal isDemoGuest={isDemoGuest} />
+          )}
           <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
             {!isDispatchFullscreen ? (
               <Sidebar
