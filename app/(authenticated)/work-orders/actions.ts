@@ -15,6 +15,7 @@ import {
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
 import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
+import { requirePermission } from "@/src/lib/permissions";
 import {
   TERMINAL_STATUSES,
   normalizeStatus,
@@ -636,6 +637,11 @@ export async function saveWorkOrder(
       tenantId
     );
     if (!allowedUpdate) return { error: "Unauthorized." };
+    // Prevent edits to terminal-state work orders. Use status change actions instead.
+    const currentStatus = String((row as Record<string, unknown>).status ?? "");
+    if (TERMINAL_STATUSES.has(currentStatus)) {
+      return { error: "Cannot edit a completed or cancelled work order." };
+    }
     const beforeState = row as Record<string, unknown>;
     const updateWithSafety = await supabase
       .from("work_orders")
@@ -746,24 +752,53 @@ export async function saveWorkOrder(
       metadata: { source: "saveWorkOrder" },
     });
     const insertedId = (inserted as { id: string }).id;
+    const insertedRecord = inserted as Record<string, unknown>;
+    const woNumber = (insertedRecord.work_order_number as string | undefined);
+
+    // Notify creator.
     if (actorId) {
       await createNotification(supabase, {
         companyId,
         userId: actorId,
         eventType: "work_order.created",
         title: `Work order created: ${title}`,
-        message: (inserted as { work_order_number?: string }).work_order_number ?? undefined,
+        message: woNumber,
         entityType: "work_order",
         entityId: insertedId,
-        metadata: { work_order_number: (inserted as { work_order_number?: string }).work_order_number },
+        metadata: { work_order_number: woNumber },
       });
+    }
+
+    // If the work order was created already-assigned, notify the assigned technician
+    // so they don't miss it. The creator notification above goes to the dispatcher;
+    // the technician needs a separate signal.
+    const assignedTechId = (insertedRecord.assigned_technician_id as string | null) ?? null;
+    if (assignedTechId && assignedTechId !== actorId) {
+      // Look up the user_id linked to this technician record.
+      const { data: techRow } = await supabase
+        .from("technicians")
+        .select("user_id")
+        .eq("id", assignedTechId)
+        .maybeSingle();
+      const techUserId = (techRow as { user_id?: string | null } | null)?.user_id ?? null;
+      if (techUserId) {
+        await createNotification(supabase, {
+          companyId,
+          userId: techUserId,
+          eventType: "work_order.assigned",
+          title: `You have been assigned: ${title}`,
+          message: woNumber,
+          entityType: "work_order",
+          entityId: insertedId,
+          metadata: { work_order_number: woNumber, assigned_by: actorId },
+        }).catch(() => { /* Non-fatal */ });
+      }
     }
     const locationInherited =
       resolvedPropertyId !== propertyId ||
       resolvedBuildingId !== buildingId ||
       resolvedUnitId !== unitId;
     if (locationInherited) {
-      const insertedRecord = inserted as Record<string, unknown>;
       await insertActivityLog(supabase, {
         tenantId,
         companyId,
@@ -796,20 +831,48 @@ export async function saveWorkOrder(
 }
 
 export async function deleteWorkOrder(id: string): Promise<WorkOrderFormState> {
+  // Require explicit delete permission — tenant membership alone is not enough.
+  try {
+    await requirePermission("work_orders.delete");
+  } catch {
+    return { error: "You do not have permission to delete work orders." };
+  }
+
   const supabase = await createClient();
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("work_orders")
-    .select("company_id, assigned_technician_id, assigned_crew_id")
+    .select("company_id, assigned_technician_id, assigned_crew_id, work_order_number, title, status")
     .eq("id", id)
     .maybeSingle();
   if (!row) return { error: "Work order not found." };
   const allowed = await companyBelongsToTenant(row.company_id, tenantId);
   if (!allowed) return { error: "Unauthorized." };
 
+  // Capture snapshot before deletion for audit trail.
+  const snapshot = row as Record<string, unknown>;
+
   const { error } = await supabase.from("work_orders").delete().eq("id", id);
   if (error) return { error: error.message };
+
+  // Write audit/activity log so deletions are traceable.
+  const actorId = (await supabase.auth.getUser()).data.user?.id ?? null;
+  await insertActivityLog(supabase, {
+    tenantId,
+    companyId: snapshot.company_id as string,
+    entityType: "work_order",
+    entityId: id,
+    actionType: "work_order_deleted",
+    performedBy: actorId,
+    beforeState: snapshot,
+    metadata: {
+      work_order_number: snapshot.work_order_number,
+      title: snapshot.title,
+      status: snapshot.status,
+    },
+  }).catch(() => { /* Non-fatal: don't block delete response on audit log failure */ });
+
   revalidatePath("/work-orders");
   return { success: true };
 }

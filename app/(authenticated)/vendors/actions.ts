@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
+import { insertActivityLog } from "@/src/lib/activity-logs";
+import { requirePermission } from "@/src/lib/permissions";
 
 export type VendorFormState = { error?: string; success?: boolean };
 
@@ -57,21 +59,40 @@ export async function saveVendor(
 }
 
 export async function deleteVendor(id: string): Promise<VendorFormState> {
+  try {
+    await requirePermission("vendors.delete");
+  } catch {
+    return { error: "You do not have permission to delete vendors." };
+  }
+
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
 
   const { data: existing } = await scope.supabase
     .from("vendors")
-    .select("id, company_id")
+    .select("id, company_id, name")
     .eq("id", id)
     .maybeSingle();
   if (!existing) return { error: "Vendor not found." };
-  if (!companyInScope((existing as { company_id?: string | null }).company_id, scope.companyIds)) {
+  const companyId = (existing as { company_id?: string | null }).company_id;
+  if (!companyInScope(companyId, scope.companyIds)) {
     return { error: "Unauthorized." };
   }
 
+  const snapshot = existing as Record<string, unknown>;
   const { error } = await scope.supabase.from("vendors").delete().eq("id", id);
   if (error) return { error: error.message };
+
+  // Audit log so vendor deletions are traceable.
+  await insertActivityLog(scope.supabase, {
+    companyId: companyId ?? null,
+    entityType: "vendor",
+    entityId: id,
+    actionType: "vendor_deleted",
+    performedBy: scope.userId ?? null,
+    beforeState: snapshot,
+    metadata: { name: snapshot.name },
+  }).catch(() => { /* Non-fatal */ });
 
   revalidatePath("/vendors");
   revalidatePath("/products");
