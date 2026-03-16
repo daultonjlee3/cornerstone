@@ -279,36 +279,46 @@ export async function loadOperationsIntelligenceData({
   const pmPlans = (pmPlansResult.data ?? []) as Array<Record<string, unknown>>;
 
   const pmPlanIds = pmPlans.map((row) => String(row.id));
-  let pmRuns: Array<Record<string, unknown>> = [];
-  if (pmPlanIds.length > 0) {
-    const pmRunsResult = await supabase
-      .from("preventive_maintenance_runs")
-      .select("id, preventive_maintenance_plan_id, scheduled_date, generated_work_order_id, status")
-      .in("preventive_maintenance_plan_id", pmPlanIds)
-      .gte("scheduled_date", complianceStartDate)
-      .lte("scheduled_date", today);
-    pmRuns = (pmRunsResult.data ?? []) as Array<Record<string, unknown>>;
+  const workOrderIds = workOrders.map((row) => String(row.id));
+
+  // Run PM runs query and all parts-cost chunk queries concurrently.
+  // Previously: pmRuns awaited, then part chunks ran sequentially one at a time.
+  // Now: all fired in parallel → saves (N_chunks + 1) serial round trips.
+  const chunkSize = 250;
+  const partChunks: string[][] = [];
+  for (let i = 0; i < workOrderIds.length; i += chunkSize) {
+    partChunks.push(workOrderIds.slice(i, i + chunkSize));
   }
 
-  const workOrderIds = workOrders.map((row) => String(row.id));
-  const partsCostByWorkOrder = new Map<string, number>();
-  if (workOrderIds.length > 0) {
-    const chunkSize = 250;
-    for (let index = 0; index < workOrderIds.length; index += chunkSize) {
-      const idsChunk = workOrderIds.slice(index, index + chunkSize);
-      const partUsageResult = await supabase
+  const [pmRunsResult, ...partChunkResults] = await Promise.all([
+    pmPlanIds.length > 0
+      ? supabase
+          .from("preventive_maintenance_runs")
+          .select("id, preventive_maintenance_plan_id, scheduled_date, generated_work_order_id, status")
+          .in("preventive_maintenance_plan_id", pmPlanIds)
+          .gte("scheduled_date", complianceStartDate)
+          .lte("scheduled_date", today)
+      : Promise.resolve({ data: [] as unknown[] }),
+    ...partChunks.map((chunk) =>
+      supabase
         .from("work_order_part_usage")
         .select("work_order_id, total_cost")
-        .in("work_order_id", idsChunk);
-      for (const row of partUsageResult.data ?? []) {
-        const record = row as { work_order_id?: string; total_cost?: number | null };
-        const workOrderId = record.work_order_id;
-        if (!workOrderId) continue;
-        partsCostByWorkOrder.set(
-          workOrderId,
-          (partsCostByWorkOrder.get(workOrderId) ?? 0) + toNumber(record.total_cost)
-        );
-      }
+        .in("work_order_id", chunk)
+    ),
+  ]);
+
+  const pmRuns = ((pmRunsResult.data ?? []) as Array<Record<string, unknown>>);
+
+  const partsCostByWorkOrder = new Map<string, number>();
+  for (const chunkResult of partChunkResults) {
+    for (const row of (chunkResult as { data?: unknown[] }).data ?? []) {
+      const record = row as { work_order_id?: string; total_cost?: number | null };
+      const workOrderId = record.work_order_id;
+      if (!workOrderId) continue;
+      partsCostByWorkOrder.set(
+        workOrderId,
+        (partsCostByWorkOrder.get(workOrderId) ?? 0) + toNumber(record.total_cost)
+      );
     }
   }
 

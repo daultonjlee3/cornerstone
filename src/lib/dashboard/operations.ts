@@ -285,12 +285,32 @@ export async function loadOperationsDashboardData({
     .sort((a, b) => b[1] - a[1])
     .map(([assetId]) => assetId);
 
-  const { data: repeatedAssetsRows } = repeatedAssetIds.length
-    ? await supabase
-        .from("assets")
-        .select("id, asset_name, name")
-        .in("id", repeatedAssetIds)
-    : { data: [] as unknown[] };
+  // pmDueSoonAssetIds can be derived without any DB call.
+  const pmDueSoonAssetIds = Array.from(
+    new Set(
+      (pmDueSoonRows.data ?? [])
+        .map((row) => (row as { asset_id?: string | null }).asset_id)
+        .filter(Boolean) as string[]
+    )
+  );
+
+  // Run the three independent follow-up queries concurrently instead of sequentially.
+  // Previously these waterfall: repeatedAssets → pmAssets → stockLocations → inventory.
+  const [repeatedAssetsResult, pmAssetsResult, stockLocResult] = await Promise.all([
+    repeatedAssetIds.length > 0
+      ? supabase.from("assets").select("id, asset_name, name").in("id", repeatedAssetIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+    pmDueSoonAssetIds.length > 0
+      ? supabase.from("assets").select("id, asset_name, name").in("id", pmDueSoonAssetIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+    supabase
+      .from("stock_locations")
+      .select("id, name")
+      .in("company_id", companyIds)
+      .eq("active", true),
+  ]);
+
+  const repeatedAssetsRows = repeatedAssetsResult.data;
   const repeatedAssetsById = new Map(
     (repeatedAssetsRows ?? []).map((row) => [
       (row as { id: string }).id,
@@ -306,19 +326,7 @@ export async function loadOperationsDashboardData({
     failure_count: repeatedFailureCounts.get(assetId) ?? 0,
   }));
 
-  const pmDueSoonAssetIds = Array.from(
-    new Set(
-      (pmDueSoonRows.data ?? [])
-        .map((row) => (row as { asset_id?: string | null }).asset_id)
-        .filter(Boolean) as string[]
-    )
-  );
-  const { data: pmAssetsRows } = pmDueSoonAssetIds.length
-    ? await supabase
-        .from("assets")
-        .select("id, asset_name, name")
-        .in("id", pmDueSoonAssetIds)
-    : { data: [] as unknown[] };
+  const pmAssetsRows = pmAssetsResult.data;
   const pmAssetById = new Map(
     (pmAssetsRows ?? []).map((row) => [
       (row as { id: string }).id,
@@ -343,11 +351,7 @@ export async function loadOperationsDashboardData({
     };
   });
 
-  const { data: stockLocationRows } = await supabase
-    .from("stock_locations")
-    .select("id, name")
-    .in("company_id", companyIds)
-    .eq("active", true);
+  const stockLocationRows = stockLocResult.data;
   const stockLocationIds = (stockLocationRows ?? []).map((row) => (row as { id: string }).id);
   const locationNameById = new Map(
     (stockLocationRows ?? []).map((row) => [(row as { id: string }).id, (row as { name: string }).name])

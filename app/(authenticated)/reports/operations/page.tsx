@@ -141,7 +141,7 @@ export default async function OperationsReportsPage() {
           title="PM On-Time"
           value={intelligence.pmCompliance.completedOnTime}
           description="Completed on or before scheduled date"
-          icon={require("lucide-react").CheckCircle}
+          icon={CheckCircle}
         />
         <MetricCard
           title="PM Late"
@@ -153,7 +153,7 @@ export default async function OperationsReportsPage() {
           title="PM Missed"
           value={intelligence.pmCompliance.missed}
           description="Past due without completion"
-          icon={require("lucide-react").AlertTriangle}
+          icon={AlertTriangle}
         />
         <MetricCard
           title="PM Compliance"

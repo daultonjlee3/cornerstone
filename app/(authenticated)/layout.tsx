@@ -18,14 +18,18 @@ export default async function AuthenticatedLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const impersonationState = await getImpersonationStateFromCookie();
+  // ── Phase 1: Run cookie reads + super-admin check in parallel ──────────────
+  // These are all independent of each other — no reason to serialize them.
+  const [impersonationState, isSuperAdmin] = await Promise.all([
+    getImpersonationStateFromCookie(),
+    isPlatformSuperAdmin(supabase),
+  ]);
   const effectiveUserId = impersonationState?.actingAsUserId ?? user.id;
 
-  const isSuperAdmin = await isPlatformSuperAdmin(supabase);
-
+  // ── Phase 2: Resolve tenant membership ────────────────────────────────────
+  // Super admins may have an acting-tenant override; normal users get their own.
   let membership: { tenant_id: string; tenants: { name: string } | { name: string }[] | null } | null = null;
 
-  // Super admin "work in this tenant": prefer acting-tenant cookie when set (so you can leave your home tenant)
   if (isSuperAdmin) {
     const actingTenantId = await getActingTenantIdFromCookie();
     if (actingTenantId) {
@@ -59,24 +63,56 @@ export default async function AuthenticatedLayout({
     redirect("/onboarding");
   }
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("is_portal_only")
-    .eq("id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // ── Phase 3: All remaining queries are independent — run in parallel ──────
+  // Previously these ran sequentially (6 separate awaits). Parallelizing them
+  // removes ~5 round-trip latencies from every authenticated page render.
+  const [
+    profileResult,
+    impersonationSession,
+    membershipRolesResult,
+    companyResult,
+    completedTourIds,
+    isDemoGuest,
+    actingUserResult,
+  ] = await Promise.all([
+    supabase
+      .from("users")
+      .select("is_portal_only")
+      .eq("id", user.id)
+      .limit(1)
+      .maybeSingle(),
+    getImpersonationSession(),
+    supabase.from("tenant_memberships").select("role").eq("user_id", user.id),
+    supabase
+      .from("companies")
+      .select("name")
+      .eq("tenant_id", membership.tenant_id)
+      .limit(1)
+      .maybeSingle(),
+    getCompletedTourIds(),
+    isDemoGuestUser(supabase, user.id),
+    // Fetch impersonation banner data in the same round-trip if needed,
+    // otherwise resolve immediately.
+    impersonationState?.actingAsUserId
+      ? supabase
+          .from("users")
+          .select("full_name")
+          .eq("id", impersonationState.actingAsUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  // ── Derive values from phase-3 results ────────────────────────────────────
+  const profile = profileResult.data;
   const isPortalOnly = Boolean(
     (profile as { is_portal_only?: boolean | null } | null)?.is_portal_only
   );
-  const portalImpersonation = await getImpersonationSession();
-  const isPortalImpersonating = portalImpersonation?.admin_user_id === user.id;
-  const { data: membershipRows } = await supabase
-    .from("tenant_memberships")
-    .select("role")
-    .eq("user_id", user.id);
+  const isPortalImpersonating = impersonationSession?.admin_user_id === user.id;
+  const { data: membershipRows } = membershipRolesResult;
   const isAdminOrOwner = (membershipRows ?? []).some(
     (r) => (r as { role?: string }).role === "owner" || (r as { role?: string }).role === "admin"
   );
+
   if (!isAdminOrOwner && (isPortalOnly || isPortalImpersonating)) {
     redirect("/portal");
   }
@@ -86,29 +122,17 @@ export default async function AuthenticatedLayout({
   const tenantName =
     (Array.isArray(tenantData) ? tenantData[0]?.name : tenantData?.name) ?? "Organization";
 
-  const { data: company } = await supabase
-    .from("companies")
-    .select("name")
-    .eq("tenant_id", membership.tenant_id)
-    .limit(1)
-    .maybeSingle();
+  const companyName = companyResult.data?.name ?? "—";
 
-  const companyName = company?.name ?? "—";
-  const showPlatformAdmin = await isPlatformSuperAdmin(supabase);
+  // isSuperAdmin already computed in phase 1 — reuse it, don't query again.
+  const showPlatformAdmin = isSuperAdmin;
 
   let impersonationBanner: { actingAsName: string; companyName: string } | null = null;
   if (impersonationState?.actingAsUserId) {
-    const { data: actingUser } = await supabase
-      .from("users")
-      .select("full_name")
-      .eq("id", impersonationState.actingAsUserId)
-      .maybeSingle();
+    const actingUser = actingUserResult?.data;
     const actingAsName = (actingUser as { full_name?: string } | null)?.full_name ?? "User";
     impersonationBanner = { actingAsName, companyName };
   }
-
-  const completedTourIds = await getCompletedTourIds();
-  const isDemoGuest = await isDemoGuestUser(supabase, user.id);
 
   return (
     <Shell
