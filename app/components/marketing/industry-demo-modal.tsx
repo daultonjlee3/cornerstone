@@ -81,12 +81,10 @@ function IndustryDemoModalContent({
     }
   }, [state?.redirectUrl]);
 
+  // Only industry options from INDUSTRY_DEMO_OPTIONS are passed here. The "Just show me the platform"
+  // general option is a separate button that calls onSelectGeneral directly (no route comparison).
   const handleIndustrySelect = useCallback(
     (option: (typeof INDUSTRY_DEMO_OPTIONS)[number]) => {
-      if (option.route === DEMO_ROUTES.general) {
-        onSelectGeneral();
-        return;
-      }
       if (DEMO_INDUSTRY_IDS.includes(option.id as (typeof DEMO_INDUSTRY_IDS)[number])) {
         setSelectedIndustry({ slug: option.id, name: option.name });
         setStep("email");
@@ -94,7 +92,7 @@ function IndustryDemoModalContent({
         onSelectIndustryThenEmail(option.id, option.name);
       }
     },
-    [onSelectGeneral, onSelectIndustryThenEmail]
+    [onSelectIndustryThenEmail]
   );
 
   return (
@@ -289,11 +287,13 @@ export function SeeHowItWorksButton({
   className = "",
   variant = "secondary",
   onClick,
+  "data-testid": dataTestId,
 }: {
   children?: React.ReactNode;
   className?: string;
   variant?: "primary" | "secondary";
   onClick?: () => void;
+  "data-testid"?: string;
 }) {
   const ctx = useIndustryDemoModal();
 
@@ -306,9 +306,11 @@ export function SeeHowItWorksButton({
 
   const sharedClass = `${baseClass} ${variant === "primary" ? primaryClass : secondaryClass} ${className}`;
 
+  const testIdProps = dataTestId ? { "data-testid": dataTestId } : {};
+
   if (!ctx) {
     return (
-      <Link href={ROUTES.howItWorks} className={sharedClass}>
+      <Link href={ROUTES.howItWorks} className={sharedClass} {...testIdProps}>
         {children}
       </Link>
     );
@@ -324,6 +326,7 @@ export function SeeHowItWorksButton({
       type="button"
       onClick={handleClick}
       className={sharedClass}
+      {...testIdProps}
     >
       {children}
     </button>

@@ -108,14 +108,67 @@ export const FEATURES = [
 ] as const;
 
 export const INDUSTRIES = [
-  { slug: "facility-maintenance", title: "Facility Maintenance Companies", href: "/industries/facility-maintenance" },
-  { slug: "industrial-manufacturing", title: "Industrial / Manufacturing Maintenance", href: "/industries/industrial-manufacturing" },
-  { slug: "school-districts", title: "School District Maintenance Teams", href: "/industries/school-districts" },
-  { slug: "healthcare", title: "Healthcare Facility Maintenance Teams", href: "/industries/healthcare" },
+  { slug: "facility-maintenance-software", title: "Facility Maintenance Companies", href: "/facility-maintenance-software" },
+  { slug: "industrial-maintenance-software", title: "Industrial / Manufacturing Maintenance", href: "/industrial-maintenance-software" },
+  { slug: "school-maintenance-software", title: "School District Maintenance Teams", href: "/school-maintenance-software" },
+  { slug: "healthcare-maintenance-software", title: "Healthcare Facility Maintenance Teams", href: "/healthcare-maintenance-software" },
 ] as const;
 
 export type FeatureSlug = (typeof FEATURES)[number]["slug"];
 export type IndustrySlug = (typeof INDUSTRIES)[number]["slug"];
+
+/** Map route slug to industry content key (industry-content.ts). */
+export const INDUSTRY_ROUTE_TO_CONTENT_KEY: Record<
+  IndustrySlug,
+  import("@/lib/industry-content").IndustryContentKey
+> = {
+  "facility-maintenance-software": "facility-maintenance",
+  "industrial-maintenance-software": "industrial-manufacturing",
+  "school-maintenance-software": "school-districts",
+  "healthcare-maintenance-software": "healthcare",
+};
+
+/** Screenshots per industry route (main + optional secondary). Filenames under /marketing/screenshots/. */
+export const INDUSTRY_SCREENSHOTS: Record<
+  IndustrySlug,
+  { main: string; secondary: string }
+> = {
+  "facility-maintenance-software": {
+    main: "cornerstone-dispatch.png",
+    secondary: "cornerstone-asset-intelligence.png",
+  },
+  "industrial-maintenance-software": {
+    main: "cornerstone-assets-list.png",
+    secondary: "cornerstone-pm.png",
+  },
+  "school-maintenance-software": {
+    main: "cornerstone-work-orders.png",
+    secondary: "cornerstone-assets-list.png",
+  },
+  "healthcare-maintenance-software": {
+    main: "cornerstone-reporting.png",
+    secondary: "cornerstone-pm.png",
+  },
+};
+
+/** Screenshot filename (under /marketing/screenshots/) per feature slug. Used for marketing pages. */
+export const FEATURE_SCREENSHOTS: Partial<Record<FeatureSlug, string>> = {
+  "work-order-management": "cornerstone-work-orders.png",
+  "preventive-maintenance": "cornerstone-pm.png",
+  "asset-management": "cornerstone-assets-list.png",
+  "dispatch-scheduling": "cornerstone-dispatch.png",
+  "technician-mobile": "cornerstone-mobile-field.png",
+  "reporting-dashboards": "cornerstone-reporting.png",
+  "request-portal": "cornerstone-request-portal.png",
+  "ai-automation": "cornerstone-dashboard.png",
+};
+
+/** Hero screenshot options for above-the-fold. */
+export const HERO_SCREENSHOTS = {
+  dashboard: "cornerstone-hero-dashboard.png",
+  dispatch: "cornerstone-hero-dispatch.png",
+  workOrders: "cornerstone-hero-work-orders.png",
+} as const;
 
 /** Core features highlighted on homepage (subset of FEATURES). */
 export const CORE_FEATURES_HOME = FEATURES.slice(0, 6);
@@ -249,22 +302,26 @@ export const SEO_FEATURES: Record<FeatureSlug, { title: string; description: str
   },
 };
 
-/** SEO for industry pages (keyed by slug). Keyword-optimized for industry-specific maintenance software. */
+/** SEO for industry pages (keyed by route slug). Unique title and meta description per industry. */
 export const SEO_INDUSTRIES: Record<IndustrySlug, { title: string; description: string }> = {
-  "facility-maintenance": {
+  "facility-maintenance-software": {
     title: "Facility Maintenance Software | CMMS for Facilities",
-    description: "Facility maintenance software and CMMS for facilities teams. Work order management, assets, vendors, and compliance in one facility management platform.",
+    description:
+      "Facility maintenance software and CMMS for facilities teams. Work order management, dispatch, assets, vendors, and compliance in one facility management platform.",
   },
-  "industrial-manufacturing": {
+  "industrial-maintenance-software": {
     title: "Industrial Maintenance Software | CMMS for Manufacturing",
-    description: "Industrial maintenance software and CMMS for manufacturing. Plant maintenance, preventive maintenance, and asset tracking for industrial operations.",
+    description:
+      "Industrial maintenance software and CMMS for manufacturing. Plant maintenance, preventive maintenance, asset tracking, and PM scheduling for industrial operations.",
   },
-  "school-districts": {
+  "school-maintenance-software": {
     title: "School Maintenance Software | K-12 CMMS for School Districts",
-    description: "School maintenance software and CMMS for school districts. Buildings, grounds, work order management, and operations for K-12 facility maintenance.",
+    description:
+      "School maintenance software and CMMS for school districts. Work orders, buildings, grounds, and operations for K-12 facility maintenance and compliance.",
   },
-  healthcare: {
+  "healthcare-maintenance-software": {
     title: "Healthcare Facility Maintenance Software | Hospital CMMS",
-    description: "Healthcare facility maintenance software and hospital CMMS. Clinic and facility maintenance, compliance, and uptime in one maintenance management platform.",
+    description:
+      "Healthcare facility maintenance software and hospital CMMS. Clinic and facility maintenance, Joint Commission compliance, and uptime in one maintenance platform.",
   },
 };

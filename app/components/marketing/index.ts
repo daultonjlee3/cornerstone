@@ -1,5 +1,6 @@
 export { CTASection } from "./cta-section";
 export { FeatureCard } from "./feature-card";
+export { IndustryPageContent } from "./industry-page-content";
 export { FeatureSection } from "./feature-section";
 export { HeroSection } from "./hero-section";
 export { IndustryCard } from "./industry-card";

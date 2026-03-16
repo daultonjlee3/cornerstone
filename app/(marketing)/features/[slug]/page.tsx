@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   FEATURES,
+  FEATURE_SCREENSHOTS,
   INDUSTRIES,
   ROUTES,
   SEO_FEATURES,
@@ -44,11 +45,19 @@ export default async function FeaturePage({ params }: Props) {
           <p className="mt-6 mk-subheadline">{content.intro}</p>
         </header>
 
-        {/* Main screenshot placeholder */}
+        {/* Main screenshot */}
         <div className="mt-12">
           <ScreenshotContainer
+            src={
+              FEATURE_SCREENSHOTS[slug as FeatureSlug]
+                ? `/marketing/screenshots/${FEATURE_SCREENSHOTS[slug as FeatureSlug]}`
+                : undefined
+            }
+            alt={`${feature.title} — Cornerstone OS`}
             caption={`${feature.title} — product screenshot`}
             aspectRatio="wide"
+            width={1200}
+            height={675}
           />
         </div>
 
@@ -88,9 +97,20 @@ export default async function FeaturePage({ params }: Props) {
         )}
       </section>
 
-        {/* Secondary screenshot placeholder */}
+        {/* Secondary screenshot */}
         <div className="mt-12">
-          <ScreenshotContainer caption="Workflow in action" aspectRatio="video" />
+          <ScreenshotContainer
+            src={
+              FEATURE_SCREENSHOTS[slug as FeatureSlug]
+                ? `/marketing/screenshots/${FEATURE_SCREENSHOTS[slug as FeatureSlug]}`
+                : undefined
+            }
+            alt={`${feature.title} workflow in action`}
+            caption="Workflow in action"
+            aspectRatio="video"
+            width={1200}
+            height={675}
+          />
         </div>
 
         {/* Benefits */}

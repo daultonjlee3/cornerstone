@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   CORE_FEATURES_HOME,
+  FEATURE_SCREENSHOTS,
+  HERO_SCREENSHOTS,
   INDUSTRIES,
   ROUTES,
   SEO,
@@ -54,7 +56,7 @@ export default function HomePage() {
               Start Free Trial
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
-            <SeeHowItWorksButton className="w-full sm:w-auto" />
+            <SeeHowItWorksButton className="w-full sm:w-auto" data-testid="live-demo-cta" />
           </>
         }
         credibilityStrip={
@@ -84,9 +86,13 @@ export default function HomePage() {
         }
       >
         <ScreenshotContainer
-          caption="Product overview screenshot coming soon"
+          src={`/marketing/screenshots/${HERO_SCREENSHOTS.dashboard}`}
+          alt="Cornerstone OS operations dashboard"
+          caption="Operations dashboard — work orders, assets, and visibility in one place"
           aspectRatio="wide"
           variant="hero"
+          width={1600}
+          height={900}
         />
       </HeroSection>
 
@@ -115,11 +121,22 @@ export default function HomePage() {
         title="Core features"
         subtitle="Everything your team needs to manage maintenance operations in one platform."
       >
-        {CORE_FEATURES_HOME.map((feature) => (
-          <FeatureCard key={feature.slug} title={feature.title} href={feature.href}>
-            <ScreenshotContainer caption="" aspectRatio="video" className="opacity-90" />
-          </FeatureCard>
-        ))}
+        {CORE_FEATURES_HOME.map((feature) => {
+          const screenshot = FEATURE_SCREENSHOTS[feature.slug];
+          return (
+            <FeatureCard key={feature.slug} title={feature.title} href={feature.href}>
+              <ScreenshotContainer
+                src={screenshot ? `/marketing/screenshots/${screenshot}` : undefined}
+                alt={`${feature.title} — Cornerstone OS`}
+                caption=""
+                aspectRatio="video"
+                className="opacity-90"
+                width={1200}
+                height={675}
+              />
+            </FeatureCard>
+          );
+        })}
       </FeatureSection>
 
       <section className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">

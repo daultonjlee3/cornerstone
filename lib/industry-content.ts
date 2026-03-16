@@ -1,6 +1,15 @@
-import type { IndustrySlug } from "./marketing-site";
+/** Content keys for industry pages (maps to route slug via INDUSTRY_ROUTE_TO_CONTENT_KEY). */
+export type IndustryContentKey =
+  | "facility-maintenance"
+  | "industrial-manufacturing"
+  | "school-districts"
+  | "healthcare";
 
 export type IndustryContent = {
+  /** Hero headline (H1). */
+  heroHeadline: string;
+  /** Hero subheading below the headline. */
+  heroSubheading: string;
   intro: string;
   challenges: string[];
   workflowNeeds: string[];
@@ -10,8 +19,11 @@ export type IndustryContent = {
   benefitsTechnicians: string[];
 };
 
-export const INDUSTRY_CONTENT: Record<IndustrySlug, IndustryContent> = {
+export const INDUSTRY_CONTENT: Record<IndustryContentKey, IndustryContent> = {
   "facility-maintenance": {
+    heroHeadline: "Facility maintenance software built for multi-site operations.",
+    heroSubheading:
+      "One CMMS for work orders, dispatch, assets, and compliance across all your properties and tenants.",
     intro:
       "Facility maintenance companies run work across multiple properties, vendors, and tenants. Cornerstone OS gives you one CMMS for work orders, preventive maintenance, assets, and reporting—so operations stay visible and under control.",
     challenges: [
@@ -50,6 +62,9 @@ export const INDUSTRY_CONTENT: Record<IndustrySlug, IndustryContent> = {
     ],
   },
   "industrial-manufacturing": {
+    heroHeadline: "Industrial maintenance software that keeps production running.",
+    heroSubheading:
+      "Preventive maintenance, asset tracking, and work order management in one CMMS for manufacturing and plant operations.",
     intro:
       "Industrial and manufacturing maintenance demands reliability, uptime, and strict PM. Cornerstone OS brings work orders, preventive maintenance, asset tracking, and reporting into one CMMS so plants run with less unplanned downtime and better visibility.",
     challenges: [
@@ -88,6 +103,9 @@ export const INDUSTRY_CONTENT: Record<IndustrySlug, IndustryContent> = {
     ],
   },
   "school-districts": {
+    heroHeadline: "School maintenance software for districts that run on tight budgets.",
+    heroSubheading:
+      "Work orders, PM, and asset tracking across buildings and grounds—so facilities and operations stay compliant and in control.",
     intro:
       "School district maintenance teams keep buildings, grounds, and systems safe and compliant on tight budgets. Cornerstone OS gives you one CMMS for work orders, PM, assets, and reporting—so facilities and operations stay on top of work and compliance.",
     challenges: [
@@ -126,6 +144,9 @@ export const INDUSTRY_CONTENT: Record<IndustrySlug, IndustryContent> = {
     ],
   },
   healthcare: {
+    heroHeadline: "Healthcare facility maintenance software built for compliance and uptime.",
+    heroSubheading:
+      "One CMMS for work orders, preventive maintenance, and reporting so clinical environments stay safe and audit-ready.",
     intro:
       "Healthcare facility maintenance must support uptime, safety, and strict compliance. Cornerstone OS is a CMMS built for hospital and clinic operations: work orders, preventive maintenance, asset tracking, and reporting in one platform so clinical environments stay safe and compliant.",
     challenges: [

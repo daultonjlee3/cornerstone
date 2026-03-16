@@ -50,6 +50,8 @@ To allow self-serve demo login (“See How It Works” → industry → sign in 
 
    This creates (or reuses) Auth users for the emails in `DEMO_LOGIN_CONFIG` and links each to its tenant with role `admin`. Idempotent: safe to run again.
 
+   **Playwright screenshot tests** use the healthcare demo with password (no magic link). After running `seed:demo:users`, set `PLAYWRIGHT_DEMO_PASSWORD` (or `DEMO_PASSWORD`) when running: `npx playwright test tests/screenshots.spec.ts`.
+
 **Option B — Manual (Supabase Dashboard)**
 
 1. Create four users in Supabase Auth with the emails below and the same password; set it in `.env.local` as `DEMO_PASSWORD`.

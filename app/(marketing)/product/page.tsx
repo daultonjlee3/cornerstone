@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   FEATURES,
+  HERO_SCREENSHOTS,
   INDUSTRIES,
   ROUTES,
   SEO,
@@ -95,10 +96,13 @@ export default function ProductPage() {
         }
       >
         <ScreenshotContainer
-          caption="Product overview screenshot coming soon"
+          src={`/marketing/screenshots/${HERO_SCREENSHOTS.dashboard}`}
+          alt="Cornerstone OS product overview — operations dashboard"
+          caption="One platform for work orders, PM, assets, dispatch, and reporting"
           aspectRatio="wide"
           variant="hero"
-          placeholderLabel="[Product Screenshot Placeholder]"
+          width={1600}
+          height={900}
         />
       </HeroSection>
 
@@ -157,10 +161,12 @@ export default function ProductPage() {
           </div>
           <div className="overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-work-orders.png"
+              alt="Work order management — create, assign, track, and complete"
               caption="Work order management"
               aspectRatio="video"
-              alt="Work order management screenshot placeholder"
-              placeholderLabel="[Work Order Management Screenshot Placeholder]"
+              width={1200}
+              height={675}
             />
           </div>
         </div>
@@ -171,10 +177,12 @@ export default function ProductPage() {
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div className="order-2 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-pm.png"
+              alt="Preventive maintenance — schedules and asset history"
               caption="Preventive maintenance"
               aspectRatio="video"
-              alt="Preventive maintenance screenshot placeholder"
-              placeholderLabel="[Preventive Maintenance Screenshot Placeholder]"
+              width={1200}
+              height={675}
             />
           </div>
           <div className="order-1 lg:order-2">
@@ -204,10 +212,12 @@ export default function ProductPage() {
           </div>
           <div className="overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-assets-list.png"
+              alt="Asset management — track assets, history, and condition"
               caption="Asset management"
               aspectRatio="video"
-              alt="Asset management screenshot placeholder"
-              placeholderLabel="[Asset Management Screenshot Placeholder]"
+              width={1200}
+              height={675}
             />
           </div>
         </div>
@@ -218,10 +228,12 @@ export default function ProductPage() {
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div className="order-2 lg:order-1 overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-dispatch.png"
+              alt="Dispatch and technician workflows — assign and schedule work"
               caption="Dispatch and technician workflows"
               aspectRatio="video"
-              alt="Dispatch and technician workflows screenshot placeholder"
-              placeholderLabel="[Dispatch & Technician Workflows Screenshot Placeholder]"
+              width={1200}
+              height={675}
             />
           </div>
           <div className="order-1 lg:order-2">
@@ -242,20 +254,20 @@ export default function ProductPage() {
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
             <h2 className="mk-section-headline">
-              See what&apos;s happening across your operations.
+              Custom reporting built around how your business runs.
             </h2>
             <p className="mt-6 mk-body-lg">
-              Dashboards and reporting give you operational visibility—work order status, completion
-              rates, asset health, and team performance so leadership and ops can make decisions
-              with real data.
+              Every maintenance team operates differently. Cornerstone OS lets you build dashboards and reports around the metrics that matter most—work order performance, preventive maintenance compliance, asset health, and technician productivity—so leadership always has clear operational visibility.
             </p>
           </div>
           <div className="overflow-hidden rounded-xl border border-[var(--card-border)] shadow-[var(--shadow-soft)]">
             <ScreenshotContainer
+              src="/marketing/screenshots/cornerstone-reporting.png"
+              alt="Reporting and operational visibility — dashboards and insights"
               caption="Reporting and dashboards"
               aspectRatio="video"
-              alt="Reporting and operational visibility screenshot placeholder"
-              placeholderLabel="[Reporting & Operational Visibility Screenshot Placeholder]"
+              width={1200}
+              height={675}
             />
           </div>
         </div>

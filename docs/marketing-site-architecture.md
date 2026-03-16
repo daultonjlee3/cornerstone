@@ -28,10 +28,10 @@ World-class B2B SaaS marketing website that:
     - [Request Portal](/features/request-portal)
     - [AI & Automation](/features/ai-automation)
 - **Industries** — Dropdown:
-  - [Facility Maintenance Companies](/industries/facility-maintenance)
-  - [Industrial / Manufacturing Maintenance](/industries/industrial-manufacturing)
-  - [School District Maintenance Teams](/industries/school-districts)
-  - [Healthcare Facility Maintenance](/industries/healthcare)
+  - [Facility Maintenance Companies](/facility-maintenance-software)
+  - [Industrial / Manufacturing Maintenance](/industrial-maintenance-software)
+  - [School District Maintenance Teams](/school-maintenance-software)
+  - [Healthcare Facility Maintenance](/healthcare-maintenance-software)
 - **Pricing** — [Pricing](/pricing)
 - **Founding Customer** — [Founding Customer Program](/founding-customer)
 - **Resources** or **Company** (optional group):
@@ -62,7 +62,7 @@ World-class B2B SaaS marketing website that:
 | **Home** | `/` | Homepage — hero, value prop, workflow, features, pricing preview, founding program, CTAs |
 | **Product** | `/product` | Product overview — one platform, capabilities, differentiator |
 | **Features** | `/features/[slug]` | 8 feature pages — problem, workflow, benefits, placeholders |
-| **Industries** | `/industries/[slug]` | 4 industry pages — challenges, needs, how Cornerstone helps |
+| **Industries** | `/facility-maintenance-software`, `/industrial-maintenance-software`, `/school-maintenance-software`, `/healthcare-maintenance-software` | 4 industry pages — industry-specific hero, challenges, needs, screenshots, how Cornerstone helps |
 | **Pricing** | `/pricing` | Pricing, technician-only billing, comparison, founding CTA |
 | **Program** | `/founding-customer` | Founding customer benefits, application CTA |
 | **Resources** | `/how-it-works`, `/about`, `/contact` | How it works, company story, demo/contact |

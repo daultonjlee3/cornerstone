@@ -83,7 +83,7 @@ export default async function DashboardPage() {
     intelligence.pmCompliance.overdueTasks.length === 0;
 
   return (
-    <div className="space-y-8" data-tour="dashboard:overview">
+    <div className="space-y-8" data-tour="dashboard:overview" data-testid="dashboard-page">
       <div data-tour="demo-guided:command-center" className="space-y-8">
       <PageHeader
         icon={<LayoutDashboard className="size-5" />}

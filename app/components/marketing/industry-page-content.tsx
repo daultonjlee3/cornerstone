@@ -1,54 +1,40 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
   INDUSTRIES,
+  INDUSTRY_ROUTE_TO_CONTENT_KEY,
+  INDUSTRY_SCREENSHOTS,
   ROUTES,
-  SEO_INDUSTRIES,
-  buildMarketingMetadata,
   type IndustrySlug,
 } from "@/lib/marketing-site";
 import { INDUSTRY_CONTENT } from "@/lib/industry-content";
-import { ScreenshotPlaceholder } from "../../../components/marketing/screenshot-placeholder";
+import { ScreenshotContainer } from "./screenshot-container";
 import { ArrowRight, CheckCircle2, Users, Building2 } from "lucide-react";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { industrySlug: IndustrySlug };
 
-const slugs = new Set(INDUSTRIES.map((i) => i.slug));
-
-export async function generateStaticParams() {
-  return INDUSTRIES.map((i) => ({ slug: i.slug }));
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  if (!slugs.has(slug as IndustrySlug)) return { title: "Industry | Cornerstone OS" };
-  const seo = SEO_INDUSTRIES[slug as IndustrySlug];
-  const industry = INDUSTRIES.find((i) => i.slug === slug)!;
-  return buildMarketingMetadata(seo.title, seo.description, industry.href);
-}
-
-export default async function IndustryPage({ params }: Props) {
-  const { slug } = await params;
-  if (!slugs.has(slug as IndustrySlug)) notFound();
-  const industry = INDUSTRIES.find((i) => i.slug === slug)!;
-  const content = INDUSTRY_CONTENT[slug as IndustrySlug];
+export function IndustryPageContent({ industrySlug }: Props) {
+  const industry = INDUSTRIES.find((i) => i.slug === industrySlug)!;
+  const contentKey = INDUSTRY_ROUTE_TO_CONTENT_KEY[industrySlug];
+  const content = INDUSTRY_CONTENT[contentKey];
+  const screenshots = INDUSTRY_SCREENSHOTS[industrySlug];
 
   return (
     <article className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
       {/* Hero */}
       <header>
-        <h1 className="mk-hero-headline break-words">{industry.title}</h1>
-        <p className="mt-4 sm:mt-6 mk-subheadline">
-          {content.intro}
-        </p>
+        <h1 className="mk-hero-headline break-words">{content.heroHeadline}</h1>
+        <p className="mt-4 sm:mt-6 mk-subheadline">{content.heroSubheading}</p>
       </header>
 
-      {/* Screenshot placeholder */}
+      {/* Main screenshot (industry-specific) */}
       <div className="mt-10 w-full sm:mt-12">
-        <ScreenshotPlaceholder
+        <ScreenshotContainer
+          src={`/marketing/screenshots/${screenshots.main}`}
+          alt={`${industry.title} — Cornerstone OS platform`}
           caption={`${industry.title} — platform in use`}
           aspectRatio="wide"
+          width={1200}
+          height={675}
         />
       </div>
 
@@ -136,11 +122,15 @@ export default async function IndustryPage({ params }: Props) {
         </section>
       </div>
 
-      {/* Secondary screenshot placeholder */}
+      {/* Secondary screenshot (industry-specific) */}
       <div className="mt-12">
-        <ScreenshotPlaceholder
-          caption="Operations and reporting"
+        <ScreenshotContainer
+          src={`/marketing/screenshots/${screenshots.secondary}`}
+          alt={`${industry.title} — operations and workflow`}
+          caption="Operations and workflow"
           aspectRatio="video"
+          width={1200}
+          height={675}
         />
       </div>
 
