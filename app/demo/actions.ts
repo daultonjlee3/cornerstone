@@ -112,7 +112,7 @@ export async function enterDemoAction(
     envUrl ||
     SITE_URL ||
     // Localhost is only used as a last resort in non-production environments.
-    (process.env.NODE_ENV === "production" ? "https://cornerstoneos.com" : "http://localhost:3000");
+    (process.env.NODE_ENV === "production" ? "https://cornerstonecmms.com" : "http://localhost:3000");
   const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=/dashboard`;
 
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({

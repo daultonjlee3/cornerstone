@@ -11,7 +11,7 @@ export const SITE_TAGLINE = "The Operations System for Maintenance Teams";
 /** Base URL for canonical, Open Graph, and sitemap. Set NEXT_PUBLIC_SITE_URL in production. */
 export const SITE_URL =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SITE_URL) ||
-  "https://cornerstoneos.com";
+  "https://cornerstonecmms.com";
 
 export const ROUTES = {
   home: "/",
