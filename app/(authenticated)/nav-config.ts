@@ -8,6 +8,8 @@ export type NavItem = {
   label: string;
   href: string;
   icon?: string;
+  /** data-tour attribute value for the guided product tour. */
+  tourId?: string;
 };
 
 export type NavGroup = {
@@ -21,9 +23,9 @@ export const navConfig: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-      { label: "Work Orders", href: "/work-orders", icon: "ClipboardList" },
-      { label: "Dispatch", href: "/dispatch", icon: "Truck" },
+      { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard", tourId: "dashboard" },
+      { label: "Work Orders", href: "/work-orders", icon: "ClipboardList", tourId: "work-orders" },
+      { label: "Dispatch", href: "/dispatch", icon: "Truck", tourId: "dispatch" },
       { label: "Work Requests", href: "/requests", icon: "Inbox" },
       { label: "Request Portal", href: "/request", icon: "ExternalLink" },
       { label: "Asset Intelligence", href: "/assets/intelligence", icon: "Activity" },
@@ -37,8 +39,8 @@ export const navConfig: NavGroup[] = [
     label: "Assets",
     secondary: true,
     items: [
-      { label: "Assets", href: "/assets", icon: "Box" },
-      { label: "Preventive Maintenance", href: "/preventive-maintenance", icon: "CalendarCheck" },
+      { label: "Assets", href: "/assets", icon: "Box", tourId: "assets" },
+      { label: "Preventive Maintenance", href: "/preventive-maintenance", icon: "CalendarCheck", tourId: "preventive-maintenance" },
     ],
   },
   {
@@ -53,10 +55,10 @@ export const navConfig: NavGroup[] = [
     label: "Supply",
     secondary: true,
     items: [
-      { label: "Inventory", href: "/inventory", icon: "Warehouse" },
-      { label: "Vendors", href: "/vendors", icon: "Store" },
+      { label: "Inventory", href: "/inventory", icon: "Warehouse", tourId: "inventory" },
+      { label: "Vendors", href: "/vendors", icon: "Store", tourId: "vendors" },
       { label: "Products", href: "/products", icon: "Package" },
-      { label: "Purchase Orders", href: "/purchase-orders", icon: "ShoppingCart" },
+      { label: "Purchase Orders", href: "/purchase-orders", icon: "ShoppingCart", tourId: "purchase-orders" },
     ],
   },
   {
@@ -74,7 +76,7 @@ export const navConfig: NavGroup[] = [
     secondary: true,
     items: [
       { label: "Reports", href: "/reports", icon: "BarChart2" },
-      { label: "Operations Intelligence", href: "/reports/operations", icon: "BarChart2" },
+      { label: "Operations Intelligence", href: "/reports/operations", icon: "BarChart2", tourId: "operations-intelligence" },
     ],
   },
   {

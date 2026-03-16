@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Compass, Sparkles } from "lucide-react";
 import { useTour } from "@/src/components/ui/tour";
+import { TOUR_COMPLETED_KEY } from "@/config/tourSteps";
 
 const DEMO_WELCOME_SHOWN_KEY = "demo_welcome_shown";
 
@@ -14,6 +15,10 @@ export function DemoWelcomeModal({ isDemoGuest }: Props) {
 
   useEffect(() => {
     if (!isDemoGuest || typeof window === "undefined") return;
+    // If the new guided product tour hasn't been completed yet, it will show
+    // its own welcome modal — don't stack two modals on first visit.
+    const newTourCompleted = localStorage.getItem(TOUR_COMPLETED_KEY) === "1";
+    if (!newTourCompleted) return;
     const shown = sessionStorage.getItem(DEMO_WELCOME_SHOWN_KEY);
     if (!shown) setOpen(true);
   }, [isDemoGuest]);
