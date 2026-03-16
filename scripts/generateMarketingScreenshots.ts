@@ -46,7 +46,12 @@ const OUTPUT_DIR = path.resolve(
   process.env.SCREENSHOT_OUTPUT_DIR ?? "public/screenshots"
 );
 
-const VIEWPORT = { width: 1920, height: 1080 };
+// Smaller viewport + CSS zoom means the app UI fills more of the frame and
+// appears readable when scaled into marketing page containers (~800px wide).
+// At 1440×900 + 1.5× zoom: effective 960px content in 1440px frame →
+// ~83% scale in the marketing card vs ~42% at 1920×1080 (≈2× more readable).
+const VIEWPORT = { width: 1440, height: 900 };
+const CSS_ZOOM = 1.5;
 
 // ─── Screenshot definitions ───────────────────────────────────────────────────
 
@@ -184,9 +189,9 @@ function screenshotUrl(route: string): string {
   return `${BASE_URL}${route}${sep}screenshotMode=true`;
 }
 
-/** Suppress all tours and modals via localStorage. */
+/** Suppress all tours/modals via localStorage and apply CSS zoom for readability. */
 async function setScreenshotModeStorage(page: Page) {
-  await page.evaluate(() => {
+  await page.evaluate((zoom) => {
     // Disable new guided product tour
     localStorage.setItem("cornerstone_demo_tour_completed", "1");
     // Signal app-level screenshot mode flag
@@ -195,7 +200,10 @@ async function setScreenshotModeStorage(page: Page) {
     localStorage.setItem("sidebar-collapsed", "0");
     // Mark old demo welcome as shown
     sessionStorage.setItem("demo_welcome_shown", "1");
-  });
+    // Zoom in so product UI is readable in marketing page containers.
+    // CSS zoom scales the entire page (including fixed sidebar/topbar) in Chrome.
+    document.documentElement.style.zoom = String(zoom);
+  }, CSS_ZOOM);
 }
 
 /** Expand the sidebar to ensure nav items are visible in screenshots. */
@@ -379,7 +387,12 @@ async function main() {
         path: outPath,
         fullPage: false,
         type: "png",
-        clip: { x: 0, y: 0, width: VIEWPORT.width, height: VIEWPORT.height },
+        clip: {
+          x: 0,
+          y: 0,
+          width: VIEWPORT.width,
+          height: VIEWPORT.height,
+        },
       });
 
       log(`     ✓ Saved ${spec.filename}`);
