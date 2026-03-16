@@ -202,11 +202,11 @@ export default function HomePage() {
         steps={[...WORKFLOW_STEPS]}
       />
 
-      {/* Section 3 — Technician Mobile: narrower screenshot to imply mobile */}
+      {/* Section 3 — Technician Mobile: optimized technician work queue screenshot */}
       <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="mx-auto min-w-0 max-w-7xl">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 md:items-center">
-            <div className="min-w-0 md:order-2">
+            <div className="min-w-0">
               <h2 className="mk-section-headline">
                 Field teams that actually adopt the software
               </h2>
@@ -229,11 +229,11 @@ export default function HomePage() {
                 </li>
               </ul>
             </div>
-            <div className="min-w-0 mx-auto max-w-sm md:order-1 md:mx-0">
+            <div className="min-w-0 mx-auto max-w-md md:max-w-xl md:mx-0">
               <ScreenshotContainer
                 src="/marketing/screenshots/cornerstone-mobile-field.png"
-                alt="Cornerstone OS technician mobile interface"
-                aspectRatio="video"
+                alt="Cornerstone OS technician work queue and mobile interface"
+                aspectRatio="dashboard"
                 width={1920}
                 height={1080}
               />

@@ -56,9 +56,9 @@ export function HeroSection({
           </div>
         )}
 
-        {/* Screenshot frame: subtle overlap, soft shadow, clear separation above */}
+        {/* Screenshot frame: subtle overlap on larger screens, clear separation on mobile */}
         {children && (
-          <div className="mx-auto -mt-4 w-full max-w-5xl px-0 sm:-mt-6 lg:-mt-8">
+          <div className="mx-auto mt-8 w-full max-w-5xl px-0 sm:-mt-6 lg:-mt-8">
             <div className="overflow-hidden rounded-xl border border-[var(--card-border)]/80 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.12),0_0_0_1px_rgba(15,23,42,0.04)] transition-shadow dark:border-[var(--card-border)]/60 dark:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.25),0_0_0_1px_rgba(255,255,255,0.04)] sm:rounded-2xl">
               {children}
             </div>
