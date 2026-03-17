@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { ComingSoon } from "../components/coming-soon";
+import { featureFlags } from "@/src/lib/features";
 
 export const metadata = {
   title: "Contracts | Cornerstone Tech",
@@ -6,5 +8,8 @@ export const metadata = {
 };
 
 export default function ContractsPage() {
+  if (!featureFlags.contracts) {
+    redirect("/operations");
+  }
   return <ComingSoon moduleName="Contracts" />;
 }

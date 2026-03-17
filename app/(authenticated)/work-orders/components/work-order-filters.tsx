@@ -6,11 +6,22 @@ import { useTransition, useState, useCallback, useEffect } from "react";
 type FilterOptions = {
   companies: { id: string; name: string }[];
   properties: { id: string; name: string; company_id: string }[];
+  buildings: { id: string; name: string; property_id: string }[];
+  units: { id: string; name: string; building_id: string }[];
+  assets: { id: string; name: string; company_id: string; property_id: string | null; building_id: string | null; unit_id: string | null }[];
   technicians: { id: string; name: string }[];
   crews: { id: string; name: string; company_id?: string | null }[];
 };
 
-const STATUS_OPTIONS = ["open", "assigned", "in_progress", "on_hold", "completed", "cancelled", "closed"] as const;
+const STATUS_OPTIONS = [
+  "new",
+  "ready_to_schedule",
+  "scheduled",
+  "in_progress",
+  "on_hold",
+  "completed",
+  "cancelled",
+] as const;
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent", "emergency"] as const;
 const CATEGORY_OPTIONS = ["repair", "preventive_maintenance", "inspection", "installation", "emergency", "general"] as const;
 const SORT_OPTIONS = [
@@ -53,10 +64,27 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
   const completedFrom = searchParams.get("completed_from") ?? "";
   const completedTo = searchParams.get("completed_to") ?? "";
   const completionStatus = searchParams.get("completion_status") ?? "";
+  const buildingId = searchParams.get("building_id") ?? "";
+  const unitId = searchParams.get("unit_id") ?? "";
+  const assetId = searchParams.get("asset_id") ?? "";
+  const sourceType = searchParams.get("source_type") ?? "";
+  const overdue = searchParams.get("overdue") ?? "";
+  const unassigned = searchParams.get("unassigned") ?? "";
   const sort = searchParams.get("sort") ?? "updated_at";
   const order = searchParams.get("order") ?? "desc";
 
   const propertiesFiltered = companyId ? options.properties.filter((p) => p.company_id === companyId) : options.properties;
+  const buildingsFiltered = propertyId ? options.buildings.filter((b) => b.property_id === propertyId) : options.buildings;
+  const unitsFiltered = buildingId ? options.units.filter((u) => u.building_id === buildingId) : options.units;
+  const assetsFiltered = companyId
+    ? options.assets.filter((a) => {
+        if (a.company_id !== companyId) return false;
+        if (unitId) return a.unit_id === unitId;
+        if (buildingId) return a.building_id === buildingId;
+        if (propertyId) return a.property_id === propertyId;
+        return true;
+      })
+    : options.assets;
   const crewsFiltered = companyId ? options.crews.filter((c) => !c.company_id || c.company_id === companyId) : options.crews;
 
   const buildParams = (updates: Record<string, string>) => {
@@ -84,7 +112,7 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
   };
 
   const hasActiveFilters =
-    q || status || priority || category || companyId || propertyId || technicianId || crewId || dateFrom || dateTo || completedFrom || completedTo || completionStatus;
+    q || status || priority || category || companyId || propertyId || buildingId || unitId || assetId || technicianId || crewId || sourceType || overdue || unassigned || dateFrom || dateTo || completedFrom || completedTo || completionStatus;
 
   const inputClass =
     "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-1.5 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
@@ -208,7 +236,7 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
               <select
                 id="wo-filter-property"
                 value={propertyId}
-                onChange={(e) => apply({ property_id: e.target.value })}
+                onChange={(e) => apply({ property_id: e.target.value, building_id: "", unit_id: "", asset_id: "" })}
                 className={inputClass}
               >
                 <option value="">All</option>
@@ -218,6 +246,97 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label htmlFor="wo-filter-building" className={labelClass}>
+                Building
+              </label>
+              <select
+                id="wo-filter-building"
+                value={buildingId}
+                onChange={(e) => apply({ building_id: e.target.value, unit_id: "", asset_id: "" })}
+                className={inputClass}
+              >
+                <option value="">All</option>
+                {buildingsFiltered.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="wo-filter-unit" className={labelClass}>
+                Unit
+              </label>
+              <select
+                id="wo-filter-unit"
+                value={unitId}
+                onChange={(e) => apply({ unit_id: e.target.value, asset_id: "" })}
+                className={inputClass}
+              >
+                <option value="">All</option>
+                {unitsFiltered.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="wo-filter-asset" className={labelClass}>
+                Asset
+              </label>
+              <select
+                id="wo-filter-asset"
+                value={assetId}
+                onChange={(e) => apply({ asset_id: e.target.value })}
+                className={inputClass}
+              >
+                <option value="">All</option>
+                {assetsFiltered.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="wo-filter-source" className={labelClass}>
+                Source
+              </label>
+              <select
+                id="wo-filter-source"
+                value={sourceType}
+                onChange={(e) => apply({ source_type: e.target.value })}
+                className={inputClass}
+              >
+                <option value="">All</option>
+                <option value="manual">Manual</option>
+                <option value="preventive_maintenance">Preventive Maintenance</option>
+                <option value="reactive">Reactive</option>
+                <option value="inspection">Inspection</option>
+              </select>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  checked={overdue === "1"}
+                  onChange={(e) => apply({ overdue: e.target.checked ? "1" : "" })}
+                  className="rounded border-[var(--card-border)]"
+                />
+                Overdue only
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  checked={unassigned === "1"}
+                  onChange={(e) => apply({ unassigned: e.target.checked ? "1" : "" })}
+                  className="rounded border-[var(--card-border)]"
+                />
+                Unassigned only
+              </label>
             </div>
             <div>
               <label htmlFor="wo-filter-technician" className={labelClass}>

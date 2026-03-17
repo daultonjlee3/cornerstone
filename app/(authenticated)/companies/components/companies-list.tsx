@@ -1,20 +1,61 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition, useState, useCallback } from "react";
 import { deleteCompany } from "../actions";
 import type { Company } from "./company-form-modal";
 import { CompanyFormModal } from "./company-form-modal";
 import { saveCompany } from "../actions";
+import { Button } from "@/src/components/ui/button";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+} from "@/src/components/ui/data-table";
 
 type CompaniesListProps = {
   companies: Company[];
   error?: string | null;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
 };
 
-export function CompaniesList({ companies: initialCompanies, error: initialError }: CompaniesListProps) {
+function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
+  const next = new URLSearchParams(searchParams.toString());
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === "" || value == null) next.delete(key);
+    else next.set(key, value);
+  });
+  return next.toString();
+}
+
+export function CompaniesList({
+  companies: initialCompanies,
+  error: initialError,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
+}: CompaniesListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const applyParams = useCallback(
+    (updates: Record<string, string>) => {
+      const query = buildParams(searchParams, updates);
+      startTransition(() => {
+        router.push(`/companies${query ? `?${query}` : ""}`);
+      });
+    },
+    [router, searchParams]
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -69,86 +110,63 @@ export function CompaniesList({ companies: initialCompanies, error: initialError
       )}
       <div className="flex justify-between items-center gap-4">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Companies</h2>
-        <button
-          type="button"
-          onClick={openNew}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        >
+        <Button type="button" onClick={openNew}>
           New Company
-        </button>
+        </Button>
       </div>
 
       {initialCompanies.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">No companies yet.</p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
+          <Button type="button" onClick={openNew} className="mt-4">
             Add your first company
-          </button>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Name</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Code</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Contact</th>
-                  <th className="w-24 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {initialCompanies.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
-                  >
-                    <td className="px-4 py-3 text-[var(--foreground)]">{c.name}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{c.company_code ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          c.status === "active"
-                            ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                            : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
-                      {c.primary_contact_name ?? c.primary_contact_email ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(c)}
-                          className="text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(c.id, c.name)}
-                          disabled={isPending}
-                          className="text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable>
+          <Table className="min-w-[600px]">
+            <TableHead>
+              <Th>Name</Th>
+              <Th>Code</Th>
+              <Th>Status</Th>
+              <Th>Contact</Th>
+              <Th className="w-24">Actions</Th>
+            </TableHead>
+            <TBody>
+              {initialCompanies.map((c) => (
+                <Tr key={c.id}>
+                  <Td>{c.name}</Td>
+                  <Td className="text-[var(--muted)]">{c.company_code ?? "—"}</Td>
+                  <Td>
+                    <StatusBadge status={c.status} />
+                  </Td>
+                  <Td className="text-[var(--muted)]">
+                    {c.primary_contact_name ?? c.primary_contact_email ?? "—"}
+                  </Td>
+                  <Td>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "button", label: "Edit", onClick: () => openEdit(c) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(c.id, c.name), disabled: isPending, destructive: true },
+                      ]}
+                    />
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyParams({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyParams({ page_size: String(size), page: "1" })}
+            />
+          )}
+        </DataTable>
       )}
 
       <CompanyFormModal

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { WorkOrderStatusBadge } from "./work-order-status-badge";
-import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
 
 const btnBase =
   "rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]";
@@ -48,8 +48,8 @@ export function WorkOrderHeader({
           </h1>
           <p className="mt-1 text-[var(--foreground)]">{title}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <WorkOrderStatusBadge status={status} />
-            <WorkOrderPriorityBadge priority={priority} />
+            <StatusBadge status={status} />
+            <PriorityBadge priority={priority} />
             {category && (
               <span className="rounded bg-[var(--muted)]/20 px-2 py-0.5 text-xs text-[var(--muted)]">
                 {(category as string).replace(/_/g, " ")}

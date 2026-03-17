@@ -2,23 +2,9 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type UnitFormState = { error?: string; success?: boolean };
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
-}
 
 async function buildingBelongsToTenant(buildingId: string, tenantId: string): Promise<boolean> {
   const supabase = await createClient();
@@ -47,7 +33,8 @@ export async function saveUnit(
   _prev: UnitFormState,
   formData: FormData
 ): Promise<UnitFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -61,12 +48,19 @@ export async function saveUnit(
   if (!allowed) return { error: "Invalid building." };
 
   const squareFeetRaw = (formData.get("square_feet") as string)?.trim();
+  const latRaw = (formData.get("latitude") as string)?.trim();
+  const lonRaw = (formData.get("longitude") as string)?.trim();
+  const lat = latRaw ? parseFloat(latRaw) : null;
+  const lon = lonRaw ? parseFloat(lonRaw) : null;
 
   const payload = {
     unit_name: unitName,
     name_or_number: unitName,
     building_id: buildingId,
     tenant_id: tenantId,
+    address: (formData.get("address") as string)?.trim() || null,
+    latitude: lat != null && Number.isFinite(lat) ? lat : null,
+    longitude: lon != null && Number.isFinite(lon) ? lon : null,
     unit_code: (formData.get("unit_code") as string)?.trim() || null,
     floor: (formData.get("floor") as string)?.trim() || null,
     square_feet: squareFeetRaw ? parseFloat(squareFeetRaw) : null,
@@ -76,7 +70,6 @@ export async function saveUnit(
     notes: (formData.get("notes") as string)?.trim() || null,
   };
 
-  const supabase = await createClient();
   if (id) {
     const { data: row } = await supabase
       .from("units")
@@ -97,10 +90,9 @@ export async function saveUnit(
 }
 
 export async function deleteUnit(id: string): Promise<UnitFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
     .from("units")
     .select("building_id")

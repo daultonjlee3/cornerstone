@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { Modal } from "@/src/components/ui/modal";
+import { FormField } from "@/src/components/ui/form-field";
+import { Button } from "@/src/components/ui/button";
 
 export type Unit = {
   id: string;
@@ -14,6 +17,9 @@ export type Unit = {
   occupancy_type: string | null;
   status: string;
   notes: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   building?: { building_name?: string; name?: string } | null;
 };
 
@@ -37,6 +43,9 @@ const emptyUnit: Unit = {
   occupancy_type: null,
   status: "active",
   notes: null,
+  address: null,
+  latitude: null,
+  longitude: null,
 };
 
 export function UnitFormModal({
@@ -53,50 +62,40 @@ export function UnitFormModal({
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  if (!open) return null;
-
   const u = unit ?? emptyUnit;
   const displayName = u.unit_name ?? u.name_or_number ?? "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" aria-hidden onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
-        <div className="sticky top-0 border-b border-[var(--card-border)] bg-[var(--card)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            {isEdit ? "Edit Unit" : "New Unit"}
-          </h2>
-        </div>
-        <form action={formAction} className="space-y-4 p-6">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit Unit" : "New Unit"}
+      className="max-w-md"
+    >
+      <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={u.id} />}
           {state?.error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {state.error}
             </p>
           )}
-          <div>
-            <label htmlFor="unit_name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Unit name *
-            </label>
+          <FormField label="Unit name" htmlFor="unit_name" required>
             <input
               id="unit_name"
               name="unit_name"
               type="text"
               required
               defaultValue={displayName}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="building_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Building *
-            </label>
+          </FormField>
+          <FormField label="Building" htmlFor="building_id" required>
             <select
               id="building_id"
               name="building_id"
               required
               defaultValue={u.building_id}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="">Select building</option>
               {buildings.map((b) => (
@@ -105,36 +104,61 @@ export function UnitFormModal({
                 </option>
               ))}
             </select>
+          </FormField>
+          <FormField label="Address" htmlFor="unit_address">
+            <input
+              id="unit_address"
+              name="address"
+              type="text"
+              defaultValue={u.address ?? ""}
+              placeholder="Suite, floor, or unit address"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Latitude" htmlFor="unit_latitude">
+              <input
+                id="unit_latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                defaultValue={u.latitude ?? ""}
+                placeholder="e.g. 33.7490"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Longitude" htmlFor="unit_longitude">
+              <input
+                id="unit_longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                defaultValue={u.longitude ?? ""}
+                placeholder="e.g. -84.3880"
+                className="ui-input"
+              />
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="unit_code" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Unit code
-            </label>
+          <FormField label="Unit code" htmlFor="unit_code">
             <input
               id="unit_code"
               name="unit_code"
               type="text"
               defaultValue={u.unit_code ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="floor" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Floor
-            </label>
+          </FormField>
+          <FormField label="Floor" htmlFor="floor">
             <input
               id="floor"
               name="floor"
               type="text"
               defaultValue={u.floor ?? ""}
               placeholder="e.g. 2 or 2nd"
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="square_feet" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Square feet
-            </label>
+          </FormField>
+          <FormField label="Square feet" htmlFor="square_feet">
             <input
               id="square_feet"
               name="square_feet"
@@ -142,66 +166,48 @@ export function UnitFormModal({
               min={0}
               step="any"
               defaultValue={u.square_feet ?? u.square_footage ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="occupancy_type" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Occupancy type
-            </label>
+          </FormField>
+          <FormField label="Occupancy type" htmlFor="occupancy_type">
             <input
               id="occupancy_type"
               name="occupancy_type"
               type="text"
               defaultValue={u.occupancy_type ?? ""}
               placeholder="e.g. Office, Retail"
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="status" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Status
-            </label>
+          </FormField>
+          <FormField label="Status" htmlFor="status">
             <select
               id="status"
               name="status"
               defaultValue={u.status}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
-          <div>
-            <label htmlFor="notes" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Notes
-            </label>
+          </FormField>
+          <FormField label="Notes" htmlFor="notes">
             <textarea
               id="notes"
               name="notes"
               rows={2}
               defaultValue={u.notes ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-textarea"
             />
-          </div>
+          </FormField>
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? "Saving…" : isEdit ? "Save" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-[var(--foreground)] hover:bg-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            </Button>
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

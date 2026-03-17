@@ -1,6 +1,9 @@
+import { Users } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { CrewsList } from "./components/crews-list";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { CrewsList, type CrewRow } from "./components/crews-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
   title: "Crews | Cornerstone Tech",
@@ -18,16 +21,8 @@ export default async function CrewsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
-
-  const tenantId = membership.tenant_id;
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
   const searchQuery = (await searchParams)?.q?.trim() ?? "";
 
   const { data: crewsRaw } = await supabase
@@ -129,16 +124,13 @@ export default async function CrewsPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Crews
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Teams & labor groups
-        </p>
-      </div>
+      <PageHeader
+        icon={<Users className="size-5" />}
+        title="Crews"
+        subtitle="Teams & labor groups"
+      />
       <CrewsList
-        crews={crews}
+        crews={crews as CrewRow[]}
         companies={companyOptions}
         technicians={technicianOptions}
         searchQuery={searchQuery}

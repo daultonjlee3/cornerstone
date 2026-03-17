@@ -7,6 +7,8 @@ export type Technician = {
   technician_name: string | null;
   name?: string;
   company_id: string;
+  user_id?: string | null;
+  is_portal_only?: boolean;
   email: string | null;
   phone: string | null;
   trade: string | null;
@@ -32,6 +34,8 @@ const emptyTechnician: Technician = {
   id: "",
   technician_name: "",
   company_id: "",
+  user_id: null,
+  is_portal_only: false,
   email: null,
   phone: null,
   trade: null,
@@ -58,6 +62,7 @@ export function TechnicianFormModal({
 
   const t = technician ?? emptyTechnician;
   const displayName = t.technician_name ?? t.name ?? "";
+  const hasLinkedUser = Boolean(t.user_id);
   const hourlyDisplay =
     t.hourly_cost != null && t.hourly_cost !== undefined
       ? String(t.hourly_cost)
@@ -100,7 +105,7 @@ export function TechnicianFormModal({
               id="company_id"
               name="company_id"
               required
-              defaultValue={t.company_id}
+              defaultValue={t.company_id || (companies.length === 1 ? companies[0].id : "")}
               className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             >
               <option value="">Select company</option>
@@ -165,6 +170,54 @@ export function TechnicianFormModal({
               </select>
             </div>
           </div>
+          {!isEdit ? (
+            <label className="flex items-start gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/70 px-3 py-2 text-sm text-[var(--foreground)]">
+              <input
+                type="checkbox"
+                name="create_login"
+                value="1"
+                className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+              />
+              <span>
+                <span className="block font-medium">Create login for this technician</span>
+                <span className="block text-xs text-[var(--muted)]">
+                  Requires email. New logins are technician portal only; existing org users keep main app access.
+                </span>
+              </span>
+            </label>
+          ) : hasLinkedUser ? (
+            <label className="flex items-start gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/70 px-3 py-2 text-sm text-[var(--foreground)]">
+              <input type="hidden" name="portal_login_enabled_present" value="1" />
+              <input
+                type="checkbox"
+                name="portal_login_enabled"
+                value="1"
+                defaultChecked={Boolean(t.is_portal_only)}
+                className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+              />
+              <span>
+                <span className="block font-medium">Portal login enabled</span>
+                <span className="block text-xs text-[var(--muted)]">
+                  Disable to revoke technician portal-only access for linked user.
+                </span>
+              </span>
+            </label>
+          ) : (
+            <label className="flex items-start gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/70 px-3 py-2 text-sm text-[var(--foreground)]">
+              <input
+                type="checkbox"
+                name="create_login"
+                value="1"
+                className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+              />
+              <span>
+                <span className="block font-medium">Create login for this technician</span>
+                <span className="block text-xs text-[var(--muted)]">
+                  This technician currently has no linked login user.
+                </span>
+              </span>
+            </label>
+          )}
           <div>
             <label htmlFor="hourly_cost" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Hourly cost

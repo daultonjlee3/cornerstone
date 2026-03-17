@@ -1,46 +1,51 @@
+import { DoorOpen } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { UnitsList } from "./components/units-list";
+import { PageHeader } from "@/src/components/ui/page-header";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, getStringParam } from "@/src/lib/page-utils";
 
 export const metadata = {
   title: "Units | Cornerstone Tech",
   description: "Manage units",
 };
 
-export default async function UnitsPage() {
+type SearchParams = { page?: string; page_size?: string };
+
+export default async function UnitsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams | Promise<SearchParams>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
-  if (!membership) redirect("/onboarding");
+  const params = await resolveSearchParams(searchParams);
+  const page = Math.max(1, parseInt(getStringParam(params, "page") ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(getStringParam(params, "page_size") ?? "25", 10) || 25));
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
 
   const companyIds = (companies ?? []).map((c) => c.id);
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Units
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage spaces within buildings.
-          </p>
-        </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <PageHeader
+          icon={<DoorOpen className="size-5" />}
+          title="Units"
+          subtitle="Manage spaces within buildings."
+        />
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company, property, and building first, then add units.</p>
         </div>
       </div>
@@ -69,27 +74,26 @@ export default async function UnitsPage() {
   if (buildingIds.length === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Units
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Manage spaces within buildings.
-          </p>
-        </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <PageHeader
+          icon={<DoorOpen className="size-5" />}
+          title="Units"
+          subtitle="Manage spaces within buildings."
+        />
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a building first, then add units.</p>
         </div>
       </div>
     );
   }
 
-  const { data: units, error } = await supabase
+  const baseQuery = supabase
     .from("units")
-    .select("id, unit_name, name_or_number, building_id, unit_code, floor, square_feet, square_footage, occupancy_type, status, notes, buildings(building_name, name, property_id, properties(company_id))")
+    .select("id, unit_name, name_or_number, building_id, unit_code, floor, square_feet, square_footage, occupancy_type, status, notes, address, latitude, longitude, buildings(building_name, name, property_id, properties(company_id))", { count: "exact" })
     .in("building_id", buildingIds)
     .order("unit_name")
     .order("name_or_number");
+
+  const { data: units, error, count } = await baseQuery.range((page - 1) * pageSize, page * pageSize - 1);
 
   const normalized = (units ?? []).map((u) => {
     const raw = u as {
@@ -109,20 +113,20 @@ export default async function UnitsPage() {
     };
   });
 
-  return (
+return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Units
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage spaces within buildings.
-        </p>
-      </div>
+      <PageHeader
+        icon={<DoorOpen className="size-5" />}
+        title="Units"
+        subtitle="Manage spaces within buildings."
+      />
       <UnitsList
         units={normalized}
         buildings={buildingOptions}
         error={error?.message ?? null}
+        totalCount={count ?? 0}
+        page={page}
+        pageSize={pageSize}
       />
     </div>
   );

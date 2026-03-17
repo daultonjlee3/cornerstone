@@ -1,47 +1,58 @@
+import { Building } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { CompaniesList } from "./components/companies-list";
+import { PageHeader } from "@/src/components/ui/page-header";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 
 export const metadata = {
   title: "Companies | Cornerstone Tech",
   description: "Manage companies",
 };
 
-export default async function CompaniesPage() {
+
+export default async function CompaniesPage({
+  searchParams,
+}: {
+  searchParams: SearchParams | Promise<SearchParams>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
-  if (!membership) redirect("/onboarding");
+  const params = await resolveSearchParams(searchParams);
+  const pageParam = params?.page;
+  const pageSizeParam = params?.page_size;
+  const page = Math.max(1, parseInt(typeof pageParam === "string" ? pageParam : "", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(typeof pageSizeParam === "string" ? pageSizeParam : "", 10) || 25));
 
-  const { data: companies, error } = await supabase
+  const baseQuery = supabase
     .from("companies")
-    .select("id, name, legal_name, company_code, status, primary_contact_name, primary_contact_email, phone")
-    .eq("tenant_id", membership.tenant_id)
+    .select("id, name, legal_name, company_code, status, primary_contact_name, primary_contact_email, phone", { count: "exact" })
+    .eq("tenant_id", tenantId)
     .order("name");
+
+  const { data: companies, error, count } = await baseQuery.range((page - 1) * pageSize, page * pageSize - 1);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Companies
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Manage companies for your organization.
-        </p>
-      </div>
+      <PageHeader
+        icon={<Building className="size-5" />}
+        title="Companies"
+        subtitle="Manage companies for your organization."
+      />
       <CompaniesList
         companies={companies ?? []}
         error={error?.message ?? null}
+        totalCount={count ?? 0}
+        page={page}
+        pageSize={pageSize}
       />
     </div>
   );

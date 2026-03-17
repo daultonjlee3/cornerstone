@@ -1,6 +1,10 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { Modal } from "@/src/components/ui/modal";
+import { FormField } from "@/src/components/ui/form-field";
+import { Button } from "@/src/components/ui/button";
+import { AddressAutocomplete, type AddressSuggestion } from "@/src/components/address-autocomplete";
 
 export type Property = {
   id: string;
@@ -11,6 +15,9 @@ export type Property = {
   city: string | null;
   state: string | null;
   zip: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   company?: { name: string } | null;
 };
@@ -23,6 +30,7 @@ type PropertyFormModalProps = {
   property: Property | null;
   companies: CompanyOption[];
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  mapboxToken?: string | null;
 };
 
 const emptyProperty: Property = {
@@ -34,6 +42,9 @@ const emptyProperty: Property = {
   city: null,
   state: null,
   zip: null,
+  country: null,
+  latitude: null,
+  longitude: null,
   status: "active",
 };
 
@@ -43,58 +54,81 @@ export function PropertyFormModal({
   property,
   companies,
   saveAction,
+  mapboxToken,
 }: PropertyFormModalProps) {
   const isEdit = !!property?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
+
+  const p = property ?? emptyProperty;
+  const displayName = p.property_name ?? (p as { name?: string }).name ?? "";
+
+  const [addressLine1, setAddressLine1] = useState(p.address_line1 ?? "");
+  const [addressLine2, setAddressLine2] = useState(p.address_line2 ?? "");
+  const [city, setCity] = useState(p.city ?? "");
+  const [stateVal, setStateVal] = useState(p.state ?? "");
+  const [zip, setZip] = useState(p.zip ?? "");
+  const [country, setCountry] = useState(p.country ?? "");
+  const [latitude, setLatitude] = useState(p.latitude != null ? String(p.latitude) : "");
+  const [longitude, setLongitude] = useState(p.longitude != null ? String(p.longitude) : "");
 
   useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    const src = property ?? emptyProperty;
+    setAddressLine1(src.address_line1 ?? "");
+    setAddressLine2(src.address_line2 ?? "");
+    setCity(src.city ?? "");
+    setStateVal(src.state ?? "");
+    setZip(src.zip ?? "");
+    setCountry(src.country ?? "");
+    setLatitude(src.latitude != null ? String(src.latitude) : "");
+    setLongitude(src.longitude != null ? String(src.longitude) : "");
+  }, [open, property?.id, property?.address_line1, property?.address_line2, property?.city, property?.state, property?.zip, property?.country, property?.latitude, property?.longitude]);
 
-  const p = property ?? emptyProperty;
-  const displayName = p.property_name ?? (p as { name?: string }).name ?? "";
+  const handleAddressSelect = (s: AddressSuggestion) => {
+    setAddressLine1(s.address_line1 ?? "");
+    setCity(s.city ?? "");
+    setStateVal(s.state ?? "");
+    setZip(s.postal_code ?? "");
+    setCountry(s.country ?? "");
+    setLatitude(String(s.latitude));
+    setLongitude(String(s.longitude));
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" aria-hidden onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
-        <div className="sticky top-0 border-b border-[var(--card-border)] bg-[var(--card)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            {isEdit ? "Edit Property" : "New Property"}
-          </h2>
-        </div>
-        <form action={formAction} className="space-y-4 p-6">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit Property" : "New Property"}
+      className="max-w-md"
+    >
+      <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={p.id} />}
           {state?.error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {state.error}
             </p>
           )}
-          <div>
-            <label htmlFor="property_name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Property name *
-            </label>
+          <FormField label="Property name" htmlFor="property_name" required>
             <input
               id="property_name"
               name="property_name"
               type="text"
               required
               defaultValue={displayName}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="company_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Company *
-            </label>
+          </FormField>
+          <FormField label="Company" htmlFor="company_id" required>
             <select
               id="company_id"
               name="company_id"
               required
-              defaultValue={p.company_id}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              defaultValue={p.company_id || (companies.length === 1 ? companies[0].id : "")}
+              className="ui-select"
             >
               <option value="">Select company</option>
               {companies.map((c) => (
@@ -103,101 +137,124 @@ export function PropertyFormModal({
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label htmlFor="address_line1" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Address line 1
-            </label>
+          </FormField>
+          <FormField label="Address search" htmlFor="address_autocomplete">
+            <AddressAutocomplete
+              onSelect={handleAddressSelect}
+              placeholder="Type to search for an address…"
+              className="ui-input"
+              mapboxToken={mapboxToken ?? undefined}
+            />
+          </FormField>
+          <FormField label="Address line 1" htmlFor="address_line1">
             <input
               id="address_line1"
               name="address_line1"
               type="text"
-              defaultValue={p.address_line1 ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="address_line2" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Address line 2
-            </label>
+          </FormField>
+          <FormField label="Address line 2" htmlFor="address_line2">
             <input
               id="address_line2"
               name="address_line2"
               type="text"
-              defaultValue={p.address_line2 ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={addressLine2}
+              onChange={(e) => setAddressLine2(e.target.value)}
+              className="ui-input"
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="city" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-                City
-              </label>
+            <FormField label="City" htmlFor="city">
               <input
                 id="city"
                 name="city"
                 type="text"
-                defaultValue={p.city ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="ui-input"
               />
-            </div>
-            <div>
-              <label htmlFor="state" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-                State
-              </label>
+            </FormField>
+            <FormField label="State" htmlFor="state">
               <input
                 id="state"
                 name="state"
                 type="text"
-                defaultValue={p.state ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                value={stateVal}
+                onChange={(e) => setStateVal(e.target.value)}
+                className="ui-input"
               />
-            </div>
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="zip" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Zip
-            </label>
+          <FormField label="Zip" htmlFor="zip">
             <input
               id="zip"
               name="zip"
               type="text"
-              defaultValue={p.zip ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              value={zip}
+              onChange={(e) => setZip(e.target.value)}
+              className="ui-input"
             />
+          </FormField>
+          <FormField label="Country" htmlFor="country">
+            <input
+              id="country"
+              name="country"
+              type="text"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. USA"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Latitude" htmlFor="latitude">
+              <input
+                id="latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="e.g. 33.7490"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Longitude" htmlFor="longitude">
+              <input
+                id="longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="e.g. -84.3880"
+                className="ui-input"
+              />
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="status" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Status
-            </label>
+          <FormField label="Status" htmlFor="status">
             <select
               id="status"
               name="status"
               defaultValue={p.status}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
+          </FormField>
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? "Saving…" : isEdit ? "Save" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-[var(--foreground)] hover:bg-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            </Button>
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

@@ -4,50 +4,71 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Suspense } from "react";
 import { useTransition, useState, useEffect, useRef } from "react";
-import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus } from "../actions";
+import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus, bulkUpdateWorkOrderStatus, bulkDeleteWorkOrders, exportWorkOrdersCsv } from "../actions";
 import type { WorkOrder, WorkOrderPrefill } from "./work-order-form-modal";
 import { WorkOrderFormModal } from "./work-order-form-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
-import { WorkOrderStats } from "./work-order-stats";
-import { WorkOrderStatusBadge } from "./work-order-status-badge";
-import { WorkOrderPriorityBadge } from "./work-order-priority-badge";
+import { WorkOrderKpiBar, type WorkOrderKpiStats } from "./work-order-kpi-bar";
+import { WorkOrderSavedViews } from "./work-order-saved-views";
+import { TodaysFocusPanel } from "./todays-focus-panel";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
+import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
+import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
+import { ClipboardList } from "lucide-react";
+import { PageHeader } from "@/src/components/ui/page-header";
+import { ActionBar } from "@/src/components/ui/action-bar";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
+import { Hint } from "@/src/components/ui/hint";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { HelpDrawer } from "@/src/components/ui/help-drawer";
+import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 
-type CompanyOption = { id: string; name: string };
-type PropertyOption = { id: string; name: string; company_id: string };
-type BuildingOption = { id: string; name: string; property_id: string };
-type UnitOption = { id: string; name: string; building_id: string };
-type AssetOption = {
-  id: string;
-  name: string;
-  company_id: string;
-  property_id: string | null;
-  building_id: string | null;
-  unit_id: string | null;
-};
-type TechnicianOption = { id: string; name: string };
+import { formatDate } from "@/src/lib/date-utils";
+import type {
+  CompanyOption,
+  PropertyOption,
+  BuildingOption,
+  UnitOption,
+  AssetOption,
+  TechnicianOption,
+  VendorOption,
+} from "@/src/types/common";
 
-export type WorkOrderListStats = {
-  open: number;
-  assigned: number;
-  inProgress: number;
-  dueToday: number;
+export type WorkOrderListStats = WorkOrderKpiStats & {
+  new: number;
+  readyToSchedule: number;
+  scheduled: number;
   completedThisWeek: number;
 };
 
 type WorkOrderListRow = WorkOrder & {
   technician_name?: string;
   crew_name?: string;
+  vendor_name?: string;
   company_name?: string;
   customer_name?: string;
   location?: string;
   asset_name?: string;
 };
 
-const STATUS_OPTIONS_QUICK = ["open", "assigned", "in_progress", "on_hold", "cancelled", "closed"] as const;
+const STATUS_OPTIONS_QUICK = [
+  "new",
+  "ready_to_schedule",
+  "scheduled",
+  "in_progress",
+  "on_hold",
+  "cancelled",
+] as const;
 
 type CustomerOption = { id: string; name: string; company_id: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type SlaPolicyOption = {
+  company_id: string;
+  priority: string;
+  response_target_minutes: number;
+};
 
 type WorkOrdersListProps = {
   workOrders: WorkOrderListRow[];
@@ -60,6 +81,8 @@ type WorkOrdersListProps = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors: VendorOption[];
+  slaPolicies: SlaPolicyOption[];
   initialPrefill?: WorkOrderPrefill | null;
   autoOpenNew?: boolean;
   initialEditId?: string | null;
@@ -69,20 +92,14 @@ type WorkOrdersListProps = {
 function assignedDisplay(wo: WorkOrderListRow): string {
   const tech = wo.technician_name;
   const crew = wo.crew_name;
+  const vendor = wo.vendor_name;
   if (tech && crew) return `${tech} / ${crew}`;
+  if (tech && vendor) return `${tech} / ${vendor}`;
+  if (crew && vendor) return `${crew} / ${vendor}`;
   if (tech) return tech;
   if (crew) return crew;
+  if (vendor) return vendor;
   return "—";
-}
-
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    const d = new Date(val);
-    return d.toLocaleDateString(undefined, { dateStyle: "short" });
-  } catch {
-    return "—";
-  }
 }
 
 export function WorkOrdersList({
@@ -96,6 +113,8 @@ export function WorkOrdersList({
   assets,
   technicians,
   crews,
+  vendors,
+  slaPolicies,
   initialPrefill = null,
   autoOpenNew = false,
   initialEditId = null,
@@ -109,9 +128,28 @@ export function WorkOrdersList({
   const [prefill, setPrefill] = useState<WorkOrderPrefill | null>(initialPrefill);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [assigningWorkOrder, setAssigningWorkOrder] = useState<WorkOrderListRow | null>(null);
-  const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [detailDrawerRow, setDetailDrawerRow] = useState<WorkOrderListRow | null>(null);
+  const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [slaModalOpen, setSlaModalOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === initialList.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(initialList.map((wo) => wo.id)));
+  };
+  const clearSelection = () => setSelectedIds(new Set());
 
   useEffect(() => {
     setPrefill(initialPrefill);
@@ -168,7 +206,6 @@ export function WorkOrdersList({
     router.refresh();
   };
   const setStatusForRow = (wo: WorkOrderListRow, newStatus: string) => {
-    setStatusDropdownId(null);
     startTransition(async () => {
       const result = await updateWorkOrderStatus(wo.id, newStatus);
       if (result.error) setMessage({ type: "error", text: result.error });
@@ -177,6 +214,52 @@ export function WorkOrdersList({
         router.refresh();
       }
     });
+  };
+
+  const handleBulkStatus = (newStatus: string) => {
+    setBulkStatusDropdown(false);
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      const result = await bulkUpdateWorkOrderStatus(ids, newStatus);
+      if (result.error) setMessage({ type: "error", text: result.error });
+      else {
+        setMessage({ type: "success", text: `Status updated for ${ids.length} work order(s).` });
+        setSelectedIds(new Set());
+        router.refresh();
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} work order(s)? This cannot be undone.`)) return;
+    startTransition(async () => {
+      const result = await bulkDeleteWorkOrders(ids);
+      if (result.error) setMessage({ type: "error", text: result.error });
+      else {
+        setMessage({ type: "success", text: `Deleted ${ids.length} work order(s).` });
+        setSelectedIds(new Set());
+        router.refresh();
+      }
+    });
+  };
+
+  const handleExport = async (ids: string[]) => {
+    const result = await exportWorkOrdersCsv(ids);
+    if (result.error) {
+      setMessage({ type: "error", text: result.error });
+      return;
+    }
+    const blob = new Blob([result.data!], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `work-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessage({ type: "success", text: "Export downloaded." });
   };
 
   if (initialError) {
@@ -201,89 +284,299 @@ export function WorkOrdersList({
           {message.text}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-medium text-[var(--foreground)]">Work Orders</h2>
-          <p className="text-sm text-[var(--muted)]">Create and track maintenance and service jobs</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<ClipboardList className="size-5" />}
+        title="Work Order Command Center"
+        subtitle="Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations."
+        actions={
+          <div className="flex items-center gap-2">
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
+            <div className="relative">
+            <button
+              type="button"
+              onClick={() => setQuickActionsOpen((v) => !v)}
+              className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
+            >
+              Quick actions ▾
+            </button>
+            {quickActionsOpen && (
+              <>
+                <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => { openNew(); setQuickActionsOpen(false); }}
+                    className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+                  >
+                    Create work order
+                  </button>
+                  {selectedIds.size > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { handleBulkStatus("in_progress"); setQuickActionsOpen(false); }}
+                        disabled={isPending}
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
+                      >
+                        Mark selected in progress
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport(Array.from(selectedIds))}
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+                      >
+                        Export selected
+                      </button>
+                    </>
+                  )}
+                  <a
+                    href="/dispatch"
+                    className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
+                    onClick={() => setQuickActionsOpen(false)}
+                  >
+                    Open dispatch board
+                  </a>
+                </div>
+                <div className="fixed inset-0 z-10" aria-hidden onClick={() => setQuickActionsOpen(false)} />
+              </>
+            )}
+          </div>
+            </TooltipTrigger>
+            <TooltipContent>Quick actions menu</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
+              <HelpTriggerButton onClick={() => setHelpOpen(true)} />
+            </TooltipTrigger>
+            <TooltipContent>Open a simple guide for this screen</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
-            disabled
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--muted)] opacity-70"
-            title="Export (coming soon)"
+            onClick={() => setSlaModalOpen(true)}
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
+          >
+            SLA Settings
+          </button>
+            </TooltipTrigger>
+            <TooltipContent>Configure SLA targets</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
+          <button
+            type="button"
+            onClick={() => handleExport(initialList.map((w) => w.id))}
+            className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)]"
           >
             Export
           </button>
+            </TooltipTrigger>
+            <TooltipContent>Export to CSV</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
             onClick={openNew}
-            className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+            className="rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             New Work Order
           </button>
+            </TooltipTrigger>
+            <TooltipContent>Create work order</TooltipContent>
+          </Tooltip>
+          </div>
+        }
+      />
+
+      {initialList.length > 0 && (
+        <TodaysFocusPanel workOrders={initialList} />
+      )}
+      {initialList.length > 0 && stats.readyToSchedule + stats.new >= 5 && (
+        <Hint
+          id="work-orders-many-unassigned"
+          variant="banner"
+          message="You have several work orders not yet assigned. Open Dispatch to drag-and-drop jobs onto technicians or crews."
+          action={
+            <Link href="/dispatch" className="mt-1 inline-block text-sm font-medium text-[var(--accent)] hover:underline">
+              Open Dispatch →
+            </Link>
+          }
+        />
+      )}
+      <div data-tour="demo-guided:completion">
+        <div data-tour="work-orders:statuses">
+        <WorkOrderKpiBar
+          stats={{
+            open: stats.open,
+            inProgress: stats.inProgress,
+            onHold: stats.onHold,
+            overdue: stats.overdue,
+            dueToday: stats.dueToday,
+            completedToday: stats.completedToday,
+          }}
+        />
         </div>
       </div>
-
-      <WorkOrderStats stats={stats} />
-
+      <Suspense fallback={null}>
+        <WorkOrderSavedViews />
+      </Suspense>
       <Suspense fallback={<div className="h-12 animate-pulse rounded-lg bg-[var(--card-border)]/50" />}>
+        <div data-tour="work-orders:scheduling">
         <WorkOrderFilters
           options={{
             companies,
             properties,
+            buildings,
+            units,
+            assets,
             technicians,
             crews,
           }}
         />
+        </div>
       </Suspense>
 
-      {initialList.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
-          <p className="text-[var(--muted)]">No work orders yet.</p>
+      {selectedIds.size > 0 && (
+        <ActionBar className="flex flex-wrap items-center gap-3 border-[var(--accent)]/30 bg-[var(--accent)]/5">
+          <span className="text-sm font-medium text-[var(--foreground)]">
+            {selectedIds.size} selected
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setBulkStatusDropdown((v) => !v)}
+              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            >
+              Change status
+            </button>
+            {bulkStatusDropdown && (
+              <>
+                <div className="absolute left-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
+                  {STATUS_OPTIONS_QUICK.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleBulkStatus(s)}
+                      disabled={isPending}
+                      className="block w-full px-3 py-1.5 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
+                    >
+                      {s.replace(/_/g, " ")}
+                    </button>
+                  ))}
+                </div>
+                <div className="fixed inset-0 z-0" aria-hidden onClick={() => setBulkStatusDropdown(false)} />
+              </>
+            )}
+          </div>
           <button
             type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+            onClick={() => handleExport(Array.from(selectedIds))}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
           >
-            Create your first work order
+            Export selected
           </button>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={isPending}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            Delete selected
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+          >
+            Clear selection
+          </button>
+        </ActionBar>
+      )}
+
+      {initialList.length === 0 ? (
+        <div className="rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card)] py-16 text-center shadow-[var(--shadow-soft)]">
+          <ClipboardList className="mx-auto mb-3 size-9 text-[var(--muted)]/40" strokeWidth={1.5} />
+          <p className="text-sm font-medium text-[var(--foreground)]">No work orders found</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Try adjusting your filters, or create a new work order to get started.
+          </p>
+          <div className="mt-5 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/work-orders")}
+              className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            >
+              Clear filters
+            </button>
+            <button
+              type="button"
+              onClick={openNew}
+              className="rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)]"
+            >
+              New Work Order
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div data-tour="demo-guided:execution">
+        <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/90 shadow-[var(--shadow-soft)]" data-tour="work-orders:assignment">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Work Order #</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Title</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Company</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Customer</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property / Location</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Asset</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Priority</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Scheduled</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Assigned To</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Updated</th>
-                  <th className="w-28 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="w-10 px-2 py-3">
+                    <input
+                      type="checkbox"
+                      checked={initialList.length > 0 && selectedIds.size === initialList.length}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all"
+                      className="rounded border-[var(--card-border)]"
+                    />
+                  </th>
+                  <th className="px-4 py-3 font-semibold">Work Order #</th>
+                  <th className="px-4 py-3 font-semibold">Title</th>
+                  <th className="px-4 py-3 font-semibold">Company</th>
+                  <th className="px-4 py-3 font-semibold">Customer</th>
+                  <th className="px-4 py-3 font-semibold">Property / Location</th>
+                  <th className="px-4 py-3 font-semibold">Asset</th>
+                  <th className="px-4 py-3 font-semibold">Source</th>
+                  <th className="px-4 py-3 font-semibold">Priority</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Scheduled</th>
+                  <th className="px-4 py-3 font-semibold">Assigned To</th>
+                  <th className="px-4 py-3 font-semibold">Updated</th>
+                  <th className="w-28 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-tour="work-orders:completion">
                 {initialList.map((wo) => (
                   <tr
                     key={wo.id}
-                    className={`border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50 ${
-                      wo.status === "completed" || wo.status === "closed"
-                        ? "bg-[var(--muted)]/5"
+                    onClick={() => setDetailDrawerRow(wo)}
+                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/60 cursor-pointer ${
+                      wo.status === "completed"
+                        ? "bg-[var(--muted)]/5 opacity-80"
                         : ""
                     } ${
-                      wo.priority === "emergency"
+                      wo.priority === "emergency" || wo.priority === "urgent"
                         ? "border-l-4 border-l-red-500 bg-red-500/5 dark:border-l-red-400 dark:bg-red-500/10"
+                        : wo.priority === "high"
+                        ? "border-l-4 border-l-amber-400 bg-amber-50/40 dark:border-l-amber-400 dark:bg-amber-500/5"
                         : ""
                     }`}
                   >
-                    <td className="px-4 py-3">
+                    <td className="w-10 px-2 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(wo.id)}
+                        onChange={() => toggleSelect(wo.id)}
+                        aria-label={`Select ${wo.title ?? wo.id}`}
+                        className="rounded border-[var(--card-border)]"
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
                       <Link
                         href={`/work-orders/${wo.id}`}
                         className="font-medium text-[var(--accent)] hover:underline"
@@ -291,89 +584,86 @@ export function WorkOrdersList({
                         {wo.work_order_number ?? "—"}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[var(--foreground)]">
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">
                       <Link href={`/work-orders/${wo.id}`} className="hover:underline">
                         {wo.title}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{wo.company_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{wo.customer_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)] max-w-[140px] truncate" title={wo.location ?? undefined}>{wo.location ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{wo.asset_name ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <WorkOrderPriorityBadge priority={wo.priority ?? "medium"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <WorkOrderStatusBadge status={wo.status ?? "open"} />
-                    </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{assignedDisplay(wo)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link
-                          href={`/work-orders/${wo.id}`}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          View
-                        </Link>
-                        <span className="text-[var(--muted)]">|</span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); setAssigningWorkOrder(wo); }}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Assign
-                        </button>
-                        <span className="text-[var(--muted)]">|</span>
-                        <div className="relative inline-block">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); setStatusDropdownId((id) => (id === wo.id ? null : wo.id)); }}
-                            className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.company_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.customer_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)] max-w-[140px] truncate" title={wo.location ?? undefined}>{wo.location ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.asset_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
+                      {(wo.source_type as string | undefined) === "preventive_maintenance" ? (
+                        (wo.preventive_maintenance_plan_id as string | undefined) ? (
+                          <Link
+                            href={`/preventive-maintenance/${wo.preventive_maintenance_plan_id as string}`}
+                            className="text-[var(--accent)] hover:underline"
                           >
-                            Change status
-                          </button>
-                          {statusDropdownId === wo.id && (
-                            <>
-                              <div className="absolute left-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
-                                {STATUS_OPTIONS_QUICK.map((s) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => setStatusForRow(wo, s)}
-                                    disabled={isPending}
-                                    className="block w-full px-3 py-1.5 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
-                                  >
-                                    {s.replace(/_/g, " ")}
-                                  </button>
-                                ))}
-                              </div>
-                              <div
-                                className="fixed inset-0 z-0"
-                                aria-hidden
-                                onClick={() => setStatusDropdownId(null)}
-                              />
-                            </>
-                          )}
-                        </div>
-                        <span className="text-[var(--muted)]">|</span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); openEdit(wo); }}
-                          className="rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); handleDelete(wo.id, wo.title); }}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                            PM
+                          </Link>
+                        ) : (
+                          "PM"
+                        )
+                      ) : (
+                        "Manual"
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <PriorityBadge priority={wo.priority ?? "medium"} />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={wo.status ?? "new"} />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {(() => {
+                        const today = new Date().toISOString().slice(0, 10);
+                        const dueDate = (wo as Record<string, unknown>).due_date as string | null | undefined;
+                        const isOverdue = dueDate && dueDate < today && wo.status !== "completed" && wo.status !== "cancelled";
+                        return (
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</span>
+                            {isOverdue && (
+                              <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                                Overdue
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {(() => {
+                        const display = assignedDisplay(wo);
+                        const unassigned = !wo.assigned_technician_id && !wo.assigned_crew_id && !wo.vendor_id;
+                        if (unassigned) {
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-400">
+                              <span className="size-1.5 rounded-full bg-orange-400" aria-hidden />
+                              Unassigned
+                            </span>
+                          );
+                        }
+                        return <span className="text-[var(--muted)]">{display}</span>;
+                      })()}
+                    </td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
+                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      <ActionsDropdown
+                        align="right"
+                        items={[
+                          { type: "link", label: "View", href: `/work-orders/${wo.id}` },
+                          { type: "button", label: "Assign", onClick: () => setAssigningWorkOrder(wo) },
+                          ...STATUS_OPTIONS_QUICK.map((s) => ({
+                            type: "button" as const,
+                            label: `Mark ${s.replace(/_/g, " ")}`,
+                            onClick: () => setStatusForRow(wo, s),
+                            disabled: isPending,
+                          })),
+                          { type: "button", label: "Edit", onClick: () => openEdit(wo) },
+                          { type: "button", label: "Delete", onClick: () => handleDelete(wo.id, wo.title), disabled: isPending, destructive: true },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -381,23 +671,112 @@ export function WorkOrdersList({
             </table>
           </div>
         </div>
+        </div>
       )}
 
-      <WorkOrderFormModal
-        open={modalOpen}
-        onClose={closeModal}
-        workOrder={editingWorkOrder}
-        prefill={editingWorkOrder ? null : prefill}
-        companies={companies}
-        customers={customers}
-        properties={properties}
-        buildings={buildings}
-        units={units}
-        assets={assets}
-        technicians={technicians}
-        crews={crews}
-        saveAction={saveWorkOrder}
+      {modalOpen ? (
+        <WorkOrderFormModal
+          key={editingWorkOrder?.id ?? "new-work-order"}
+          open={modalOpen}
+          onClose={closeModal}
+          workOrder={editingWorkOrder}
+          prefill={editingWorkOrder ? null : prefill}
+          companies={companies}
+          customers={customers}
+          properties={properties}
+          buildings={buildings}
+          units={units}
+          assets={assets}
+          technicians={technicians}
+          crews={crews}
+          vendors={vendors}
+          saveAction={saveWorkOrder}
+        />
+      ) : null}
+
+      <WorkOrderDetailDrawer
+        workOrder={detailDrawerRow}
+        onClose={() => setDetailDrawerRow(null)}
+        onAssign={() => {
+          if (detailDrawerRow) setAssigningWorkOrder(detailDrawerRow);
+          setDetailDrawerRow(null);
+        }}
+        onEdit={() => {
+          if (detailDrawerRow) {
+            setEditingWorkOrder(detailDrawerRow as WorkOrder);
+            setModalOpen(true);
+          }
+          setDetailDrawerRow(null);
+        }}
       />
+
+      <HelpDrawer
+        title="How to use Work Orders"
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+      >
+        <p className="mb-3 text-sm text-[var(--muted)]">
+          This screen is your home base for managing maintenance jobs. Use it to see what work
+          exists, who it is assigned to, and what needs attention today.
+        </p>
+
+        <h3 className="mb-1 text-sm font-semibold">What this screen is for</h3>
+        <p className="mb-3">
+          The Work Orders screen tracks individual maintenance jobs that need to be done. Each row
+          represents a task with a status, priority, and assignment.
+        </p>
+
+        <h3 className="mb-1 text-sm font-semibold">Who typically uses it</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>Maintenance supervisors</li>
+          <li>Dispatchers</li>
+          <li>Technicians</li>
+          <li>Operations managers</li>
+        </ul>
+
+        <h3 className="mb-1 text-sm font-semibold">Key things you can do</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>See all work orders for your tenant.</li>
+          <li>Filter by status, priority, technician, and more.</li>
+          <li>Open a work order to see full details.</li>
+          <li>Update status, schedule, and assignment where you have permission.</li>
+        </ul>
+
+        <h3 className="mb-1 text-sm font-semibold">Layout overview</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>
+            <strong>Top bar</strong>: title, quick actions, and saved views.
+          </li>
+          <li>
+            <strong>Filters</strong>: choose presets such as Open, In Progress, Overdue, or use
+            detailed filters.
+          </li>
+          <li>
+            <strong>Table</strong>: each row is a work order with key fields like number, title,
+            status, location, and assigned person.
+          </li>
+        </ul>
+
+        <h3 className="mb-1 text-sm font-semibold">How to review today&apos;s work</h3>
+        <ol className="mb-3 list-decimal space-y-1 pl-5">
+          <li>Use the preset views or filters to show open or overdue work.</li>
+          <li>Scan the table for high-priority or overdue jobs.</li>
+          <li>Click a row to open details in the drawer.</li>
+          <li>Update status or assignment as needed.</li>
+        </ol>
+
+        <h3 className="mb-1 text-sm font-semibold">Typical flow</h3>
+        <p className="mb-1">
+          Request submitted → Work order created → Scheduled and assigned → Completed.
+        </p>
+
+        <h3 className="mb-1 text-sm font-semibold">Tips</h3>
+        <ul className="mb-2 list-disc space-y-1 pl-5">
+          <li>Use clear titles so work is easy to find later.</li>
+          <li>Keep statuses up to date so the board reflects reality.</li>
+          <li>Link work orders to assets when possible so history is complete.</li>
+        </ul>
+      </HelpDrawer>
 
       {assigningWorkOrder && (
         <WorkOrderAssignmentModal
@@ -409,18 +788,28 @@ export function WorkOrdersList({
           initial={{
             assigned_technician_id: assigningWorkOrder.assigned_technician_id ?? null,
             assigned_crew_id: assigningWorkOrder.assigned_crew_id ?? null,
+            assigned_vendor_id: assigningWorkOrder.vendor_id ?? null,
             scheduled_date: assigningWorkOrder.scheduled_date ?? null,
             scheduled_start: assigningWorkOrder.scheduled_start ?? null,
             scheduled_end: assigningWorkOrder.scheduled_end ?? null,
           }}
           technicians={technicians}
           crews={crews}
+          vendors={vendors}
           onSuccess={() => {
             setAssigningWorkOrder(null);
             router.refresh();
           }}
         />
       )}
+      <WorkOrderSlaSettingsModal
+        key={slaModalOpen ? "sla-open" : "sla-closed"}
+        open={slaModalOpen}
+        onClose={() => setSlaModalOpen(false)}
+        companies={companies}
+        policies={slaPolicies}
+        onSaved={() => router.refresh()}
+      />
     </div>
   );
 }

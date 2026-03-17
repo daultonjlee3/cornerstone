@@ -2,25 +2,36 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState, useCallback, useEffect } from "react";
+import { useTransition, useState, useCallback } from "react";
 import { deleteAsset, updateAssetStatus } from "../actions";
 import type { Asset } from "./asset-form-modal";
 import { AssetFormModal } from "./asset-form-modal";
 import { WorkOrderFormModal } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
 import type { WorkOrderPrefill } from "@/app/(authenticated)/work-orders/components/work-order-form-modal";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { Hint } from "@/src/components/ui/hint";
+import { ActionsDropdown, type ActionsDropdownItem } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
+import { PreventiveMaintenancePlanFormModal } from "@/app/(authenticated)/preventive-maintenance/components/pm-plan-form-modal";
 
 type CompanyOption = { id: string; name: string };
-type PropertyOption = { id: string; name: string; company_id?: string };
-type BuildingOption = { id: string; name: string; property_id?: string };
-type UnitOption = { id: string; name: string; building_id?: string };
+type PropertyOption = { id: string; name: string; company_id?: string | undefined };
+type BuildingOption = { id: string; name: string; property_id?: string | undefined };
+type UnitOption = { id: string; name: string; building_id?: string | undefined };
 
 export type AssetRow = Asset & {
   property_name?: string;
   building_name?: string;
   unit_name?: string;
   company_name?: string;
+  parent_asset_name?: string | null;
+  parent_asset_id?: string | null;
+  is_parent_asset?: boolean;
+  child_count?: number;
   asset_type?: string | null;
   condition?: string | null;
+  health_score?: number | null;
+  failure_risk?: number | null;
 };
 
 type FilterParams = {
@@ -30,10 +41,13 @@ type FilterParams = {
   type: string;
   condition: string;
   status: string;
+  health_status: string;
+  hierarchy: string;
 };
 
 type StatusOption = { value: string; label: string };
 
+/** Option types compatible with WorkOrderFormModal (ids may be optional from page data). */
 type WorkOrderFormData = {
   companies: { id: string; name: string }[];
   customers: { id: string; name: string; company_id: string }[];
@@ -43,6 +57,7 @@ type WorkOrderFormData = {
   assets: { id: string; name: string; company_id: string; property_id: string | null; building_id: string | null; unit_id: string | null }[];
   technicians: { id: string; name: string }[];
   crews: { id: string; name: string; company_id: string | null }[];
+  vendors: { id: string; name: string; company_id: string; service_type?: string | null }[];
   saveWorkOrder: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
 };
 
@@ -57,8 +72,20 @@ type AssetsListProps = {
   statusOptions: readonly StatusOption[];
   filterParams: FilterParams;
   error?: string | null;
-  saveAction: (payload: FormData) => Promise<{ error?: string; success?: boolean }>;
+  saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  pmPlanCount?: number;
+  pmModalData?: {
+    companies: { id: string; name: string }[];
+    assets: { id: string; name: string; company_id: string; property_id: string | null; building_id: string | null; unit_id: string | null }[];
+    technicians: { id: string; name: string; company_id: string }[];
+    saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  } | null;
   workOrderFormData?: WorkOrderFormData | null;
+  parentCandidates: { id: string; name: string; company_id: string; parent_asset_id: string | null }[];
+  /** When set, pagination is shown. Omit when not using server-side pagination. */
+  totalCount?: number | null;
+  page?: number;
+  pageSize?: number;
 };
 
 function assetDisplayName(a: AssetRow): string {
@@ -72,6 +99,14 @@ function locationDisplay(a: AssetRow): string {
 
 function typeDisplay(a: AssetRow): string {
   return a.asset_type ?? a.category ?? "—";
+}
+
+function healthToneClass(score: number): string {
+  if (score >= 90) return "bg-emerald-100 text-emerald-700";
+  if (score >= 70) return "bg-blue-100 text-blue-700";
+  if (score >= 50) return "bg-amber-100 text-amber-700";
+  if (score >= 30) return "bg-orange-100 text-orange-700";
+  return "bg-red-100 text-red-700";
 }
 
 /** Build work order prefill from asset for quick-dispatch modal. Populates full location hierarchy. */
@@ -113,6 +148,12 @@ export function AssetsList({
   error: initialError,
   saveAction,
   workOrderFormData,
+  pmPlanCount = 0,
+  pmModalData = null,
+  parentCandidates,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
 }: AssetsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,10 +161,8 @@ export function AssetsList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
-  const [searchLocal, setSearchLocal] = useState(filterParams.q);
   const [selectedAssetForWO, setSelectedAssetForWO] = useState<AssetRow | null>(null);
-
-  useEffect(() => setSearchLocal(filterParams.q), [filterParams.q]);
+  const [selectedAssetForPM, setSelectedAssetForPM] = useState<AssetRow | null>(null);
 
   const applyFilters = useCallback(
     (updates: Record<string, string>) => {
@@ -137,7 +176,20 @@ export function AssetsList({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    applyFilters({ q: searchLocal.trim() });
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const get = (key: string) => (formData.get(key) != null ? String(formData.get(key)).trim() : "");
+    applyFilters({
+      q: get("q"),
+      company_id: get("company_id"),
+      property_id: get("property_id"),
+      type: get("type"),
+      condition: get("condition"),
+      status: get("status"),
+      health_status: get("health_status"),
+      hierarchy: get("hierarchy"),
+      page: "1",
+    });
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -197,7 +249,7 @@ export function AssetsList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="assets:asset-list">
       {message && (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -210,7 +262,20 @@ export function AssetsList({
           {message.text}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {initialAssets.length > 0 && pmPlanCount === 0 && (
+        <Hint
+          id="assets-no-pm"
+          variant="card"
+          title="Suggest preventive maintenance"
+          message="You have assets but no PM schedules. Create recurring plans to auto-generate work orders and keep equipment maintained."
+          action={
+            <Link href="/preventive-maintenance" className="text-sm font-medium text-[var(--accent)] hover:underline">
+              Go to Preventive Maintenance →
+            </Link>
+          }
+        />
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-4" data-tour="assets:schedule-pm">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Assets</h2>
         <button
           type="button"
@@ -230,9 +295,9 @@ export function AssetsList({
             </label>
             <input
               id="assets-q"
+              name="q"
               type="search"
-              value={searchLocal}
-              onChange={(e) => setSearchLocal(e.target.value)}
+              defaultValue={filterParams.q}
               placeholder="Name, tag, model, serial..."
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             />
@@ -243,6 +308,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-company"
+              name="company_id"
               value={filterParams.company_id}
               onChange={(e) =>
                 applyFilters({ company_id: e.target.value, property_id: "" })
@@ -281,6 +347,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-type"
+              name="type"
               value={filterParams.type}
               onChange={(e) => applyFilters({ type: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -299,6 +366,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-condition"
+              name="condition"
               value={filterParams.condition}
               onChange={(e) => applyFilters({ condition: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -317,6 +385,7 @@ export function AssetsList({
             </label>
             <select
               id="assets-status"
+              name="status"
               value={filterParams.status}
               onChange={(e) => applyFilters({ status: e.target.value })}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -329,13 +398,47 @@ export function AssetsList({
               ))}
             </select>
           </div>
+          <div className="w-36">
+            <label htmlFor="assets-health-status" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Health
+            </label>
+            <select
+              id="assets-health-status"
+              value={filterParams.health_status}
+              onChange={(e) => applyFilters({ health_status: e.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            >
+              <option value="">All</option>
+              <option value="excellent">Excellent</option>
+              <option value="good">Good</option>
+              <option value="warning">Warning</option>
+              <option value="poor">Poor</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div className="w-40">
+            <label htmlFor="assets-hierarchy" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Hierarchy
+            </label>
+            <select
+              id="assets-hierarchy"
+              name="hierarchy"
+              value={filterParams.hierarchy}
+              onChange={(e) => applyFilters({ hierarchy: e.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            >
+              <option value="">All assets</option>
+              <option value="parents">Parent assets only</option>
+              <option value="sub_assets">Sub-assets only</option>
+            </select>
+          </div>
           <button
             type="submit"
             className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             Search
           </button>
-          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status) && (
+          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy) && (
             <button
               type="button"
               onClick={() =>
@@ -346,6 +449,8 @@ export function AssetsList({
                   type: "",
                   condition: "",
                   status: "",
+                  health_status: "",
+                  hierarchy: "",
                 })
               }
               className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
@@ -357,59 +462,111 @@ export function AssetsList({
       </div>
 
       {initialAssets.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
-          <p className="text-[var(--muted)]">
-            {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status
-              ? "No assets match your filters."
-              : "No assets yet."}
-          </p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
-            Add your first asset
-          </button>
+        <div className="space-y-4">
+          {!filterParams.q && !filterParams.company_id && !filterParams.property_id && !filterParams.type && !filterParams.condition && !filterParams.status && !filterParams.health_status && !filterParams.hierarchy && (
+            <Hint
+              id="assets-no-assets"
+              variant="empty-state"
+              message="Assets are the foundation of maintenance tracking. Add equipment and systems here, then link work orders and preventive maintenance to them."
+            />
+          )}
+          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+            <p className="text-[var(--muted)]">
+              {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy
+                ? "No assets match your filters."
+                : "No assets yet."}
+            </p>
+            <button
+              type="button"
+              onClick={openNew}
+              className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+            >
+              Add your first asset
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm" data-tour="assets:asset-detail">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1080px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Asset</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Type</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Building</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Unit</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Manufacturer</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Model</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Condition</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="w-40 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
+                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                  <th className="px-4 py-3 font-semibold">Asset</th>
+                  <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Hierarchy</th>
+                  <th className="px-4 py-3 font-semibold">Health</th>
+                  <th className="px-4 py-3 font-semibold">Property</th>
+                  <th className="px-4 py-3 font-semibold">Building</th>
+                  <th className="px-4 py-3 font-semibold">Unit</th>
+                  <th className="px-4 py-3 font-semibold">Manufacturer</th>
+                  <th className="px-4 py-3 font-semibold">Model</th>
+                  <th className="px-4 py-3 font-semibold">Condition</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="w-28 px-4 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-tour="assets:maintenance-history">
                 {initialAssets.map((a) => (
                   <tr
                     key={a.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
+                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >
-                    <td className="px-4 py-3 text-[var(--foreground)]">
-                      <Link
-                        href={`/assets/${a.id}`}
-                        className="font-medium text-[var(--accent)] hover:underline"
-                      >
-                        {assetDisplayName(a)}
-                      </Link>
+                    <td className="px-4 py-3.5 text-[var(--foreground)]">
+                      <div>
+                        <Link
+                          href={`/assets/${a.id}`}
+                          className="font-medium text-[var(--accent)] hover:underline"
+                        >
+                          {assetDisplayName(a)}
+                        </Link>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {(a.child_count ?? 0) > 0 ? (
+                            <span className="inline-flex rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                              Parent
+                            </span>
+                          ) : null}
+                          {a.parent_asset_id ? (
+                            <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300">
+                              Sub-asset
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{typeDisplay(a)}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.property_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.building_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.unit_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.manufacturer ?? "—"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.model ?? "—"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{typeDisplay(a)}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
+                      {a.parent_asset_id && a.parent_asset_name ? (
+                        <span>Child of {a.parent_asset_name}</span>
+                      ) : (a.child_count ?? 0) > 0 ? (
+                        <span>{a.child_count} sub-assets</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {a.health_score != null ? (
+                        <div className="space-y-1">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${healthToneClass(
+                              Number(a.health_score)
+                            )}`}
+                          >
+                            {Number(a.health_score).toFixed(0)}
+                          </span>
+                          <p className="text-[11px] text-[var(--muted)]">
+                            Risk {a.failure_risk != null ? Number(a.failure_risk).toFixed(0) : "—"}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-[var(--muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.property_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.building_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.unit_name ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.manufacturer ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.model ?? "—"}</td>
+                    <td className="px-4 py-3.5">
                       {a.condition ? (
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -428,76 +585,44 @@ export function AssetsList({
                         "—"
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          a.status === "active"
-                            ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                            : a.status === "retired"
-                            ? "bg-[var(--muted)]/30 text-[var(--muted)]"
-                            : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
-                      >
-                        {a.status}
-                      </span>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={a.status} />
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/assets/${a.id}`}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          View
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(a)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        {a.status === "active" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(a.id, "inactive", assetDisplayName(a))}
-                              disabled={isPending}
-                              className="rounded text-amber-600 hover:underline disabled:opacity-50 dark:text-amber-400"
-                            >
-                              Set inactive
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(a.id, "retired", assetDisplayName(a))}
-                              disabled={isPending}
-                              className="rounded text-[var(--muted)] hover:underline disabled:opacity-50"
-                            >
-                              Retire
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => openCreateWO(a)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Create WO
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(a.id, assetDisplayName(a))}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <td className="px-4 py-3.5" data-tour="assets:create-wo" onClick={(e) => e.stopPropagation()}>
+                      <ActionsDropdown
+                        align="right"
+                        items={[
+                          { type: "link", label: "View", href: `/assets/${a.id}` },
+                          { type: "button", label: "Edit", onClick: () => openEdit(a) },
+                          ...(a.status === "active"
+                            ? [
+                                { type: "button" as const, label: "Set inactive", onClick: () => handleStatusChange(a.id, "inactive", assetDisplayName(a)), disabled: isPending },
+                                { type: "button" as const, label: "Retire", onClick: () => handleStatusChange(a.id, "retired", assetDisplayName(a)), disabled: isPending },
+                              ]
+                            : []),
+                          { type: "button", label: "Create WO", onClick: () => openCreateWO(a) },
+                          ...(pmModalData
+                            ? [{ type: "button" as const, label: "Schedule PM", onClick: () => setSelectedAssetForPM(a) }]
+                            : [{ type: "link" as const, label: "Schedule PM", href: `/preventive-maintenance?new=1&company_id=${encodeURIComponent(a.company_id)}&asset_id=${encodeURIComponent(a.id)}` }]),
+                          { type: "button", label: "Delete", onClick: () => handleDelete(a.id, assetDisplayName(a)), disabled: isPending, destructive: true },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyFilters({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyFilters({ page_size: String(size), page: "1" })}
+            />
+          )}
         </div>
       )}
 
@@ -509,26 +634,41 @@ export function AssetsList({
         properties={properties}
         buildings={buildings}
         units={units}
+        parentCandidates={parentCandidates}
         saveAction={saveAction}
       />
 
-      {workOrderFormData && (
+      {workOrderFormData && selectedAssetForWO ? (
         <WorkOrderFormModal
-          open={!!selectedAssetForWO}
+          open={true}
           onClose={closeWoModal}
           workOrder={null}
           prefill={selectedAssetForWO ? buildWoPrefillFromAsset(selectedAssetForWO) : null}
           companies={workOrderFormData.companies}
           customers={workOrderFormData.customers}
-          properties={workOrderFormData.properties}
-          buildings={workOrderFormData.buildings}
-          units={workOrderFormData.units}
+          properties={workOrderFormData.properties as { id: string; name: string; company_id: string }[]}
+          buildings={workOrderFormData.buildings as { id: string; name: string; property_id: string }[]}
+          units={workOrderFormData.units as { id: string; name: string; building_id: string }[]}
           assets={workOrderFormData.assets}
           technicians={workOrderFormData.technicians}
           crews={workOrderFormData.crews}
+          vendors={workOrderFormData.vendors}
           saveAction={workOrderFormData.saveWorkOrder}
         />
-      )}
+      ) : null}
+
+      {pmModalData && selectedAssetForPM ? (
+        <PreventiveMaintenancePlanFormModal
+          open={true}
+          onClose={() => setSelectedAssetForPM(null)}
+          plan={null}
+          companies={pmModalData.companies}
+          assets={pmModalData.assets}
+          technicians={pmModalData.technicians}
+          prefill={{ company_id: selectedAssetForPM.company_id, asset_id: selectedAssetForPM.id }}
+          saveAction={pmModalData.saveAction}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addWorkOrderPartUsage, type AddPartUsagePayload } from "../actions";
+import { formatDate } from "@/src/lib/date-utils";
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";
 const cardTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)]";
@@ -12,7 +13,9 @@ const inputClass =
 
 type PartUsageRow = {
   id: string;
+  product_id?: string | null;
   quantity_used: number;
+  unit_cost_snapshot?: number | null;
   unit_cost: number | null;
   total_cost: number | null;
   created_at: string;
@@ -20,11 +23,16 @@ type PartUsageRow = {
   sku_snapshot: string | null;
   unit_of_measure: string | null;
   used_at: string | null;
+  stock_location_name?: string | null;
+  notes?: string | null;
 };
 
 type InventoryItemOption = {
   id: string;
+  product_id: string;
+  stock_location_id: string;
   name: string;
+  location_name: string;
   sku: string | null;
   unit: string | null;
   cost: number | null;
@@ -38,15 +46,6 @@ type WorkOrderPartsCardProps = {
   inventoryItems: InventoryItemOption[];
 };
 
-function formatDate(val: string | null | undefined): string {
-  if (!val) return "—";
-  try {
-    return new Date(val).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
-  } catch {
-    return "—";
-  }
-}
-
 export function WorkOrderPartsCard({
   workOrderId,
   partUsage,
@@ -56,22 +55,22 @@ export function WorkOrderPartsCard({
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [inventoryItemId, setInventoryItemId] = useState("");
+  const [inventoryOptionId, setInventoryOptionId] = useState("");
   const [partNameManual, setPartNameManual] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState("");
   const [notes, setNotes] = useState("");
   const [deductInventory, setDeductInventory] = useState(true);
 
-  const selectedItem = inventoryItemId
-    ? inventoryItems.find((i) => i.id === inventoryItemId)
+  const selectedItem = inventoryOptionId
+    ? inventoryItems.find((i) => i.id === inventoryOptionId)
     : null;
   const defaultUnitCost = selectedItem?.cost != null ? String(selectedItem.cost) : "";
   const effectiveUnitCost = unitCost !== "" ? unitCost : defaultUnitCost;
 
   const openModal = () => {
     setError(null);
-    setInventoryItemId("");
+    setInventoryOptionId("");
     setPartNameManual("");
     setQuantity("");
     setUnitCost("");
@@ -92,8 +91,8 @@ export function WorkOrderPartsCard({
       setError("Unit cost must be zero or greater.");
       return;
     }
-    if (!inventoryItemId && !partNameManual.trim()) {
-      setError("Select an inventory item or enter a part name.");
+    if (!inventoryOptionId && !partNameManual.trim()) {
+      setError("Select a stocked product or enter a part name.");
       return;
     }
 
@@ -101,10 +100,14 @@ export function WorkOrderPartsCard({
       quantity_used: qty,
       unit_cost: uc,
       notes: notes.trim() || undefined,
-      deduct_inventory: !!inventoryItemId && deductInventory,
+      deduct_inventory: !!inventoryOptionId && deductInventory,
     };
-    if (inventoryItemId) {
-      payload.inventory_item_id = inventoryItemId;
+    if (inventoryOptionId && selectedItem) {
+      payload.product_id = selectedItem.product_id;
+      payload.stock_location_id = selectedItem.stock_location_id;
+      payload.part_name_snapshot = selectedItem.name;
+      payload.sku_snapshot = selectedItem.sku ?? null;
+      payload.unit_of_measure = selectedItem.unit ?? null;
     } else {
       payload.part_name_snapshot = partNameManual.trim() || null;
     }
@@ -136,6 +139,7 @@ export function WorkOrderPartsCard({
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Unit</th>
                 <th className="py-2 text-right font-medium text-[var(--muted)]">Unit cost</th>
                 <th className="py-2 text-right font-medium text-[var(--muted)]">Total cost</th>
+                <th className="py-2 text-left font-medium text-[var(--muted)]">Stock location</th>
                 <th className="py-2 text-left font-medium text-[var(--muted)]">Used at</th>
               </tr>
             </thead>
@@ -147,11 +151,16 @@ export function WorkOrderPartsCard({
                   <td className="py-2 text-right text-[var(--foreground)]">{p.quantity_used}</td>
                   <td className="py-2 text-[var(--muted)]">{p.unit_of_measure ?? "—"}</td>
                   <td className="py-2 text-right text-[var(--foreground)]">
-                    {p.unit_cost != null ? `$${Number(p.unit_cost).toFixed(2)}` : "—"}
+                    {p.unit_cost_snapshot != null
+                      ? `$${Number(p.unit_cost_snapshot).toFixed(2)}`
+                      : p.unit_cost != null
+                      ? `$${Number(p.unit_cost).toFixed(2)}`
+                      : "—"}
                   </td>
                   <td className="py-2 text-right text-[var(--foreground)]">
                     {p.total_cost != null ? `$${Number(p.total_cost).toFixed(2)}` : "—"}
                   </td>
+                  <td className="py-2 text-[var(--muted)]">{p.stock_location_name ?? "—"}</td>
                   <td className="py-2 text-[var(--muted)]">{formatDate(p.used_at ?? p.created_at)}</td>
                 </tr>
               ))}
@@ -178,7 +187,7 @@ export function WorkOrderPartsCard({
                 Add part usage
               </h2>
               <p className="mt-0.5 text-xs text-[var(--muted)]">
-                Select an inventory item or enter manually. Optionally deduct from stock.
+                Select a product+location balance or enter manually. Optionally deduct from stock.
               </p>
             </div>
             <div className="space-y-4 p-4">
@@ -189,13 +198,13 @@ export function WorkOrderPartsCard({
               )}
               <div>
                 <label htmlFor="part-inventory-item" className="mb-1 block text-xs font-medium text-[var(--muted)]">
-                  Inventory item
+                  Product from inventory
                 </label>
                 <select
                   id="part-inventory-item"
-                  value={inventoryItemId}
+                  value={inventoryOptionId}
                   onChange={(e) => {
-                    setInventoryItemId(e.target.value);
+                    setInventoryOptionId(e.target.value);
                     setUnitCost("");
                   }}
                   className={inputClass}
@@ -205,12 +214,13 @@ export function WorkOrderPartsCard({
                     <option key={item.id} value={item.id}>
                       {item.name}
                       {item.sku ? ` (${item.sku})` : ""} — {item.quantity} on hand
+                      {item.location_name ? ` @ ${item.location_name}` : ""}
                       {item.cost != null ? ` · $${Number(item.cost).toFixed(2)}` : ""}
                     </option>
                   ))}
                 </select>
               </div>
-              {!inventoryItemId && (
+              {!inventoryOptionId && (
                 <div>
                   <label htmlFor="part-name-manual" className="mb-1 block text-xs font-medium text-[var(--muted)]">
                     Part / product name
@@ -266,7 +276,7 @@ export function WorkOrderPartsCard({
                   className={inputClass}
                 />
               </div>
-              {inventoryItemId && (
+              {inventoryOptionId && (
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -285,7 +295,7 @@ export function WorkOrderPartsCard({
                     isPending ||
                     !quantity ||
                     parseFloat(quantity) <= 0 ||
-                    (!inventoryItemId && !partNameManual.trim())
+                    (!inventoryOptionId && !partNameManual.trim())
                   }
                   className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
                 >

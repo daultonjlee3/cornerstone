@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { LocationBreadcrumb } from "@/src/components/ui/location-breadcrumb";
 
 export type WorkOrder = {
   id: string;
@@ -12,7 +13,9 @@ export type WorkOrder = {
   building_id: string | null;
   unit_id: string | null;
   asset_id: string | null;
+  vendor_id?: string | null;
   description: string | null;
+  safety_notes?: string | null;
   category: string | null;
   priority: string;
   status: string;
@@ -31,6 +34,9 @@ export type WorkOrder = {
   actual_hours: number | null;
   billable: boolean;
   nte_amount: number | null;
+  source_type?: string | null;
+  preventive_maintenance_plan_id?: string | null;
+  preventive_maintenance_run_id?: string | null;
   updated_at?: string | null;
   completed_at?: string | null;
 };
@@ -50,6 +56,7 @@ type AssetOption = {
 };
 type TechnicianOption = { id: string; name: string };
 type CrewOption = { id: string; name: string; company_id: string | null };
+type VendorOption = { id: string; name: string; company_id: string; service_type?: string | null };
 
 export type WorkOrderPrefill = {
   company_id?: string;
@@ -77,6 +84,7 @@ type WorkOrderFormModalProps = {
   assets: AssetOption[];
   technicians: TechnicianOption[];
   crews: CrewOption[];
+  vendors: VendorOption[];
   saveAction: (
     prev: { error?: string; success?: boolean },
     formData: FormData
@@ -154,9 +162,10 @@ const emptyWorkOrder: WorkOrder = {
   unit_id: null,
   asset_id: null,
   description: null,
+  safety_notes: null,
   category: null,
   priority: "medium",
-  status: "open",
+  status: "new",
   requested_by_name: null,
   requested_by_email: null,
   requested_by_phone: null,
@@ -175,7 +184,14 @@ const emptyWorkOrder: WorkOrder = {
 };
 
 const PRIORITIES = ["low", "medium", "high", "urgent", "emergency"] as const;
-const STATUSES = ["open", "assigned", "in_progress", "on_hold", "completed", "cancelled", "closed"] as const;
+const STATUSES = [
+  "new",
+  "ready_to_schedule",
+  "scheduled",
+  "in_progress",
+  "on_hold",
+  "cancelled",
+] as const;
 const CATEGORIES = [
   "repair",
   "preventive_maintenance",
@@ -239,33 +255,21 @@ export function WorkOrderFormModal({
   assets,
   technicians,
   crews,
+  vendors,
   saveAction,
 }: WorkOrderFormModalProps) {
   const isEdit = !!workOrder?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
 
-  const initial = useMemo(
-    () => getInitialLocation(workOrder, prefill),
-    [workOrder?.id, prefill, open]
-  );
+  const initial = getInitialLocation(workOrder, prefill);
+  const defaultCompanyId = initial.companyId || (companies.length === 1 ? companies[0]?.id : "") || "";
 
-  const [companyId, setCompanyId] = useState(initial.companyId);
+  const [companyId, setCompanyId] = useState(defaultCompanyId);
   const [customerId, setCustomerId] = useState(initial.customerId);
   const [propertyId, setPropertyId] = useState(initial.propertyId);
   const [buildingId, setBuildingId] = useState(initial.buildingId);
   const [unitId, setUnitId] = useState(initial.unitId);
   const [assetId, setAssetId] = useState(initial.assetId);
-
-  useEffect(() => {
-    if (!open) return;
-    const next = getInitialLocation(workOrder, prefill);
-    setCompanyId(next.companyId);
-    setCustomerId(next.customerId);
-    setPropertyId(next.propertyId);
-    setBuildingId(next.buildingId);
-    setUnitId(next.unitId);
-    setAssetId(next.assetId);
-  }, [open, workOrder?.id, prefill?.company_id, prefill?.customer_id, prefill?.property_id, prefill?.building_id, prefill?.unit_id, prefill?.asset_id]);
 
   useEffect(() => {
     if (state?.success) onClose();
@@ -306,6 +310,10 @@ export function WorkOrderFormModal({
     () => (companyId ? crews.filter((c) => !c.company_id || c.company_id === companyId) : crews),
     [companyId, crews]
   );
+  const vendorsFiltered = useMemo(
+    () => (companyId ? vendors.filter((vendor) => vendor.company_id === companyId) : []),
+    [companyId, vendors]
+  );
   const assetsFiltered = useMemo(() => {
     if (!companyId) return [];
     let list = assets.filter((a) => a.company_id === companyId);
@@ -314,6 +322,23 @@ export function WorkOrderFormModal({
     else if (propertyId) list = list.filter((a) => a.property_id === propertyId);
     return list;
   }, [companyId, propertyId, buildingId, unitId, assets]);
+
+  const selectedCompanyName = useMemo(
+    () => companies.find((company) => company.id === companyId)?.name ?? null,
+    [companies, companyId]
+  );
+  const selectedPropertyName = useMemo(
+    () => properties.find((property) => property.id === propertyId)?.name ?? null,
+    [properties, propertyId]
+  );
+  const selectedBuildingName = useMemo(
+    () => buildings.find((building) => building.id === buildingId)?.name ?? null,
+    [buildings, buildingId]
+  );
+  const selectedUnitName = useMemo(
+    () => units.find((unit) => unit.id === unitId)?.name ?? null,
+    [units, unitId]
+  );
 
   const handleCompanyChange = (value: string) => {
     setCompanyId(value);
@@ -341,14 +366,24 @@ export function WorkOrderFormModal({
       : assets.filter((a) => a.company_id === companyId && a.unit_id === value);
     if (assetId && !nextAssets.some((a) => a.id === assetId)) setAssetId("");
   };
-  const handleAssetChange = (value: string) => setAssetId(value);
+  const handleAssetChange = (value: string) => {
+    setAssetId(value);
+    if (value) {
+      const asset = assets.find((a) => a.id === value);
+      if (asset) {
+        setPropertyId(asset.property_id ?? "");
+        setBuildingId(asset.building_id ?? "");
+        setUnitId(asset.unit_id ?? "");
+      }
+    }
+  };
   if (!open) return null;
 
   const wo = workOrder ?? emptyWorkOrder;
   const titleDefault = isEdit ? wo.title : (prefill?.title ?? wo.title);
   const descriptionDefault = isEdit ? (wo.description ?? "") : (prefill?.description ?? wo.description ?? "");
-  const inputClass = "w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
-  const labelClass = "mb-1 block text-sm font-medium text-[var(--foreground)]";
+  const inputClass = "ui-input";
+  const labelClass = "ui-label";
   const sectionTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)] border-b border-[var(--card-border)] pb-2";
 
   const requestedAtDefault = wo.requested_at ?? (isEdit ? "" : new Date().toISOString().slice(0, 16));
@@ -392,6 +427,17 @@ export function WorkOrderFormModal({
               <div>
                 <label htmlFor="description" className={labelClass}>Description</label>
                 <textarea id="description" name="description" rows={2} defaultValue={descriptionDefault} className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="safety_notes" className={labelClass}>Safety Notes</label>
+                <textarea
+                  id="safety_notes"
+                  name="safety_notes"
+                  rows={2}
+                  defaultValue={wo.safety_notes ?? ""}
+                  placeholder="Lockout/tagout, PPE requirements, hazard warnings..."
+                  className={inputClass}
+                />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -478,6 +524,13 @@ export function WorkOrderFormModal({
           {/* Section 3: Location & Asset */}
           <div>
             <h3 className={sectionTitleClass}>Location & Asset</h3>
+            <LocationBreadcrumb
+              className="mb-3"
+              company={selectedCompanyName}
+              property={selectedPropertyName}
+              building={selectedBuildingName}
+              unit={selectedUnitName}
+            />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="property_id" className={labelClass}>Property</label>
@@ -546,7 +599,7 @@ export function WorkOrderFormModal({
                 <label htmlFor="due_date" className={labelClass}>Due Date</label>
                 <DateInputWithPicker id="due_date" name="due_date" type="date" defaultValue={wo.due_date ?? ""} className={inputClass} aria-label="Due date" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="assigned_technician_id" className={labelClass}>Assigned Technician</label>
                   <select id="assigned_technician_id" name="assigned_technician_id" defaultValue={wo.assigned_technician_id ?? ""} className={inputClass}>
@@ -565,7 +618,27 @@ export function WorkOrderFormModal({
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label htmlFor="assigned_vendor_id" className={labelClass}>External Vendor</label>
+                  <select
+                    id="assigned_vendor_id"
+                    name="assigned_vendor_id"
+                    defaultValue={wo.vendor_id ?? ""}
+                    className={inputClass}
+                  >
+                    <option value="">None</option>
+                    {vendorsFiltered.map((vendor) => (
+                      <option key={vendor.id} value={vendor.id}>
+                        {vendor.name}
+                        {vendor.service_type ? ` (${vendor.service_type})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+              <p className="text-xs text-[var(--muted)]">
+                Choose one assignment target: technician, crew, or external vendor.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="estimated_hours" className={labelClass}>Estimated Hours</label>

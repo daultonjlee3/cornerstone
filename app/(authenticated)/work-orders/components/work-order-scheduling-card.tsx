@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { formatDate, formatDateTime } from "./detail-utils";
 
 const cardClass = "rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm";
@@ -12,20 +13,29 @@ type WorkOrderSchedulingCardProps = {
   onAssignTechnician: () => void;
 };
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function Row({ label, value }: { label: string; value?: unknown }) {
+  const display = value == null || value === "" ? "—" : typeof value === "string" || typeof value === "number" ? value : String(value);
   return (
     <div className="space-y-0.5">
       <dt className="text-xs font-medium text-[var(--muted)]">{label}</dt>
-      <dd className="text-sm text-[var(--foreground)]">{value ?? "—"}</dd>
+      <dd className="text-sm text-[var(--foreground)]">{display}</dd>
     </div>
   );
 }
 
 export function WorkOrderSchedulingCard({ workOrder, onAssignTechnician }: WorkOrderSchedulingCardProps) {
-  const hasTechnician = !!(workOrder.technician_name as string);
+  const hasAssignment = Boolean(
+    (workOrder.technician_name as string | null | undefined) ||
+      (workOrder.crew_name as string | null | undefined) ||
+      (workOrder.vendor_name as string | null | undefined)
+  );
   const scheduledStart = workOrder.scheduled_start ? formatDateTime(workOrder.scheduled_start as string) : null;
   const scheduledEnd = workOrder.scheduled_end ? formatDateTime(workOrder.scheduled_end as string) : null;
   const scheduledRange = [scheduledStart, scheduledEnd].filter(Boolean).join(" – ") || null;
+  const crewLeadName: string = workOrder.crew_lead_name != null ? String(workOrder.crew_lead_name) : "";
+  const crewMembersLabel: string = Array.isArray(workOrder.crew_member_names)
+    ? (workOrder.crew_member_names as string[]).join(", ")
+    : "";
 
   return (
     <div className={cardClass}>
@@ -34,21 +44,22 @@ export function WorkOrderSchedulingCard({ workOrder, onAssignTechnician }: WorkO
         <Row label="Scheduled date" value={formatDate(workOrder.scheduled_date as string)} />
         {scheduledRange && <Row label="Scheduled start – end" value={scheduledRange} />}
         <Row label="Due date" value={formatDate(workOrder.due_date as string)} />
-        <Row label="Assigned technician" value={workOrder.technician_name as string} />
-        <Row label="Assigned crew" value={workOrder.crew_name as string} />
-        {workOrder.crew_name && (workOrder.crew_lead_name as string) && (
-          <Row label="Crew lead" value={workOrder.crew_lead_name as string} />
-        )}
-        {workOrder.crew_name && Array.isArray(workOrder.crew_member_names) && (workOrder.crew_member_names as string[]).length > 0 && (
-          <Row label="Crew members" value={(workOrder.crew_member_names as string[]).join(", ")} />
-        )}
+        <Row label="Assigned technician" value={workOrder.technician_name != null ? String(workOrder.technician_name) : "—"} />
+        <Row label="Assigned crew" value={workOrder.crew_name != null ? String(workOrder.crew_name) : "—"} />
+        <Row label="External vendor" value={workOrder.vendor_name != null ? String(workOrder.vendor_name) : "—"} />
+        {workOrder.crew_name && workOrder.crew_lead_name ? (
+          <Row label="Crew lead" value={crewLeadName} />
+        ) : null}
+        {workOrder.crew_name && crewMembersLabel ? (
+          <Row label="Crew members" value={crewMembersLabel} />
+        ) : null}
         <Row label="Estimated hours" value={workOrder.estimated_hours != null ? String(workOrder.estimated_hours) : null} />
         <Row label="Actual hours" value={workOrder.actual_hours != null ? String(workOrder.actual_hours) : null} />
       </dl>
-      {!hasTechnician && (
+      {!hasAssignment && (
         <div className="mt-4">
           <button type="button" onClick={onAssignTechnician} className={btnClass}>
-            Assign technician
+            Assign work order
           </button>
         </div>
       )}

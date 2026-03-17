@@ -1,59 +1,57 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 import type { WorkOrder } from "./components/work-order-form-modal";
 import { WorkOrdersList } from "./components/work-orders-list";
+import { PageHeader } from "@/src/components/ui/page-header";
 
 export const metadata = {
-  title: "Work Orders | Cornerstone Tech",
-  description: "Manage work orders",
+  title: "Work Order Command Center | Cornerstone OS",
+  description: "Operational hub for triage, dispatch, and work order management",
 };
 
-type SearchParams = { [key: string]: string | string[] | undefined };
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function WorkOrdersPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) redirect("/onboarding");
 
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .order("name");
 
   const companyIds = (companies ?? []).map((c) => c.id);
   if (companyIds.length === 0) {
     return (
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Work Orders
-          </h1>
-          <p className="mt-1 text-[var(--muted)]">
-            Create and track maintenance and repair work.
-          </p>
-        </div>
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+      <div className="space-y-6">
+        <PageHeader
+          title="Work Orders"
+          subtitle="Create and track maintenance and repair work."
+        />
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add work orders.</p>
         </div>
       </div>
     );
   }
+
+  const { data: slaPoliciesData } = await supabase
+    .from("work_order_sla_policies")
+    .select("company_id, priority, response_target_minutes")
+    .in("company_id", companyIds);
 
   const { data: properties } = await supabase
     .from("properties")
@@ -80,10 +78,59 @@ export default async function WorkOrdersPage({
 
   const { data: assetsData } = await supabase
     .from("assets")
-    .select("id, asset_name, name, company_id, property_id, building_id, unit_id")
+    .select("id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id")
     .in("company_id", companyIds)
     .order("asset_name")
     .order("name");
+  const assetHierarchyRows = (assetsData ?? []) as Array<{
+    id: string;
+    asset_name: string | null;
+    name: string | null;
+    company_id: string;
+    parent_asset_id: string | null;
+    property_id: string | null;
+    building_id: string | null;
+    unit_id: string | null;
+  }>;
+  const assetHierarchyById = new Map(assetHierarchyRows.map((row) => [row.id, row]));
+  const effectiveAssetLocationById = new Map<
+    string,
+    { property_id: string | null; building_id: string | null; unit_id: string | null }
+  >();
+  const resolveEffectiveAssetLocation = (
+    assetId: string,
+    visited: Set<string> = new Set()
+  ): { property_id: string | null; building_id: string | null; unit_id: string | null } => {
+    const cached = effectiveAssetLocationById.get(assetId);
+    if (cached) return cached;
+    const row = assetHierarchyById.get(assetId);
+    if (!row) {
+      return { property_id: null, building_id: null, unit_id: null };
+    }
+    if (visited.has(assetId)) {
+      const fallback = {
+        property_id: row.property_id,
+        building_id: row.building_id,
+        unit_id: row.unit_id,
+      };
+      effectiveAssetLocationById.set(assetId, fallback);
+      return fallback;
+    }
+    visited.add(assetId);
+    const parentLocation = row.parent_asset_id
+      ? resolveEffectiveAssetLocation(row.parent_asset_id, visited)
+      : { property_id: null, building_id: null, unit_id: null };
+    const resolved = {
+      property_id: row.property_id ?? parentLocation.property_id ?? null,
+      building_id: row.building_id ?? parentLocation.building_id ?? null,
+      unit_id: row.unit_id ?? parentLocation.unit_id ?? null,
+    };
+    effectiveAssetLocationById.set(assetId, resolved);
+    return resolved;
+  };
+  for (const row of assetHierarchyRows) {
+    resolveEffectiveAssetLocation(row.id);
+  }
 
   const { data: techniciansData } = await supabase
     .from("technicians")
@@ -99,10 +146,16 @@ export default async function WorkOrdersPage({
     .in("company_id", companyIds)
     .order("name");
 
+  const { data: vendorsData } = await supabase
+    .from("vendors")
+    .select("id, name, company_id, service_type")
+    .in("company_id", companyIds)
+    .order("name");
+
   const { data: crewsData } = await supabase
     .from("crews")
     .select("id, name, company_id")
-    .eq("tenant_id", membership.tenant_id)
+    .eq("tenant_id", tenantId)
     .eq("is_active", true)
     .order("name");
 
@@ -116,6 +169,12 @@ export default async function WorkOrdersPage({
     id: (c as { id: string }).id,
     name: (c as { name: string }).name,
     company_id: (c as { company_id?: string }).company_id ?? null,
+  }));
+  const vendorOptions = (vendorsData ?? []).map((v) => ({
+    id: (v as { id: string }).id,
+    name: (v as { name: string }).name,
+    company_id: (v as { company_id: string }).company_id,
+    service_type: (v as { service_type?: string | null }).service_type ?? null,
   }));
   const propertyOptions = (properties ?? []).map((p) => ({
     id: p.id,
@@ -132,72 +191,105 @@ export default async function WorkOrdersPage({
     name: (u as { unit_name?: string }).unit_name ?? (u as { name_or_number?: string }).name_or_number ?? u.id,
     building_id: (u as { building_id: string }).building_id,
   }));
-  const assetOptions = (assetsData ?? []).map((a) => ({
-    id: a.id,
-    name: (a as { asset_name?: string }).asset_name ?? (a as { name?: string }).name ?? a.id,
-    company_id: (a as { company_id: string }).company_id,
-    property_id: (a as { property_id?: string }).property_id ?? null,
-    building_id: (a as { building_id?: string }).building_id ?? null,
-    unit_id: (a as { unit_id?: string }).unit_id ?? null,
-  }));
+  const assetOptions = assetHierarchyRows.map((asset) => {
+    const effectiveLocation = effectiveAssetLocationById.get(asset.id) ?? {
+      property_id: null,
+      building_id: null,
+      unit_id: null,
+    };
+    return {
+      id: asset.id,
+      name: asset.asset_name ?? asset.name ?? asset.id,
+      company_id: asset.company_id,
+      property_id: effectiveLocation.property_id,
+      building_id: effectiveLocation.building_id,
+      unit_id: effectiveLocation.unit_id,
+    };
+  });
 
-  const newParam = searchParams?.new;
+  const newParam = resolvedSearchParams?.new;
   const wantNew = newParam === "1" || newParam === "true";
   const prefill = wantNew
     ? {
-        company_id: typeof searchParams?.company_id === "string" ? searchParams.company_id : undefined,
-        property_id: typeof searchParams?.property_id === "string" ? searchParams.property_id : undefined,
-        building_id: typeof searchParams?.building_id === "string" ? searchParams.building_id : undefined,
-        unit_id: typeof searchParams?.unit_id === "string" ? searchParams.unit_id : undefined,
-        asset_id: typeof searchParams?.asset_id === "string" ? searchParams.asset_id : undefined,
-        title: typeof searchParams?.title === "string" ? decodeURIComponent(searchParams.title) : undefined,
-        description: typeof searchParams?.description === "string" ? decodeURIComponent(searchParams.description) : undefined,
+        company_id: typeof resolvedSearchParams?.company_id === "string" ? resolvedSearchParams.company_id : undefined,
+        property_id: typeof resolvedSearchParams?.property_id === "string" ? resolvedSearchParams.property_id : undefined,
+        building_id: typeof resolvedSearchParams?.building_id === "string" ? resolvedSearchParams.building_id : undefined,
+        unit_id: typeof resolvedSearchParams?.unit_id === "string" ? resolvedSearchParams.unit_id : undefined,
+        asset_id: typeof resolvedSearchParams?.asset_id === "string" ? resolvedSearchParams.asset_id : undefined,
+        title: typeof resolvedSearchParams?.title === "string" ? decodeURIComponent(resolvedSearchParams.title) : undefined,
+        description:
+          typeof resolvedSearchParams?.description === "string"
+            ? decodeURIComponent(resolvedSearchParams.description)
+            : undefined,
       }
     : null;
   const autoOpenNew = wantNew && (prefill?.company_id ?? prefill?.property_id ?? prefill?.building_id ?? prefill?.unit_id ?? prefill?.asset_id ?? prefill?.title ?? prefill?.description);
-  const editId = typeof searchParams?.edit === "string" ? searchParams.edit : null;
+  const editId = typeof resolvedSearchParams?.edit === "string" ? resolvedSearchParams.edit : null;
   const technicianOptions = (techniciansData ?? []).map((t) => ({
     id: t.id,
     name: (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? t.id,
   }));
 
-  const q = typeof searchParams?.q === "string" ? searchParams.q.trim() : "";
-  const filterStatus = typeof searchParams?.status === "string" ? searchParams.status : null;
-  const filterPriority = typeof searchParams?.priority === "string" ? searchParams.priority : null;
-  const filterCategory = typeof searchParams?.category === "string" ? searchParams.category : null;
-  const filterCompany = typeof searchParams?.company_id === "string" ? searchParams.company_id : null;
-  const filterProperty = typeof searchParams?.property_id === "string" ? searchParams.property_id : null;
-  const filterTechnician = typeof searchParams?.technician_id === "string" ? searchParams.technician_id : null;
-  const filterCrew = typeof searchParams?.crew_id === "string" ? searchParams.crew_id : null;
-  const dateFrom = typeof searchParams?.date_from === "string" ? searchParams.date_from : null;
-  const dateTo = typeof searchParams?.date_to === "string" ? searchParams.date_to : null;
-  const filterCompletionStatus = typeof searchParams?.completion_status === "string" ? searchParams.completion_status : null;
-  const completedFrom = typeof searchParams?.completed_from === "string" ? searchParams.completed_from : null;
-  const completedTo = typeof searchParams?.completed_to === "string" ? searchParams.completed_to : null;
-  const sortBy = typeof searchParams?.sort === "string" && ["updated_at", "scheduled_date", "due_date", "completed_at", "priority", "status"].includes(searchParams.sort)
-    ? searchParams.sort
+  const q = typeof resolvedSearchParams?.q === "string" ? resolvedSearchParams.q.trim() : "";
+  const filterStatus = typeof resolvedSearchParams?.status === "string" ? resolvedSearchParams.status : null;
+  const filterPriority = typeof resolvedSearchParams?.priority === "string" ? resolvedSearchParams.priority : null;
+  const filterCategory = typeof resolvedSearchParams?.category === "string" ? resolvedSearchParams.category : null;
+  const filterCompany = typeof resolvedSearchParams?.company_id === "string" ? resolvedSearchParams.company_id : null;
+  const filterProperty = typeof resolvedSearchParams?.property_id === "string" ? resolvedSearchParams.property_id : null;
+  const filterBuilding = typeof resolvedSearchParams?.building_id === "string" ? resolvedSearchParams.building_id : null;
+  const filterUnit = typeof resolvedSearchParams?.unit_id === "string" ? resolvedSearchParams.unit_id : null;
+  const filterAsset = typeof resolvedSearchParams?.asset_id === "string" ? resolvedSearchParams.asset_id : null;
+  const filterTechnician = typeof resolvedSearchParams?.technician_id === "string" ? resolvedSearchParams.technician_id : null;
+  const filterCrew = typeof resolvedSearchParams?.crew_id === "string" ? resolvedSearchParams.crew_id : null;
+  const filterSourceType = typeof resolvedSearchParams?.source_type === "string" ? resolvedSearchParams.source_type : null;
+  const filterOverdue = resolvedSearchParams?.overdue === "1" || resolvedSearchParams?.overdue === "true";
+  const filterUnassigned =
+    resolvedSearchParams?.unassigned === "1" || resolvedSearchParams?.unassigned === "true";
+  const filterDueToday = resolvedSearchParams?.due_today === "1" || resolvedSearchParams?.due_today === "true";
+  const filterCompletedToday =
+    resolvedSearchParams?.completed_today === "1" || resolvedSearchParams?.completed_today === "true";
+  const viewPreset = typeof resolvedSearchParams?.view === "string" ? resolvedSearchParams.view : null;
+  const dateFrom = typeof resolvedSearchParams?.date_from === "string" ? resolvedSearchParams.date_from : null;
+  const dateTo = typeof resolvedSearchParams?.date_to === "string" ? resolvedSearchParams.date_to : null;
+  const filterCompletionStatus =
+    typeof resolvedSearchParams?.completion_status === "string"
+      ? resolvedSearchParams.completion_status
+      : null;
+  const completedFrom =
+    typeof resolvedSearchParams?.completed_from === "string" ? resolvedSearchParams.completed_from : null;
+  const completedTo =
+    typeof resolvedSearchParams?.completed_to === "string" ? resolvedSearchParams.completed_to : null;
+  const sortBy =
+    typeof resolvedSearchParams?.sort === "string" &&
+    ["updated_at", "scheduled_date", "due_date", "completed_at", "priority", "status"].includes(
+      resolvedSearchParams.sort
+    )
+    ? resolvedSearchParams.sort
     : "updated_at";
-  const sortOrder = searchParams?.order === "asc" ? "asc" : "desc";
+  const sortOrder = resolvedSearchParams?.order === "asc" ? "asc" : "desc";
+  const today = new Date().toISOString().slice(0, 10);
 
   let query = supabase
     .from("work_orders")
     .select(`
-      id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id,
+      id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id, vendor_id,
       description, category, priority, status,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date,
       requested_by_name, requested_by_email, requested_by_phone,
       assigned_technician_id, assigned_crew_id,
       estimated_hours, estimated_technicians, actual_hours,
       billable, nte_amount, updated_at,
+      source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
       completed_at, completion_status,
       companies(name),
       customers(name),
       properties(property_name, name),
       buildings(building_name, name),
       units(unit_name, name_or_number),
-      assets(asset_name, name),
+      assets!work_orders_asset_id_fkey(asset_name, name),
       technicians!assigned_technician_id(technician_name, name),
-      crews!assigned_crew_id(name)
+      crews!assigned_crew_id(name),
+      vendors(name)
     `)
     .in("company_id", companyIds);
 
@@ -207,13 +299,54 @@ export default async function WorkOrdersPage({
       `title.ilike.%${term}%,work_order_number.ilike.%${term}%,description.ilike.%${term}%,requested_by_name.ilike.%${term}%,requested_by_email.ilike.%${term}%`
     );
   }
-  if (filterStatus) query = query.eq("status", filterStatus);
+  if (viewPreset === "open") {
+    query = query.in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]);
+  } else if (viewPreset === "in_progress") {
+    query = query.eq("status", "in_progress");
+  } else if (viewPreset === "on_hold") {
+    query = query.eq("status", "on_hold");
+  } else if (viewPreset === "overdue") {
+    query = query.lt("due_date", today).not("status", "in", "(completed,cancelled)");
+  } else if (viewPreset === "due_today") {
+    query = query.eq("due_date", today);
+  } else if (viewPreset === "completed_today") {
+    query = query.eq("status", "completed").gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
+  } else if (viewPreset === "unassigned") {
+    query = query
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
+  } else if (viewPreset === "pm") {
+    query = query.eq("source_type", "preventive_maintenance");
+  } else if (viewPreset === "high_priority") {
+    query = query.in("priority", ["high", "urgent", "emergency"]);
+  }
+  if (!viewPreset && filterStatus) query = query.eq("status", filterStatus);
   if (filterPriority) query = query.eq("priority", filterPriority);
   if (filterCategory) query = query.eq("category", filterCategory);
   if (filterCompany) query = query.eq("company_id", filterCompany);
   if (filterProperty) query = query.eq("property_id", filterProperty);
+  if (filterBuilding) query = query.eq("building_id", filterBuilding);
+  if (filterUnit) query = query.eq("unit_id", filterUnit);
+  if (filterAsset) query = query.eq("asset_id", filterAsset);
   if (filterTechnician) query = query.eq("assigned_technician_id", filterTechnician);
   if (filterCrew) query = query.eq("assigned_crew_id", filterCrew);
+  if (!viewPreset && filterSourceType) query = query.eq("source_type", filterSourceType);
+  if (!viewPreset && filterOverdue) {
+    query = query.lt("due_date", today);
+    query = query.not("status", "in", "(completed,cancelled)");
+  }
+  if (!viewPreset && filterUnassigned) {
+    query = query
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
+  }
+  if (!viewPreset && filterDueToday) query = query.eq("due_date", today);
+  if (!viewPreset && filterCompletedToday) {
+    query = query.eq("status", "completed");
+    query = query.gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
+  }
   if (dateFrom) query = query.gte("scheduled_date", dateFrom);
   if (dateTo) query = query.lte("scheduled_date", dateTo);
   if (filterCompletionStatus) query = query.eq("completion_status", filterCompletionStatus);
@@ -223,7 +356,6 @@ export default async function WorkOrdersPage({
   const sortColumn = sortBy === "scheduled_date" ? "scheduled_date" : sortBy === "due_date" ? "due_date" : sortBy === "completed_at" ? "completed_at" : sortBy === "priority" ? "priority" : sortBy === "status" ? "status" : "updated_at";
   const { data: workOrdersRaw, error } = await query.order(sortColumn, { ascending: sortOrder === "asc" });
 
-  const today = new Date().toISOString().slice(0, 10);
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const weekAgoStr = oneWeekAgo.toISOString();
@@ -238,6 +370,7 @@ export default async function WorkOrdersPage({
     const bld = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
     const un = Array.isArray(row.units) ? row.units[0] : row.units;
     const ast = Array.isArray(row.assets) ? row.assets[0] : row.assets;
+    const ven = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
     const technician_name = tech && typeof tech === "object" && "technician_name" in tech ? (tech as { technician_name?: string }).technician_name ?? (tech as { name?: string }).name : null;
     const crew_name = crewRow && typeof crewRow === "object" && "name" in crewRow ? (crewRow as { name?: string }).name : null;
     const company_name = comp && typeof comp === "object" && "name" in comp ? (comp as { name?: string }).name : null;
@@ -246,38 +379,54 @@ export default async function WorkOrdersPage({
     const building_name = bld && typeof bld === "object" ? (bld as { building_name?: string }).building_name ?? (bld as { name?: string }).name : null;
     const unit_name = un && typeof un === "object" ? (un as { unit_name?: string }).unit_name ?? (un as { name_or_number?: string }).name_or_number : null;
     const asset_name = ast && typeof ast === "object" ? (ast as { asset_name?: string }).asset_name ?? (ast as { name?: string }).name : null;
+    const vendor_name = ven && typeof ven === "object" && "name" in ven ? (ven as { name?: string }).name : null;
     const locationParts = [property_name, building_name, unit_name].filter(Boolean);
     const location = locationParts.length ? locationParts.join(" / ") : null;
-    const { technicians: _, crews: __, companies: ___, customers: ____, properties: _____, buildings: ______, units: _______, assets: ________, ...rest } = row;
+    const { technicians: _, crews: __, companies: ___, customers: ____, properties: _____, buildings: ______, units: _______, assets: ________, vendors: _________, ...rest } = row;
     return {
       ...rest,
       technician_name: technician_name ?? undefined,
       crew_name: crew_name ?? undefined,
+      vendor_name: vendor_name ?? undefined,
       company_name: company_name ?? undefined,
       customer_name: customer_name ?? undefined,
       location: location ?? undefined,
       asset_name: asset_name ?? undefined,
     };
-  }) as (WorkOrder & { technician_name?: string; crew_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
+  }) as (WorkOrder & { technician_name?: string; crew_name?: string; vendor_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
 
   const stats = {
-    open: workOrders.filter((wo) => wo.status === "open").length,
-    assigned: workOrders.filter((wo) => wo.status === "assigned").length,
+    open: workOrders.filter(
+      (wo) =>
+        ["new", "open", "ready_to_schedule", "assigned", "scheduled"].includes(wo.status ?? "") &&
+        wo.status !== "completed" &&
+        wo.status !== "cancelled"
+    ).length,
     inProgress: workOrders.filter((wo) => wo.status === "in_progress").length,
-    dueToday: workOrders.filter((wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled" && wo.status !== "closed").length,
+    onHold: workOrders.filter((wo) => wo.status === "on_hold").length,
+    overdue: workOrders.filter(
+      (wo) =>
+        wo.due_date != null &&
+        wo.due_date < today &&
+        wo.status !== "completed" &&
+        wo.status !== "cancelled"
+    ).length,
+    dueToday: workOrders.filter(
+      (wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled"
+    ).length,
+    completedToday: workOrders.filter((wo) => {
+      if (wo.status !== "completed" || !wo.completed_at) return false;
+      const completedAt = String(wo.completed_at).slice(0, 10);
+      return completedAt === today;
+    }).length,
+    new: workOrders.filter((wo) => wo.status === "new" || wo.status === "open").length,
+    readyToSchedule: workOrders.filter((wo) => wo.status === "ready_to_schedule" || wo.status === "assigned").length,
+    scheduled: workOrders.filter((wo) => wo.status === "scheduled").length,
     completedThisWeek: workOrders.filter((wo) => wo.status === "completed" && wo.updated_at && String(wo.updated_at) >= weekAgoStr).length,
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-          Work Orders
-        </h1>
-        <p className="mt-1 text-[var(--muted)]">
-          Create and track maintenance and repair work.
-        </p>
-      </div>
+    <div className="space-y-6" data-tour="demo-guided:work-orders">
       <WorkOrdersList
         workOrders={workOrders}
         stats={stats}
@@ -289,6 +438,14 @@ export default async function WorkOrdersPage({
         assets={assetOptions}
         technicians={technicianOptions}
         crews={crewOptions}
+        vendors={vendorOptions}
+        slaPolicies={
+          (slaPoliciesData ?? []) as {
+            company_id: string;
+            priority: string;
+            response_target_minutes: number;
+          }[]
+        }
         initialPrefill={prefill}
         autoOpenNew={!!autoOpenNew}
         initialEditId={editId}

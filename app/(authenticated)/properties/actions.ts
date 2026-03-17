@@ -2,41 +2,17 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { geocodeAddress } from "@/src/lib/geocoding";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 
 export type PropertyFormState = { error?: string; success?: boolean };
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
-}
-
-/** Verify company belongs to current tenant */
-async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  return !!data;
-}
 
 export async function saveProperty(
   _prev: PropertyFormState,
   formData: FormData
 ): Promise<PropertyFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -46,22 +22,50 @@ export async function saveProperty(
   if (!propertyName) return { error: "Property name is required." };
   if (!companyId) return { error: "Company is required." };
 
-  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  const allowed = await companyBelongsToTenant(companyId, tenantId, supabase);
   if (!allowed) return { error: "Invalid company." };
+
+  let addressLine1 = (formData.get("address_line1") as string)?.trim() || null;
+  let city = (formData.get("city") as string)?.trim() || null;
+  let state = (formData.get("state") as string)?.trim() || null;
+  let zip = (formData.get("zip") as string)?.trim() || null;
+  let country = (formData.get("country") as string)?.trim() || null;
+  const latRaw = (formData.get("latitude") as string)?.trim();
+  const lonRaw = (formData.get("longitude") as string)?.trim();
+  let lat = latRaw ? parseFloat(latRaw) : null;
+  let lon = lonRaw ? parseFloat(lonRaw) : null;
+
+  // On manual save without coordinates, attempt to geocode from address text
+  const hasAddressText = [addressLine1, city, state, zip, country].some(Boolean);
+  if (hasAddressText && (lat == null || !Number.isFinite(lat) || lon == null || !Number.isFinite(lon))) {
+    const parts = [addressLine1, city, state, zip, country].filter(Boolean);
+    const geocoded = await geocodeAddress(parts.join(", "));
+    if (geocoded?.latitude != null && geocoded?.longitude != null) {
+      lat = geocoded.latitude;
+      lon = geocoded.longitude;
+      if (geocoded.address_line1 && !addressLine1) addressLine1 = geocoded.address_line1;
+      if (geocoded.city && !city) city = geocoded.city;
+      if (geocoded.state && !state) state = geocoded.state;
+      if (geocoded.postal_code && !zip) zip = geocoded.postal_code;
+      if (geocoded.country && !country) country = geocoded.country;
+    }
+  }
 
   const payload = {
     name: propertyName,
     property_name: propertyName,
     company_id: companyId,
-    address_line1: (formData.get("address_line1") as string)?.trim() || null,
+    address_line1: addressLine1,
     address_line2: (formData.get("address_line2") as string)?.trim() || null,
-    city: (formData.get("city") as string)?.trim() || null,
-    state: (formData.get("state") as string)?.trim() || null,
-    zip: (formData.get("zip") as string)?.trim() || null,
+    city,
+    state,
+    zip,
+    country,
+    latitude: lat != null && Number.isFinite(lat) ? lat : null,
+    longitude: lon != null && Number.isFinite(lon) ? lon : null,
     status: (formData.get("status") as string) === "inactive" ? "inactive" : "active",
   };
 
-  const supabase = await createClient();
   if (id) {
     const { data: prop } = await supabase
       .from("properties")
@@ -85,10 +89,9 @@ export async function saveProperty(
 }
 
 export async function deleteProperty(id: string): Promise<PropertyFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { data: prop } = await supabase
     .from("properties")
     .select("company_id")

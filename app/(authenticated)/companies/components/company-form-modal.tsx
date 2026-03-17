@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { Modal } from "@/src/components/ui/modal";
+import { FormField } from "@/src/components/ui/form-field";
+import { Button } from "@/src/components/ui/button";
 
 export type Company = {
   id: string;
@@ -44,135 +47,97 @@ export function CompanyFormModal({
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  if (!open) return null;
-
   const c = company ?? emptyCompany;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60"
-        aria-hidden
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-md rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
-        <div className="border-b border-[var(--card-border)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            {isEdit ? "Edit Company" : "New Company"}
-          </h2>
-        </div>
-        <form action={formAction} className="p-6 space-y-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit Company" : "New Company"}
+      className="max-w-md"
+    >
+      <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={c.id} />}
           {state?.error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {state.error}
             </p>
           )}
-          <div>
-            <label htmlFor="name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Company name *
-            </label>
+          <FormField label="Company name" htmlFor="name" required>
             <input
               id="name"
               name="name"
               type="text"
               required
               defaultValue={c.name}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="legal_name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Legal name
-            </label>
+          </FormField>
+          <FormField label="Legal name" htmlFor="legal_name">
             <input
               id="legal_name"
               name="legal_name"
               type="text"
               defaultValue={c.legal_name ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="company_code" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Company code
-            </label>
+          </FormField>
+          <FormField label="Company code" htmlFor="company_code">
             <input
               id="company_code"
               name="company_code"
               type="text"
               defaultValue={c.company_code ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="status" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Status
-            </label>
+          </FormField>
+          <FormField label="Status" htmlFor="status">
             <select
               id="status"
               name="status"
               defaultValue={c.status}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
-          <div>
-            <label htmlFor="primary_contact_name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Primary contact name
-            </label>
+          </FormField>
+          <FormField label="Primary contact name" htmlFor="primary_contact_name">
             <input
               id="primary_contact_name"
               name="primary_contact_name"
               type="text"
               defaultValue={c.primary_contact_name ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="primary_contact_email" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Primary contact email
-            </label>
+          </FormField>
+          <FormField label="Primary contact email" htmlFor="primary_contact_email">
             <input
               id="primary_contact_email"
               name="primary_contact_email"
               type="email"
               defaultValue={c.primary_contact_email ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="phone" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Phone
-            </label>
+          </FormField>
+          <FormField label="Phone" htmlFor="phone">
             <input
               id="phone"
               name="phone"
               type="tel"
               defaultValue={c.phone ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
+          </FormField>
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? "Saving…" : isEdit ? "Save" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-[var(--foreground)] hover:bg-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            </Button>
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

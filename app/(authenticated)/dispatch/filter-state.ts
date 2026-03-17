@@ -3,16 +3,19 @@
  * Parsed from URL search params (server + client) and serialized back for navigation.
  */
 
-export type DispatchViewMode = "day" | "week" | "month";
+export type DispatchViewMode = "day" | "week" | "month" | "map" | "combined";
 
 export type DispatchFilterState = {
   search: string;
   companyId: string;
   propertyId: string;
+  buildingId: string;
   priority: string;
   status: string;
   crewId: string;
   technicianId: string;
+  assignmentType: string;
+  assetId: string;
   category: string;
   viewMode: DispatchViewMode;
   selectedDate: string; // YYYY-MM-DD
@@ -22,10 +25,13 @@ const DEFAULT_FILTER_STATE: DispatchFilterState = {
   search: "",
   companyId: "",
   propertyId: "",
+  buildingId: "",
   priority: "",
   status: "",
   crewId: "",
   technicianId: "",
+  assignmentType: "",
+  assetId: "",
   category: "",
   viewMode: "day",
   selectedDate: "",
@@ -63,7 +69,12 @@ export function parseFilterStateFromParams(
 
   const viewParam = get("view");
   const viewMode: DispatchViewMode =
-    viewParam === "week" || viewParam === "month" ? viewParam : "day";
+    viewParam === "week" ||
+    viewParam === "month" ||
+    viewParam === "map" ||
+    viewParam === "combined"
+      ? viewParam
+      : "day";
 
   const dateParam = get("date");
   const selectedDate = parseDateSafe(dateParam) ?? todayISO();
@@ -72,10 +83,13 @@ export function parseFilterStateFromParams(
     search: get("q"),
     companyId: get("company_id"),
     propertyId: get("property_id"),
+    buildingId: get("building_id"),
     priority: get("priority"),
     status: get("status"),
     crewId: get("crew_id"),
     technicianId: get("technician_id"),
+    assignmentType: get("assignment_type"),
+    assetId: get("asset_id"),
     category: get("category"),
     viewMode,
     selectedDate,
@@ -90,10 +104,13 @@ export function filterStateToParams(state: DispatchFilterState): URLSearchParams
   if (state.search) params.set("q", state.search);
   if (state.companyId) params.set("company_id", state.companyId);
   if (state.propertyId) params.set("property_id", state.propertyId);
+  if (state.buildingId) params.set("building_id", state.buildingId);
   if (state.priority) params.set("priority", state.priority);
   if (state.status) params.set("status", state.status);
   if (state.crewId) params.set("crew_id", state.crewId);
   if (state.technicianId) params.set("technician_id", state.technicianId);
+  if (state.assignmentType) params.set("assignment_type", state.assignmentType);
+  if (state.assetId) params.set("asset_id", state.assetId);
   if (state.category) params.set("category", state.category);
   return params;
 }
@@ -113,10 +130,13 @@ export function hasActiveFilters(state: DispatchFilterState): boolean {
     state.search ||
     state.companyId ||
     state.propertyId ||
+    state.buildingId ||
     state.priority ||
     state.status ||
     state.crewId ||
     state.technicianId ||
+    state.assignmentType ||
+    state.assetId ||
     state.category
   );
 }

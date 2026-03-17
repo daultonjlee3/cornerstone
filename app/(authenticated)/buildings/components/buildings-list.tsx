@@ -1,12 +1,24 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition, useState, useCallback } from "react";
 import { deleteBuilding } from "../actions";
 import type { Building } from "./building-form-modal";
 import { BuildingFormModal } from "./building-form-modal";
 import { saveBuilding } from "../actions";
+import { Button } from "@/src/components/ui/button";
+import { StatusBadge } from "@/src/components/ui/status-badge";
+import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { Pagination } from "@/src/components/ui/pagination";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+} from "@/src/components/ui/data-table";
 
 type PropertyOption = { id: string; name: string };
 
@@ -14,19 +26,44 @@ type BuildingsListProps = {
   buildings: Building[];
   properties: PropertyOption[];
   error?: string | null;
+  mapboxToken?: string | null;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
 };
 
 function buildingDisplayName(b: Building): string {
   return b.building_name ?? b.name ?? "—";
 }
 
+function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
+  const next = new URLSearchParams(searchParams.toString());
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === "" || value == null) next.delete(key);
+    else next.set(key, value);
+  });
+  return next.toString();
+}
+
 export function BuildingsList({
   buildings: initialBuildings,
   properties,
   error: initialError,
+  mapboxToken,
+  totalCount: totalCountProp,
+  page: pageProp = 1,
+  pageSize: pageSizeProp = 25,
 }: BuildingsListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const applyParams = useCallback(
+    (updates: Record<string, string>) => {
+      const query = buildParams(searchParams, updates);
+      startTransition(() => router.push(`/buildings${query ? `?${query}` : ""}`));
+    },
+    [router, searchParams]
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -81,92 +118,64 @@ export function BuildingsList({
       )}
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Buildings</h2>
-        <button
-          type="button"
-          onClick={openNew}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        >
+        <Button type="button" onClick={openNew}>
           New Building
-        </button>
+        </Button>
       </div>
 
       {initialBuildings.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
+        <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">No buildings yet.</p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
+          <Button type="button" onClick={openNew} className="mt-4">
             Add your first building
-          </button>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--card-border)] bg-[var(--card)]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]">
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Building</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Property</th>
-                  <th className="px-4 py-3 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="w-24 px-4 py-3 font-medium text-[var(--foreground)]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {initialBuildings.map((b) => (
-                  <tr
-                    key={b.id}
-                    className="border-b border-[var(--card-border)] last:border-0 hover:bg-[var(--background)]/50"
-                  >
-                    <td className="px-4 py-3 text-[var(--foreground)]">
-                      {buildingDisplayName(b)}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
-                      {b.property && "name" in b.property ? b.property.name : (b.property as { property_name?: string })?.property_name ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          b.status === "active"
-                            ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                            : "bg-[var(--muted)]/20 text-[var(--muted)]"
-                        }`}
-                      >
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/work-orders?new=1&company_id=${encodeURIComponent((b.property as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent(b.property_id)}&building_id=${encodeURIComponent(b.id)}`}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Create Work Order
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(b)}
-                          className="rounded text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(b.id, buildingDisplayName(b))}
-                          disabled={isPending}
-                          className="rounded text-red-500 hover:underline disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable>
+          <Table className="min-w-[650px]">
+            <TableHead>
+              <Th>Building</Th>
+              <Th>Property</Th>
+              <Th>Status</Th>
+              <Th className="w-32">Actions</Th>
+            </TableHead>
+            <TBody>
+              {initialBuildings.map((b) => (
+                <Tr key={b.id}>
+                  <Td>{buildingDisplayName(b)}</Td>
+                  <Td className="text-[var(--muted)]">
+                    {b.property && "name" in b.property
+                      ? b.property.name
+                      : (b.property as { property_name?: string })?.property_name ?? "—"}
+                  </Td>
+                  <Td>
+                    <StatusBadge status={b.status} />
+                  </Td>
+                  <Td>
+                    <ActionsDropdown
+                      align="right"
+                      items={[
+                        { type: "link", label: "Create Work Order", href: `/work-orders?new=1&company_id=${encodeURIComponent((b.property as { company_id?: string })?.company_id ?? "")}&property_id=${encodeURIComponent(b.property_id)}&building_id=${encodeURIComponent(b.id)}` },
+                        { type: "button", label: "Edit", onClick: () => openEdit(b) },
+                        { type: "button", label: "Delete", onClick: () => handleDelete(b.id, buildingDisplayName(b)), disabled: isPending, destructive: true },
+                      ]}
+                    />
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+          {totalCountProp != null && (
+            <Pagination
+              page={pageProp}
+              pageSize={pageSizeProp}
+              totalCount={totalCountProp}
+              onPageChange={(p) => applyParams({ page: String(p) })}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={(size) => applyParams({ page_size: String(size), page: "1" })}
+            />
+          )}
+        </DataTable>
       )}
 
       <BuildingFormModal
@@ -175,6 +184,7 @@ export function BuildingsList({
         building={editingBuilding}
         properties={properties}
         saveAction={saveBuilding}
+        mapboxToken={mapboxToken}
       />
     </div>
   );

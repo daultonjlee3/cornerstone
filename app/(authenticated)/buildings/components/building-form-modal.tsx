@@ -1,6 +1,10 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { Modal } from "@/src/components/ui/modal";
+import { FormField } from "@/src/components/ui/form-field";
+import { Button } from "@/src/components/ui/button";
+import { AddressAutocomplete, type AddressSuggestion } from "@/src/components/address-autocomplete";
 
 export type Building = {
   id: string;
@@ -8,6 +12,13 @@ export type Building = {
   name?: string;
   property_id: string;
   building_code: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   year_built: number | null;
   floors: number | null;
@@ -24,6 +35,7 @@ type BuildingFormModalProps = {
   building: Building | null;
   properties: PropertyOption[];
   saveAction: (prev: { error?: string; success?: boolean }, formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  mapboxToken?: string | null;
 };
 
 const emptyBuilding: Building = {
@@ -31,6 +43,13 @@ const emptyBuilding: Building = {
   building_name: "",
   property_id: "",
   building_code: null,
+  address: null,
+  city: null,
+  state: null,
+  postal_code: null,
+  country: null,
+  latitude: null,
+  longitude: null,
   status: "active",
   year_built: null,
   floors: null,
@@ -44,58 +63,79 @@ export function BuildingFormModal({
   building,
   properties,
   saveAction,
+  mapboxToken,
 }: BuildingFormModalProps) {
   const isEdit = !!building?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
+
+  const b = building ?? emptyBuilding;
+  const displayName = b.building_name ?? b.name ?? "";
+
+  const [address, setAddress] = useState(b.address ?? "");
+  const [city, setCity] = useState(b.city ?? "");
+  const [stateVal, setStateVal] = useState(b.state ?? "");
+  const [postalCode, setPostalCode] = useState(b.postal_code ?? "");
+  const [country, setCountry] = useState(b.country ?? "");
+  const [latitude, setLatitude] = useState(b.latitude != null ? String(b.latitude) : "");
+  const [longitude, setLongitude] = useState(b.longitude != null ? String(b.longitude) : "");
 
   useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success, onClose]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    const src = building ?? emptyBuilding;
+    setAddress(src.address ?? "");
+    setCity(src.city ?? "");
+    setStateVal(src.state ?? "");
+    setPostalCode(src.postal_code ?? "");
+    setCountry(src.country ?? "");
+    setLatitude(src.latitude != null ? String(src.latitude) : "");
+    setLongitude(src.longitude != null ? String(src.longitude) : "");
+  }, [open, building?.id, building?.address, building?.city, building?.state, building?.postal_code, building?.country, building?.latitude, building?.longitude]);
 
-  const b = building ?? emptyBuilding;
-  const displayName = b.building_name ?? b.name ?? "";
+  const handleAddressSelect = (s: AddressSuggestion) => {
+    setAddress(s.address_line1 ?? "");
+    setCity(s.city ?? "");
+    setStateVal(s.state ?? "");
+    setPostalCode(s.postal_code ?? "");
+    setCountry(s.country ?? "");
+    setLatitude(String(s.latitude));
+    setLongitude(String(s.longitude));
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" aria-hidden onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-xl">
-        <div className="sticky top-0 border-b border-[var(--card-border)] bg-[var(--card)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            {isEdit ? "Edit Building" : "New Building"}
-          </h2>
-        </div>
-        <form action={formAction} className="space-y-4 p-6">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit Building" : "New Building"}
+      className="max-w-md"
+    >
+      <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={b.id} />}
           {state?.error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
               {state.error}
             </p>
           )}
-          <div>
-            <label htmlFor="building_name" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Building name *
-            </label>
+          <FormField label="Building name" htmlFor="building_name" required>
             <input
               id="building_name"
               name="building_name"
               type="text"
               required
               defaultValue={displayName}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="property_id" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Property *
-            </label>
+          </FormField>
+          <FormField label="Property" htmlFor="property_id" required>
             <select
               id="property_id"
               name="property_id"
               required
               defaultValue={b.property_id}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="">Select property</option>
               {properties.map((p) => (
@@ -104,38 +144,117 @@ export function BuildingFormModal({
                 </option>
               ))}
             </select>
+          </FormField>
+          <FormField label="Address search" htmlFor="building_address_autocomplete">
+            <AddressAutocomplete
+              onSelect={handleAddressSelect}
+              placeholder="Type to search for building address…"
+              className="ui-input"
+              mapboxToken={mapboxToken ?? undefined}
+            />
+          </FormField>
+          <FormField label="Address" htmlFor="building_address">
+            <input
+              id="building_address"
+              name="address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street address"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="City" htmlFor="building_city">
+              <input
+                id="building_city"
+                name="city"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="State" htmlFor="building_state">
+              <input
+                id="building_state"
+                name="state"
+                type="text"
+                value={stateVal}
+                onChange={(e) => setStateVal(e.target.value)}
+                className="ui-input"
+              />
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="building_code" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Building code
-            </label>
+          <FormField label="Postal code" htmlFor="postal_code">
+            <input
+              id="postal_code"
+              name="postal_code"
+              type="text"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              className="ui-input"
+            />
+          </FormField>
+          <FormField label="Country" htmlFor="building_country">
+            <input
+              id="building_country"
+              name="country"
+              type="text"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. USA"
+              className="ui-input"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Latitude" htmlFor="building_latitude">
+              <input
+                id="building_latitude"
+                name="latitude"
+                type="number"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="e.g. 33.7490"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Longitude" htmlFor="building_longitude">
+              <input
+                id="building_longitude"
+                name="longitude"
+                type="number"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="e.g. -84.3880"
+                className="ui-input"
+              />
+            </FormField>
+          </div>
+          <FormField label="Building code" htmlFor="building_code">
             <input
               id="building_code"
               name="building_code"
               type="text"
               defaultValue={b.building_code ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="status" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Status
-            </label>
+          </FormField>
+          <FormField label="Status" htmlFor="status">
             <select
               id="status"
               name="status"
               defaultValue={b.status}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-select"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="year_built" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-                Year built
-              </label>
+            <FormField label="Year built" htmlFor="year_built">
               <input
                 id="year_built"
                 name="year_built"
@@ -143,27 +262,21 @@ export function BuildingFormModal({
                 min={1800}
                 max={2100}
                 defaultValue={b.year_built ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="ui-input"
               />
-            </div>
-            <div>
-              <label htmlFor="floors" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-                Floors
-              </label>
+            </FormField>
+            <FormField label="Floors" htmlFor="floors">
               <input
                 id="floors"
                 name="floors"
                 type="number"
                 min={0}
                 defaultValue={b.floors ?? ""}
-                className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="ui-input"
               />
-            </div>
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="square_feet" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Square feet
-            </label>
+          <FormField label="Square feet" htmlFor="square_feet">
             <input
               id="square_feet"
               name="square_feet"
@@ -171,39 +284,27 @@ export function BuildingFormModal({
               min={0}
               step="any"
               defaultValue={b.square_feet ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-input"
             />
-          </div>
-          <div>
-            <label htmlFor="notes" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
-              Notes
-            </label>
+          </FormField>
+          <FormField label="Notes" htmlFor="notes">
             <textarea
               id="notes"
               name="notes"
               rows={2}
               defaultValue={b.notes ?? ""}
-              className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="ui-textarea"
             />
-          </div>
+          </FormField>
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? "Saving…" : isEdit ? "Save" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-[var(--foreground)] hover:bg-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
+            </Button>
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

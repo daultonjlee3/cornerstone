@@ -2,29 +2,16 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type CompanyFormState = { error?: string; success?: boolean };
-
-async function getTenantId(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  return data?.tenant_id ?? null;
-}
 
 export async function saveCompany(
   _prev: CompanyFormState,
   formData: FormData
 ): Promise<CompanyFormState> {
-  const tenantId = await getTenantId();
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -41,7 +28,6 @@ export async function saveCompany(
     phone: (formData.get("phone") as string)?.trim() || null,
   };
 
-  const supabase = await createClient();
   if (id) {
     const { error } = await supabase
       .from("companies")
@@ -61,10 +47,9 @@ export async function saveCompany(
 }
 
 export async function deleteCompany(id: string): Promise<CompanyFormState> {
-  const tenantId = await getTenantId();
-  if (!tenantId) return { error: "Unauthorized." };
-
   const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
   const { error } = await supabase
     .from("companies")
     .delete()

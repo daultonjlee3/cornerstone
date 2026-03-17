@@ -3,19 +3,27 @@
 type Stat = { label: string; value: number };
 
 type WorkOrderStatsProps = {
-  stats: { open: number; assigned: number; inProgress: number; dueToday: number; completedThisWeek: number };
+  stats: {
+    new: number;
+    readyToSchedule: number;
+    scheduled: number;
+    inProgress: number;
+    dueToday: number;
+    completedThisWeek: number;
+  };
 };
 
 export function WorkOrderStats({ stats }: WorkOrderStatsProps) {
   const items: Stat[] = [
-    { label: "Open", value: stats.open },
-    { label: "Assigned", value: stats.assigned },
+    { label: "New", value: stats.new },
+    { label: "Ready", value: stats.readyToSchedule },
+    { label: "Scheduled", value: stats.scheduled },
     { label: "In Progress", value: stats.inProgress },
     { label: "Due Today", value: stats.dueToday },
-    { label: "Completed This Week", value: stats.completedThisWeek },
+    { label: "Completed (7d)", value: stats.completedThisWeek },
   ];
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
       {items.map(({ label, value }) => (
         <div
           key={label}

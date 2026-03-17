@@ -12,10 +12,10 @@ export function ComingSoon({ moduleName }: ComingSoonProps) {
       </h2>
       <p className="mt-2 text-[var(--muted)]">This module is coming soon.</p>
       <Link
-        href="/dashboard"
+        href="/operations"
         className="mt-6 inline-flex items-center rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--background)]"
       >
-        Back to Dashboard
+        Back to Operations Center
       </Link>
     </div>
   );

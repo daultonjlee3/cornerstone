@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Work Orders | Cornerstone Tech",
-  description: "Maintenance & service jobs",
+  title: "Work Order Command Center | Cornerstone OS",
+  description: "Triage, dispatch, and manage work orders",
 };
 
 export default function WorkOrdersLayout({

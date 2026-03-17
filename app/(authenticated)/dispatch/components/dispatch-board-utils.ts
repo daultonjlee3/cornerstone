@@ -57,3 +57,51 @@ export function getWorkOrderPosition(
 }
 
 export const DEFAULT_AVAILABLE_HOURS = 10;
+
+/** Slot droppable id for crew column + hour (e.g. "slot-{crewId}-8"). */
+export function getSlotId(crewId: string, hour: number): string {
+  return `slot-${crewId}-${hour}`;
+}
+
+/** Parse slot id to get crewId and hour; returns null if not a slot id. */
+export function parseSlotId(
+  slotId: string
+): { crewId: string; hour: number } | null {
+  if (!slotId.startsWith("slot-")) return null;
+  const parts = slotId.split("-");
+  if (parts.length < 3) return null;
+  const crewId = parts.slice(1, -1).join("-");
+  const hour = parseInt(parts[parts.length - 1]!, 10);
+  if (Number.isNaN(hour)) return null;
+  return { crewId, hour };
+}
+
+/** Convert top percent (0–100) in the day column to nearest start hour (DAY_START_HOUR–DAY_END_HOUR). */
+export function percentToStartHour(percent: number): number {
+  const p = Math.max(0, Math.min(100, percent));
+  const totalMins = DAY_TOTAL_MINUTES;
+  const startMins = (p / 100) * totalMins;
+  const hour = DAY_START_HOUR + Math.floor(startMins / 60);
+  return Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR, hour));
+}
+
+/** Duration in hours from height percent. */
+export function heightPercentToHours(heightPercent: number): number {
+  const totalMins = DAY_TOTAL_MINUTES;
+  const mins = (heightPercent / 100) * totalMins;
+  return Math.max(0.25, Math.round((mins / 60) * 4) / 4);
+}
+
+/** Add hours to an ISO date string. */
+export function addHours(iso: string, hours: number): string {
+  const d = new Date(iso);
+  d.setTime(d.getTime() + hours * 60 * 60 * 1000);
+  return d.toISOString();
+}
+
+/** Build ISO for start of a slot on a given date. */
+export function toSlotISO(dateStr: string, hour: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}

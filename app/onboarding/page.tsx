@@ -22,7 +22,7 @@ export default async function OnboardingPage() {
     .limit(1)
     .maybeSingle();
 
-  if (membership) redirect("/dashboard");
+  if (membership) redirect("/operations");
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)] px-4">

@@ -1,0 +1,860 @@
+"use client";
+
+import "leaflet/dist/leaflet.css";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  MapContainer,
+  Marker,
+  Popup,
+  Polyline,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
+import { divIcon, latLngBounds } from "leaflet";
+import type { DispatchWorkOrder } from "../types";
+import type {
+  DispatchFilterOptions,
+  DispatchWorkforce,
+} from "../dispatch-data";
+import type { DispatchFilterState } from "../filter-state";
+import type { DispatchViewMode } from "../filter-state";
+import {
+  buildTechnicianRoute,
+  clusterWorkOrders,
+  hasCoordinate,
+} from "../dispatch-map-utils";
+import { Button } from "@/src/components/ui/button";
+
+/** Temporary debug logs for Map+ (container size, invalidateSize, center/zoom). Remove or set to false after validation. */
+const DEBUG_MAP_PLUS = process.env.NODE_ENV === "development";
+
+type DispatchMapPanelProps = {
+  /** When "combined", map is in Map+ layout; invalidateSize is triggered when panel becomes visible. */
+  viewMode?: DispatchViewMode;
+  /** In Map+ view, true when the map pane is visible (not hidden by "Hide map"). */
+  mapPanelVisible?: boolean;
+  workOrders: DispatchWorkOrder[];
+  workforce: DispatchWorkforce;
+  filterState: DispatchFilterState;
+  filterOptions: DispatchFilterOptions;
+  selectedTechnicianId: string | null;
+  selectedWorkOrderId: string | null;
+  hoveredWorkOrderId?: string | null;
+  assignmentPending?: boolean;
+  onSelectTechnician: (technicianId: string | null) => void;
+  onSelectWorkOrder: (workOrderId: string | null) => void;
+  onHoverWorkOrder?: (workOrderId: string | null) => void;
+  onOpenWorkOrderDrawer: (workOrderId: string) => void;
+  onOpenWorkOrder: (workOrderId: string) => void;
+  onAssignFromMap: (workOrderId: string, technicianId: string) => Promise<void>;
+  onPatchFilters: (patch: Partial<DispatchFilterState>) => void;
+};
+
+function priorityClass(priority: string | null | undefined): string {
+  const value = String(priority ?? "").toLowerCase();
+  if (value === "emergency") return "dispatch-map-pin-emergency";
+  if (value === "urgent") return "dispatch-map-pin-urgent";
+  if (value === "high") return "dispatch-map-pin-high";
+  if (value === "medium") return "dispatch-map-pin-medium";
+  return "dispatch-map-pin-low";
+}
+
+/** Status-based marker color: Red=Overdue, Yellow=Ready/Unscheduled, Blue=Scheduled, Green=Completed */
+function statusPinClass(
+  workOrder: DispatchWorkOrder,
+  selectedDate: string
+): string {
+  const status = String(workOrder.status ?? "").toLowerCase();
+  const due = workOrder.due_date ?? null;
+  const scheduled = workOrder.scheduled_date ?? null;
+  const isOverdue = due && due < selectedDate && status !== "completed" && status !== "closed" && status !== "cancelled";
+  if (isOverdue) return "dispatch-map-pin-status-overdue";
+  if (status === "completed" || status === "closed" || status === "cancelled") return "dispatch-map-pin-status-completed";
+  if (scheduled && (workOrder.assigned_technician_id || workOrder.assigned_crew_id)) return "dispatch-map-pin-status-scheduled";
+  return "dispatch-map-pin-status-ready";
+}
+
+function shortWorkOrderLabel(workOrder: DispatchWorkOrder): string {
+  if (workOrder.work_order_number) return workOrder.work_order_number;
+  if (workOrder.title) return workOrder.title.slice(0, 18);
+  return `WO-${workOrder.id.slice(0, 6)}`;
+}
+
+function workOrderPinIcon(
+  workOrder: DispatchWorkOrder,
+  selectedDate: string,
+  selected: boolean,
+  hovered: boolean
+) {
+  const label = shortWorkOrderLabel(workOrder).replace(/^WO-?/i, "").slice(0, 8) || "WO";
+  const stateClass = selected
+    ? "dispatch-map-pin-selected"
+    : hovered
+      ? "dispatch-map-pin-hovered"
+      : "";
+  const statusClass = statusPinClass(workOrder, selectedDate);
+  return divIcon({
+    className: "dispatch-map-pin-shell",
+    html: `<span class="dispatch-map-pin ${statusClass} ${stateClass}">${label}</span>`,
+    iconSize: selected ? [36, 36] : [30, 30],
+    iconAnchor: selected ? [18, 18] : [15, 15],
+  });
+}
+
+const technicianPinIcon = divIcon({
+  className: "dispatch-map-pin-shell",
+  html: '<span class="dispatch-map-pin dispatch-map-pin-technician">T</span>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
+const ROUTE_POLYLINE_OPTIONS = { color: "#1d4ed8", weight: 4, opacity: 0.7 };
+
+/** Memoized single work order marker so icon and eventHandlers are stable and do not trigger full layer rebuilds on hover/selection. */
+const WorkOrderMarker = React.memo(function WorkOrderMarker({
+  workOrder,
+  selectedDate,
+  isSelected,
+  isHovered,
+  onSelect,
+  onHover,
+  onOpenDrawer,
+  onOpen,
+  onAssign,
+  selectedTechnician,
+}: {
+  workOrder: DispatchWorkOrder;
+  selectedDate: string;
+  isSelected: boolean;
+  isHovered: boolean;
+  onSelect: (id: string) => void;
+  onHover: (id: string | null) => void;
+  onOpenDrawer: (id: string) => void;
+  onOpen: (id: string) => void;
+  onAssign: (workOrderId: string, technicianId: string) => void;
+  selectedTechnician: { id: string; name: string } | null;
+}) {
+  const icon = useMemo(
+    () => workOrderPinIcon(workOrder, selectedDate, isSelected, isHovered),
+    [workOrder.id, workOrder.status, workOrder.due_date, workOrder.scheduled_date, workOrder.assigned_technician_id, workOrder.assigned_crew_id, selectedDate, isSelected, isHovered]
+  );
+  const eventHandlers = useMemo(
+    () => ({
+      click: () => onSelect(workOrder.id),
+      mouseover: () => onHover(workOrder.id),
+      mouseout: () => onHover(null),
+    }),
+    [workOrder.id, onSelect, onHover]
+  );
+  return (
+    <Marker
+      position={[workOrder.latitude as number, workOrder.longitude as number]}
+      icon={icon}
+      eventHandlers={eventHandlers}
+    >
+      <Popup>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-slate-800">
+            {shortWorkOrderLabel(workOrder)}
+          </p>
+          <p className="text-xs text-slate-700">
+            {workOrder.title ?? "Work order"}
+          </p>
+          <p className="text-xs text-slate-600">
+            {workOrder.priority ?? "medium"} · {workOrder.status ?? "new"}
+          </p>
+          <p className="text-xs text-slate-600">{locationLine(workOrder)}</p>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+              onClick={() => onOpenDrawer(workOrder.id)}
+            >
+              View details
+            </button>
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+              onClick={() => onOpen(workOrder.id)}
+            >
+              Open work order
+            </button>
+            {selectedTechnician &&
+            selectedTechnician.id !== workOrder.assigned_technician_id ? (
+              <button
+                type="button"
+                className="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
+                onClick={() => onAssign(workOrder.id, selectedTechnician.id)}
+              >
+                Assign to {selectedTechnician.name}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+
+function clusterPinIcon(count: number) {
+  return divIcon({
+    className: "dispatch-map-pin-shell",
+    html: `<span class="dispatch-map-pin dispatch-map-pin-cluster">${count}</span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+}
+
+function locationLine(workOrder: DispatchWorkOrder): string {
+  const pieces = [
+    workOrder.property_name,
+    workOrder.building_name,
+    workOrder.unit_name,
+    workOrder.location,
+  ].filter(Boolean);
+  return pieces.join(" / ");
+}
+
+function locationFreshness(lastLocationAt: string | null | undefined): {
+  label: string;
+  stale: boolean;
+} {
+  if (!lastLocationAt) return { label: "Last updated —", stale: true };
+  const ms = new Date(lastLocationAt).getTime();
+  if (!Number.isFinite(ms)) return { label: "Last updated —", stale: true };
+  const diffMinutes = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (diffMinutes < 1) return { label: "Last updated just now", stale: false };
+  return {
+    label: `Last updated ${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`,
+    stale: diffMinutes >= 10,
+  };
+}
+
+// --- Stable map hook components (module-level so they are not recreated each render and do not remount) ---
+
+function MapZoomWatcher({
+  setZoomLevel,
+}: {
+  setZoomLevel: React.Dispatch<React.SetStateAction<number>>;
+}) {
+  const map = useMapEvents({
+    zoomend: (event) => {
+      const z = event.target.getZoom();
+      setZoomLevel((prev) => (prev === z ? prev : z));
+    },
+  });
+  useEffect(() => {
+    const z = map.getZoom();
+    setZoomLevel((prev) => (prev === z ? prev : z));
+  }, [map, setZoomLevel]);
+  return null;
+}
+
+const RESIZE_DEBOUNCE_MS = 250;
+
+function MapResizeOnMount() {
+  const map = useMap();
+  const lastSizeRef = useRef<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    let rafId: number | null = null;
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+    const container = map.getContainer();
+    const runInvalidate = () => {
+      if (!mounted) return;
+      try {
+        const c = map.getContainer();
+        if (!c?.isConnected) return;
+        const w = c.offsetWidth;
+        const h = c.offsetHeight;
+        const last = lastSizeRef.current;
+        if (last != null && last.w === w && last.h === h) return;
+        lastSizeRef.current = { w, h };
+        map.invalidateSize();
+      } catch {
+        // Map may be torn down
+      }
+    };
+    const scheduleInvalidate = () => {
+      if (debounceId != null) clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        debounceId = null;
+        if (rafId != null) cancelAnimationFrame(rafId);
+        rafId = window.requestAnimationFrame(() => {
+          rafId = null;
+          runInvalidate();
+        });
+      }, RESIZE_DEBOUNCE_MS);
+    };
+    const t = setTimeout(scheduleInvalidate, 150);
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(scheduleInvalidate)
+      : null;
+    if (ro && container) ro.observe(container);
+    return () => {
+      mounted = false;
+      clearTimeout(t);
+      if (debounceId != null) clearTimeout(debounceId);
+      if (rafId != null) cancelAnimationFrame(rafId);
+      if (ro && container) ro.unobserve(container);
+    };
+  }, [map]);
+  return null;
+}
+
+/** When Map+ is active and visible, call invalidateSize so the map fills the container after layout settles. */
+function MapPlusRefresh({
+  isMapPlusActive,
+  mapPanelVisible,
+}: {
+  isMapPlusActive: boolean;
+  mapPanelVisible: boolean;
+}) {
+  const map = useMap();
+  const runInvalidate = useCallback(() => {
+    try {
+      const c = map.getContainer();
+      if (!c?.isConnected) return;
+      const w = c.offsetWidth;
+      const h = c.offsetHeight;
+      if (DEBUG_MAP_PLUS) {
+        console.log("[Dispatch Map+] invalidateSize", { width: w, height: h, center: map.getCenter(), zoom: map.getZoom() });
+      }
+      map.invalidateSize();
+    } catch {
+      // Map may be torn down
+    }
+  }, [map]);
+
+  useEffect(() => {
+    if (!isMapPlusActive || !mapPanelVisible) return;
+    runInvalidate();
+    const rafId = requestAnimationFrame(() => runInvalidate());
+    const t1 = setTimeout(runInvalidate, 100);
+    const t2 = setTimeout(runInvalidate, 350);
+    const t3 = setTimeout(runInvalidate, 600);
+    const handleResize = () => runInvalidate();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isMapPlusActive, mapPanelVisible, runInvalidate]);
+
+  useEffect(() => {
+    if (!isMapPlusActive || !mapPanelVisible) return;
+    const container = map.getContainer();
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (DEBUG_MAP_PLUS) {
+        const c = map.getContainer();
+        console.log("[Dispatch Map+] ResizeObserver", c ? { width: c.offsetWidth, height: c.offsetHeight } : "no container");
+      }
+      runInvalidate();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [map, isMapPlusActive, mapPanelVisible, runInvalidate]);
+  return null;
+}
+
+function PanToSelectedWorkOrder({
+  selectedLatLng,
+}: {
+  selectedLatLng: [number, number] | null;
+}) {
+  const map = useMap();
+  const lastPannedRef = useRef<string>("");
+  useEffect(() => {
+    if (!selectedLatLng) return;
+    const key = `${selectedLatLng[0].toFixed(5)},${selectedLatLng[1].toFixed(5)}`;
+    if (lastPannedRef.current === key) return;
+    lastPannedRef.current = key;
+    map.setView(
+      [selectedLatLng[0], selectedLatLng[1]],
+      Math.max(map.getZoom(), 14),
+      { animate: true, duration: 0.35 }
+    );
+  }, [map, selectedLatLng]);
+  return null;
+}
+
+function FitBoundsToDispatchPoints({
+  points,
+}: {
+  points: Array<{ latitude: number; longitude: number }>;
+}) {
+  const map = useMap();
+  const signature = useMemo(
+    () =>
+      points
+        .map((p) => `${p.latitude.toFixed(4)}:${p.longitude.toFixed(4)}`)
+        .join("|"),
+    [points]
+  );
+  const appliedSignatureRef = useRef<string>("");
+  useEffect(() => {
+    if (points.length === 0) return;
+    if (signature === appliedSignatureRef.current) return;
+    appliedSignatureRef.current = signature;
+    const bounds = latLngBounds(
+      points.map((p) => [p.latitude, p.longitude] as [number, number])
+    );
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 13 });
+  }, [map, points, signature]);
+  return null;
+}
+
+// --- End stable map hook components ---
+
+export function DispatchMapPanel({
+  viewMode = "map",
+  mapPanelVisible = true,
+  workOrders,
+  workforce,
+  filterState,
+  filterOptions,
+  selectedTechnicianId,
+  selectedWorkOrderId,
+  hoveredWorkOrderId = null,
+  assignmentPending = false,
+  onSelectTechnician,
+  onSelectWorkOrder,
+  onHoverWorkOrder,
+  onOpenWorkOrderDrawer,
+  onOpenWorkOrder,
+  onAssignFromMap,
+  onPatchFilters,
+}: DispatchMapPanelProps) {
+  const [zoomLevel, setZoomLevel] = useState(11);
+  const [mapMounted, setMapMounted] = useState(false);
+  /** In Map+, we only mount the map once the container has measurable dimensions so Leaflet doesn't get 0x0. */
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const isMapPlusActive = viewMode === "combined";
+
+  useEffect(() => {
+    setMapMounted(true);
+    if (DEBUG_MAP_PLUS) {
+      console.log("[Dispatch Map+] mount", { viewMode, mapPanelVisible });
+    }
+    return () => {
+      setMapMounted(false);
+      if (DEBUG_MAP_PLUS) console.log("[Dispatch Map+] unmount");
+    };
+  }, [viewMode, mapPanelVisible]);
+
+  // In Map+, clear measured size when view becomes inactive so we re-measure when shown again.
+  useEffect(() => {
+    if (!isMapPlusActive || !mapPanelVisible) setContainerSize(null);
+  }, [isMapPlusActive, mapPanelVisible]);
+
+  // ResizeObserver: measure container and set explicit size so we can delay map mount until we have non-zero dimensions (Map+).
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const updateSize = () => {
+      // Use clientWidth/clientHeight (inner size, excluding border) so the map wrapper doesn't overflow and cause scrollbars.
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (DEBUG_MAP_PLUS && isMapPlusActive) {
+        console.log("[Dispatch Map+] container size", { width: w, height: h });
+      }
+      setContainerSize((prev) => {
+        if (prev && prev.width === w && prev.height === h) return prev;
+        return { width: w, height: h };
+      });
+    };
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(el);
+    // Initial measure after layout (ResizeObserver may fire before flex layout settles in Map+).
+    const rafId = requestAnimationFrame(() => updateSize());
+    const tId = setTimeout(updateSize, 150);
+    const tId2 = setTimeout(updateSize, 400);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafId);
+      clearTimeout(tId);
+      clearTimeout(tId2);
+    };
+  }, [isMapPlusActive]);
+
+  /** In Map+, only render the map when the container has non-zero dimensions; otherwise Leaflet draws a blank map. */
+  const canRenderMap = !isMapPlusActive || (containerSize != null && containerSize.width > 0 && containerSize.height > 0);
+  const onMarkerSelect = useCallback(
+    (workOrderId: string) => {
+      onSelectWorkOrder(workOrderId);
+      onOpenWorkOrderDrawer(workOrderId);
+    },
+    [onSelectWorkOrder, onOpenWorkOrderDrawer]
+  );
+  const onMarkerHover = useCallback(
+    (workOrderId: string | null) => onHoverWorkOrder?.(workOrderId),
+    [onHoverWorkOrder]
+  );
+  const onMarkerAssign = useCallback(
+    (workOrderId: string, technicianId: string) => onAssignFromMap(workOrderId, technicianId),
+    [onAssignFromMap]
+  );
+
+  const propertyOptions = useMemo(() => {
+    if (!filterState.companyId) return filterOptions.properties;
+    return filterOptions.properties.filter((row) => row.company_id === filterState.companyId);
+  }, [filterOptions.properties, filterState.companyId]);
+
+  const workOrderCoordinates = useMemo(
+    () =>
+      workOrders.filter((workOrder) =>
+        hasCoordinate(workOrder.latitude, workOrder.longitude)
+      ),
+    [workOrders]
+  );
+  const technicianCoordinates = useMemo(
+    () =>
+      workforce.technicians.filter((technician) =>
+        hasCoordinate(technician.latitude, technician.longitude)
+      ),
+    [workforce.technicians]
+  );
+  const selectedLatLng = useMemo((): [number, number] | null => {
+    if (!selectedWorkOrderId) return null;
+    const wo = workOrderCoordinates.find((w) => w.id === selectedWorkOrderId);
+    if (!wo?.latitude || !wo?.longitude) return null;
+    return [wo.latitude as number, wo.longitude as number];
+  }, [selectedWorkOrderId, workOrderCoordinates]);
+  const mapCenter = useMemo(() => {
+    const coordinatePool: Array<{ latitude: number; longitude: number }> = [];
+    workOrderCoordinates.forEach((workOrder) => {
+      coordinatePool.push({
+        latitude: workOrder.latitude as number,
+        longitude: workOrder.longitude as number,
+      });
+    });
+    technicianCoordinates.forEach((technician) => {
+      coordinatePool.push({
+        latitude: technician.latitude as number,
+        longitude: technician.longitude as number,
+      });
+    });
+    if (coordinatePool.length === 0) return { latitude: 39.5, longitude: -98.35 };
+    const latitude =
+      coordinatePool.reduce((sum, point) => sum + point.latitude, 0) /
+      coordinatePool.length;
+    const longitude =
+      coordinatePool.reduce((sum, point) => sum + point.longitude, 0) /
+      coordinatePool.length;
+    return { latitude, longitude };
+  }, [technicianCoordinates, workOrderCoordinates]);
+
+  const mapCenterTuple = useMemo(
+    (): [number, number] => [mapCenter.latitude, mapCenter.longitude],
+    [mapCenter.latitude, mapCenter.longitude]
+  );
+
+  const clusters = useMemo(
+    () => clusterWorkOrders(workOrderCoordinates, zoomLevel),
+    [workOrderCoordinates, zoomLevel]
+  );
+  const fitBoundsPoints = useMemo(
+    () => [
+      ...workOrderCoordinates.map((workOrder) => ({
+        latitude: workOrder.latitude as number,
+        longitude: workOrder.longitude as number,
+      })),
+      ...technicianCoordinates.map((technician) => ({
+        latitude: technician.latitude as number,
+        longitude: technician.longitude as number,
+      })),
+    ],
+    [technicianCoordinates, workOrderCoordinates]
+  );
+
+  const selectedTechnician = useMemo(
+    () =>
+      workforce.technicians.find((technician) => technician.id === selectedTechnicianId) ?? null,
+    [selectedTechnicianId, workforce.technicians]
+  );
+  const selectedWorkOrder = useMemo(
+    () => workOrders.find((workOrder) => workOrder.id === selectedWorkOrderId) ?? null,
+    [selectedWorkOrderId, workOrders]
+  );
+  const selectedRoute = useMemo(() => {
+    if (!selectedTechnician) return null;
+    return buildTechnicianRoute(selectedTechnician, workOrders, filterState.selectedDate);
+  }, [filterState.selectedDate, selectedTechnician, workOrders]);
+
+  const routePolylinePositions = useMemo((): [number, number][] | null => {
+    if (!selectedRoute || selectedRoute.orderedJobs.length === 0) return null;
+    return [
+      [selectedRoute.start.latitude, selectedRoute.start.longitude],
+      ...selectedRoute.orderedJobs.map((wo) => [
+        wo.latitude as number,
+        wo.longitude as number,
+      ] as [number, number]),
+    ];
+  }, [selectedRoute]);
+
+  const canAssignFromMap = Boolean(
+    selectedWorkOrder &&
+      selectedTechnician &&
+      selectedWorkOrder.assigned_technician_id !== selectedTechnician.id
+  );
+
+  const compactSelect = "ui-select min-h-0 w-full min-w-0 py-1 text-[10px]";
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <div className="flex shrink-0 items-center justify-between gap-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+          Map
+        </p>
+        <span className="text-[9px] text-[var(--muted)]">
+          {workOrderCoordinates.length} jobs · {technicianCoordinates.length} techs
+        </span>
+      </div>
+      <div className="grid shrink-0 grid-cols-3 gap-1">
+        <select
+          className={compactSelect}
+          value={filterState.technicianId}
+          onChange={(e) => onPatchFilters({ technicianId: e.target.value })}
+          title="Focus technician"
+        >
+          <option value="">All techs</option>
+          {filterOptions.technicians.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <select
+          className={compactSelect}
+          value={filterState.priority}
+          onChange={(e) => onPatchFilters({ priority: e.target.value })}
+          title="Priority"
+        >
+          <option value="">Priority</option>
+          {filterOptions.priorities.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <select
+          className={compactSelect}
+          value={filterState.propertyId}
+          onChange={(e) => onPatchFilters({ propertyId: e.target.value })}
+          title="Property"
+        >
+          <option value="">Property</option>
+          {propertyOptions.map((p) => (
+            <option key={p.id} value={p.id}>{p.property_name ?? p.name ?? p.id}</option>
+          ))}
+        </select>
+      </div>
+      <div
+        ref={mapContainerRef}
+        className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50"
+        style={{ minHeight: 280, height: "100%" }}
+      >
+        {!mapMounted ? (
+          <div className="flex h-full min-h-[350px] items-center justify-center text-[11px] text-[var(--muted)]">
+            Loading map…
+          </div>
+        ) : !canRenderMap ? (
+          <div className="flex h-full min-h-[260px] items-center justify-center text-[11px] text-[var(--muted)]">
+            Preparing map…
+          </div>
+        ) : (
+        <div
+          className="h-full w-full overflow-hidden min-h-0"
+          style={isMapPlusActive && containerSize ? { width: containerSize.width, height: containerSize.height, minWidth: 0, minHeight: 0 } : undefined}
+        >
+        <MapContainer
+          key="dispatch-map"
+          center={mapCenterTuple}
+          zoom={11}
+          minZoom={3}
+          maxZoom={19}
+          scrollWheelZoom
+          className="h-full w-full overflow-hidden"
+          style={{ overflow: "hidden" }}
+        >
+          <MapZoomWatcher setZoomLevel={setZoomLevel} />
+          <MapResizeOnMount />
+          <MapPlusRefresh isMapPlusActive={isMapPlusActive} mapPanelVisible={mapPanelVisible} />
+          <PanToSelectedWorkOrder selectedLatLng={selectedLatLng} />
+          <FitBoundsToDispatchPoints points={fitBoundsPoints} />
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          {clusters.map((cluster) => {
+            if (cluster.workOrders.length === 1) {
+              const workOrder = cluster.workOrders[0];
+              return (
+                <WorkOrderMarker
+                  key={workOrder.id}
+                  workOrder={workOrder}
+                  selectedDate={filterState.selectedDate}
+                  isSelected={selectedWorkOrderId === workOrder.id}
+                  isHovered={hoveredWorkOrderId === workOrder.id}
+                  onSelect={onMarkerSelect}
+                  onHover={onMarkerHover}
+                  onOpenDrawer={onOpenWorkOrderDrawer}
+                  onOpen={onOpenWorkOrder}
+                  onAssign={onMarkerAssign}
+                  selectedTechnician={selectedTechnician}
+                />
+              );
+            }
+            return (
+              <Marker
+                key={cluster.id}
+                position={[cluster.latitude, cluster.longitude]}
+                icon={clusterPinIcon(cluster.workOrders.length)}
+              >
+                <Popup>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-800">
+                      {cluster.workOrders.length} nearby work orders
+                    </p>
+                    <div className="max-h-44 space-y-1 overflow-auto">
+                      {cluster.workOrders.slice(0, 10).map((workOrder) => (
+                        <button
+                          key={workOrder.id}
+                          type="button"
+                          className="block w-full rounded border border-slate-200 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-100"
+                          onClick={() => onMarkerSelect(workOrder.id)}
+                          onMouseEnter={() => onMarkerHover(workOrder.id)}
+                          onMouseLeave={() => onMarkerHover(null)}
+                        >
+                          {shortWorkOrderLabel(workOrder)} · {workOrder.priority ?? "medium"} ·{" "}
+                          {workOrder.status ?? "new"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+          {technicianCoordinates.map((technician) => (
+            <Marker
+              key={technician.id}
+              position={[technician.latitude as number, technician.longitude as number]}
+              icon={technicianPinIcon}
+              eventHandlers={{
+                click: () => onSelectTechnician(technician.id),
+              }}
+            >
+              <Popup>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-800">{technician.name}</p>
+                  <p className="text-xs text-slate-600">
+                    {technician.currentAssignments} assignments · {technician.workloadHoursToday.toFixed(1)}h
+                  </p>
+                  <p
+                    className={`text-[11px] ${
+                      locationFreshness(technician.lastLocationAt).stale
+                        ? "text-amber-700"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {locationFreshness(technician.lastLocationAt).label}
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    onClick={() => onSelectTechnician(technician.id)}
+                  >
+                    Show route
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {routePolylinePositions ? (
+            <Polyline
+              positions={routePolylinePositions}
+              pathOptions={ROUTE_POLYLINE_OPTIONS}
+            />
+          ) : null}
+        </MapContainer>
+        </div>
+        )}
+      </div>
+
+      <section className="shrink-0 space-y-1.5 rounded-lg border border-[var(--card-border)]/80 bg-[var(--background)]/40 p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <select
+            className="ui-select min-h-0 flex-1 min-w-0 py-1.5 text-sm"
+            value={selectedTechnicianId ?? ""}
+            onChange={(event) =>
+              onSelectTechnician(event.target.value ? event.target.value : null)
+            }
+          >
+            <option value="">Technician route</option>
+            {workforce.technicians.map((technician) => (
+              <option key={technician.id} value={technician.id}>
+                {technician.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="ui-select min-h-0 flex-1 min-w-0 py-1.5 text-sm"
+            value={selectedWorkOrderId ?? ""}
+            onChange={(event) =>
+              onSelectWorkOrder(event.target.value ? event.target.value : null)
+            }
+          >
+            <option value="">Work order</option>
+            {workOrders.map((workOrder) => (
+              <option key={workOrder.id} value={workOrder.id}>
+                {shortWorkOrderLabel(workOrder)} · {workOrder.priority ?? "medium"}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0 text-[11px]"
+            disabled={!canAssignFromMap || assignmentPending}
+            onClick={() => {
+              if (!selectedWorkOrder || !selectedTechnician) return;
+              onAssignFromMap(selectedWorkOrder.id, selectedTechnician.id);
+            }}
+          >
+            {assignmentPending ? "…" : "Assign"}
+          </Button>
+        </div>
+
+        {selectedRoute ? (
+          <div className="max-h-32 space-y-1 overflow-auto">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              Technician Route
+            </p>
+            {selectedRoute.orderedJobs.length === 0 ? (
+              <p className="text-xs text-[var(--muted)]">No geo-located assignments for this technician.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {selectedRoute.orderedJobs.map((wo) => {
+                  const timeStr = wo.scheduled_start
+                    ? new Date(wo.scheduled_start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
+                    : "—";
+                  const title = wo.title ?? wo.work_order_number ?? "Work order";
+                  return (
+                    <li key={wo.id} className="text-xs text-[var(--foreground)]">
+                      {timeStr} – {title}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}

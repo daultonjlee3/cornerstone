@@ -1,0 +1,109 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState } from "react";
+import { User, Mail, Lock } from "lucide-react";
+import { signupAction } from "./actions";
+
+const inputBase =
+  "w-full min-h-[52px] rounded-xl border bg-white py-3.5 pl-11 pr-4 text-base text-slate-900 placeholder:text-slate-500 transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 focus:border-[var(--accent)] dark:bg-slate-700/80 dark:text-slate-100 dark:placeholder:text-slate-400 dark:border-slate-600 dark:hover:border-slate-500 sm:min-h-0 sm:text-[15px]";
+
+export function SignupForm() {
+  const [state, formAction] = useActionState(signupAction, {});
+
+  return (
+    <form action={formAction} className="space-y-6 sm:space-y-6">
+      {state?.error && (
+        <div
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
+          role="alert"
+        >
+          {state.error}
+        </div>
+      )}
+      <div className="space-y-2">
+        <label
+          htmlFor="signup-full-name"
+          className="block text-sm font-semibold text-slate-700 dark:text-slate-200"
+        >
+          Full name
+        </label>
+        <div className="relative">
+          <User
+            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+            aria-hidden
+          />
+          <input
+            id="signup-full-name"
+            name="full_name"
+            type="text"
+            autoComplete="name"
+            placeholder="Your name"
+            className={`${inputBase} border-slate-200 hover:border-slate-300 dark:hover:border-slate-500`}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <label
+          htmlFor="signup-email"
+          className="block text-sm font-semibold text-slate-700 dark:text-slate-200"
+        >
+          Email
+        </label>
+        <div className="relative">
+          <Mail
+            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+            aria-hidden
+          />
+          <input
+            id="signup-email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@company.com"
+            className={`${inputBase} border-slate-200 hover:border-slate-300 dark:hover:border-slate-500`}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <label
+          htmlFor="signup-password"
+          className="block text-sm font-semibold text-slate-700 dark:text-slate-200"
+        >
+          Password
+        </label>
+        <div className="relative">
+          <Lock
+            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500 dark:text-slate-400"
+            aria-hidden
+          />
+          <input
+            id="signup-password"
+            name="password"
+            type="password"
+            required
+            autoComplete="new-password"
+            placeholder="••••••••"
+            className={`${inputBase} border-slate-200 hover:border-slate-300 dark:hover:border-slate-500`}
+          />
+        </div>
+      </div>
+      <button
+        type="submit"
+        className="w-full min-h-[52px] rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 ease-out hover:-translate-y-px hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:transition-none active:scale-[0.99] sm:min-h-0"
+      >
+        Create account
+      </button>
+      <p className="text-center text-[15px] text-slate-600 dark:text-slate-300">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="inline-block py-2 font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 rounded sm:py-0"
+        >
+          Sign in
+        </Link>
+      </p>
+    </form>
+  );
+}
