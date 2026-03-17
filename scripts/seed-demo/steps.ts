@@ -911,10 +911,7 @@ export async function seedTenant(
       .insert({ name: cfg.tenantName, slug: cfg.slug })
       .select("id")
       .single();
-    if (te || !t?.id) {
-      console.error("Tenant insert error details:", JSON.stringify(te, null, 2));
-      throw new Error("Failed to create tenant: " + (te?.message ?? "no id"));
-    }
+    if (te || !t?.id) throw new Error("Failed to create tenant: " + (te?.message ?? "no id"));
     tenantId = t.id as string;
   }
 

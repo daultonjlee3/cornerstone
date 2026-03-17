@@ -57,16 +57,7 @@ function parseImpersonationCookie(rawValue: string | undefined): { admin_user_id
 }
 
 export async function middleware(request: NextRequest) {
-  // TEMPORARY: Skip all auth for testing work orders UI  
-  return NextResponse.next({ request });
-  
   const response = NextResponse.next({ request });
-  
-  // TEMPORARY: Skip auth for testing work orders UI
-  if (request.nextUrl.pathname.startsWith("/work-orders")) {
-    return response;
-  }
-  
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return response;
