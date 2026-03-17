@@ -5,7 +5,12 @@ import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/s
 import { resolveTaxable } from "@/src/lib/procurement/pricing";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 
-export type PurchaseOrderFormState = { error?: string; success?: boolean };
+export type PurchaseOrderFormState = {
+  error?: string;
+  success?: boolean;
+  /** Optional: used when template-related actions need to return a created/updated template id. */
+  templateId?: string;
+};
 
 function normalizeStatus(value: string): string {
   const allowed = ["draft", "ordered", "partially_received", "received", "cancelled"];
