@@ -116,6 +116,9 @@ export function WorkOrderDetailView({
   vendors,
   sla,
   inventoryItems,
+  materialLines,
+  productsForMaterials,
+  stockLocationsForMaterials,
   laborMinutes = null,
 }: WorkOrderDetailViewProps) {
   const router = useRouter();
