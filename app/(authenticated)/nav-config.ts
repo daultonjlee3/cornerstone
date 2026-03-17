@@ -5,6 +5,7 @@
  * Operations Center is the primary landing page (/operations).
  */
 
+import { featureFlags } from "@/src/lib/features";
 export type NavItem = {
   label: string;
   href: string;
@@ -19,6 +20,21 @@ export type NavGroup = {
   /** When true, section is visually de-emphasized (secondary). */
   secondary?: boolean;
 };
+
+const adminItems: NavItem[] = [
+  { label: "Companies", href: "/companies", icon: "Building" },
+  { label: "Onboarding Wizard", href: "/onboarding-wizard", icon: "Sparkles" },
+  { label: "Customers", href: "/customers", icon: "UserCircle" },
+  { label: "Contracts", href: "/dashboard/contracts", icon: "FileText" },
+  { label: "Invoices", href: "/dashboard/invoices", icon: "Receipt" },
+];
+
+function isAdminItemEnabled(item: NavItem): boolean {
+  if (item.href === "/customers") return featureFlags.customers;
+  if (item.href === "/dashboard/contracts") return featureFlags.contracts;
+  if (item.href === "/dashboard/invoices") return featureFlags.invoicing;
+  return true;
+}
 
 export const navConfig: NavGroup[] = [
   {
@@ -74,13 +90,7 @@ export const navConfig: NavGroup[] = [
   {
     label: "Admin",
     secondary: true,
-    items: [
-      { label: "Companies", href: "/companies", icon: "Building" },
-      { label: "Onboarding Wizard", href: "/onboarding-wizard", icon: "Sparkles" },
-      { label: "Customers", href: "/customers", icon: "UserCircle" },
-      { label: "Contracts", href: "/dashboard/contracts", icon: "FileText" },
-      { label: "Invoices", href: "/dashboard/invoices", icon: "Receipt" },
-    ],
+    items: adminItems.filter(isAdminItemEnabled),
   },
   {
     label: "Organization",

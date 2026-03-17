@@ -17,9 +17,11 @@ type AssetOption = { id: string; name: string };
 type RequestFormProps = {
   properties: PropertyOption[];
   assets: AssetOption[];
+  tenantId: string;
+  companyId: string;
 };
 
-export function RequestForm({ properties, assets }: RequestFormProps) {
+export function RequestForm({ properties, assets, tenantId, companyId }: RequestFormProps) {
   const { t, locale } = useRequestPortalTranslations();
   const [state, formAction, pending] = useActionState(
     submitMaintenanceRequestPortal,
@@ -35,6 +37,8 @@ export function RequestForm({ properties, assets }: RequestFormProps) {
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="tenant_id" value={tenantId} />
+      <input type="hidden" name="company_id" value={companyId} />
       {state.error ? (
         <div className="rounded-xl bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
           {state.error}

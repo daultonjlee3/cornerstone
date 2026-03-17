@@ -38,8 +38,8 @@ export async function submitMaintenanceRequestPortal(
   formData: FormData
 ): Promise<PortalSubmissionState> {
   const locale = getLocale(formData);
-  const tenantId = process.env.PORTAL_TENANT_ID?.trim();
-  const companyId = process.env.PORTAL_COMPANY_ID?.trim();
+  const tenantId = ((formData.get("tenant_id") as string | null) ?? "").trim();
+  const companyId = ((formData.get("company_id") as string | null) ?? "").trim();
   if (!tenantId || !companyId) {
     return { error: t(locale, "validation.portalNotConfigured") };
   }

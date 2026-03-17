@@ -12,16 +12,22 @@ type RequestPortalLayoutProps = {
   properties: PropertyOption[];
   assets: AssetOption[];
   configured?: boolean;
+  tenantId?: string;
+  companyId?: string;
 };
 
 function RequestPortalContent({
   properties,
   assets,
   configured = true,
+  tenantId,
+  companyId,
 }: {
   properties: PropertyOption[];
   assets: AssetOption[];
   configured: boolean;
+  tenantId?: string;
+  companyId?: string;
 }) {
   const { t } = useRequestPortalTranslations();
 
@@ -39,10 +45,15 @@ function RequestPortalContent({
             {t("requestPortal.subtitle")}
           </p>
         </header>
-        {configured ? (
+        {configured && tenantId && companyId ? (
           <>
             <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] sm:p-10">
-              <RequestForm properties={properties} assets={assets} />
+              <RequestForm
+                properties={properties}
+                assets={assets}
+                tenantId={tenantId}
+                companyId={companyId}
+              />
             </div>
             <p className="mt-8 text-center text-xs text-[var(--muted)]">
               {t("requestPortal.footer")}
@@ -71,6 +82,8 @@ export function RequestPortalLayout({
   properties,
   assets,
   configured = true,
+  tenantId,
+  companyId,
 }: RequestPortalLayoutProps) {
   return (
     <RequestPortalI18nProvider initialLocale={initialLocale}>
@@ -78,6 +91,8 @@ export function RequestPortalLayout({
         properties={properties}
         assets={assets}
         configured={configured}
+        tenantId={tenantId}
+        companyId={companyId}
       />
     </RequestPortalI18nProvider>
   );
