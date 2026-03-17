@@ -47,7 +47,9 @@ export function WorkOrderMaterialsCard({
   const [availability, setAvailability] = useState<{ on_hand: number; reserved: number; available: number } | { by_location: Array<{ stock_location_id: string; location_name: string; on_hand: number; reserved: number; available: number }> } | null>(null);
   const [actionLineId, setActionLineId] = useState<string | null>(null);
   const [actionQty, setActionQty] = useState("");
-  const [actionModal, setActionModal] = useState<"reserve" | "issue" | "release" | null>(null);
+  const [actionModal, setActionModal] = useState<"reserve" | "issue" | "release" | "edit" | null>(null);
+  const [editRequiredQty, setEditRequiredQty] = useState("");
+  const [editLocationId, setEditLocationId] = useState("");
 
   const refreshAvailability = (pid: string, locId?: string | null) => {
     if (!pid) {
@@ -198,6 +200,7 @@ export function WorkOrderMaterialsCard({
   const canReserve = line && line.stock_location_id && line.reserved_quantity < line.required_quantity && (line.available_at_location ?? 0) > 0;
   const canIssue = line && line.reserved_quantity > line.issued_quantity;
   const canRelease = line && line.reserved_quantity > line.issued_quantity;
+  const canEdit = line && line.issued_quantity === 0;
 
   return (
     <div className={cardClass}>
