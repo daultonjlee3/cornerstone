@@ -1,17 +1,18 @@
-type PriorityTone = "gray" | "blue" | "amber" | "red";
+type PriorityTone = "gray" | "blue" | "amber" | "orange" | "red";
 
 const toneClass: Record<PriorityTone, string> = {
   gray: "border-slate-200 bg-slate-100 text-slate-700",
   blue: "border-blue-200 bg-blue-100 text-blue-700",
-  amber: "border-amber-200 bg-amber-100 text-amber-700",
-  red: "border-red-200 bg-red-100 text-red-700",
+  amber: "border-amber-200 bg-amber-100 text-amber-700 font-semibold",
+  orange: "border-orange-200 bg-orange-100 text-orange-700 font-semibold",
+  red: "border-red-200 bg-red-100 text-red-700 font-semibold",
 };
 
 const PRIORITY_MAP: Record<string, { label: string; tone: PriorityTone }> = {
   low: { label: "Low", tone: "gray" },
   medium: { label: "Medium", tone: "blue" },
   high: { label: "High", tone: "amber" },
-  urgent: { label: "Emergency", tone: "red" },
+  urgent: { label: "Urgent", tone: "orange" },
   emergency: { label: "Emergency", tone: "red" },
 };
 

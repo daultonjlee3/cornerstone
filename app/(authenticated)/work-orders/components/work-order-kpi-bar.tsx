@@ -41,6 +41,30 @@ const KPI_ITEMS: {
   { key: "completedToday", label: "Completed Today", view: "completed_today", tone: "good", icon: CheckCircle },
 ];
 
+function getCardVariant(
+  key: keyof WorkOrderKpiStats,
+  value: number
+): "default" | "danger" | "success" {
+  if (key === "overdue" && value > 0) return "danger";
+  if (key === "completedToday" && value > 0) return "success";
+  return "default";
+}
+
+function getCardDescription(
+  key: keyof WorkOrderKpiStats,
+  value: number
+): string | undefined {
+  if (key === "overdue" && value > 0)
+    return value === 1 ? "Needs immediate action" : "Needs immediate action";
+  if (key === "dueToday" && value > 0)
+    return value === 1 ? "1 job due today" : `${value} jobs queued today`;
+  if (key === "completedToday" && value === 0)
+    return "No completions yet today";
+  if (key === "completedToday" && value > 0)
+    return value === 1 ? "1 completed" : `${value} completed today`;
+  return undefined;
+}
+
 export function WorkOrderKpiBar({ stats }: WorkOrderKpiBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,22 +80,30 @@ export function WorkOrderKpiBar({ stats }: WorkOrderKpiBarProps) {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-      {KPI_ITEMS.map(({ key, label, view, tone, icon }) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => applyView(view)}
-          className="text-left transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 rounded-lg"
-          aria-label={`Filter by ${label}: ${stats[key]} items`}
-        >
-          <MetricCard
-            title={label}
-            value={stats[key]}
-            trend={tone ? { label: `View ${label}`, tone } : undefined}
-            icon={icon}
-          />
-        </button>
-      ))}
+      {KPI_ITEMS.map(({ key, label, view, tone, icon }) => {
+        const value = stats[key];
+        const variant = getCardVariant(key, value);
+        const description = getCardDescription(key, value);
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => applyView(view)}
+            className="text-left transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 rounded-lg"
+            aria-label={`Filter by ${label}: ${value} items`}
+          >
+            <MetricCard
+              title={label}
+              value={value}
+              description={description}
+              trend={tone ? { label: `View ${label}`, tone } : undefined}
+              icon={icon}
+              variant={variant}
+              className={key === "overdue" && value > 0 ? "ring-1 ring-red-200/60" : ""}
+            />
+          </button>
+        );
+      })}
     </div>
   );
 }

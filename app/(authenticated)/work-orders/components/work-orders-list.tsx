@@ -10,6 +10,7 @@ import { WorkOrderFormModal } from "./work-order-form-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
 import { WorkOrderKpiBar, type WorkOrderKpiStats } from "./work-order-kpi-bar";
 import { WorkOrderSavedViews } from "./work-order-saved-views";
+import { TodaysFocusPanel } from "./todays-focus-panel";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
@@ -389,6 +390,9 @@ export function WorkOrdersList({
         }
       />
 
+      {initialList.length > 0 && (
+        <TodaysFocusPanel workOrders={initialList} />
+      )}
       {initialList.length > 0 && stats.readyToSchedule + stats.new >= 5 && (
         <Hint
           id="work-orders-many-unassigned"
@@ -492,15 +496,28 @@ export function WorkOrdersList({
       )}
 
       {initialList.length === 0 ? (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
-          <p className="text-[var(--muted)]">No work orders yet.</p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
-          >
-            Create your first work order
-          </button>
+        <div className="rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card)] py-16 text-center shadow-[var(--shadow-soft)]">
+          <ClipboardList className="mx-auto mb-3 size-9 text-[var(--muted)]/40" strokeWidth={1.5} />
+          <p className="text-sm font-medium text-[var(--foreground)]">No work orders found</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Try adjusting your filters, or create a new work order to get started.
+          </p>
+          <div className="mt-5 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/work-orders")}
+              className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            >
+              Clear filters
+            </button>
+            <button
+              type="button"
+              onClick={openNew}
+              className="rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)]"
+            >
+              New Work Order
+            </button>
+          </div>
         </div>
       ) : (
         <div data-tour="demo-guided:execution">
@@ -537,13 +554,16 @@ export function WorkOrdersList({
                 {initialList.map((wo) => (
                   <tr
                     key={wo.id}
-                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50 cursor-pointer ${
+                    onClick={() => setDetailDrawerRow(wo)}
+                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/60 cursor-pointer ${
                       wo.status === "completed"
-                        ? "bg-[var(--muted)]/5"
+                        ? "bg-[var(--muted)]/5 opacity-80"
                         : ""
                     } ${
-                      wo.priority === "emergency"
+                      wo.priority === "emergency" || wo.priority === "urgent"
                         ? "border-l-4 border-l-red-500 bg-red-500/5 dark:border-l-red-400 dark:bg-red-500/10"
+                        : wo.priority === "high"
+                        ? "border-l-4 border-l-amber-400 bg-amber-50/40 dark:border-l-amber-400 dark:bg-amber-500/5"
                         : ""
                     }`}
                   >
@@ -595,8 +615,38 @@ export function WorkOrdersList({
                     <td className="px-4 py-3.5">
                       <StatusBadge status={wo.status ?? "new"} />
                     </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{assignedDisplay(wo)}</td>
+                    <td className="px-4 py-3.5">
+                      {(() => {
+                        const today = new Date().toISOString().slice(0, 10);
+                        const dueDate = (wo as Record<string, unknown>).due_date as string | null | undefined;
+                        const isOverdue = dueDate && dueDate < today && wo.status !== "completed" && wo.status !== "cancelled";
+                        return (
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</span>
+                            {isOverdue && (
+                              <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                                Overdue
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {(() => {
+                        const display = assignedDisplay(wo);
+                        const unassigned = !wo.assigned_technician_id && !wo.assigned_crew_id && !wo.vendor_id;
+                        if (unassigned) {
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-400">
+                              <span className="size-1.5 rounded-full bg-orange-400" aria-hidden />
+                              Unassigned
+                            </span>
+                          );
+                        }
+                        return <span className="text-[var(--muted)]">{display}</span>;
+                      })()}
+                    </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
                     <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <ActionsDropdown

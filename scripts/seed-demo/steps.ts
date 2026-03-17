@@ -157,7 +157,8 @@ function buildDemoWorkOrdersForTenant(
     titleOverride?: string,
     descriptionOverride?: string,
     completionNotesOverride?: string,
-    resolutionSummaryOverride?: string
+    resolutionSummaryOverride?: string,
+    priorityOverride?: string
   ) {
     const durationMins = durationMinsOverride ?? durationMinsDefault;
     const title = titleOverride ?? allTitles[i % allTitles.length];
@@ -169,7 +170,9 @@ function buildDemoWorkOrdersForTenant(
     const resolutionSummary = resolutionSummaryOverride ?? (status === "completed" ? RESOLUTION_SUMMARIES[i % RESOLUTION_SUMMARIES.length] : null);
     const created = scheduledDate ? new Date(scheduledDate + "T10:00:00") : new Date(dueDate + "T10:00:00");
     const updated = completedAt ? new Date(completedAt) : (scheduledEnd ? new Date(scheduledEnd) : created);
-    const vendorId = vendorIds.length && i % 6 === 2 ? vendorIds[i % vendorIds.length] ?? null : null;
+    const vendorId = assignedTechId && vendorIds.length && i % 6 === 2 ? vendorIds[i % vendorIds.length] ?? null : null;
+    const category = categories[i % categories.length];
+    const sourceType = category === "preventive_maintenance" ? "preventive_maintenance" : "manual";
     woBatch.push({
       tenant_id: tenantId,
       company_id: companyId,
@@ -177,8 +180,9 @@ function buildDemoWorkOrdersForTenant(
       title: `${title}`,
       description,
       status,
-      priority: priorities[i % priorities.length],
-      category: categories[i % categories.length],
+      priority: priorityOverride ?? priorities[i % priorities.length],
+      category,
+      source_type: sourceType,
       asset_id: assetId,
       property_id: loc?.property_id ?? defaultPropertyId,
       building_id: loc?.building_id ?? defaultBuildingId,
@@ -270,19 +274,22 @@ function buildDemoWorkOrdersForTenant(
     addWO("ready_to_schedule", scheduledDate, dueDate, null, null, null, techId, idx);
   }
 
-  // New: 7
+  // New: 7 — freshly submitted, unassigned (no technician yet assigned)
+  const HIGH_PRIORITY_NEW: string[] = ["urgent", "high", "high", "medium", "medium", "low", "medium"];
   for (let i = 0; i < 7; i++, idx++) {
     const dueDate = addDays(today, 1 + (i % 7)).toISOString().slice(0, 10);
-    const techId = techRotate[idx % techRotate.length];
-    addWO("new", null, dueDate, null, null, null, techId, idx);
+    // Leave new/unscheduled WOs unassigned — realistic for freshly submitted requests
+    addWO("new", null, dueDate, null, null, null, null, idx, undefined, undefined, undefined, undefined, undefined, HIGH_PRIORITY_NEW[i]);
   }
 
-  // Overdue: 10 (~10%) — due in past, incomplete
+  // Overdue: 10 (~10%) — due in past, incomplete; mix of assigned and unassigned
+  const OVERDUE_PRIORITIES: string[] = ["urgent", "high", "urgent", "high", "medium", "high", "medium", "urgent", "high", "medium"];
   for (let i = 0; i < 10; i++, idx++) {
     const daysAgo = 1 + (i % 5);
     const dueDate = addDays(today, -daysAgo).toISOString().slice(0, 10);
-    const techId = techRotate[idx % techRotate.length];
-    addWO("ready_to_schedule", null, dueDate, null, null, null, techId, idx);
+    // First 4 overdue are unassigned (fell through the cracks); rest have a tech
+    const techId = i < 4 ? null : techRotate[idx % techRotate.length];
+    addWO("ready_to_schedule", null, dueDate, null, null, null, techId, idx, undefined, undefined, undefined, undefined, undefined, OVERDUE_PRIORITIES[i]);
   }
 
   // On hold: 2
@@ -292,12 +299,13 @@ function buildDemoWorkOrdersForTenant(
     addWO("on_hold", scheduledDate, scheduledDate, null, null, null, techId, idx);
   }
 
-  // Hero records: 3 overdue, 3 completed, 2 in progress (detailed titles/descriptions for demos)
+  // Hero records: 3 overdue (unassigned, high/urgent priority for demo insights)
+  const HERO_OVERDUE_PRIORITIES = ["urgent", "urgent", "high"] as const;
   for (let i = 0; i < HERO_OVERDUE.length; i++, idx++) {
     const dueDate = addDays(today, -(2 + i)).toISOString().slice(0, 10);
-    const techId = techRotate[idx % techRotate.length];
     const hero = HERO_OVERDUE[i];
-    addWO("ready_to_schedule", null, dueDate, null, null, null, techId, idx, 60, hero.title, hero.description);
+    // Intentionally unassigned — these are the overdue items that "fell through the cracks"
+    addWO("ready_to_schedule", null, dueDate, null, null, null, null, idx, 60, hero.title, hero.description, undefined, undefined, HERO_OVERDUE_PRIORITIES[i]);
   }
   for (let i = 0; i < HERO_COMPLETED.length; i++, idx++) {
     const daysAgo = 2 + (i % 3);
