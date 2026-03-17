@@ -220,6 +220,7 @@ export async function dispatchNotificationEvent(
 ): Promise<{ inAppCreated: number; emailQueued: number; smsQueued: number }> {
   const {
     tenantId,
+    companyId,
     eventType,
     entityType,
     entityId,
