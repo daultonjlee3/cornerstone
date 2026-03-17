@@ -37,5 +37,5 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
     return { error: message };
   }
 
-  redirect("/dashboard");
+  redirect("/operations");
 }

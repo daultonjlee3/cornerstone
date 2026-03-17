@@ -65,18 +65,19 @@ export default async function WorkOrderDetailPage({
 
   const companyId = String((woRaw as { company_id?: string }).company_id ?? "");
   if (!companyId) notFound();
-  const { data: companyRow } = await supabase
-    .from("companies")
-    .select("id")
-    .eq("id", companyId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+  const [{ data: companyRow }, { data: slaPolicyRows }] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("id")
+      .eq("id", companyId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle(),
+    supabase
+      .from("work_order_sla_policies")
+      .select("company_id, priority, response_target_minutes")
+      .eq("company_id", companyId),
+  ]);
   if (!companyRow) notFound();
-
-  const { data: slaPolicyRows } = await supabase
-    .from("work_order_sla_policies")
-    .select("company_id, priority, response_target_minutes")
-    .eq("company_id", companyId);
 
   const row = woRaw as Record<string, unknown>;
   const comp = Array.isArray(row.companies) ? row.companies[0] : row.companies;
@@ -90,71 +91,192 @@ export default async function WorkOrderDetailPage({
   const crew = Array.isArray(row.crews) ? row.crews[0] : row.crews;
 
   const completedByTechnicianId = (row.completed_by_technician_id as string) ?? null;
-  let completedByTechnicianName: string | null = null;
-  if (completedByTechnicianId) {
-    const { data: cbTech } = await supabase
-      .from("technicians")
-      .select("technician_name, name")
-      .eq("id", completedByTechnicianId)
-      .maybeSingle();
-    if (cbTech)
-      completedByTechnicianName =
-        (cbTech as { technician_name?: string }).technician_name ?? (cbTech as { name?: string }).name ?? null;
-  }
-
-  let crewLeadName: string | null = null;
-  let crewMemberNames: string[] = [];
   const assignedCrewId = row.assigned_crew_id as string | null;
-  if (assignedCrewId) {
-    const { data: crewRow } = await supabase
-      .from("crews")
-      .select("id, technicians!crew_lead_id(technician_name, name)")
-      .eq("id", assignedCrewId)
-      .maybeSingle();
-    if (crewRow) {
-      const crewRecord = crewRow as Record<string, unknown>;
-      const techs = crewRecord.technicians;
-      const lead = Array.isArray(techs) ? techs[0] : techs;
-      if (lead && typeof lead === "object") {
-        const leadObj = lead as { technician_name?: string; name?: string };
-        crewLeadName = leadObj.technician_name ?? leadObj.name ?? null;
-      }
-    }
-    const { data: mems } = await supabase
-      .from("crew_members")
-      .select("technician_id")
-      .eq("crew_id", assignedCrewId)
-      .order("sort_order");
-    if (mems?.length) {
-      const techIds = mems.map((m) => (m as { technician_id: string }).technician_id);
-      const { data: techs } = await supabase
+
+  const completedByTechnicianNamePromise = completedByTechnicianId
+    ? supabase
         .from("technicians")
-        .select("id, technician_name, name")
-        .in("id", techIds);
-      const techById = new Map(
-        (techs ?? []).map((t) => [
-          (t as { id: string }).id,
-          (t as { technician_name?: string }).technician_name ?? (t as { name?: string }).name ?? "",
-        ])
-      );
-      crewMemberNames = techIds.map((id) => techById.get(id) ?? "—");
-    }
-  }
+        .select("technician_name, name")
+        .eq("id", completedByTechnicianId)
+        .maybeSingle()
+        .then(({ data }) =>
+          data
+            ? (data as { technician_name?: string }).technician_name ??
+              (data as { name?: string }).name ??
+              null
+            : null
+        )
+    : Promise.resolve<string | null>(null);
+
+  const crewLeadNamePromise = assignedCrewId
+    ? supabase
+        .from("crews")
+        .select("id, technicians!crew_lead_id(technician_name, name)")
+        .eq("id", assignedCrewId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) return null;
+          const crewRecord = data as Record<string, unknown>;
+          const techs = crewRecord.technicians;
+          const lead = Array.isArray(techs) ? techs[0] : techs;
+          if (!lead || typeof lead !== "object") return null;
+          const leadObj = lead as { technician_name?: string; name?: string };
+          return leadObj.technician_name ?? leadObj.name ?? null;
+        })
+    : Promise.resolve<string | null>(null);
+
+  const crewMemberNamesPromise = assignedCrewId
+    ? (async () => {
+        const { data: mems } = await supabase
+          .from("crew_members")
+          .select("technician_id")
+          .eq("crew_id", assignedCrewId)
+          .order("sort_order");
+        if (!mems?.length) return [] as string[];
+        const techIds = mems.map((m) => (m as { technician_id: string }).technician_id);
+        const { data: techs } = await supabase
+          .from("technicians")
+          .select("id, technician_name, name")
+          .in("id", techIds);
+        const techById = new Map(
+          (techs ?? []).map((t) => [
+            (t as { id: string }).id,
+            (t as { technician_name?: string }).technician_name ??
+              (t as { name?: string }).name ??
+              "",
+          ])
+        );
+        return techIds.map((techId) => techById.get(techId) ?? "—");
+      })()
+    : Promise.resolve<string[]>([]);
+
+  const [
+    { data: notes },
+    { data: checklistItems },
+    { data: partUsage },
+    { data: stockLocations },
+    { data: materialLines },
+    { data: productsForMaterials },
+    { data: statusHistory },
+    { data: attachments },
+    { data: laborEntries },
+    { data: techniciansData },
+    { data: crewsData },
+    { data: vendorsData },
+    completedByTechnicianName,
+    crewLeadName,
+    crewMemberNames,
+  ] = await Promise.all([
+    supabase
+      .from("work_order_notes")
+      .select("id, body, note_type, created_at")
+      .eq("work_order_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("work_order_checklist_items")
+      .select("id, label, completed, sort_order")
+      .eq("work_order_id", id)
+      .order("sort_order"),
+    supabase
+      .from("work_order_part_usage")
+      .select(
+        "id, product_id, quantity_used, unit_cost_snapshot, unit_cost, total_cost, notes, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
+      )
+      .eq("work_order_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("stock_locations")
+      .select("id, name")
+      .eq("company_id", companyId)
+      .eq("active", true)
+      .order("name", { ascending: true }),
+    getWorkOrderMaterialLinesWithAvailability(id),
+    supabase
+      .from("products")
+      .select("id, name, sku, default_cost")
+      .eq("company_id", companyId)
+      .eq("active", true)
+      .order("name", { ascending: true }),
+    supabase
+      .from("work_order_status_history")
+      .select("id, from_status, to_status, changed_at")
+      .eq("work_order_id", id)
+      .order("changed_at", { ascending: false }),
+    supabase
+      .from("work_order_attachments")
+      .select("id, file_name, file_url, file_type, caption, uploaded_at, created_at")
+      .eq("work_order_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("work_order_labor_entries")
+      .select("started_at, ended_at, duration_minutes")
+      .eq("work_order_id", id),
+    supabase
+      .from("technicians")
+      .select("id, technician_name, name")
+      .eq("company_id", companyId)
+      .eq("status", "active")
+      .order("technician_name")
+      .order("name"),
+    supabase
+      .from("crews")
+      .select("id, name, company_id")
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("vendors")
+      .select("id, name, company_id, service_type")
+      .eq("company_id", companyId)
+      .order("name"),
+    completedByTechnicianNamePromise,
+    crewLeadNamePromise,
+    crewMemberNamesPromise,
+  ]);
 
   const workOrder = {
     ...row,
-    company_name: comp && typeof comp === "object" && "name" in comp ? (comp as { name?: string }).name : null,
-    customer_name: cust && typeof cust === "object" && "name" in cust ? (cust as { name?: string }).name : null,
-    property_name: prop && typeof prop === "object" ? (prop as { property_name?: string }).property_name ?? (prop as { name?: string }).name : null,
-    building_name: bld && typeof bld === "object" ? (bld as { building_name?: string }).building_name ?? (bld as { name?: string }).name : null,
-    unit_name: un && typeof un === "object" ? (un as { unit_name?: string }).unit_name ?? (un as { name_or_number?: string }).name_or_number : null,
-    asset_name: ast && typeof ast === "object" ? (ast as { asset_name?: string }).asset_name ?? (ast as { name?: string }).name : null,
+    company_name:
+      comp && typeof comp === "object" && "name" in comp
+        ? (comp as { name?: string }).name
+        : null,
+    customer_name:
+      cust && typeof cust === "object" && "name" in cust
+        ? (cust as { name?: string }).name
+        : null,
+    property_name:
+      prop && typeof prop === "object"
+        ? (prop as { property_name?: string }).property_name ??
+          (prop as { name?: string }).name
+        : null,
+    building_name:
+      bld && typeof bld === "object"
+        ? (bld as { building_name?: string }).building_name ??
+          (bld as { name?: string }).name
+        : null,
+    unit_name:
+      un && typeof un === "object"
+        ? (un as { unit_name?: string }).unit_name ??
+          (un as { name_or_number?: string }).name_or_number
+        : null,
+    asset_name:
+      ast && typeof ast === "object"
+        ? (ast as { asset_name?: string }).asset_name ??
+          (ast as { name?: string }).name
+        : null,
     vendor_name:
       ven && typeof ven === "object" && "name" in ven
         ? (ven as { name?: string }).name ?? null
         : null,
-    technician_name: tech && typeof tech === "object" ? (tech as { technician_name?: string }).technician_name ?? (tech as { name?: string }).name : null,
-    crew_name: crew && typeof crew === "object" && "name" in crew ? (crew as { name?: string }).name : null,
+    technician_name:
+      tech && typeof tech === "object"
+        ? (tech as { technician_name?: string }).technician_name ??
+          (tech as { name?: string }).name
+        : null,
+    crew_name:
+      crew && typeof crew === "object" && "name" in crew
+        ? (crew as { name?: string }).name
+        : null,
     crew_lead_name: crewLeadName,
     crew_member_names: crewMemberNames,
     completed_by_technician_name: completedByTechnicianName,
@@ -176,40 +298,7 @@ export default async function WorkOrderDetailPage({
     companyPolicyMap: slaPolicyMapByCompany.get(companyId) ?? null,
   });
 
-  const { data: notes } = await supabase
-    .from("work_order_notes")
-    .select("id, body, note_type, created_at")
-    .eq("work_order_id", id)
-    .order("created_at", { ascending: false });
-
-  const { data: checklistItems } = await supabase
-    .from("work_order_checklist_items")
-    .select("id, label, completed, sort_order")
-    .eq("work_order_id", id)
-    .order("sort_order");
-
-  const { data: partUsage } = await supabase
-    .from("work_order_part_usage")
-    .select(
-      "id, product_id, quantity_used, unit_cost_snapshot, unit_cost, total_cost, notes, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
-    )
-    .eq("work_order_id", id)
-    .order("created_at", { ascending: false });
-
-  const { data: stockLocations } = await supabase
-    .from("stock_locations")
-    .select("id, name")
-    .eq("company_id", companyId)
-    .eq("active", true)
-    .order("name", { ascending: true });
   const stockLocationIds = (stockLocations ?? []).map((row) => (row as { id: string }).id);
-  const { data: materialLines } = await getWorkOrderMaterialLinesWithAvailability(id);
-  const { data: productsForMaterials } = await supabase
-    .from("products")
-    .select("id, name, sku, default_cost")
-    .eq("company_id", companyId)
-    .eq("active", true)
-    .order("name", { ascending: true });
   const { data: inventoryItems } = stockLocationIds.length
     ? await supabase
         .from("inventory_balances")
@@ -219,43 +308,6 @@ export default async function WorkOrderDetailPage({
         .in("stock_location_id", stockLocationIds)
         .order("updated_at", { ascending: false })
     : { data: [] as unknown[] };
-
-  const { data: statusHistory } = await supabase
-    .from("work_order_status_history")
-    .select("id, from_status, to_status, changed_at")
-    .eq("work_order_id", id)
-    .order("changed_at", { ascending: false });
-
-  const { data: attachments } = await supabase
-    .from("work_order_attachments")
-    .select("id, file_name, file_url, file_type, caption, uploaded_at, created_at")
-    .eq("work_order_id", id)
-    .order("created_at", { ascending: false });
-
-  const { data: laborEntries } = await supabase
-    .from("work_order_labor_entries")
-    .select("started_at, ended_at, duration_minutes")
-    .eq("work_order_id", id);
-
-  const { data: techniciansData } = await supabase
-    .from("technicians")
-    .select("id, technician_name, name")
-    .eq("company_id", companyId)
-    .eq("status", "active")
-    .order("technician_name")
-    .order("name");
-
-  const { data: crewsData } = await supabase
-    .from("crews")
-    .select("id, name, company_id")
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true)
-    .order("name");
-  const { data: vendorsData } = await supabase
-    .from("vendors")
-    .select("id, name, company_id, service_type")
-    .eq("company_id", companyId)
-    .order("name");
 
   const technicianOptions = (techniciansData ?? []).map((t) => ({
     id: (t as { id: string }).id,

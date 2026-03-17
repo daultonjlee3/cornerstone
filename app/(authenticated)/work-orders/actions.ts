@@ -2537,26 +2537,55 @@ export async function getWorkOrderMaterialLinesWithAvailability(
     .filter((l) => l.stock_location_id)
     .map((l) => ({ product_id: l.product_id, stock_location_id: l.stock_location_id! }));
   const availabilityMap = new Map<string, { on_hand: number; reserved: number }>();
-  for (const { product_id, stock_location_id } of productLocationPairs) {
-    const key = `${product_id}:${stock_location_id}`;
-    if (availabilityMap.has(key)) continue;
-    const { data: bal } = await supabase
-      .from("inventory_balances")
-      .select("quantity_on_hand")
-      .eq("product_id", product_id)
-      .eq("stock_location_id", stock_location_id)
-      .maybeSingle();
-    const onHand = Number((bal as { quantity_on_hand?: number } | null)?.quantity_on_hand ?? 0);
-    const { data: resRows } = await supabase
-      .from("inventory_reservations")
-      .select("quantity")
-      .eq("product_id", product_id)
-      .eq("stock_location_id", stock_location_id);
-    const reserved = (resRows ?? []).reduce(
-      (sum, r) => sum + Number((r as { quantity?: number }).quantity ?? 0),
-      0
-    );
-    availabilityMap.set(key, { on_hand: onHand, reserved });
+  const uniqueProductIds = Array.from(
+    new Set(productLocationPairs.map((pair) => pair.product_id))
+  );
+  const uniqueStockLocationIds = Array.from(
+    new Set(productLocationPairs.map((pair) => pair.stock_location_id))
+  );
+
+  if (uniqueProductIds.length > 0 && uniqueStockLocationIds.length > 0) {
+    const [{ data: balances }, { data: reservationRows }] = await Promise.all([
+      supabase
+        .from("inventory_balances")
+        .select("product_id, stock_location_id, quantity_on_hand")
+        .in("product_id", uniqueProductIds)
+        .in("stock_location_id", uniqueStockLocationIds),
+      supabase
+        .from("inventory_reservations")
+        .select("product_id, stock_location_id, quantity")
+        .in("product_id", uniqueProductIds)
+        .in("stock_location_id", uniqueStockLocationIds),
+    ]);
+
+    for (const row of balances ?? []) {
+      const record = row as {
+        product_id?: string | null;
+        stock_location_id?: string | null;
+        quantity_on_hand?: number | null;
+      };
+      if (!record.product_id || !record.stock_location_id) continue;
+      const key = `${record.product_id}:${record.stock_location_id}`;
+      const existing = availabilityMap.get(key);
+      availabilityMap.set(key, {
+        on_hand: Number(record.quantity_on_hand ?? 0),
+        reserved: existing?.reserved ?? 0,
+      });
+    }
+    for (const row of reservationRows ?? []) {
+      const record = row as {
+        product_id?: string | null;
+        stock_location_id?: string | null;
+        quantity?: number | null;
+      };
+      if (!record.product_id || !record.stock_location_id) continue;
+      const key = `${record.product_id}:${record.stock_location_id}`;
+      const existing = availabilityMap.get(key);
+      availabilityMap.set(key, {
+        on_hand: existing?.on_hand ?? 0,
+        reserved: (existing?.reserved ?? 0) + Number(record.quantity ?? 0),
+      });
+    }
   }
 
   const result: WorkOrderMaterialLineWithAvailability[] = list.map((l) => {

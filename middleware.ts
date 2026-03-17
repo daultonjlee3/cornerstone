@@ -96,25 +96,28 @@ export async function middleware(request: NextRequest) {
   );
   const isImpersonating = impersonationCookie?.admin_user_id === user.id;
 
+  if (pathname === "/technician" || pathname.startsWith("/technician/")) {
+    return NextResponse.redirect(new URL("/portal", request.url));
+  }
+
+  const needsPortalRouting = isAuthPath(pathname) || isPortalPath(pathname);
+  if (!needsPortalRouting) {
+    return response;
+  }
+
   const { data: profile } = await supabase
     .from("users")
     .select("is_portal_only")
     .eq("id", user.id)
     .limit(1)
     .maybeSingle();
-  const isPortalOnly = Boolean((profile as { is_portal_only?: boolean | null } | null)?.is_portal_only);
+  const isPortalOnly = Boolean(
+    (profile as { is_portal_only?: boolean | null } | null)?.is_portal_only
+  );
   const portalActor = isPortalOnly || isImpersonating;
-
-  if (pathname === "/technician" || pathname.startsWith("/technician/")) {
-    return NextResponse.redirect(new URL("/portal", request.url));
-  }
 
   if (isAuthPath(pathname)) {
     return NextResponse.redirect(new URL(portalActor ? "/portal" : "/operations", request.url));
-  }
-
-  if (portalActor && isProtected(pathname) && !isPortalPath(pathname)) {
-    return NextResponse.redirect(new URL("/portal", request.url));
   }
 
   if (!portalActor && isPortalPath(pathname)) {

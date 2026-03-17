@@ -11,6 +11,124 @@ export const metadata = {
 };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+type WorkOrderFilters = {
+  q: string;
+  viewPreset: string | null;
+  filterStatus: string | null;
+  filterPriority: string | null;
+  filterCategory: string | null;
+  filterCompany: string | null;
+  filterProperty: string | null;
+  filterBuilding: string | null;
+  filterUnit: string | null;
+  filterAsset: string | null;
+  filterTechnician: string | null;
+  filterCrew: string | null;
+  filterSourceType: string | null;
+  filterOverdue: boolean;
+  filterUnassigned: boolean;
+  filterDueToday: boolean;
+  filterCompletedToday: boolean;
+  dateFrom: string | null;
+  dateTo: string | null;
+  filterCompletionStatus: string | null;
+  completedFrom: string | null;
+  completedTo: string | null;
+  today: string;
+};
+
+function applyWorkOrderFilters(query: any, filters: WorkOrderFilters) {
+  const {
+    q,
+    viewPreset,
+    filterStatus,
+    filterPriority,
+    filterCategory,
+    filterCompany,
+    filterProperty,
+    filterBuilding,
+    filterUnit,
+    filterAsset,
+    filterTechnician,
+    filterCrew,
+    filterSourceType,
+    filterOverdue,
+    filterUnassigned,
+    filterDueToday,
+    filterCompletedToday,
+    dateFrom,
+    dateTo,
+    filterCompletionStatus,
+    completedFrom,
+    completedTo,
+    today,
+  } = filters;
+
+  let scoped = query;
+  if (q) {
+    const term = q.replace(/%/g, "\\%").replace(/_/g, "\\_");
+    scoped = scoped.or(
+      `title.ilike.%${term}%,work_order_number.ilike.%${term}%,description.ilike.%${term}%,requested_by_name.ilike.%${term}%,requested_by_email.ilike.%${term}%`
+    );
+  }
+  if (viewPreset === "open") {
+    scoped = scoped.in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]);
+  } else if (viewPreset === "in_progress") {
+    scoped = scoped.eq("status", "in_progress");
+  } else if (viewPreset === "on_hold") {
+    scoped = scoped.eq("status", "on_hold");
+  } else if (viewPreset === "overdue") {
+    scoped = scoped.lt("due_date", today).not("status", "in", "(completed,cancelled)");
+  } else if (viewPreset === "due_today") {
+    scoped = scoped.eq("due_date", today);
+  } else if (viewPreset === "completed_today") {
+    scoped = scoped
+      .eq("status", "completed")
+      .gte("completed_at", `${today}T00:00:00`)
+      .lte("completed_at", `${today}T23:59:59.999`);
+  } else if (viewPreset === "unassigned") {
+    scoped = scoped
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
+  } else if (viewPreset === "pm") {
+    scoped = scoped.eq("source_type", "preventive_maintenance");
+  } else if (viewPreset === "high_priority") {
+    scoped = scoped.in("priority", ["high", "urgent", "emergency"]);
+  }
+  if (!viewPreset && filterStatus) scoped = scoped.eq("status", filterStatus);
+  if (filterPriority) scoped = scoped.eq("priority", filterPriority);
+  if (filterCategory) scoped = scoped.eq("category", filterCategory);
+  if (filterCompany) scoped = scoped.eq("company_id", filterCompany);
+  if (filterProperty) scoped = scoped.eq("property_id", filterProperty);
+  if (filterBuilding) scoped = scoped.eq("building_id", filterBuilding);
+  if (filterUnit) scoped = scoped.eq("unit_id", filterUnit);
+  if (filterAsset) scoped = scoped.eq("asset_id", filterAsset);
+  if (filterTechnician) scoped = scoped.eq("assigned_technician_id", filterTechnician);
+  if (filterCrew) scoped = scoped.eq("assigned_crew_id", filterCrew);
+  if (!viewPreset && filterSourceType) scoped = scoped.eq("source_type", filterSourceType);
+  if (!viewPreset && filterOverdue) {
+    scoped = scoped.lt("due_date", today);
+    scoped = scoped.not("status", "in", "(completed,cancelled)");
+  }
+  if (!viewPreset && filterUnassigned) {
+    scoped = scoped
+      .is("assigned_technician_id", null)
+      .is("assigned_crew_id", null)
+      .is("vendor_id", null);
+  }
+  if (!viewPreset && filterDueToday) scoped = scoped.eq("due_date", today);
+  if (!viewPreset && filterCompletedToday) {
+    scoped = scoped.eq("status", "completed");
+    scoped = scoped.gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
+  }
+  if (dateFrom) scoped = scoped.gte("scheduled_date", dateFrom);
+  if (dateTo) scoped = scoped.lte("scheduled_date", dateTo);
+  if (filterCompletionStatus) scoped = scoped.eq("completion_status", filterCompletionStatus);
+  if (completedFrom) scoped = scoped.gte("completed_at", completedFrom);
+  if (completedTo) scoped = scoped.lte("completed_at", completedTo);
+  return scoped;
+}
 
 export default async function WorkOrdersPage({
   searchParams,
@@ -48,40 +166,75 @@ export default async function WorkOrdersPage({
     );
   }
 
-  const { data: slaPoliciesData } = await supabase
-    .from("work_order_sla_policies")
-    .select("company_id, priority, response_target_minutes")
-    .in("company_id", companyIds);
-
-  const { data: properties } = await supabase
-    .from("properties")
-    .select("id, property_name, name, company_id")
-    .in("company_id", companyIds)
-    .order("property_name")
-    .order("name");
+  const [
+    { data: slaPoliciesData },
+    { data: properties },
+    { data: assetsData },
+    { data: techniciansData },
+    { data: customersData },
+    { data: vendorsData },
+    { data: crewsData },
+  ] = await Promise.all([
+    supabase
+      .from("work_order_sla_policies")
+      .select("company_id, priority, response_target_minutes")
+      .in("company_id", companyIds),
+    supabase
+      .from("properties")
+      .select("id, property_name, name, company_id")
+      .in("company_id", companyIds)
+      .order("property_name")
+      .order("name"),
+    supabase
+      .from("assets")
+      .select("id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id")
+      .in("company_id", companyIds)
+      .order("asset_name")
+      .order("name"),
+    supabase
+      .from("technicians")
+      .select("id, technician_name, name")
+      .in("company_id", companyIds)
+      .eq("status", "active")
+      .order("technician_name")
+      .order("name"),
+    supabase
+      .from("customers")
+      .select("id, name, company_id")
+      .in("company_id", companyIds)
+      .order("name"),
+    supabase
+      .from("vendors")
+      .select("id, name, company_id, service_type")
+      .in("company_id", companyIds)
+      .order("name"),
+    supabase
+      .from("crews")
+      .select("id, name, company_id")
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .order("name"),
+  ]);
 
   const propertyIds = (properties ?? []).map((p) => p.id);
-  const { data: buildingsData } = await supabase
-    .from("buildings")
-    .select("id, building_name, name, property_id")
-    .in("property_id", propertyIds)
-    .order("building_name")
-    .order("name");
+  const { data: buildingsData } = propertyIds.length
+    ? await supabase
+        .from("buildings")
+        .select("id, building_name, name, property_id")
+        .in("property_id", propertyIds)
+        .order("building_name")
+        .order("name")
+    : { data: [] as unknown[] };
 
-  const buildingIds = (buildingsData ?? []).map((b) => b.id);
-  const { data: unitsData } = await supabase
-    .from("units")
-    .select("id, unit_name, name_or_number, building_id")
-    .in("building_id", buildingIds)
-    .order("unit_name")
-    .order("name_or_number");
-
-  const { data: assetsData } = await supabase
-    .from("assets")
-    .select("id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id")
-    .in("company_id", companyIds)
-    .order("asset_name")
-    .order("name");
+  const buildingIds = (buildingsData ?? []).map((b) => (b as { id: string }).id);
+  const { data: unitsData } = buildingIds.length
+    ? await supabase
+        .from("units")
+        .select("id, unit_name, name_or_number, building_id")
+        .in("building_id", buildingIds)
+        .order("unit_name")
+        .order("name_or_number")
+    : { data: [] as unknown[] };
   const assetHierarchyRows = (assetsData ?? []) as Array<{
     id: string;
     asset_name: string | null;
@@ -131,33 +284,6 @@ export default async function WorkOrdersPage({
   for (const row of assetHierarchyRows) {
     resolveEffectiveAssetLocation(row.id);
   }
-
-  const { data: techniciansData } = await supabase
-    .from("technicians")
-    .select("id, technician_name, name")
-    .in("company_id", companyIds)
-    .eq("status", "active")
-    .order("technician_name")
-    .order("name");
-
-  const { data: customersData } = await supabase
-    .from("customers")
-    .select("id, name, company_id")
-    .in("company_id", companyIds)
-    .order("name");
-
-  const { data: vendorsData } = await supabase
-    .from("vendors")
-    .select("id, name, company_id, service_type")
-    .in("company_id", companyIds)
-    .order("name");
-
-  const { data: crewsData } = await supabase
-    .from("crews")
-    .select("id, name, company_id")
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true)
-    .order("name");
 
   const companyOptions = (companies ?? []).map((c) => ({ id: c.id, name: c.name }));
   const customerOptions = (customersData ?? []).map((c) => ({
@@ -268,10 +394,55 @@ export default async function WorkOrdersPage({
     : "updated_at";
   const sortOrder = resolvedSearchParams?.order === "asc" ? "asc" : "desc";
   const today = new Date().toISOString().slice(0, 10);
-
-  let query = supabase
-    .from("work_orders")
-    .select(`
+  const parsedPage = Number.parseInt(
+    typeof resolvedSearchParams?.page === "string" ? resolvedSearchParams.page : "1",
+    10
+  );
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const pageSize = 50;
+  const listFilters: WorkOrderFilters = {
+    q,
+    viewPreset,
+    filterStatus,
+    filterPriority,
+    filterCategory,
+    filterCompany,
+    filterProperty,
+    filterBuilding,
+    filterUnit,
+    filterAsset,
+    filterTechnician,
+    filterCrew,
+    filterSourceType,
+    filterOverdue,
+    filterUnassigned,
+    filterDueToday,
+    filterCompletedToday,
+    dateFrom,
+    dateTo,
+    filterCompletionStatus,
+    completedFrom,
+    completedTo,
+    today,
+  };
+  const sortColumn =
+    sortBy === "scheduled_date"
+      ? "scheduled_date"
+      : sortBy === "due_date"
+        ? "due_date"
+        : sortBy === "completed_at"
+          ? "completed_at"
+          : sortBy === "priority"
+            ? "priority"
+            : sortBy === "status"
+              ? "status"
+              : "updated_at";
+  const buildWorkOrdersQuery = () =>
+    applyWorkOrderFilters(
+      supabase
+        .from("work_orders")
+        .select(
+          `
       id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id, vendor_id,
       description, category, priority, status,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date,
@@ -290,75 +461,64 @@ export default async function WorkOrdersPage({
       technicians!assigned_technician_id(technician_name, name),
       crews!assigned_crew_id(name),
       vendors(name)
-    `)
-    .in("company_id", companyIds);
-
-  if (q) {
-    const term = q.replace(/%/g, "\\%").replace(/_/g, "\\_");
-    query = query.or(
-      `title.ilike.%${term}%,work_order_number.ilike.%${term}%,description.ilike.%${term}%,requested_by_name.ilike.%${term}%,requested_by_email.ilike.%${term}%`
+    `,
+          { count: "exact" }
+        )
+        .in("company_id", companyIds),
+      listFilters
     );
-  }
-  if (viewPreset === "open") {
-    query = query.in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]);
-  } else if (viewPreset === "in_progress") {
-    query = query.eq("status", "in_progress");
-  } else if (viewPreset === "on_hold") {
-    query = query.eq("status", "on_hold");
-  } else if (viewPreset === "overdue") {
-    query = query.lt("due_date", today).not("status", "in", "(completed,cancelled)");
-  } else if (viewPreset === "due_today") {
-    query = query.eq("due_date", today);
-  } else if (viewPreset === "completed_today") {
-    query = query.eq("status", "completed").gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
-  } else if (viewPreset === "unassigned") {
-    query = query
-      .is("assigned_technician_id", null)
-      .is("assigned_crew_id", null)
-      .is("vendor_id", null);
-  } else if (viewPreset === "pm") {
-    query = query.eq("source_type", "preventive_maintenance");
-  } else if (viewPreset === "high_priority") {
-    query = query.in("priority", ["high", "urgent", "emergency"]);
-  }
-  if (!viewPreset && filterStatus) query = query.eq("status", filterStatus);
-  if (filterPriority) query = query.eq("priority", filterPriority);
-  if (filterCategory) query = query.eq("category", filterCategory);
-  if (filterCompany) query = query.eq("company_id", filterCompany);
-  if (filterProperty) query = query.eq("property_id", filterProperty);
-  if (filterBuilding) query = query.eq("building_id", filterBuilding);
-  if (filterUnit) query = query.eq("unit_id", filterUnit);
-  if (filterAsset) query = query.eq("asset_id", filterAsset);
-  if (filterTechnician) query = query.eq("assigned_technician_id", filterTechnician);
-  if (filterCrew) query = query.eq("assigned_crew_id", filterCrew);
-  if (!viewPreset && filterSourceType) query = query.eq("source_type", filterSourceType);
-  if (!viewPreset && filterOverdue) {
-    query = query.lt("due_date", today);
-    query = query.not("status", "in", "(completed,cancelled)");
-  }
-  if (!viewPreset && filterUnassigned) {
-    query = query
-      .is("assigned_technician_id", null)
-      .is("assigned_crew_id", null)
-      .is("vendor_id", null);
-  }
-  if (!viewPreset && filterDueToday) query = query.eq("due_date", today);
-  if (!viewPreset && filterCompletedToday) {
-    query = query.eq("status", "completed");
-    query = query.gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59.999`);
-  }
-  if (dateFrom) query = query.gte("scheduled_date", dateFrom);
-  if (dateTo) query = query.lte("scheduled_date", dateTo);
-  if (filterCompletionStatus) query = query.eq("completion_status", filterCompletionStatus);
-  if (completedFrom) query = query.gte("completed_at", completedFrom);
-  if (completedTo) query = query.lte("completed_at", completedTo);
 
-  const sortColumn = sortBy === "scheduled_date" ? "scheduled_date" : sortBy === "due_date" ? "due_date" : sortBy === "completed_at" ? "completed_at" : sortBy === "priority" ? "priority" : sortBy === "status" ? "status" : "updated_at";
-  const { data: workOrdersRaw, error } = await query.order(sortColumn, { ascending: sortOrder === "asc" });
+  const fetchWorkOrdersPage = async (targetPage: number) => {
+    const from = (targetPage - 1) * pageSize;
+    const to = from + pageSize - 1;
+    return buildWorkOrdersQuery()
+      .order(sortColumn, { ascending: sortOrder === "asc" })
+      .range(from, to);
+  };
+
+  let currentPage = page;
+  let {
+    data: workOrdersRaw,
+    error,
+    count: totalCountRaw,
+  } = await fetchWorkOrdersPage(currentPage);
+  const totalCount = totalCountRaw ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+    const fallbackPage = await fetchWorkOrdersPage(currentPage);
+    workOrdersRaw = fallbackPage.data;
+    error = fallbackPage.error;
+  }
 
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const weekAgoStr = oneWeekAgo.toISOString();
+  const weekAgoStart = `${oneWeekAgo.toISOString().slice(0, 10)}T00:00:00.000Z`;
+
+  const buildStatsQuery = () =>
+    applyWorkOrderFilters(
+      supabase
+        .from("work_orders")
+        .select("id", { count: "exact", head: true })
+        .in("company_id", companyIds),
+      listFilters
+    );
+  const [openStats, inProgressStats, onHoldStats, overdueStats, dueTodayStats, completedTodayStats, newStats, readyStats, scheduledStats, completedWeekStats] =
+    await Promise.all([
+      buildStatsQuery().in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]),
+      buildStatsQuery().eq("status", "in_progress"),
+      buildStatsQuery().eq("status", "on_hold"),
+      buildStatsQuery().lt("due_date", today).not("status", "in", "(completed,cancelled)"),
+      buildStatsQuery().eq("due_date", today).not("status", "in", "(completed,cancelled)"),
+      buildStatsQuery()
+        .eq("status", "completed")
+        .gte("completed_at", `${today}T00:00:00`)
+        .lte("completed_at", `${today}T23:59:59.999`),
+      buildStatsQuery().in("status", ["new", "open"]),
+      buildStatsQuery().in("status", ["ready_to_schedule", "assigned"]),
+      buildStatsQuery().eq("status", "scheduled"),
+      buildStatsQuery().eq("status", "completed").gte("updated_at", weekAgoStart),
+    ]);
 
   const workOrders = (workOrdersRaw ?? []).map((wo) => {
     const row = wo as Record<string, unknown>;
@@ -396,33 +556,16 @@ export default async function WorkOrdersPage({
   }) as (WorkOrder & { technician_name?: string; crew_name?: string; vendor_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
 
   const stats = {
-    open: workOrders.filter(
-      (wo) =>
-        ["new", "open", "ready_to_schedule", "assigned", "scheduled"].includes(wo.status ?? "") &&
-        wo.status !== "completed" &&
-        wo.status !== "cancelled"
-    ).length,
-    inProgress: workOrders.filter((wo) => wo.status === "in_progress").length,
-    onHold: workOrders.filter((wo) => wo.status === "on_hold").length,
-    overdue: workOrders.filter(
-      (wo) =>
-        wo.due_date != null &&
-        wo.due_date < today &&
-        wo.status !== "completed" &&
-        wo.status !== "cancelled"
-    ).length,
-    dueToday: workOrders.filter(
-      (wo) => wo.due_date === today && wo.status !== "completed" && wo.status !== "cancelled"
-    ).length,
-    completedToday: workOrders.filter((wo) => {
-      if (wo.status !== "completed" || !wo.completed_at) return false;
-      const completedAt = String(wo.completed_at).slice(0, 10);
-      return completedAt === today;
-    }).length,
-    new: workOrders.filter((wo) => wo.status === "new" || wo.status === "open").length,
-    readyToSchedule: workOrders.filter((wo) => wo.status === "ready_to_schedule" || wo.status === "assigned").length,
-    scheduled: workOrders.filter((wo) => wo.status === "scheduled").length,
-    completedThisWeek: workOrders.filter((wo) => wo.status === "completed" && wo.updated_at && String(wo.updated_at) >= weekAgoStr).length,
+    open: openStats.count ?? 0,
+    inProgress: inProgressStats.count ?? 0,
+    onHold: onHoldStats.count ?? 0,
+    overdue: overdueStats.count ?? 0,
+    dueToday: dueTodayStats.count ?? 0,
+    completedToday: completedTodayStats.count ?? 0,
+    new: newStats.count ?? 0,
+    readyToSchedule: readyStats.count ?? 0,
+    scheduled: scheduledStats.count ?? 0,
+    completedThisWeek: completedWeekStats.count ?? 0,
   };
 
   return (
@@ -449,6 +592,9 @@ export default async function WorkOrdersPage({
         initialPrefill={prefill}
         autoOpenNew={!!autoOpenNew}
         initialEditId={editId}
+        page={currentPage}
+        pageSize={pageSize}
+        totalCount={totalCount}
         error={error?.message ?? null}
       />
     </div>

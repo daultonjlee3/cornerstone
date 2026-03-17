@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import type { DispatchFilterState } from "../filter-state";
@@ -148,6 +148,7 @@ function DispatchCalendarPopover({ selectedDate, onSelect, onClose, anchorRef }:
 export function DispatchTopBar({ filterState, filterOptions, insights, opsMode = false }: DispatchTopBarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [, startTransition] = useTransition();
   const [searchText, setSearchText] = useState(filterState.search);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -176,7 +177,11 @@ export function DispatchTopBar({ filterState, filterOptions, insights, opsMode =
 
   const pushState = (next: DispatchFilterState) => {
     const params = filterStateToParams(next);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    const nextQuery = params.toString();
+    if (nextQuery === filterStateToParams(filterState).toString()) return;
+    startTransition(() => {
+      router.replace(`${pathname}?${nextQuery}`, { scroll: false });
+    });
   };
 
   const patchState = (patch: Partial<DispatchFilterState>) => {

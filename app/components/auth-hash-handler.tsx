@@ -8,7 +8,7 @@ import { createClient } from "@/src/lib/supabase/client";
  * When Supabase redirects after magic link (or similar), it often sends users to the Site URL
  * with tokens in the hash (e.g. /#access_token=...&refresh_token=...). The server never sees
  * the hash, so /auth/callback is never hit. This component runs on the client, detects that
- * hash, sets the session via setSession, then redirects to the app (dashboard).
+ * hash, sets the session via setSession, then redirects to the app.
  * Does nothing when there is no auth hash. Safe to mount in the root layout.
  */
 export function AuthHashHandler() {
@@ -40,8 +40,8 @@ export function AuthHashHandler() {
           handled.current = false;
           return;
         }
-        // Clear hash and go to dashboard (demo user already has correct tenant membership)
-        const next = "/dashboard";
+        // Clear hash and go to the operations landing route.
+        const next = "/operations";
         window.history.replaceState(null, "", next);
         router.replace(next);
       })

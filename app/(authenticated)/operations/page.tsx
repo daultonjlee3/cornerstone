@@ -31,6 +31,8 @@ import { DashboardHelperTips } from "../dashboard/components/dashboard-helper-ti
 import { DashboardSectionEmpty } from "../dashboard/components/dashboard-section-empty";
 import { DashboardSetupGuidance } from "../dashboard/components/dashboard-setup-guidance";
 import { formatDate } from "@/src/lib/date-utils";
+import { Suspense } from "react";
+import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 
 export const metadata = {
   title: "Operations Center | Cornerstone Tech",
@@ -40,6 +42,153 @@ export const metadata = {
 const PRIORITY_URGENCY_ORDER: Record<string, number> = { emergency: 0, urgent: 1, high: 2 };
 function priorityUrgency(priority: string | null | undefined): number {
   return PRIORITY_URGENCY_ORDER[String(priority ?? "").toLowerCase()] ?? 3;
+}
+
+function PmComplianceSectionSkeleton() {
+  return (
+    <section className="space-y-4 pt-1">
+      <div>
+        <div className="h-6 w-52 animate-pulse rounded bg-[var(--card-border)]" />
+        <div className="mt-2 h-4 w-96 max-w-full animate-pulse rounded bg-[var(--card-border)]" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div
+            key={`pm-kpi-${idx}`}
+            className="h-28 animate-pulse rounded-xl border border-[var(--card-border)] bg-[var(--card)]"
+          />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="h-64 animate-pulse rounded-xl border border-[var(--card-border)] bg-[var(--card)]" />
+        <div className="h-64 animate-pulse rounded-xl border border-[var(--card-border)] bg-[var(--card)]" />
+      </div>
+    </section>
+  );
+}
+
+async function PmComplianceSection({
+  intelligencePromise,
+}: {
+  intelligencePromise: Promise<OperationsIntelligenceData>;
+}) {
+  const intelligence = await intelligencePromise;
+  return (
+    <section className="space-y-4 pt-1">
+      <div>
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">PM Compliance Engine</h2>
+        <p className="text-sm text-[var(--muted)]">
+          On-time, late, and missed PM execution with upcoming/overdue schedule visibility.
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Completed On-Time"
+          value={intelligence.pmCompliance.completedOnTime}
+          description="Completed by scheduled PM date"
+          icon={BadgeCheck}
+        />
+        <MetricCard
+          title="Completed Late"
+          value={intelligence.pmCompliance.completedLate}
+          description="Completed after scheduled PM date"
+          icon={Clock}
+        />
+        <MetricCard
+          title="Missed PM"
+          value={intelligence.pmCompliance.missed}
+          description="Past due without completion"
+          icon={AlertTriangle}
+        />
+        <MetricCard
+          title="Compliance %"
+          value={
+            intelligence.pmCompliance.compliancePercentage != null
+              ? `${intelligence.pmCompliance.compliancePercentage.toFixed(2)}%`
+              : "—"
+          }
+          description={
+            intelligence.pmCompliance.compliancePercentage != null
+              ? "On-time completions vs. due PM runs"
+              : "Create PM plans and complete runs to see compliance here."
+          }
+          icon={Percent}
+        />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Upcoming PM Tasks</CardTitle>
+            <CardDescription>Next 30 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {intelligence.pmCompliance.upcomingTasks.length === 0 ? (
+              <DashboardSectionEmpty
+                message="No upcoming PM tasks in the next 30 days."
+                subtext="PM metrics and this list will populate after you create preventive maintenance plans."
+                cta={{ label: "Preventive maintenance", href: "/preventive-maintenance" }}
+              />
+            ) : (
+              <ul className="space-y-2">
+                {intelligence.pmCompliance.upcomingTasks.slice(0, 6).map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        href={`/preventive-maintenance/${row.id}`}
+                        className="truncate text-sm font-medium text-[var(--accent)] hover:underline"
+                      >
+                        {row.name}
+                      </Link>
+                      <p className="truncate text-xs text-[var(--muted)]">{row.asset_name ?? "No linked asset"}</p>
+                    </div>
+                    <span className="text-xs text-[var(--muted)]">{formatDate(row.next_run_date)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Overdue PM Tasks</CardTitle>
+            <CardDescription>Active plans that missed next run date</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {intelligence.pmCompliance.overdueTasks.length === 0 ? (
+              <DashboardSectionEmpty
+                message="No overdue PM tasks."
+                subtext="Active plans that have passed their next run date will appear here."
+                cta={{ label: "View PM plans", href: "/preventive-maintenance" }}
+              />
+            ) : (
+              <ul className="space-y-2">
+                {intelligence.pmCompliance.overdueTasks.slice(0, 6).map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex items-center justify-between rounded-lg border border-red-200/70 bg-red-50/40 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        href={`/preventive-maintenance/${row.id}`}
+                        className="truncate text-sm font-medium text-[var(--accent)] hover:underline"
+                      >
+                        {row.name}
+                      </Link>
+                      <p className="truncate text-xs text-[var(--muted)]">{row.asset_name ?? "No linked asset"}</p>
+                    </div>
+                    <span className="text-xs font-medium text-red-700">{formatDate(row.next_run_date)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  );
 }
 
 export default async function OperationsCenterPage() {
@@ -58,10 +207,8 @@ export default async function OperationsCenterPage() {
     .eq("tenant_id", tenantId);
   const companyIds = (companies ?? []).map((row) => row.id);
 
-  const [operations, intelligence] = await Promise.all([
-    loadOperationsDashboardData({ supabase, companyIds }),
-    loadOperationsIntelligenceData({ supabase, companyIds }),
-  ]);
+  const intelligencePromise = loadOperationsIntelligenceData({ supabase, companyIds });
+  const operations = await loadOperationsDashboardData({ supabase, companyIds });
 
   const noCompanies = companyIds.length === 0;
   const hasNoVisibleActivity =
@@ -70,8 +217,8 @@ export default async function OperationsCenterPage() {
     operations.kpis.completedToday === 0 &&
     operations.kpis.scheduledToday === 0 &&
     operations.kpis.activeTechnicians === 0 &&
-    intelligence.pmCompliance.upcomingTasks.length === 0 &&
-    intelligence.pmCompliance.overdueTasks.length === 0;
+    operations.backlog.pmNotScheduled === 0 &&
+    operations.backlog.upcomingPmTasks === 0;
 
   return (
     <div className="space-y-8" data-tour="dashboard:overview" data-testid="operations-center-page">
@@ -225,116 +372,9 @@ export default async function OperationsCenterPage() {
         </div>
       </section>
 
-      <section className="space-y-4 pt-1">
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">PM Compliance Engine</h2>
-          <p className="text-sm text-[var(--muted)]">
-            On-time, late, and missed PM execution with upcoming/overdue schedule visibility.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            title="Completed On-Time"
-            value={intelligence.pmCompliance.completedOnTime}
-            description="Completed by scheduled PM date"
-            icon={BadgeCheck}
-          />
-          <MetricCard
-            title="Completed Late"
-            value={intelligence.pmCompliance.completedLate}
-            description="Completed after scheduled PM date"
-            icon={Clock}
-          />
-          <MetricCard
-            title="Missed PM"
-            value={intelligence.pmCompliance.missed}
-            description="Past due without completion"
-            icon={AlertTriangle}
-          />
-          <MetricCard
-            title="Compliance %"
-            value={intelligence.pmCompliance.compliancePercentage != null ? `${intelligence.pmCompliance.compliancePercentage.toFixed(2)}%` : "—"}
-            description={
-              intelligence.pmCompliance.compliancePercentage != null
-                ? "On-time completions vs. due PM runs"
-                : "Create PM plans and complete runs to see compliance here."
-            }
-            icon={Percent}
-          />
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming PM Tasks</CardTitle>
-              <CardDescription>Next 30 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {intelligence.pmCompliance.upcomingTasks.length === 0 ? (
-                <DashboardSectionEmpty
-                  message="No upcoming PM tasks in the next 30 days."
-                  subtext="PM metrics and this list will populate after you create preventive maintenance plans."
-                  cta={{ label: "Preventive maintenance", href: "/preventive-maintenance" }}
-                />
-              ) : (
-                <ul className="space-y-2">
-                  {intelligence.pmCompliance.upcomingTasks.slice(0, 6).map((row) => (
-                    <li
-                      key={row.id}
-                      className="flex items-center justify-between rounded-lg border border-[var(--card-border)] px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          href={`/preventive-maintenance/${row.id}`}
-                          className="truncate text-sm font-medium text-[var(--accent)] hover:underline"
-                        >
-                          {row.name}
-                        </Link>
-                        <p className="truncate text-xs text-[var(--muted)]">{row.asset_name ?? "No linked asset"}</p>
-                      </div>
-                      <span className="text-xs text-[var(--muted)]">{formatDate(row.next_run_date)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Overdue PM Tasks</CardTitle>
-              <CardDescription>Active plans that missed next run date</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {intelligence.pmCompliance.overdueTasks.length === 0 ? (
-                <DashboardSectionEmpty
-                  message="No overdue PM tasks."
-                  subtext="Active plans that have passed their next run date will appear here."
-                  cta={{ label: "View PM plans", href: "/preventive-maintenance" }}
-                />
-              ) : (
-                <ul className="space-y-2">
-                  {intelligence.pmCompliance.overdueTasks.slice(0, 6).map((row) => (
-                    <li
-                      key={row.id}
-                      className="flex items-center justify-between rounded-lg border border-red-200/70 bg-red-50/40 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          href={`/preventive-maintenance/${row.id}`}
-                          className="truncate text-sm font-medium text-[var(--accent)] hover:underline"
-                        >
-                          {row.name}
-                        </Link>
-                        <p className="truncate text-xs text-[var(--muted)]">{row.asset_name ?? "No linked asset"}</p>
-                      </div>
-                      <span className="text-xs font-medium text-red-700">{formatDate(row.next_run_date)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+      <Suspense fallback={<PmComplianceSectionSkeleton />}>
+        <PmComplianceSection intelligencePromise={intelligencePromise} />
+      </Suspense>
 
       <section className="grid gap-4 lg:grid-cols-2" data-tour="dashboard:urgent">
         <Card>

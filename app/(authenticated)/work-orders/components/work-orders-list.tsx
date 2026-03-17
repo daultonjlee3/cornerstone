@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useTransition, useState, useEffect, useRef } from "react";
 import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus, bulkUpdateWorkOrderStatus, bulkDeleteWorkOrders, exportWorkOrdersCsv } from "../actions";
@@ -24,6 +24,7 @@ import { Hint } from "@/src/components/ui/hint";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
+import { Pagination } from "@/src/components/ui/pagination";
 
 import { formatDate } from "@/src/lib/date-utils";
 import type {
@@ -86,6 +87,9 @@ type WorkOrdersListProps = {
   initialPrefill?: WorkOrderPrefill | null;
   autoOpenNew?: boolean;
   initialEditId?: string | null;
+  page: number;
+  pageSize: number;
+  totalCount: number;
   error?: string | null;
 };
 
@@ -118,10 +122,14 @@ export function WorkOrdersList({
   initialPrefill = null,
   autoOpenNew = false,
   initialEditId = null,
+  page,
+  pageSize,
+  totalCount,
   error: initialError,
 }: WorkOrdersListProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
@@ -260,6 +268,16 @@ export function WorkOrdersList({
     a.click();
     URL.revokeObjectURL(url);
     setMessage({ type: "success", text: "Export downloaded." });
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) params.delete("page");
+    else params.set("page", String(nextPage));
+    const query = params.toString();
+    startTransition(() => {
+      router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+    });
   };
 
   if (initialError) {
@@ -670,6 +688,12 @@ export function WorkOrdersList({
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            onPageChange={handlePageChange}
+          />
         </div>
         </div>
       )}

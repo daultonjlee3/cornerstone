@@ -180,7 +180,9 @@ export function DispatchView({
       const next = filterStateToParams(nextState);
       const fullscreen = searchParams.get("dispatch_fullscreen");
       if (fullscreen === "1") next.set("dispatch_fullscreen", "1");
-      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+      const nextQuery = next.toString();
+      if (nextQuery === searchParams.toString()) return;
+      router.replace(`${pathname}?${nextQuery}`, { scroll: false });
     },
     [pathname, router, searchParams]
   );
@@ -190,7 +192,9 @@ export function DispatchView({
       const next = new URLSearchParams(searchParams.toString());
       if (enabled) next.set("dispatch_fullscreen", "1");
       else next.delete("dispatch_fullscreen");
-      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+      const nextQuery = next.toString();
+      if (nextQuery === searchParams.toString()) return;
+      router.replace(`${pathname}?${nextQuery}`, { scroll: false });
     },
     [pathname, router, searchParams]
   );
@@ -1612,52 +1616,6 @@ export function DispatchView({
         </ul>
       </HelpDrawer>
 
-      <WorkOrderAssignmentModal
-        open={Boolean(assignmentTarget)}
-        onClose={() => setAssignmentTarget(null)}
-        workOrderId={assignmentTarget?.id ?? ""}
-        workOrderStatus={(assignmentTarget?.status as string | undefined) ?? undefined}
-        companyId={(assignmentTarget?.company_id as string | null | undefined) ?? null}
-        initial={{
-          assigned_technician_id:
-            (assignmentTarget?.assigned_technician_id as string | null | undefined) ?? null,
-          assigned_crew_id:
-            (assignmentTarget?.assigned_crew_id as string | null | undefined) ?? null,
-          scheduled_date:
-            (assignmentTarget?.scheduled_date as string | null | undefined) ?? null,
-          scheduled_start:
-            (assignmentTarget?.scheduled_start as string | null | undefined) ?? null,
-          scheduled_end:
-            (assignmentTarget?.scheduled_end as string | null | undefined) ?? null,
-        }}
-        technicians={filterOptions.technicians}
-        crews={boardCrews.map((crew) => ({
-          id: crew.id,
-          name: crew.name ?? "Unnamed crew",
-          company_id: crew.company_id ?? null,
-        }))}
-        onSuccess={() => router.refresh()}
-      />
-
-      <WorkOrderFormModal
-        open={createWorkOrderModalOpen}
-        onClose={() => {
-          setCreateWorkOrderModalOpen(false);
-          router.refresh();
-        }}
-        workOrder={null}
-        prefill={null}
-        companies={createFormOptions.companies}
-        customers={createFormOptions.customers}
-        properties={createFormOptions.properties}
-        buildings={createFormOptions.buildings}
-        units={createFormOptions.units}
-        assets={createFormOptions.assets}
-        technicians={createFormOptions.technicians}
-        crews={createFormOptions.crews}
-        vendors={createFormOptions.vendors}
-        saveAction={saveWorkOrder}
-      />
       {assignmentTarget ? (
         <WorkOrderAssignmentModal
           key={assignmentTarget.id}

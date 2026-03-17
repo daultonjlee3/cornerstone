@@ -87,8 +87,9 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
     : options.assets;
   const crewsFiltered = companyId ? options.crews.filter((c) => !c.company_id || c.company_id === companyId) : options.crews;
 
-  const buildParams = (updates: Record<string, string>) => {
+  const buildParams = (updates: Record<string, string>, keepPage = false) => {
     const next = new URLSearchParams(searchParams.toString());
+    if (!keepPage) next.delete("page");
     Object.entries(updates).forEach(([key, value]) => {
       if (value === "" || value == null) next.delete(key);
       else next.set(key, value);
@@ -97,18 +98,18 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
   };
 
   const apply = useCallback(
-    (updates: Record<string, string>) => {
-      const query = buildParams(updates);
+    (updates: Record<string, string>, options?: { keepPage?: boolean }) => {
+      const query = buildParams(updates, options?.keepPage ?? false);
       startTransition(() => {
-        router.push(`/work-orders${query ? `?${query}` : ""}`);
+        router.replace(`/work-orders${query ? `?${query}` : ""}`, { scroll: false });
       });
     },
-    [router, searchParams]
+    [router, searchParams, startTransition]
   );
 
-  const handleSearch = (value: string) => apply({ ...Object.fromEntries(searchParams.entries()), q: value });
+  const handleSearch = (value: string) => apply({ q: value });
   const clearAll = () => {
-    startTransition(() => router.push("/work-orders"));
+    startTransition(() => router.replace("/work-orders"));
   };
 
   const hasActiveFilters =
@@ -146,11 +147,11 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
                 id="wo-filter-q"
                 type="text"
                 placeholder="Search..."
-                value={q}
+                value={searchLocal}
                 onChange={(e) => {
                   const v = e.target.value;
                   setSearchLocal(v);
-                  if (!v) apply({ ...Object.fromEntries(searchParams.entries()), q: "" });
+                  if (!v) apply({ q: "" });
                 }}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch(searchLocal)}
                 onBlur={() => handleSearch(searchLocal)}
