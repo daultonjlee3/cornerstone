@@ -1,14 +1,15 @@
 /**
- * Refreshes Supabase session and protects dashboard/onboarding routes.
- * - Unauthenticated users hitting /dashboard or /onboarding → redirect to /login
- * - Authenticated users hitting /login or /signup → redirect to /dashboard
- *   (dashboard layout will redirect to /onboarding if user has no tenant)
+ * Refreshes Supabase session and protects app/onboarding routes.
+ * - Unauthenticated users hitting /operations, /dashboard, or /onboarding → redirect to /login
+ * - Authenticated users hitting /login or /signup → redirect to /operations
+ *   (authenticated layout will redirect to /onboarding if user has no tenant)
  */
 
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 const protectedPaths = [
+  "/operations",
   "/dashboard",
   "/onboarding",
   "/portal",
@@ -109,7 +110,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAuthPath(pathname)) {
-    return NextResponse.redirect(new URL(portalActor ? "/portal" : "/dashboard", request.url));
+    return NextResponse.redirect(new URL(portalActor ? "/portal" : "/operations", request.url));
   }
 
   if (portalActor && isProtected(pathname) && !isPortalPath(pathname)) {
@@ -125,6 +126,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/operations",
+    "/operations/:path*",
     "/dashboard/:path*",
     "/onboarding",
     "/portal",

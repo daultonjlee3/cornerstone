@@ -6,7 +6,8 @@ import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelli
 import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { createNotification } from "@/src/lib/notifications/service";
-import { createTenantNotification, sendEmailAlert } from "@/src/lib/notifications";
+import { dispatchNotificationEvent } from "@/src/lib/notifications/dispatch";
+import { sendEmailAlert, getCompanyAlertRecipients } from "@/src/lib/notifications";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
   calculateNextRunDateAfterExecution,
@@ -107,31 +108,6 @@ function portalGuardHasWorkOrderAccess(
   return (
     assignedTechnicianId === guard.technicianId ||
     Boolean(assignedCrewId && guard.crewIds.has(assignedCrewId))
-  );
-}
-
-async function getCompanyAlertRecipients(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  companyId: string | null
-): Promise<string[]> {
-  if (!companyId) return [];
-  const { data: company } = await supabase
-    .from("companies")
-    .select("email, primary_contact_email")
-    .eq("id", companyId)
-    .limit(1)
-    .maybeSingle();
-  if (!company) return [];
-  const payload = company as {
-    email?: string | null;
-    primary_contact_email?: string | null;
-  };
-  return Array.from(
-    new Set(
-      [payload.email ?? null, payload.primary_contact_email ?? null].filter(
-        (email): email is string => Boolean(email && email.includes("@"))
-      )
-    )
   );
 }
 
@@ -1323,20 +1299,21 @@ export async function updateWorkOrderAssignment(
         (afterState.work_order_number as string | null) ??
         (afterState.title as string | null) ??
         "Work order";
-      await createTenantNotification(supabase, {
+      const msg = `${workOrderLabel} was assigned.`;
+      await dispatchNotificationEvent(supabase, {
         tenantId,
-        type: "work_order_assigned",
+        companyId,
+        eventType: "work_order.assigned",
         entityType: "work_order",
         entityId: id,
-        message: `${workOrderLabel} was assigned.`,
-        metadata: {
-          assigned_technician_id: nextTechnicianId,
-          assigned_crew_id: nextCrewId,
-          vendor_id: nextVendorId,
-          company_id: companyId,
-        },
+        title: msg,
+        message: msg,
+        includeAllTenantMembers: true,
       });
-      const recipients = await getCompanyAlertRecipients(supabase, companyId);
+      const recipients = await getCompanyAlertRecipients(
+        supabase,
+        companyId ? [companyId] : []
+      );
       await sendEmailAlert({
         subject: "Work order assigned",
         message: `${workOrderLabel} was assigned and scheduled for execution.`,
@@ -2479,6 +2456,606 @@ export async function addWorkOrderPartUsage(
   revalidatePath("/technician/work");
   revalidatePath(`/portal/work-orders/${workOrderId}`);
   revalidatePath("/portal/work-orders");
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Work order material lines (plan, reserve, issue)
+// ---------------------------------------------------------------------------
+
+function deriveMaterialLineStatus(
+  required: number,
+  reserved: number,
+  issued: number
+): "needed" | "partially_reserved" | "reserved" | "partially_issued" | "issued" | "backordered" {
+  if (required <= 0) return "needed";
+  if (issued >= required) return "issued";
+  if (issued > 0) return "partially_issued";
+  if (reserved >= required) return "reserved";
+  if (reserved > 0) return "partially_reserved";
+  return "needed";
+}
+
+export type WorkOrderMaterialLineWithAvailability = {
+  id: string;
+  work_order_id: string;
+  product_id: string;
+  product_name: string | null;
+  product_sku: string | null;
+  required_quantity: number;
+  reserved_quantity: number;
+  issued_quantity: number;
+  stock_location_id: string | null;
+  stock_location_name: string | null;
+  unit_cost_snapshot: number | null;
+  status: string;
+  available_at_location: number | null;
+  on_hand_at_location: number | null;
+  reserved_total_at_location: number | null;
+};
+
+export async function getWorkOrderMaterialLinesWithAvailability(
+  workOrderId: string
+): Promise<{ data: WorkOrderMaterialLineWithAvailability[] | null; error: string | null }> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { data: null, error: "Unauthorized." };
+  const { data: wo } = await supabase
+    .from("work_orders")
+    .select("company_id")
+    .eq("id", workOrderId)
+    .maybeSingle();
+  if (!wo) return { data: null, error: "Work order not found." };
+  const companyId = (wo as { company_id: string }).company_id;
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { data: null, error: "Unauthorized." };
+
+  const { data: lines, error: linesError } = await supabase
+    .from("work_order_material_lines")
+    .select(
+      "id, work_order_id, product_id, required_quantity, reserved_quantity, issued_quantity, stock_location_id, unit_cost_snapshot, status, products(name, sku), stock_locations(name)"
+    )
+    .eq("work_order_id", workOrderId)
+    .order("created_at", { ascending: true });
+  if (linesError) return { data: null, error: linesError.message };
+
+  const list = (lines ?? []) as Array<{
+    id: string;
+    work_order_id: string;
+    product_id: string;
+    required_quantity: number;
+    reserved_quantity: number;
+    issued_quantity: number;
+    stock_location_id: string | null;
+    unit_cost_snapshot: number | null;
+    status: string;
+    products?: { name?: string; sku?: string | null } | unknown;
+    stock_locations?: { name?: string } | unknown;
+  }>;
+
+  const productLocationPairs = list
+    .filter((l) => l.stock_location_id)
+    .map((l) => ({ product_id: l.product_id, stock_location_id: l.stock_location_id! }));
+  const availabilityMap = new Map<string, { on_hand: number; reserved: number }>();
+  for (const { product_id, stock_location_id } of productLocationPairs) {
+    const key = `${product_id}:${stock_location_id}`;
+    if (availabilityMap.has(key)) continue;
+    const { data: bal } = await supabase
+      .from("inventory_balances")
+      .select("quantity_on_hand")
+      .eq("product_id", product_id)
+      .eq("stock_location_id", stock_location_id)
+      .maybeSingle();
+    const onHand = Number((bal as { quantity_on_hand?: number } | null)?.quantity_on_hand ?? 0);
+    const { data: resRows } = await supabase
+      .from("inventory_reservations")
+      .select("quantity")
+      .eq("product_id", product_id)
+      .eq("stock_location_id", stock_location_id);
+    const reserved = (resRows ?? []).reduce(
+      (sum, r) => sum + Number((r as { quantity?: number }).quantity ?? 0),
+      0
+    );
+    availabilityMap.set(key, { on_hand: onHand, reserved });
+  }
+
+  const result: WorkOrderMaterialLineWithAvailability[] = list.map((l) => {
+    const req = Number(l.required_quantity ?? 0);
+    const res = Number(l.reserved_quantity ?? 0);
+    const iss = Number(l.issued_quantity ?? 0);
+    const status = deriveMaterialLineStatus(req, res, iss);
+    const product = Array.isArray(l.products) ? l.products[0] : l.products;
+    const loc = Array.isArray(l.stock_locations) ? l.stock_locations[0] : l.stock_locations;
+    let available_at_location: number | null = null;
+    let on_hand_at_location: number | null = null;
+    let reserved_total_at_location: number | null = null;
+    if (l.stock_location_id) {
+      const key = `${l.product_id}:${l.stock_location_id}`;
+      const av = availabilityMap.get(key);
+      if (av) {
+        on_hand_at_location = av.on_hand;
+        reserved_total_at_location = av.reserved;
+        available_at_location = Math.max(0, av.on_hand - av.reserved);
+      }
+    }
+    return {
+      id: l.id,
+      work_order_id: l.work_order_id,
+      product_id: l.product_id,
+      product_name:
+        product && typeof product === "object" && "name" in (product as object)
+          ? (product as { name?: string }).name ?? null
+          : null,
+      product_sku:
+        product && typeof product === "object" && "sku" in (product as object)
+          ? (product as { sku?: string | null }).sku ?? null
+          : null,
+      required_quantity: req,
+      reserved_quantity: res,
+      issued_quantity: iss,
+      stock_location_id: l.stock_location_id ?? null,
+      stock_location_name:
+        loc && typeof loc === "object" && "name" in (loc as object)
+          ? (loc as { name?: string }).name ?? null
+          : null,
+      unit_cost_snapshot: l.unit_cost_snapshot ?? null,
+      status,
+      available_at_location,
+      on_hand_at_location,
+      reserved_total_at_location,
+    };
+  });
+
+  return { data: result, error: null };
+}
+
+export async function getAvailabilityForProduct(
+  companyId: string,
+  productId: string,
+  stockLocationId?: string | null
+): Promise<{
+  data:
+    | { on_hand: number; reserved: number; available: number }
+    | { by_location: Array<{ stock_location_id: string; location_name: string; on_hand: number; reserved: number; available: number }> };
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { data: null as never, error: "Unauthorized." };
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { data: null as never, error: "Unauthorized." };
+
+  if (stockLocationId) {
+    const { data: bal } = await supabase
+      .from("inventory_balances")
+      .select("quantity_on_hand")
+      .eq("product_id", productId)
+      .eq("stock_location_id", stockLocationId)
+      .maybeSingle();
+    const on_hand = Number((bal as { quantity_on_hand?: number } | null)?.quantity_on_hand ?? 0);
+    const { data: resRows } = await supabase
+      .from("inventory_reservations")
+      .select("quantity")
+      .eq("product_id", productId)
+      .eq("stock_location_id", stockLocationId);
+    const reserved = (resRows ?? []).reduce(
+      (sum, r) => sum + Number((r as { quantity?: number }).quantity ?? 0),
+      0
+    );
+    return {
+      data: { on_hand, reserved, available: Math.max(0, on_hand - reserved) },
+      error: null,
+    };
+  }
+
+  const { data: balances } = await supabase
+    .from("inventory_balances")
+    .select("stock_location_id, quantity_on_hand, stock_locations(name)")
+    .eq("product_id", productId);
+  const { data: resRows } = await supabase
+    .from("inventory_reservations")
+    .select("stock_location_id, quantity")
+    .eq("product_id", productId);
+  const reservedByLoc = new Map<string, number>();
+  for (const r of resRows ?? []) {
+    const sid = (r as { stock_location_id?: string }).stock_location_id ?? "";
+    reservedByLoc.set(sid, (reservedByLoc.get(sid) ?? 0) + Number((r as { quantity?: number }).quantity ?? 0));
+  }
+  const by_location = (balances ?? []).map((b) => {
+    const sid = (b as { stock_location_id: string }).stock_location_id;
+    const on_hand = Number((b as { quantity_on_hand?: number }).quantity_on_hand ?? 0);
+    const reserved = reservedByLoc.get(sid) ?? 0;
+    const loc = Array.isArray((b as { stock_locations?: unknown }).stock_locations)
+      ? ((b as { stock_locations: unknown[] }).stock_locations[0] as { name?: string })
+      : (b as { stock_locations?: { name?: string } }).stock_locations;
+    return {
+      stock_location_id: sid,
+      location_name: loc?.name ?? "Location",
+      on_hand,
+      reserved,
+      available: Math.max(0, on_hand - reserved),
+    };
+  });
+  return { data: { by_location }, error: null };
+}
+
+export async function addWorkOrderMaterialLine(
+  workOrderId: string,
+  input: { product_id: string; required_quantity: number; stock_location_id?: string | null; unit_cost_snapshot?: number | null }
+): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  const { data: wo } = await supabase
+    .from("work_orders")
+    .select("company_id")
+    .eq("id", workOrderId)
+    .maybeSingle();
+  if (!wo) return { error: "Work order not found." };
+  const companyId = (wo as { company_id: string }).company_id;
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { error: "Unauthorized." };
+  if (!Number.isFinite(input.required_quantity) || input.required_quantity <= 0) {
+    return { error: "Required quantity must be greater than zero." };
+  }
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, company_id")
+    .eq("id", input.product_id)
+    .eq("company_id", companyId)
+    .maybeSingle();
+  if (!product) return { error: "Product not found." };
+  if (input.stock_location_id) {
+    const { data: loc } = await supabase
+      .from("stock_locations")
+      .select("id, company_id, active")
+      .eq("id", input.stock_location_id)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (!loc || (loc as { active?: boolean }).active === false) return { error: "Stock location not found or inactive." };
+  }
+  const { error } = await supabase.from("work_order_material_lines").insert({
+    work_order_id: workOrderId,
+    product_id: input.product_id,
+    required_quantity: input.required_quantity,
+    reserved_quantity: 0,
+    issued_quantity: 0,
+    stock_location_id: input.stock_location_id ?? null,
+    unit_cost_snapshot: input.unit_cost_snapshot ?? null,
+    status: "needed",
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/work-orders/${workOrderId}`);
+  return { success: true };
+}
+
+export async function updateWorkOrderMaterialLine(
+  lineId: string,
+  input: { required_quantity?: number; stock_location_id?: string | null }
+): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  const { data: line } = await supabase
+    .from("work_order_material_lines")
+    .select("id, work_order_id, issued_quantity, reserved_quantity, required_quantity, work_orders(company_id)")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (!line) return { error: "Material line not found." };
+  const wo = (line as { work_orders?: { company_id?: string } }).work_orders;
+  const companyId = Array.isArray(wo) ? wo[0]?.company_id : (wo as { company_id?: string } | null)?.company_id;
+  if (!companyId || !(await companyBelongsToTenant(companyId, tenantId))) return { error: "Unauthorized." };
+  const issued = Number((line as { issued_quantity?: number }).issued_quantity ?? 0);
+  const reserved = Number((line as { reserved_quantity?: number }).reserved_quantity ?? 0);
+  const required = Number((line as { required_quantity?: number }).required_quantity ?? 0);
+  const currentLocationId = (line as { stock_location_id?: string | null }).stock_location_id ?? null;
+  if (issued > 0) return { error: "Cannot update a line that has issued quantity. Adjust issued quantities first." };
+  if (
+    reserved > 0 &&
+    input.stock_location_id !== undefined &&
+    (input.stock_location_id ?? null) !== currentLocationId
+  ) {
+    return { error: "Release reservation before changing stock location." };
+  }
+  const updates: { required_quantity?: number; reserved_quantity?: number; stock_location_id?: string | null; status?: string } = {};
+  let newRequired = required;
+  let newReserved = reserved;
+  if (input.required_quantity != null) {
+    if (!Number.isFinite(input.required_quantity) || input.required_quantity < 0)
+      return { error: "Required quantity must be zero or greater." };
+    updates.required_quantity = input.required_quantity;
+    newRequired = input.required_quantity;
+    if (reserved > input.required_quantity) {
+      updates.reserved_quantity = input.required_quantity;
+      newReserved = input.required_quantity;
+    }
+  }
+  if (input.stock_location_id !== undefined) updates.stock_location_id = input.stock_location_id ?? null;
+  updates.status = deriveMaterialLineStatus(newRequired, newReserved, issued);
+  if (newReserved < reserved) {
+    const { data: resRow } = await supabase
+      .from("inventory_reservations")
+      .select("id, quantity")
+      .eq("work_order_material_line_id", lineId)
+      .maybeSingle();
+    if (resRow) {
+      const cur = Number((resRow as { quantity?: number }).quantity ?? 0);
+      const newQty = Math.max(0, cur - (reserved - newReserved));
+      if (newQty === 0) {
+        await supabase.from("inventory_reservations").delete().eq("id", (resRow as { id: string }).id);
+      } else {
+        await supabase
+          .from("inventory_reservations")
+          .update({ quantity: newQty, updated_at: new Date().toISOString() })
+          .eq("id", (resRow as { id: string }).id);
+      }
+    }
+  }
+  const { error } = await supabase.from("work_order_material_lines").update(updates).eq("id", lineId);
+  if (error) return { error: error.message };
+  revalidatePath(`/work-orders/${(line as { work_order_id: string }).work_order_id}`);
+  return { success: true };
+}
+
+export async function removeWorkOrderMaterialLine(lineId: string): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  const { data: line } = await supabase
+    .from("work_order_material_lines")
+    .select("id, work_order_id, issued_quantity, work_orders(company_id)")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (!line) return { error: "Material line not found." };
+  const wo = (line as { work_orders?: { company_id?: string } }).work_orders;
+  const companyId = Array.isArray(wo) ? wo[0]?.company_id : (wo as { company_id?: string } | null)?.company_id;
+  if (!companyId || !(await companyBelongsToTenant(companyId, tenantId))) return { error: "Unauthorized." };
+  const issued = Number((line as { issued_quantity?: number }).issued_quantity ?? 0);
+  if (issued > 0) return { error: "Cannot remove a line that has issued quantity." };
+  await supabase.from("inventory_reservations").delete().eq("work_order_material_line_id", lineId);
+  const { error } = await supabase.from("work_order_material_lines").delete().eq("id", lineId);
+  if (error) return { error: error.message };
+  revalidatePath(`/work-orders/${(line as { work_order_id: string }).work_order_id}`);
+  return { success: true };
+}
+
+export async function reserveWorkOrderMaterial(
+  lineId: string,
+  quantity: number
+): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  if (!Number.isFinite(quantity) || quantity <= 0) return { error: "Reserve quantity must be greater than zero." };
+  const { data: line } = await supabase
+    .from("work_order_material_lines")
+    .select(
+      "id, work_order_id, product_id, stock_location_id, required_quantity, reserved_quantity, issued_quantity, work_orders(company_id)"
+    )
+    .eq("id", lineId)
+    .maybeSingle();
+  if (!line) return { error: "Material line not found." };
+  const wo = (line as { work_orders?: { company_id?: string } }).work_orders;
+  const companyId = Array.isArray(wo) ? wo[0]?.company_id : (wo as { company_id?: string } | null)?.company_id;
+  if (!companyId || !(await companyBelongsToTenant(companyId, tenantId))) return { error: "Unauthorized." };
+  const stockLocationId = (line as { stock_location_id?: string | null }).stock_location_id;
+  if (!stockLocationId) return { error: "Select a stock location on the material line before reserving." };
+  const required = Number((line as { required_quantity?: number }).required_quantity ?? 0);
+  const currentReserved = Number((line as { reserved_quantity?: number }).reserved_quantity ?? 0);
+  const productId = (line as { product_id: string }).product_id;
+  const needToReserve = Math.min(quantity, Math.max(0, required - currentReserved));
+  if (needToReserve <= 0) return { error: "No additional quantity to reserve for this line." };
+  const { data: bal } = await supabase
+    .from("inventory_balances")
+    .select("quantity_on_hand")
+    .eq("product_id", productId)
+    .eq("stock_location_id", stockLocationId)
+    .maybeSingle();
+  const onHand = Number((bal as { quantity_on_hand?: number } | null)?.quantity_on_hand ?? 0);
+  const { data: resRows } = await supabase
+    .from("inventory_reservations")
+    .select("quantity")
+    .eq("product_id", productId)
+    .eq("stock_location_id", stockLocationId);
+  const totalReserved = (resRows ?? []).reduce(
+    (sum, r) => sum + Number((r as { quantity?: number }).quantity ?? 0),
+    0
+  );
+  const available = Math.max(0, onHand - totalReserved);
+  const toReserve = Math.min(needToReserve, available);
+  if (toReserve <= 0) return { error: "No quantity available to reserve at this location." };
+  const newLineReserved = currentReserved + toReserve;
+  const { data: existingRes } = await supabase
+    .from("inventory_reservations")
+    .select("id, quantity")
+    .eq("work_order_material_line_id", lineId)
+    .maybeSingle();
+  if (existingRes) {
+    const newQty = Number((existingRes as { quantity?: number }).quantity ?? 0) + toReserve;
+    const { error: upErr } = await supabase
+      .from("inventory_reservations")
+      .update({ quantity: newQty, updated_at: new Date().toISOString() })
+      .eq("id", (existingRes as { id: string }).id);
+    if (upErr) return { error: upErr.message };
+  } else {
+    const { error: insErr } = await supabase.from("inventory_reservations").insert({
+      work_order_material_line_id: lineId,
+      product_id: productId,
+      stock_location_id: stockLocationId,
+      quantity: toReserve,
+    });
+    if (insErr) return { error: insErr.message };
+  }
+  const status = deriveMaterialLineStatus(required, newLineReserved, Number((line as { issued_quantity?: number }).issued_quantity ?? 0));
+  const { error: lineErr } = await supabase
+    .from("work_order_material_lines")
+    .update({ reserved_quantity: newLineReserved, status, updated_at: new Date().toISOString() })
+    .eq("id", lineId);
+  if (lineErr) return { error: lineErr.message };
+  revalidatePath(`/work-orders/${(line as { work_order_id: string }).work_order_id}`);
+  return { success: true };
+}
+
+export async function releaseWorkOrderReservation(
+  lineId: string,
+  quantity?: number
+): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  const { data: line } = await supabase
+    .from("work_order_material_lines")
+    .select(
+      "id, work_order_id, product_id, required_quantity, reserved_quantity, issued_quantity, work_orders(company_id)"
+    )
+    .eq("id", lineId)
+    .maybeSingle();
+  if (!line) return { error: "Material line not found." };
+  const wo = (line as { work_orders?: { company_id?: string } }).work_orders;
+  const companyId = Array.isArray(wo) ? wo[0]?.company_id : (wo as { company_id?: string } | null)?.company_id;
+  if (!companyId || !(await companyBelongsToTenant(companyId, tenantId))) return { error: "Unauthorized." };
+  const currentReserved = Number((line as { reserved_quantity?: number }).reserved_quantity ?? 0);
+  const toRelease = quantity != null
+    ? Math.min(quantity, currentReserved)
+    : currentReserved;
+  if (toRelease <= 0) return { success: true };
+  const { data: resRow } = await supabase
+    .from("inventory_reservations")
+    .select("id, quantity")
+    .eq("work_order_material_line_id", lineId)
+    .maybeSingle();
+  if (resRow) {
+    const cur = Number((resRow as { quantity?: number }).quantity ?? 0);
+    const newQty = Math.max(0, cur - toRelease);
+    if (newQty === 0) {
+      await supabase.from("inventory_reservations").delete().eq("id", (resRow as { id: string }).id);
+    } else {
+      await supabase
+        .from("inventory_reservations")
+        .update({ quantity: newQty, updated_at: new Date().toISOString() })
+        .eq("id", (resRow as { id: string }).id);
+    }
+  }
+  const newLineReserved = Math.max(0, currentReserved - toRelease);
+  const required = Number((line as { required_quantity?: number }).required_quantity ?? 0);
+  const issued = Number((line as { issued_quantity?: number }).issued_quantity ?? 0);
+  const status = deriveMaterialLineStatus(required, newLineReserved, issued);
+  const { error } = await supabase
+    .from("work_order_material_lines")
+    .update({ reserved_quantity: newLineReserved, status, updated_at: new Date().toISOString() })
+    .eq("id", lineId);
+  if (error) return { error: error.message };
+  revalidatePath(`/work-orders/${(line as { work_order_id: string }).work_order_id}`);
+  return { success: true };
+}
+
+export async function issueWorkOrderMaterial(
+  lineId: string,
+  quantity: number
+): Promise<WorkOrderFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  if (!Number.isFinite(quantity) || quantity <= 0) return { error: "Issue quantity must be greater than zero." };
+  const { data: line } = await supabase
+    .from("work_order_material_lines")
+    .select(
+      "id, work_order_id, product_id, stock_location_id, required_quantity, reserved_quantity, issued_quantity, unit_cost_snapshot, work_orders(company_id)"
+    )
+    .eq("id", lineId)
+    .maybeSingle();
+  if (!line) return { error: "Material line not found." };
+  const wo = (line as { work_orders?: { company_id?: string } }).work_orders;
+  const companyId = Array.isArray(wo) ? wo[0]?.company_id : (wo as { company_id?: string } | null)?.company_id;
+  if (!companyId || !(await companyBelongsToTenant(companyId, tenantId))) return { error: "Unauthorized." };
+  const workOrderId = (line as { work_order_id: string }).work_order_id;
+  const stockLocationId = (line as { stock_location_id?: string | null }).stock_location_id;
+  if (!stockLocationId) return { error: "Material line has no stock location. Set location before issuing." };
+  const reserved = Number((line as { reserved_quantity?: number }).reserved_quantity ?? 0);
+  const issued = Number((line as { issued_quantity?: number }).issued_quantity ?? 0);
+  const canIssue = Math.min(quantity, Math.max(0, reserved - issued));
+  if (canIssue <= 0) return { error: "No reserved quantity available to issue. Reserve first." };
+  const productId = (line as { product_id: string }).product_id;
+  const unitCost = (line as { unit_cost_snapshot?: number | null }).unit_cost_snapshot ?? null;
+  const finalUnitCost = unitCost ?? 0;
+  const { data: product } = await supabase
+    .from("products")
+    .select("name, sku, unit_of_measure, default_cost")
+    .eq("id", productId)
+    .maybeSingle();
+  const partName = (product as { name?: string } | null)?.name ?? null;
+  const sku = (product as { sku?: string | null } | null)?.sku ?? null;
+  const unitOfMeasure = (product as { unit_of_measure?: string | null } | null)?.unit_of_measure ?? null;
+  const costToUse = unitCost ?? (product as { default_cost?: number | null })?.default_cost ?? 0;
+
+  const { error: txError } = await supabase.rpc("record_inventory_transaction", {
+    p_company_id: companyId,
+    p_product_id: productId,
+    p_stock_location_id: stockLocationId,
+    p_quantity_change: -canIssue,
+    p_transaction_type: "work_order_issue",
+    p_reference_type: "work_order_material_line",
+    p_reference_id: lineId,
+    p_notes: `Work order ${workOrderId} material issue`,
+    p_idempotency_key: `wo-material-issue:${lineId}:${issued + canIssue}`,
+    p_unit_cost_snapshot: costToUse,
+  });
+  if (txError) return { error: `Inventory issue failed: ${txError.message}` };
+
+  const { data: usageRow, error: usageErr } = await supabase
+    .from("work_order_part_usage")
+    .insert({
+      work_order_id: workOrderId,
+      product_id: productId,
+      stock_location_id: stockLocationId,
+      part_name_snapshot: partName,
+      sku_snapshot: sku,
+      unit_of_measure: unitOfMeasure,
+      quantity_used: canIssue,
+      unit_cost: costToUse,
+      unit_cost_snapshot: costToUse,
+      total_cost: canIssue * costToUse,
+    })
+    .select("id")
+    .single();
+  if (usageErr) return { error: usageErr.message };
+
+  const newIssued = issued + canIssue;
+  const newReserved = reserved - canIssue;
+  const required = Number((line as { required_quantity?: number }).required_quantity ?? 0);
+  const status = deriveMaterialLineStatus(required, newReserved, newIssued);
+
+  const { data: resRow } = await supabase
+    .from("inventory_reservations")
+    .select("id, quantity")
+    .eq("work_order_material_line_id", lineId)
+    .maybeSingle();
+  if (resRow) {
+    const cur = Number((resRow as { quantity?: number }).quantity ?? 0);
+    const newQty = Math.max(0, cur - canIssue);
+    if (newQty === 0) {
+      await supabase.from("inventory_reservations").delete().eq("id", (resRow as { id: string }).id);
+    } else {
+      await supabase
+        .from("inventory_reservations")
+        .update({ quantity: newQty, updated_at: new Date().toISOString() })
+        .eq("id", (resRow as { id: string }).id);
+    }
+  }
+
+  const { error: lineErr } = await supabase
+    .from("work_order_material_lines")
+    .update({
+      reserved_quantity: newReserved,
+      issued_quantity: newIssued,
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", lineId);
+  if (lineErr) return { error: lineErr.message };
+
+  revalidatePath(`/work-orders/${workOrderId}`);
+  revalidatePath(`/technicians/work-queue/${workOrderId}`);
   return { success: true };
 }
 

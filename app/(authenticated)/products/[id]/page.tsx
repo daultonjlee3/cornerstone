@@ -19,7 +19,7 @@ export default async function ProductDetailPage({
 
   const { data: productRow } = await scope.supabase
     .from("products")
-    .select("id, company_id, name, sku, description, category, unit_of_measure, default_cost, reorder_point_default, active, default_vendor_id, vendors!products_default_vendor_id_fkey(name), companies(name)")
+    .select("id, company_id, name, sku, description, category, unit_of_measure, default_cost, reorder_point_default, taxable_default, active, default_vendor_id, vendors!products_default_vendor_id_fkey(name), companies(name)")
     .eq("id", id)
     .maybeSingle();
   if (!productRow) notFound();
@@ -101,6 +101,12 @@ export default async function ProductDetailPage({
                 <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Reorder point default</p>
                 <p className="mt-1 text-[var(--foreground)]">
                   {(productRow as { reorder_point_default?: number | null }).reorder_point_default ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Default taxable</p>
+                <p className="mt-1 text-[var(--foreground)]">
+                  {(productRow as { taxable_default?: boolean }).taxable_default !== false ? "Yes" : "No"}
                 </p>
               </div>
               <div>

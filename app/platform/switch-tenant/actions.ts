@@ -27,7 +27,7 @@ export async function switchToTenant(tenantId: string): Promise<never> {
     redirect("/platform/tenants");
   }
   await setActingTenantCookie(data.id);
-  redirect("/dashboard");
+  redirect("/operations");
 }
 
 /**

@@ -71,11 +71,13 @@ export default async function RequestPage() {
   ]);
 
   return (
-    <RequestPortalLayout
-      initialLocale={locale}
-      properties={properties}
-      assets={assets}
-      configured={configured}
-    />
+    <>
+      <RequestPortalLayout
+        initialLocale={locale}
+        properties={properties}
+        assets={assets}
+        configured={configured}
+      />
+    </>
   );
 }

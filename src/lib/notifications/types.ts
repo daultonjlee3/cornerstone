@@ -9,10 +9,13 @@ export const NOTIFICATION_EVENT_TYPES = [
   "work_order.status_changed",
   "work_order.overdue",
   "work_order.completed",
+  "work_order.vendor_assigned",
   "pm.generated",
+  "pm.due_soon",
   "pm.overdue",
   "purchase_order.created",
   "purchase_order.approved",
+  "purchase_order.received",
   "inventory.low_stock",
   "work_request.submitted",
   "work_order.comment",
@@ -34,12 +37,12 @@ export const NOTIFICATION_CATEGORIES = [
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
-export const CHANNELS = ["in_app", "email"] as const;
+export const CHANNELS = ["in_app", "email", "sms"] as const;
 export type NotificationChannel = (typeof CHANNELS)[number];
 
 export function eventTypeToCategory(eventType: string): NotificationCategory {
   if (eventType.startsWith("work_order.")) {
-    if (eventType === "work_order.assigned") return "assignments";
+    if (eventType === "work_order.assigned" || eventType === "work_order.vendor_assigned") return "assignments";
     if (eventType === "work_order.overdue") return "overdue";
     if (eventType === "work_order.completed" || eventType === "work_order.comment") return "completions";
     return "work_orders";

@@ -25,7 +25,7 @@ export default async function ProductsPage() {
     scope.supabase
       .from("products")
       .select(
-        "id, company_id, name, sku, description, category, unit_of_measure, default_vendor_id, default_cost, reorder_point_default, active, created_at, updated_at, companies(name), vendors!products_default_vendor_id_fkey(name)"
+        "id, company_id, name, sku, description, category, unit_of_measure, default_vendor_id, default_cost, reorder_point_default, taxable_default, active, created_at, updated_at, companies(name), vendors!products_default_vendor_id_fkey(name)"
       )
       .in("company_id", scope.companyIds)
       .order("name", { ascending: true }),
@@ -52,6 +52,7 @@ export default async function ProductsPage() {
       default_vendor_id: (record.default_vendor_id as string | null) ?? null,
       default_cost: (record.default_cost as number | null) ?? null,
       reorder_point_default: (record.reorder_point_default as number | null) ?? null,
+      taxable_default: record.taxable_default !== false,
       active: Boolean(record.active),
       created_at: (record.created_at as string) ?? new Date().toISOString(),
       updated_at: (record.updated_at as string) ?? new Date().toISOString(),

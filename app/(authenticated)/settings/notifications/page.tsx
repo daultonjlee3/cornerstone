@@ -1,11 +1,15 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getAuthContext } from "@/src/lib/auth-context";
+import { ensureDefaultPreferences } from "@/src/lib/notifications/service";
+import { NotificationPreferencesForm } from "./notification-preferences-form";
 
 export default async function SettingsNotificationsPage() {
   const supabase = await createClient();
   const ctx = await getAuthContext(supabase);
-  if (!ctx.tenantId) redirect("/dashboard");
+  if (!ctx.tenantId) redirect("/operations");
+
+  await ensureDefaultPreferences(supabase, ctx.effectiveUserId);
 
   const { data: prefs } = await supabase
     .from("notification_preferences")
@@ -13,7 +17,16 @@ export default async function SettingsNotificationsPage() {
     .eq("user_id", ctx.effectiveUserId)
     .order("channel");
 
-  const rows = (prefs ?? []) as Array<{ channel: string; category: string; enabled: boolean }>;
+  const rows = (prefs ?? []) as Array<{
+    channel: string;
+    category: string;
+    enabled: boolean;
+  }>;
+
+  const initialPrefs: Record<string, boolean> = {};
+  for (const p of rows) {
+    initialPrefs[`${p.channel}:${p.category}`] = p.enabled;
+  }
 
   return (
     <div className="space-y-6">
@@ -22,30 +35,10 @@ export default async function SettingsNotificationsPage() {
           Notification preferences
         </h2>
         <p className="mb-4 text-sm text-[var(--muted)]">
-          Manage how you receive notifications. Tenant-wide defaults can be configured by admins.
+          Override how you receive notifications by category. Role defaults are
+          set by admins; unset toggles use those defaults.
         </p>
-        {rows.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No preferences set; defaults apply.</p>
-        ) : (
-          <ul className="divide-y divide-[var(--card-border)]">
-            {rows.map((p, i) => (
-              <li key={`${p.channel}-${p.category}-${i}`} className="flex items-center justify-between py-2 first:pt-0">
-                <span className="text-sm text-[var(--foreground)]">
-                  {p.channel} · {p.category}
-                </span>
-                <span
-                  className={
-                    p.enabled
-                      ? "text-xs text-green-600 dark:text-green-400"
-                      : "text-xs text-[var(--muted)]"
-                  }
-                >
-                  {p.enabled ? "On" : "Off"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <NotificationPreferencesForm initialPrefs={initialPrefs} />
       </section>
     </div>
   );

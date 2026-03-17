@@ -261,12 +261,12 @@ export function TourProvider({
     return () => clearTimeout(t);
   }, [pathname, activeTour, pendingStepIndex, scrollToStep, updateTargetRect]);
 
-  // Start demo-guided from URL param (e.g. Settings "Start tour" -> /dashboard?startTour=demo-guided).
+  // Start demo-guided from URL param (e.g. Settings "Start tour" -> /operations?startTour=demo-guided).
   useEffect(() => {
     const startParam = searchParams.get("startTour");
-    if (pathname.replace(/\/$/, "") !== "/dashboard" || startParam !== "demo-guided") return;
+    if (pathname.replace(/\/$/, "") !== "/operations" || startParam !== "demo-guided") return;
     runTour(demoGuidedTourConfig);
-    router.replace("/dashboard", { scroll: false });
+    router.replace("/operations", { scroll: false });
   }, [pathname, searchParams, runTour, router]);
 
   const value: TourContextValue = {

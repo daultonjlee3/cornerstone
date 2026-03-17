@@ -8,14 +8,14 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 const DEMO_PASSWORD = process.env.PLAYWRIGHT_DEMO_PASSWORD || process.env.DEMO_PASSWORD || '';
 const SCREENSHOT_DIR = 'marketing/screenshots';
 
-/** Login as healthcare demo user and wait until dashboard is ready. */
+/** Login as healthcare demo user and wait until Operations Center is ready. */
 async function loginAndWaitForDashboard(page: import('@playwright/test').Page) {
-  await page.goto(`${BASE_URL}/login?demo=healthcare&next=/dashboard`);
+  await page.goto(`${BASE_URL}/login?demo=healthcare&next=/operations`);
   await page.waitForLoadState('domcontentloaded');
   await page.getByLabel('Email').fill('healthcare-demo@cornerstonecmms.com');
   await page.getByLabel('Password').fill(DEMO_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+  await page.waitForURL(/\/operations/, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
   if (page.url().includes('/onboarding')) {
     throw new Error('Demo user was redirected to /onboarding. Run npm run seed:demo:users.');

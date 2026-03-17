@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getTemplateWithLines } from "../actions";
 import { Button } from "@/src/components/ui/button";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
@@ -10,21 +11,40 @@ import { deletePurchaseOrder, savePurchaseOrder } from "../actions";
 import {
   PurchaseOrderFormModal,
   type PurchaseOrderRecord,
+  type ProductOption,
 } from "./purchase-order-form-modal";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 
 type CompanyOption = { id: string; name: string };
 type VendorOption = { id: string; name: string; company_id: string };
 
+type VendorPricingEntry = { vendor_id: string; product_id: string; unit_cost: number; taxable_override: boolean | null };
+
+export type InitialFromTemplate = {
+  companyId: string;
+  vendorId: string | null;
+  lineRows: { productId: string; quantity: string; unitCost: string }[];
+};
+
 type PurchaseOrdersListProps = {
   rows: PurchaseOrderRecord[];
   companies: CompanyOption[];
   vendors: VendorOption[];
+  products: ProductOption[];
+  vendorPricing?: VendorPricingEntry[];
+  useTemplateId?: string;
 };
 
 const PAGE_SIZE = 12;
 
-export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersListProps) {
+export function PurchaseOrdersList({
+  rows,
+  companies,
+  vendors,
+  products,
+  vendorPricing = [],
+  useTemplateId,
+}: PurchaseOrdersListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -33,6 +53,34 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrderRecord | null>(null);
+  const [initialFromTemplate, setInitialFromTemplate] = useState<InitialFromTemplate | null>(null);
+
+  useEffect(() => {
+    if (!useTemplateId) return;
+    let cancelled = false;
+    getTemplateWithLines(useTemplateId).then((result) => {
+      if (cancelled) return;
+      if (!result || "error" in result) return;
+      const { template, lines } = result;
+      setInitialFromTemplate({
+        companyId: (template as { company_id: string }).company_id,
+        vendorId: (template as { vendor_id?: string | null }).vendor_id ?? null,
+        lineRows: (lines ?? []).map((l) => ({
+          productId: (l as { product_id: string }).product_id,
+          quantity: String((l as { default_quantity?: number }).default_quantity ?? 0),
+          unitCost:
+            (l as { default_unit_cost?: number | null }).default_unit_cost != null
+              ? String((l as { default_unit_cost: number }).default_unit_cost)
+              : "",
+        })),
+      });
+      setEditing(null);
+      setModalOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [useTemplateId]);
 
   const filtered = useMemo(() => {
     const lower = query.trim().toLowerCase();
@@ -122,12 +170,17 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
             </select>
           </label>
         </div>
-        <Tooltip placement="bottom">
-          <TooltipTrigger>
-        <Button onClick={openNew}>New Purchase Order</Button>
-          </TooltipTrigger>
-          <TooltipContent>Order and receive parts</TooltipContent>
-        </Tooltip>
+        <div className="flex gap-2">
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
+              <Button onClick={openNew}>New Purchase Order</Button>
+            </TooltipTrigger>
+            <TooltipContent>Order and receive parts</TooltipContent>
+          </Tooltip>
+          <Button variant="secondary" asChild>
+            <Link href="/purchase-orders/templates">Templates</Link>
+          </Button>
+        </div>
       </div>
 
       <div data-tour="purchase-orders:receiving">
@@ -138,6 +191,7 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
             <Th>Company</Th>
             <Th>Vendor</Th>
             <Th>Status</Th>
+            <Th className="text-right">Lines</Th>
             <Th>Order Date</Th>
             <Th>Expected Delivery</Th>
             <Th className="text-right">Total Cost</Th>
@@ -146,7 +200,7 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
           <TBody>
             {pageRows.length === 0 ? (
               <Tr>
-                <td className="px-4 py-3.5 text-center text-[var(--muted)]" colSpan={8}>
+                <td className="px-4 py-3.5 text-center text-[var(--muted)]" colSpan={9}>
                   No purchase orders found.
                 </td>
               </Tr>
@@ -164,6 +218,9 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
                   <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-xs font-medium text-slate-700">
                     {row.status.replace(/_/g, " ")}
                   </span>
+                </Td>
+                <Td className="text-right text-[var(--muted)]">
+                  {row.line_count != null ? `${row.line_count} line${row.line_count !== 1 ? "s" : ""}` : "—"}
                 </Td>
                 <Td>{row.order_date ?? "—"}</Td>
                 <Td>{row.expected_delivery_date ?? "—"}</Td>
@@ -214,11 +271,15 @@ export function PurchaseOrdersList({ rows, companies, vendors }: PurchaseOrdersL
         onClose={() => {
           setModalOpen(false);
           setEditing(null);
+          setInitialFromTemplate(null);
           router.refresh();
         }}
+        initialFromTemplate={initialFromTemplate}
         purchaseOrder={editing}
         companies={companies}
         vendors={vendors}
+        products={products}
+        vendorPricing={vendorPricing}
         saveAction={savePurchaseOrder}
       />
     </div>

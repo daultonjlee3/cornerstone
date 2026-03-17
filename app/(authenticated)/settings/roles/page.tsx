@@ -12,7 +12,7 @@ const BUILT_IN_ROLES = [
 export default async function SettingsRolesPage() {
   const supabase = await createClient();
   const ctx = await getAuthContext(supabase);
-  if (!ctx.tenantId) redirect("/dashboard");
+  if (!ctx.tenantId) redirect("/operations");
 
   return (
     <div className="space-y-6">

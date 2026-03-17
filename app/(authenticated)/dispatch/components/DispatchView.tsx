@@ -40,6 +40,8 @@ import { CombinedWorkOrderDetailsPanel } from "./CombinedWorkOrderDetailsPanel";
 import type { WorkOrderTravelInfo } from "./DispatchOperationsJobList";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
+import { HelpDrawer } from "@/src/components/ui/help-drawer";
+import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Hint } from "@/src/components/ui/hint";
 
 const DispatchMapPanel = dynamic(
@@ -1012,6 +1014,7 @@ export function DispatchView({
   ]);
 
   const opsMode = isFullScreen && filterState.viewMode === "combined";
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <div
@@ -1062,6 +1065,7 @@ export function DispatchView({
             >
               {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
             </Button>
+            <HelpTriggerButton onClick={() => setHelpOpen(true)} />
           </div>
         </header>
       )}
@@ -1115,6 +1119,8 @@ export function DispatchView({
             <>
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2" data-tour="dispatch:routing">
                 <DispatchMapPanel
+                  viewMode={filterState.viewMode}
+                  mapPanelVisible={true}
                   workOrders={optimisticWorkOrders}
                   workforce={workforce}
                   filterState={filterState}
@@ -1157,7 +1163,7 @@ export function DispatchView({
                   className="grid min-h-[300px] grid-cols-1 shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
                   style={{ minHeight: 320, flex: "0 0 38%" }}
                 >
-                  <div className="flex min-h-[280px] min-h-0 flex-col overflow-hidden relative">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden relative" style={{ minHeight: 280 }}>
                     {/* Keep map mounted when hidden so it does not remount on toggle (avoids jitter/flicker) */}
                     <div
                       className={combinedMapVisible ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "hidden"}
@@ -1169,8 +1175,10 @@ export function DispatchView({
                           Hide map
                         </Button>
                       </div>
-                      <div className="min-h-[260px] flex-1 overflow-hidden" data-tour="dispatch:routing">
+                      <div className="min-h-[260px] h-full min-w-0 flex-1 overflow-hidden" data-tour="dispatch:routing" style={{ minHeight: 260 }}>
                         <DispatchMapPanel
+                          viewMode="combined"
+                          mapPanelVisible={combinedMapVisible}
                           workOrders={optimisticWorkOrders}
                           workforce={workforce}
                           filterState={filterState}
@@ -1563,6 +1571,46 @@ export function DispatchView({
           setDrawerWorkOrderId(null);
         }}
       />
+
+      <HelpDrawer
+        title="How this screen works"
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+      >
+        <p className="mb-3 text-sm text-[var(--muted)]">
+          The Dispatch screen is your scheduling board for work orders. Use it to match jobs to technicians or crews and
+          plan the day.
+        </p>
+        <h3 className="mb-1 text-sm font-semibold">What this screen is for</h3>
+        <p className="mb-3">
+          This view shows unscheduled work in a queue and scheduled work on technician or crew lanes. You drag work
+          orders onto lanes to assign and schedule them.
+        </p>
+        <h3 className="mb-1 text-sm font-semibold">Who typically uses it</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>Dispatchers</li>
+          <li>Maintenance supervisors</li>
+          <li>Operations managers</li>
+        </ul>
+        <h3 className="mb-1 text-sm font-semibold">Key things you can do</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>See unscheduled work orders in the queue.</li>
+          <li>View technician or crew lanes with time slots.</li>
+          <li>Drag a work order onto a lane to assign and schedule it.</li>
+          <li>Open a work order drawer for quick details.</li>
+        </ul>
+        <h3 className="mb-1 text-sm font-semibold">Typical workflow</h3>
+        <p className="mb-3">
+          Work order created → appears in the Dispatch queue → dispatcher drags it onto a technician or crew lane →
+          technician completes the work → status updates flow back into Work Orders.
+        </p>
+        <h3 className="mb-1 text-sm font-semibold">Tips</h3>
+        <ul className="mb-2 list-disc space-y-1 pl-5">
+          <li>Watch lane load to avoid overbooking any one technician.</li>
+          <li>Use filters and date controls to focus on a day or group of technicians.</li>
+          <li>Drag cards to rebalance work quickly when priorities change.</li>
+        </ul>
+      </HelpDrawer>
 
       <WorkOrderAssignmentModal
         open={Boolean(assignmentTarget)}

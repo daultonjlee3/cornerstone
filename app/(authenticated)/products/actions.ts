@@ -59,6 +59,8 @@ export async function saveProduct(
   const defaultCostRaw = ((formData.get("default_cost") as string | null) ?? "").trim();
   const reorderPointRaw = ((formData.get("reorder_point_default") as string | null) ?? "").trim();
 
+  const taxableDefault = (formData.get("taxable_default") as string | null) === "on";
+
   const payload = {
     company_id: companyId,
     name,
@@ -75,6 +77,7 @@ export async function saveProduct(
       reorderPointRaw === "" || Number.isNaN(Number(reorderPointRaw))
         ? null
         : Number(reorderPointRaw),
+    taxable_default: taxableDefault,
     active: (formData.get("active") as string | null) === "on",
   };
 

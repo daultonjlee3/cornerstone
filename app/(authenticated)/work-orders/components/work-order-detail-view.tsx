@@ -14,6 +14,7 @@ import { WorkOrderOverviewCard } from "./work-order-overview-card";
 import { WorkOrderLocationCard } from "./work-order-location-card";
 import { WorkOrderSchedulingCard } from "./work-order-scheduling-card";
 import { WorkOrderChecklistCard } from "./work-order-checklist-card";
+import { WorkOrderMaterialsCard } from "./work-order-materials-card";
 import { WorkOrderPartsCard } from "./work-order-parts-card";
 import { WorkOrderCostSummary } from "./work-order-cost-summary";
 import { WorkOrderNotesCard } from "./work-order-notes-card";
@@ -78,6 +79,9 @@ type WorkOrderDetailViewProps = {
     cost: number | null;
     quantity: number;
   }[];
+  materialLines: import("../actions").WorkOrderMaterialLineWithAvailability[];
+  productsForMaterials: { id: string; name: string; sku: string | null; default_cost: number | null }[];
+  stockLocationsForMaterials: { id: string; name: string }[];
   laborMinutes?: number | null;
 };
 
@@ -320,6 +324,14 @@ export function WorkOrderDetailView({
             onToggle={toggleChecklist}
             onItemsChange={() => router.refresh()}
             isPending={isPending}
+          />
+          <WorkOrderMaterialsCard
+            workOrderId={id}
+            companyId={String(workOrder.company_id ?? "")}
+            materialLines={materialLines}
+            products={productsForMaterials}
+            stockLocations={stockLocationsForMaterials}
+            onMaterialsChange={() => router.refresh()}
           />
           <WorkOrderPartsCard
             workOrderId={id}

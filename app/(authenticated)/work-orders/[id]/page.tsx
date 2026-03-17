@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/src/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getWorkOrderMaterialLinesWithAvailability } from "../actions";
 import { WorkOrderDetailView, type PartUsageForDetail } from "../components/work-order-detail-view";
 import {
   calculateWorkOrderSlaSnapshot,
@@ -197,9 +198,18 @@ export default async function WorkOrderDetailPage({
 
   const { data: stockLocations } = await supabase
     .from("stock_locations")
-    .select("id")
-    .eq("company_id", companyId);
+    .select("id, name")
+    .eq("company_id", companyId)
+    .eq("active", true)
+    .order("name", { ascending: true });
   const stockLocationIds = (stockLocations ?? []).map((row) => (row as { id: string }).id);
+  const { data: materialLines } = await getWorkOrderMaterialLinesWithAvailability(id);
+  const { data: productsForMaterials } = await supabase
+    .from("products")
+    .select("id, name, sku, default_cost")
+    .eq("company_id", companyId)
+    .eq("active", true)
+    .order("name", { ascending: true });
   const { data: inventoryItems } = stockLocationIds.length
     ? await supabase
         .from("inventory_balances")
@@ -327,6 +337,17 @@ export default async function WorkOrderDetailPage({
         vendors={vendorOptions}
         sla={sla}
         laborMinutes={laborMinutes}
+        materialLines={materialLines ?? []}
+        productsForMaterials={(productsForMaterials ?? []).map((p) => ({
+          id: (p as { id: string }).id,
+          name: (p as { name: string }).name,
+          sku: (p as { sku?: string | null }).sku ?? null,
+          default_cost: (p as { default_cost?: number | null }).default_cost ?? null,
+        }))}
+        stockLocationsForMaterials={(stockLocations ?? []).map((row) => ({
+          id: (row as { id: string }).id,
+          name: (row as { name: string }).name,
+        }))}
         inventoryItems={((inventoryItems ?? []).map((row) => {
           const record = row as Record<string, unknown>;
           const product = Array.isArray(record.products) ? record.products[0] : record.products;

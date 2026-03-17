@@ -65,12 +65,12 @@ export function TourOverlay() {
         />
       )}
 
-      {/* Step card — polished B2B style */}
+      {/* Step card — polished B2B style; responsive padding on small screens */}
       <div
         className="fixed z-[201] w-full max-w-[28rem] px-4 pointer-events-auto"
         style={getStepCardPosition(targetRect)}
       >
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.06)] p-6">
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.2),0_0_0_1px_rgba(15,23,42,0.06)] p-5 sm:p-6">
           {/* Progress bar */}
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--background)]">

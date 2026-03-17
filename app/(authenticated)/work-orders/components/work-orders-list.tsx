@@ -21,6 +21,8 @@ import { ActionBar } from "@/src/components/ui/action-bar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 import { Hint } from "@/src/components/ui/hint";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
+import { HelpDrawer } from "@/src/components/ui/help-drawer";
+import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 
 import { formatDate } from "@/src/lib/date-utils";
 import type {
@@ -130,6 +132,7 @@ export function WorkOrdersList({
   const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [slaModalOpen, setSlaModalOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
 
@@ -342,6 +345,12 @@ export function WorkOrdersList({
           </Tooltip>
           <Tooltip placement="bottom">
             <TooltipTrigger>
+              <HelpTriggerButton onClick={() => setHelpOpen(true)} />
+            </TooltipTrigger>
+            <TooltipContent>Open a simple guide for this screen</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
           <button
             type="button"
             onClick={() => setSlaModalOpen(true)}
@@ -538,6 +547,15 @@ export function WorkOrdersList({
                         : ""
                     }`}
                   >
+                    <td className="w-10 px-2 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(wo.id)}
+                        onChange={() => toggleSelect(wo.id)}
+                        aria-label={`Select ${wo.title ?? wo.id}`}
+                        className="rounded border-[var(--card-border)]"
+                      />
+                    </td>
                     <td className="px-4 py-3.5">
                       <Link
                         href={`/work-orders/${wo.id}`}
@@ -641,6 +659,74 @@ export function WorkOrdersList({
           setDetailDrawerRow(null);
         }}
       />
+
+      <HelpDrawer
+        title="How to use Work Orders"
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+      >
+        <p className="mb-3 text-sm text-[var(--muted)]">
+          This screen is your home base for managing maintenance jobs. Use it to see what work
+          exists, who it is assigned to, and what needs attention today.
+        </p>
+
+        <h3 className="mb-1 text-sm font-semibold">What this screen is for</h3>
+        <p className="mb-3">
+          The Work Orders screen tracks individual maintenance jobs that need to be done. Each row
+          represents a task with a status, priority, and assignment.
+        </p>
+
+        <h3 className="mb-1 text-sm font-semibold">Who typically uses it</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>Maintenance supervisors</li>
+          <li>Dispatchers</li>
+          <li>Technicians</li>
+          <li>Operations managers</li>
+        </ul>
+
+        <h3 className="mb-1 text-sm font-semibold">Key things you can do</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>See all work orders for your tenant.</li>
+          <li>Filter by status, priority, technician, and more.</li>
+          <li>Open a work order to see full details.</li>
+          <li>Update status, schedule, and assignment where you have permission.</li>
+        </ul>
+
+        <h3 className="mb-1 text-sm font-semibold">Layout overview</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>
+            <strong>Top bar</strong>: title, quick actions, and saved views.
+          </li>
+          <li>
+            <strong>Filters</strong>: choose presets such as Open, In Progress, Overdue, or use
+            detailed filters.
+          </li>
+          <li>
+            <strong>Table</strong>: each row is a work order with key fields like number, title,
+            status, location, and assigned person.
+          </li>
+        </ul>
+
+        <h3 className="mb-1 text-sm font-semibold">How to review today&apos;s work</h3>
+        <ol className="mb-3 list-decimal space-y-1 pl-5">
+          <li>Use the preset views or filters to show open or overdue work.</li>
+          <li>Scan the table for high-priority or overdue jobs.</li>
+          <li>Click a row to open details in the drawer.</li>
+          <li>Update status or assignment as needed.</li>
+        </ol>
+
+        <h3 className="mb-1 text-sm font-semibold">Typical flow</h3>
+        <p className="mb-1">
+          Request submitted → Work order created → Scheduled and assigned → Completed.
+        </p>
+
+        <h3 className="mb-1 text-sm font-semibold">Tips</h3>
+        <ul className="mb-2 list-disc space-y-1 pl-5">
+          <li>Use clear titles so work is easy to find later.</li>
+          <li>Keep statuses up to date so the board reflects reality.</li>
+          <li>Link work orders to assets when possible so history is complete.</li>
+        </ul>
+      </HelpDrawer>
 
       {assigningWorkOrder && (
         <WorkOrderAssignmentModal

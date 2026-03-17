@@ -10,7 +10,7 @@ export default async function PlatformAdminLayout({
 }) {
   const supabase = await getSupabaseClient();
   const allowed = await isPlatformSuperAdmin(supabase);
-  if (!allowed) redirect("/dashboard");
+  if (!allowed) redirect("/operations");
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -18,7 +18,7 @@ export default async function PlatformAdminLayout({
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Platform Admin</h1>
           <Link
-            href="/dashboard"
+            href="/operations"
             className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]"
           >
             ← Back to app

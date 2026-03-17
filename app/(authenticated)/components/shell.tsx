@@ -18,6 +18,7 @@ type ShellProps = {
   children: React.ReactNode;
   tenantName: string;
   companyName: string;
+  userName: string;
   showPlatformAdmin?: boolean;
   impersonationBanner?: { actingAsName: string; companyName: string } | null;
   completedTourIds?: string[];
@@ -28,6 +29,7 @@ export function Shell({
   children,
   tenantName,
   companyName,
+  userName,
   showPlatformAdmin = false,
   impersonationBanner = null,
   completedTourIds = [],
@@ -84,14 +86,17 @@ export function Shell({
   return (
     <TooltipProvider>
       <GuidedTourProvider
-        autoShow={isDemoGuest && !isScreenshotMode}
+        autoShow={false}
         onTourActive={handleTourActive}
       >
         <TourProvider completedTourIds={effectiveCompletedIds}>
           <TourOverlay />
           {!isScreenshotMode && <GuidedTour />}
           {isDemoGuest && !isScreenshotMode && (
-            <DemoWelcomeModal isDemoGuest={isDemoGuest} />
+            <DemoWelcomeModal
+              isDemoGuest={isDemoGuest}
+              onStartGuidedTour={handleTourActive}
+            />
           )}
           <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
             {!isDispatchFullscreen ? (
@@ -114,10 +119,11 @@ export function Shell({
                 <TopBar
                   tenantName={tenantName}
                   companyName={companyName}
+                  userName={userName}
                   onMenuClick={() => setSidebarOpen(true)}
                   isImpersonating={!!impersonationBanner}
                   onReturnToProfile={
-                    impersonationBanner ? () => endImpersonation("/dashboard") : undefined
+                    impersonationBanner ? () => endImpersonation("/operations") : undefined
                   }
                 />
               ) : null}
@@ -131,7 +137,7 @@ export function Shell({
                 {isDispatchFullscreen ? (
                   <div className="h-full min-h-0 flex-1 px-2 py-2">{children}</div>
                 ) : (
-                  <div className="mx-auto flex min-h-0 min-w-0 max-w-[1400px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
+                  <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-full lg:max-w-[1200px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-6">
                     {children}
                   </div>
                 )}

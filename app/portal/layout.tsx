@@ -19,7 +19,7 @@ export default async function PortalLayout({
   );
   if (!context) redirect("/login");
   if (!context.isPortalOnlyUser && !context.impersonation) {
-    redirect("/dashboard");
+    redirect("/operations");
   }
 
   const technicianName = context.technicianName ?? "Technician";

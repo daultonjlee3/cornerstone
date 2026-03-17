@@ -1,59 +1,54 @@
 import type { TourConfig } from "./types";
 
-/** 6-step guided demo tour: workflow narrative across dashboard → work orders → dispatch → execution → completion → assets. */
+/**
+ * 5-step product-led walkthrough: Operations → Work Orders → Dispatch → Work Queue → Asset Intelligence.
+ * ~2 min. Outcome-focused copy; skip anytime.
+ */
 export const demoGuidedTourConfig: TourConfig = {
   id: "demo-guided",
-  name: "2-Minute Guided Tour",
-  path: "/dashboard",
+  name: "How maintenance runs here",
+  path: "/operations",
   autoStart: false,
   steps: [
     {
       id: "command-center",
-      path: "/dashboard",
-      title: "Your maintenance operation, in one place",
+      path: "/operations",
+      title: "Operations Center",
       content:
-        "The Command Center gives you real-time visibility into open work orders, technician activity, overdue work, and scheduled maintenance.",
-      cta: "Next: See how work starts",
+        "Open, overdue, and scheduled work in one place. Start the day knowing what needs attention.",
+      cta: "Next",
     },
     {
       id: "work-orders",
       path: "/work-orders",
-      title: "Every job starts as a work order",
+      title: "Work Orders",
       content:
-        "Track maintenance requests from creation through completion. Work orders help your team stay organized, accountable, and on schedule.",
-      cta: "Next: Dispatch the right technician",
+        "Every request becomes a work order—linked to assets and locations. Track from creation to completion.",
+      cta: "Next",
     },
     {
       id: "dispatch",
       path: "/dispatch",
-      title: "Dispatch the right technician at the right time",
+      title: "Dispatch",
       content:
-        "Assign work, manage schedules, and keep field teams moving efficiently with full visibility into the day's workload.",
-      cta: "Next: See the technician workflow",
+        "Dispatch by technician, availability, or workload. Schedule the day; the map drives routes.",
+      cta: "Next",
     },
     {
-      id: "execution",
-      path: "/work-orders",
-      title: "Technicians get the context they need to execute",
+      id: "technician-execution",
+      path: "/technicians/work-queue",
+      title: "Work Queue",
       content:
-        "Each work order gives technicians the job details, asset context, history, and updates they need to complete work efficiently.",
-      cta: "Next: Track completion automatically",
+        "Technicians run their queue from the field—status, notes, photos, close. Execution feeds back in real time.",
+      cta: "Next",
     },
     {
-      id: "completion",
-      path: "/work-orders",
-      title: "Completion updates the system automatically",
+      id: "asset-intelligence",
+      path: "/assets/intelligence",
+      title: "Asset Intelligence",
       content:
-        "As work is completed, status changes, timestamps, and activity logs are captured for operational visibility and accountability.",
-      cta: "Next: Build asset history",
-    },
-    {
-      id: "asset-history",
-      path: "/assets",
-      title: "Every completed job builds asset history",
-      content:
-        "Cornerstone helps teams track maintenance history, equipment performance, and service trends so they can make smarter decisions over time.",
-      cta: "Finish Tour",
+        "Completed work builds asset history. Labor, backlog, and performance in one place—act on data, not guesswork.",
+      cta: "Finish",
     },
   ],
 };
@@ -61,32 +56,32 @@ export const demoGuidedTourConfig: TourConfig = {
 export const tourConfigs: TourConfig[] = [
   {
     id: "dashboard",
-    name: "Dashboard",
-    path: "/dashboard",
+    name: "Operations Center",
+    path: "/operations",
     steps: [
       {
         id: "overview",
         title: "Operations overview",
         content:
-          "This is your operations command center. Key metrics and alerts are summarized here so you can see workload and issues at a glance.",
+          "Open, overdue, and scheduled work in one place. Workload and issues at a glance.",
       },
       {
         id: "metrics",
         title: "Metrics",
         content:
-          "These cards show open work orders, in-progress jobs, completed today, overdue count, and active technicians. Use them to prioritize and balance workload.",
+          "Open work orders, in progress, completed today, overdue, active technicians. Prioritize and balance from here.",
       },
       {
         id: "urgent",
         title: "Urgent work",
         content:
-          "Operational alerts highlight overdue work orders, high-priority jobs not started, PM due soon, repeated failures, and low stock. Act on these first.",
+          "Overdue work, high-priority not started, PM due soon, repeated failures, low stock. Act first on what matters.",
       },
       {
         id: "quick-actions",
         title: "Quick actions",
         content:
-          "Jump to reports, open the dispatch board to schedule field work, or go straight to the work order list to triage and assign tasks.",
+          "Reports, dispatch, work orders. One click to where the work is.",
       },
     ],
   },

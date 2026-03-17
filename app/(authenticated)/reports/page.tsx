@@ -32,8 +32,8 @@ export default async function ReportsPage() {
             <Link href="/reports/operations">
               <Button variant="secondary">Operations Intelligence</Button>
             </Link>
-            <Link href="/dashboard">
-              <Button variant="secondary">Dashboard</Button>
+            <Link href="/operations">
+              <Button variant="secondary">Operations Center</Button>
             </Link>
           </div>
         }

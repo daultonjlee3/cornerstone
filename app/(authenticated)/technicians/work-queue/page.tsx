@@ -235,7 +235,7 @@ export default async function TechnicianWorkQueuePage({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="demo-guided:technician-execution">
       <PageHeader
         icon={<ListChecks className="size-5" />}
         title="Technician Work Queue"

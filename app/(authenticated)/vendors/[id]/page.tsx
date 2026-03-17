@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { VendorPriceCatalog } from "../components/vendor-price-catalog";
 
 export const metadata = {
   title: "Vendor Detail | Cornerstone Tech",
@@ -27,24 +28,36 @@ export default async function VendorDetailPage({
   const vendorCompanyId = (vendorRow as { company_id?: string | null }).company_id ?? null;
   if (!vendorCompanyId || !scope.companyIds.includes(vendorCompanyId)) notFound();
 
-  const [productsResult, purchaseOrdersResult, vendorWorkOrdersResult] = await Promise.all([
-    scope.supabase
-      .from("products")
-      .select("id, name, sku, active")
-      .eq("default_vendor_id", id)
-      .order("name", { ascending: true })
-      .limit(10),
-    scope.supabase
-      .from("purchase_orders")
-      .select("id, po_number, status, order_date, expected_delivery_date, total_cost")
-      .eq("vendor_id", id)
-      .order("created_at", { ascending: false })
-      .limit(10),
-    scope.supabase
-      .from("work_orders")
-      .select("status, response_time_minutes, vendor_cost")
-      .eq("vendor_id", id),
-  ]);
+  const [productsResult, purchaseOrdersResult, vendorWorkOrdersResult, vendorPricingResult, companyProductsResult] =
+    await Promise.all([
+      scope.supabase
+        .from("products")
+        .select("id, name, sku, active")
+        .eq("default_vendor_id", id)
+        .order("name", { ascending: true })
+        .limit(10),
+      scope.supabase
+        .from("purchase_orders")
+        .select("id, po_number, status, order_date, expected_delivery_date, total_cost")
+        .eq("vendor_id", id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      scope.supabase
+        .from("work_orders")
+        .select("status, response_time_minutes, vendor_cost")
+        .eq("vendor_id", id),
+      scope.supabase
+        .from("vendor_pricing")
+        .select("id, vendor_id, product_id, vendor_item_name, vendor_sku, unit_cost, taxable_override, preferred, lead_time_days, notes, products(name, sku, taxable_default)")
+        .eq("vendor_id", id)
+        .order("updated_at", { ascending: false }),
+      scope.supabase
+        .from("products")
+        .select("id, name, sku, taxable_default")
+        .eq("company_id", vendorCompanyId)
+        .eq("active", true)
+        .order("name", { ascending: true }),
+    ]);
 
   const vendorMetrics = (vendorWorkOrdersResult.data ?? []).reduce(
     (acc, row) => {
@@ -87,6 +100,34 @@ export default async function VendorDetailPage({
   const companyObj = Array.isArray((vendorRow as Record<string, unknown>).companies)
     ? ((vendorRow as Record<string, unknown>).companies as unknown[])[0]
     : (vendorRow as Record<string, unknown>).companies;
+
+  const pricingEntries = (vendorPricingResult.data ?? []).map((row) => {
+    const r = row as Record<string, unknown>;
+    const product = Array.isArray(r.products) ? (r.products as unknown[])[0] : r.products;
+    const p = product as Record<string, unknown> | null;
+    return {
+      id: r.id as string,
+      vendor_id: r.vendor_id as string,
+      product_id: r.product_id as string,
+      vendor_item_name: (r.vendor_item_name as string | null) ?? null,
+      vendor_sku: (r.vendor_sku as string | null) ?? null,
+      unit_cost: Number(r.unit_cost ?? 0),
+      taxable_override: r.taxable_override as boolean | null,
+      preferred: Boolean(r.preferred),
+      lead_time_days: (r.lead_time_days as number | null) ?? null,
+      notes: (r.notes as string | null) ?? null,
+      product_name: p?.name as string | undefined,
+      product_sku: (p?.sku as string | null) ?? null,
+      product_taxable_default: p?.taxable_default !== false,
+    };
+  });
+
+  const companyProducts = (companyProductsResult.data ?? []).map((row) => ({
+    id: (row as { id: string }).id,
+    name: (row as { name: string }).name,
+    sku: (row as { sku?: string | null }).sku ?? null,
+    taxable_default: (row as { taxable_default?: boolean }).taxable_default !== false,
+  }));
 
   return (
     <div className="space-y-6">
@@ -276,6 +317,14 @@ export default async function VendorDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <VendorPriceCatalog
+        vendorId={id}
+        vendorName={(vendorRow as { name?: string }).name ?? "Vendor"}
+        companyId={vendorCompanyId}
+        entries={pricingEntries}
+        products={companyProducts}
+      />
     </div>
   );
 }

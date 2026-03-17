@@ -16,7 +16,7 @@ function AuthCallbackContent() {
 
   useEffect(() => {
     if (handled.current) return;
-    const next = searchParams.get("next") || "/dashboard";
+    const next = searchParams.get("next") || "/operations";
     const code = searchParams.get("code");
 
     const supabase = createClient();
@@ -32,7 +32,7 @@ function AuthCallbackContent() {
             return;
           }
           setStatus("done");
-          router.replace(next.startsWith("/") ? next : "/dashboard");
+          router.replace(next.startsWith("/") ? next : "/operations");
         })
         .catch(() => {
           setStatus("error");
@@ -59,7 +59,7 @@ function AuthCallbackContent() {
             }
             setStatus("done");
             window.history.replaceState(null, "", next);
-            router.replace(next.startsWith("/") ? next : "/dashboard");
+            router.replace(next.startsWith("/") ? next : "/operations");
           })
           .catch(() => {
             setStatus("error");
@@ -73,7 +73,7 @@ function AuthCallbackContent() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setStatus("done");
-        router.replace(next.startsWith("/") ? next : "/dashboard");
+        router.replace(next.startsWith("/") ? next : "/operations");
       } else {
         setStatus("error");
       }

@@ -83,7 +83,7 @@ type SidebarProps = {
 };
 
 function isActive(href: string, pathname: string): boolean {
-  if (href === "/dashboard") return pathname === "/dashboard";
+  if (href === "/operations") return pathname === "/operations";
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -135,7 +135,7 @@ export function Sidebar({
           ) : (
             <>
               <Link
-                href="/dashboard"
+                href="/operations"
                 className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-2 pr-1 transition-colors hover:bg-[var(--background)]/80"
               >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)]">

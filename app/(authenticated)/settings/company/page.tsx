@@ -6,7 +6,7 @@ export default async function SettingsCompanyPage() {
   const supabase = await createClient();
   const ctx = await getAuthContext(supabase);
   const tenantId = ctx.tenantId;
-  if (!tenantId) redirect("/dashboard");
+  if (!tenantId) redirect("/operations");
 
   const { data: tenant } = await supabase
     .from("tenants")

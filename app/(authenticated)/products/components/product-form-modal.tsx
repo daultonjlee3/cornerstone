@@ -17,6 +17,7 @@ export type ProductRecord = {
   default_vendor_id: string | null;
   default_cost: number | null;
   reorder_point_default: number | null;
+  taxable_default: boolean;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -47,6 +48,7 @@ const emptyProduct: ProductRecord = {
   default_vendor_id: null,
   default_cost: null,
   reorder_point_default: null,
+  taxable_default: true,
   active: true,
   created_at: "",
   updated_at: "",
@@ -162,6 +164,16 @@ export function ProductFormModal({
             defaultValue={row.reorder_point_default ?? ""}
             className="ui-input"
           />
+        </FormField>
+        <FormField label="Default taxable" description="Default taxability when no vendor override is set.">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="taxable_default"
+              defaultChecked={row.taxable_default !== false}
+            />
+            <span className="text-sm text-[var(--foreground)]">Product is taxable by default</span>
+          </label>
         </FormField>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="active" defaultChecked={row.active} />

@@ -1,7 +1,8 @@
 /**
  * Navigation configuration for the app shell sidebar.
  * Icon keys are resolved in the Sidebar component via lucide-react.
- * Groups follow modern SaaS patterns: Operations, Assets, People, Supply, Admin, Analytics.
+ * Groups: Operations, Assets, People, Supply, Analytics, Admin.
+ * Operations Center is the primary landing page (/operations).
  */
 
 export type NavItem = {
@@ -23,16 +24,14 @@ export const navConfig: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard", tourId: "dashboard" },
-      { label: "Work Orders", href: "/work-orders", icon: "ClipboardList", tourId: "work-orders" },
+      { label: "Operations Center", href: "/operations", icon: "LayoutGrid", tourId: "dashboard" },
       { label: "Dispatch", href: "/dispatch", icon: "Truck", tourId: "dispatch" },
+      { label: "Work Orders", href: "/work-orders", icon: "ClipboardList", tourId: "work-orders" },
       { label: "Work Requests", href: "/requests", icon: "Inbox" },
       { label: "Request Portal", href: "/request", icon: "ExternalLink" },
-      { label: "Asset Intelligence", href: "/assets/intelligence", icon: "Activity" },
-      { label: "Technician Work Queue", href: "/technicians/work-queue", icon: "ListTodo" },
+      { label: "Work Queue", href: "/technicians/work-queue", icon: "ListTodo" },
       { label: "Technician Portal", href: "/portal", icon: "Smartphone" },
-      { label: "Operations Center", href: "/operations", icon: "LayoutGrid" },
-      { label: "Onboarding Wizard", href: "/onboarding-wizard", icon: "Sparkles" },
+      { label: "Asset Intelligence", href: "/assets/intelligence", icon: "Activity" },
     ],
   },
   {
@@ -41,6 +40,9 @@ export const navConfig: NavGroup[] = [
     items: [
       { label: "Assets", href: "/assets", icon: "Box", tourId: "assets" },
       { label: "Preventive Maintenance", href: "/preventive-maintenance", icon: "CalendarCheck", tourId: "preventive-maintenance" },
+      { label: "Properties", href: "/properties", icon: "MapPin" },
+      { label: "Buildings", href: "/buildings", icon: "Building2" },
+      { label: "Units", href: "/units", icon: "Layers" },
     ],
   },
   {
@@ -56,19 +58,9 @@ export const navConfig: NavGroup[] = [
     secondary: true,
     items: [
       { label: "Inventory", href: "/inventory", icon: "Warehouse", tourId: "inventory" },
-      { label: "Vendors", href: "/vendors", icon: "Store", tourId: "vendors" },
       { label: "Products", href: "/products", icon: "Package" },
+      { label: "Vendors", href: "/vendors", icon: "Store", tourId: "vendors" },
       { label: "Purchase Orders", href: "/purchase-orders", icon: "ShoppingCart", tourId: "purchase-orders" },
-    ],
-  },
-  {
-    label: "Admin",
-    secondary: true,
-    items: [
-      { label: "Companies", href: "/companies", icon: "Building" },
-      { label: "Properties", href: "/properties", icon: "MapPin" },
-      { label: "Buildings", href: "/buildings", icon: "Building2" },
-      { label: "Units", href: "/units", icon: "Layers" },
     ],
   },
   {
@@ -80,16 +72,12 @@ export const navConfig: NavGroup[] = [
     ],
   },
   {
-    label: "Business",
+    label: "Admin",
     secondary: true,
     items: [
+      { label: "Companies", href: "/companies", icon: "Building" },
+      { label: "Onboarding Wizard", href: "/onboarding-wizard", icon: "Sparkles" },
       { label: "Customers", href: "/customers", icon: "UserCircle" },
-    ],
-  },
-  {
-    label: "Financial",
-    secondary: true,
-    items: [
       { label: "Contracts", href: "/dashboard/contracts", icon: "FileText" },
       { label: "Invoices", href: "/dashboard/invoices", icon: "Receipt" },
     ],

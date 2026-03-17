@@ -51,11 +51,11 @@ export default function AuthenticatedError({
           Try again
         </button>
         <Link
-          href="/dashboard"
+          href="/operations"
           className="inline-flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-5 py-2.5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
         >
           <Home className="h-4 w-4" aria-hidden />
-          Go to dashboard
+          Go to Operations Center
         </Link>
       </div>
     </div>

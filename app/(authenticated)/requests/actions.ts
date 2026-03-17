@@ -3,7 +3,8 @@
 import { Buffer } from "node:buffer";
 import { revalidatePath } from "next/cache";
 import { insertActivityLog } from "@/src/lib/activity-logs";
-import { createTenantNotification, sendEmailAlert } from "@/src/lib/notifications";
+import { dispatchNotificationEvent } from "@/src/lib/notifications/dispatch";
+import { sendEmailAlert, getCompanyAlertRecipients } from "@/src/lib/notifications";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { saveWorkOrder } from "@/app/(authenticated)/work-orders/actions";
 
@@ -35,30 +36,6 @@ function buildWorkOrderTitle(description: string, location: string): string {
   const preferred = description.trim().slice(0, 80);
   if (preferred) return preferred;
   return `Work request at ${location.trim().slice(0, 60)}`;
-}
-
-async function getCompanyAlertRecipients(
-  supabase: Awaited<ReturnType<typeof resolveProcurementScope>>["supabase"],
-  companyId: string
-): Promise<string[]> {
-  const { data: company } = await supabase
-    .from("companies")
-    .select("email, primary_contact_email")
-    .eq("id", companyId)
-    .limit(1)
-    .maybeSingle();
-  if (!company) return [];
-  const payload = company as {
-    email?: string | null;
-    primary_contact_email?: string | null;
-  };
-  return Array.from(
-    new Set(
-      [payload.email ?? null, payload.primary_contact_email ?? null].filter(
-        (email): email is string => Boolean(email && email.includes("@"))
-      )
-    )
-  );
 }
 
 export async function submitWorkRequest(
@@ -164,20 +141,19 @@ export async function submitWorkRequest(
   });
 
   try {
-    await createTenantNotification(scope.supabase, {
+    const msg = `New maintenance request submitted: ${requesterName} (${location}).`;
+    await dispatchNotificationEvent(scope.supabase, {
       tenantId: scope.tenantId,
-      type: "maintenance_request_created",
+      companyId: resolvedCompanyId,
+      eventType: "work_request.submitted",
       entityType: "work_request",
       entityId: requestId,
-      message: `New maintenance request submitted: ${requesterName} (${location}).`,
-      metadata: {
-        company_id: resolvedCompanyId,
-        requester_name: requesterName,
-        requester_email: requesterEmail.toLowerCase(),
-      },
+      title: msg,
+      message: msg,
+      includeAllTenantMembers: true,
     });
 
-    const recipients = await getCompanyAlertRecipients(scope.supabase, resolvedCompanyId);
+    const recipients = await getCompanyAlertRecipients(scope.supabase, [resolvedCompanyId]);
     await sendEmailAlert({
       subject: "Maintenance request created",
       message: `${requesterName} submitted a maintenance request at ${location}: ${description}`,

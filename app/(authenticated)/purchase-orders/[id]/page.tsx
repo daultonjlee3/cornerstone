@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
+import { getVendorInvoicesForPurchaseOrder } from "../actions";
 import { PurchaseOrderDetailView } from "../components/purchase-order-detail-view";
 import type { PurchaseOrderRecord } from "../components/purchase-order-form-modal";
 
@@ -34,7 +35,7 @@ export default async function PurchaseOrderDetailPage({
     scope.supabase
       .from("purchase_order_lines")
       .select(
-        "id, purchase_order_id, product_id, description, quantity, unit_price, unit_cost_snapshot, line_total, received_quantity"
+        "id, purchase_order_id, product_id, description, quantity, unit_price, unit_cost_snapshot, line_total, received_quantity, taxable_snapshot"
       )
       .eq("purchase_order_id", id)
       .order("created_at", { ascending: true }),
@@ -95,6 +96,7 @@ export default async function PurchaseOrderDetailPage({
       null,
     line_total: (row as { line_total?: number | null }).line_total ?? null,
     received_quantity: Number((row as { received_quantity?: number }).received_quantity ?? 0),
+    taxable_snapshot: (row as { taxable_snapshot?: boolean | null }).taxable_snapshot ?? null,
   }));
 
   const poLineIds = lines.map((line) => line.id);
@@ -145,6 +147,8 @@ export default async function PurchaseOrderDetailPage({
     location_type: (row as { location_type?: string | null }).location_type ?? null,
   }));
 
+  const { data: vendorInvoices } = await getVendorInvoicesForPurchaseOrder(id);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -175,6 +179,7 @@ export default async function PurchaseOrderDetailPage({
         products={products}
         stockLocations={stockLocations}
         receivingHistory={receivingHistory}
+        vendorInvoices={vendorInvoices ?? []}
       />
     </div>
   );

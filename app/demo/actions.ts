@@ -121,7 +121,7 @@ export async function enterDemoAction(
       ? rawEnvUrl
       : defaultProdUrl
     : rawEnvUrl || SITE_URL || defaultDevUrl;
-  const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=/dashboard`;
+  const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=/operations`;
 
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: "magiclink",

@@ -74,6 +74,7 @@ export default async function AuthenticatedLayout({
     completedTourIds,
     isDemoGuest,
     actingUserResult,
+    displayUserResult,
   ] = await Promise.all([
     supabase
       .from("users")
@@ -91,8 +92,7 @@ export default async function AuthenticatedLayout({
       .maybeSingle(),
     getCompletedTourIds(),
     isDemoGuestUser(supabase, user.id),
-    // Fetch impersonation banner data in the same round-trip if needed,
-    // otherwise resolve immediately.
+    // Impersonation banner: name of user being acted as
     impersonationState?.actingAsUserId
       ? supabase
           .from("users")
@@ -100,6 +100,12 @@ export default async function AuthenticatedLayout({
           .eq("id", impersonationState.actingAsUserId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // Display user name in top bar (acting user: self or impersonated)
+    supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", effectiveUserId)
+      .maybeSingle(),
   ]);
 
   // ── Derive values from phase-3 results ────────────────────────────────────
@@ -123,9 +129,14 @@ export default async function AuthenticatedLayout({
     (Array.isArray(tenantData) ? tenantData[0]?.name : tenantData?.name) ?? "Organization";
 
   const companyName = companyResult.data?.name ?? "—";
-
+  const displayUser = displayUserResult?.data as { full_name?: string | null } | null;
+  const userName =
+    (displayUser?.full_name?.trim() && displayUser.full_name) ||
+    (user.email ?? "User");
   // isSuperAdmin already computed in phase 1 — reuse it, don't query again.
   const showPlatformAdmin = isSuperAdmin;
+  // Super admins should never be treated as demo guests; they must see full nav (including Settings).
+  const effectiveIsDemoGuest = isSuperAdmin ? false : isDemoGuest;
 
   let impersonationBanner: { actingAsName: string; companyName: string } | null = null;
   if (impersonationState?.actingAsUserId) {
@@ -138,10 +149,11 @@ export default async function AuthenticatedLayout({
     <Shell
       tenantName={tenantName}
       companyName={companyName}
+      userName={userName}
       showPlatformAdmin={showPlatformAdmin}
       impersonationBanner={impersonationBanner}
       completedTourIds={completedTourIds}
-      isDemoGuest={isDemoGuest}
+      isDemoGuest={effectiveIsDemoGuest}
     >
       {children}
     </Shell>

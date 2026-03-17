@@ -51,7 +51,7 @@ export default async function AssetIntelligencePage({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="demo-guided:asset-intelligence">
       <PageHeader
         variant="surface"
         icon={<Cpu className="size-5" />}

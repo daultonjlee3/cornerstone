@@ -77,5 +77,5 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   if (isPortalOnly) {
     redirect("/portal");
   }
-  redirect(next && next.startsWith("/") ? next : "/dashboard");
+  redirect(next && next.startsWith("/") ? next : "/operations");
 }

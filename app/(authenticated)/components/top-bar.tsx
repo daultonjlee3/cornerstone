@@ -22,7 +22,7 @@ function notificationHref(item: NotificationItem): string {
   if (item.entity_type === "preventive_maintenance_plan") {
     return `/preventive-maintenance/${item.entity_id}`;
   }
-  return "/dashboard";
+  return "/operations";
 }
 
 function formatWhen(value: string): string {
@@ -39,14 +39,25 @@ function formatWhen(value: string): string {
 type TopBarProps = {
   tenantName: string;
   companyName: string;
+  userName: string;
   onMenuClick: () => void;
   isImpersonating?: boolean;
   onReturnToProfile?: () => void;
 };
 
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
+  }
+  if (parts[0]) return parts[0].slice(0, 2).toUpperCase();
+  return name.slice(0, 2).toUpperCase() || "?";
+}
+
 export function TopBar({
   tenantName,
   companyName,
+  userName,
   onMenuClick,
   isImpersonating = false,
   onReturnToProfile,
@@ -72,7 +83,7 @@ export function TopBar({
     [searchQuery, router]
   );
 
-  const initials = `${tenantName.slice(0, 1)}${companyName.slice(0, 1)}`.toUpperCase();
+  const initials = initialsFromName(userName);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -258,8 +269,8 @@ export function TopBar({
           ) : null}
         </div>
         <div className="hidden text-right sm:block">
-          <p className="text-xs text-[var(--muted)]">{tenantName}</p>
-          <p className="text-xs font-medium text-[var(--foreground)]">{companyName}</p>
+          <p className="text-xs font-medium text-[var(--foreground)]">{userName}</p>
+          <p className="text-xs text-[var(--muted)]">{companyName}</p>
         </div>
         <div className="relative" ref={accountRef}>
           <button

@@ -19,7 +19,7 @@ test.describe('Marketing screenshots from demo environment', () => {
     test.setTimeout(60_000);
 
     // 1. Enter demo via password-based login (no magic link). Uses existing healthcare seeded demo.
-    await page.goto(`${BASE_URL}/login?demo=healthcare&next=/dashboard`);
+    await page.goto(`${BASE_URL}/login?demo=healthcare&next=/operations`);
     await page.waitForLoadState('domcontentloaded');
 
     await page.getByLabel('Email').fill('healthcare-demo@cornerstonecmms.com');
@@ -47,7 +47,7 @@ test.describe('Marketing screenshots from demo environment', () => {
 
     // 5. Screenshots
     await page.screenshot({
-      path: 'screenshots/dashboard.png',
+      path: 'screenshots/operations-center.png',
       fullPage: true,
     });
 

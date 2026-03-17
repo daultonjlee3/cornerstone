@@ -2,7 +2,13 @@ import { Settings } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser, getTenantIdForUser, getMembershipRoleForUser, isDemoGuestUser } from "@/src/lib/auth-context";
+import {
+  getCurrentUser,
+  getTenantIdForUser,
+  getMembershipRoleForUser,
+  isDemoGuestUser,
+  isPlatformSuperAdmin,
+} from "@/src/lib/auth-context";
 import { PageHeader } from "@/src/components/ui/page-header";
 
 const settingsNav = [
@@ -22,15 +28,18 @@ export default async function SettingsLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const isSuperAdmin = await isPlatformSuperAdmin(supabase);
+
   const tenantId = await getTenantIdForUser(supabase, user.id);
-  if (!tenantId) redirect("/onboarding");
+  if (!tenantId && !isSuperAdmin) redirect("/onboarding");
 
   const isDemoGuest = await isDemoGuestUser(supabase, user.id);
-  if (isDemoGuest) redirect("/dashboard");
+  // Super admins should be able to access Settings even if their membership is marked demo_guest.
+  if (isDemoGuest && !isSuperAdmin) redirect("/operations");
 
   const role = await getMembershipRoleForUser(supabase, user.id);
-  const canAccess = role === "owner" || role === "admin";
-  if (!canAccess) redirect("/dashboard");
+  const canAccess = isSuperAdmin || role === "owner" || role === "admin";
+  if (!canAccess) redirect("/operations");
 
   return (
     <div className="space-y-6">

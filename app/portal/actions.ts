@@ -71,5 +71,5 @@ export async function restoreMainAppAccessAction(
       .eq("tenant_id", tenantId);
   }
 
-  redirect("/dashboard");
+  redirect("/operations");
 }

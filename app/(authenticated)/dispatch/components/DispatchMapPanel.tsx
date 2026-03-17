@@ -18,6 +18,7 @@ import type {
   DispatchWorkforce,
 } from "../dispatch-data";
 import type { DispatchFilterState } from "../filter-state";
+import type { DispatchViewMode } from "../filter-state";
 import {
   buildTechnicianRoute,
   clusterWorkOrders,
@@ -25,7 +26,14 @@ import {
 } from "../dispatch-map-utils";
 import { Button } from "@/src/components/ui/button";
 
+/** Temporary debug logs for Map+ (container size, invalidateSize, center/zoom). Remove or set to false after validation. */
+const DEBUG_MAP_PLUS = process.env.NODE_ENV === "development";
+
 type DispatchMapPanelProps = {
+  /** When "combined", map is in Map+ layout; invalidateSize is triggered when panel becomes visible. */
+  viewMode?: DispatchViewMode;
+  /** In Map+ view, true when the map pane is visible (not hidden by "Hide map"). */
+  mapPanelVisible?: boolean;
   workOrders: DispatchWorkOrder[];
   workforce: DispatchWorkforce;
   filterState: DispatchFilterState;
@@ -295,6 +303,65 @@ function MapResizeOnMount() {
   return null;
 }
 
+/** When Map+ is active and visible, call invalidateSize so the map fills the container after layout settles. */
+function MapPlusRefresh({
+  isMapPlusActive,
+  mapPanelVisible,
+}: {
+  isMapPlusActive: boolean;
+  mapPanelVisible: boolean;
+}) {
+  const map = useMap();
+  const runInvalidate = useCallback(() => {
+    try {
+      const c = map.getContainer();
+      if (!c?.isConnected) return;
+      const w = c.offsetWidth;
+      const h = c.offsetHeight;
+      if (DEBUG_MAP_PLUS) {
+        console.log("[Dispatch Map+] invalidateSize", { width: w, height: h, center: map.getCenter(), zoom: map.getZoom() });
+      }
+      map.invalidateSize();
+    } catch {
+      // Map may be torn down
+    }
+  }, [map]);
+
+  useEffect(() => {
+    if (!isMapPlusActive || !mapPanelVisible) return;
+    runInvalidate();
+    const rafId = requestAnimationFrame(() => runInvalidate());
+    const t1 = setTimeout(runInvalidate, 100);
+    const t2 = setTimeout(runInvalidate, 350);
+    const t3 = setTimeout(runInvalidate, 600);
+    const handleResize = () => runInvalidate();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isMapPlusActive, mapPanelVisible, runInvalidate]);
+
+  useEffect(() => {
+    if (!isMapPlusActive || !mapPanelVisible) return;
+    const container = map.getContainer();
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (DEBUG_MAP_PLUS) {
+        const c = map.getContainer();
+        console.log("[Dispatch Map+] ResizeObserver", c ? { width: c.offsetWidth, height: c.offsetHeight } : "no container");
+      }
+      runInvalidate();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [map, isMapPlusActive, mapPanelVisible, runInvalidate]);
+  return null;
+}
+
 function PanToSelectedWorkOrder({
   selectedLatLng,
 }: {
@@ -345,6 +412,8 @@ function FitBoundsToDispatchPoints({
 // --- End stable map hook components ---
 
 export function DispatchMapPanel({
+  viewMode = "map",
+  mapPanelVisible = true,
   workOrders,
   workforce,
   filterState,
@@ -363,10 +432,59 @@ export function DispatchMapPanel({
 }: DispatchMapPanelProps) {
   const [zoomLevel, setZoomLevel] = useState(11);
   const [mapMounted, setMapMounted] = useState(false);
+  /** In Map+, we only mount the map once the container has measurable dimensions so Leaflet doesn't get 0x0. */
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const isMapPlusActive = viewMode === "combined";
+
   useEffect(() => {
     setMapMounted(true);
-    return () => setMapMounted(false);
-  }, []);
+    if (DEBUG_MAP_PLUS) {
+      console.log("[Dispatch Map+] mount", { viewMode, mapPanelVisible });
+    }
+    return () => {
+      setMapMounted(false);
+      if (DEBUG_MAP_PLUS) console.log("[Dispatch Map+] unmount");
+    };
+  }, [viewMode, mapPanelVisible]);
+
+  // In Map+, clear measured size when view becomes inactive so we re-measure when shown again.
+  useEffect(() => {
+    if (!isMapPlusActive || !mapPanelVisible) setContainerSize(null);
+  }, [isMapPlusActive, mapPanelVisible]);
+
+  // ResizeObserver: measure container and set explicit size so we can delay map mount until we have non-zero dimensions (Map+).
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const updateSize = () => {
+      // Use clientWidth/clientHeight (inner size, excluding border) so the map wrapper doesn't overflow and cause scrollbars.
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (DEBUG_MAP_PLUS && isMapPlusActive) {
+        console.log("[Dispatch Map+] container size", { width: w, height: h });
+      }
+      setContainerSize((prev) => {
+        if (prev && prev.width === w && prev.height === h) return prev;
+        return { width: w, height: h };
+      });
+    };
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(el);
+    // Initial measure after layout (ResizeObserver may fire before flex layout settles in Map+).
+    const rafId = requestAnimationFrame(() => updateSize());
+    const tId = setTimeout(updateSize, 150);
+    const tId2 = setTimeout(updateSize, 400);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafId);
+      clearTimeout(tId);
+      clearTimeout(tId2);
+    };
+  }, [isMapPlusActive]);
+
+  /** In Map+, only render the map when the container has non-zero dimensions; otherwise Leaflet draws a blank map. */
+  const canRenderMap = !isMapPlusActive || (containerSize != null && containerSize.width > 0 && containerSize.height > 0);
   const onMarkerSelect = useCallback(
     (workOrderId: string) => {
       onSelectWorkOrder(workOrderId);
@@ -532,12 +650,24 @@ export function DispatchMapPanel({
           ))}
         </select>
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50" style={{ minHeight: 280, height: "100%" }}>
+      <div
+        ref={mapContainerRef}
+        className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--card-border)] bg-[var(--card)]/50"
+        style={{ minHeight: 280, height: "100%" }}
+      >
         {!mapMounted ? (
           <div className="flex h-full min-h-[350px] items-center justify-center text-[11px] text-[var(--muted)]">
             Loading map…
           </div>
+        ) : !canRenderMap ? (
+          <div className="flex h-full min-h-[260px] items-center justify-center text-[11px] text-[var(--muted)]">
+            Preparing map…
+          </div>
         ) : (
+        <div
+          className="h-full w-full overflow-hidden min-h-0"
+          style={isMapPlusActive && containerSize ? { width: containerSize.width, height: containerSize.height, minWidth: 0, minHeight: 0 } : undefined}
+        >
         <MapContainer
           key="dispatch-map"
           center={mapCenterTuple}
@@ -545,10 +675,12 @@ export function DispatchMapPanel({
           minZoom={3}
           maxZoom={19}
           scrollWheelZoom
-          className="h-full w-full"
+          className="h-full w-full overflow-hidden"
+          style={{ overflow: "hidden" }}
         >
           <MapZoomWatcher setZoomLevel={setZoomLevel} />
           <MapResizeOnMount />
+          <MapPlusRefresh isMapPlusActive={isMapPlusActive} mapPanelVisible={mapPanelVisible} />
           <PanToSelectedWorkOrder selectedLatLng={selectedLatLng} />
           <FitBoundsToDispatchPoints points={fitBoundsPoints} />
           <TileLayer
@@ -650,6 +782,7 @@ export function DispatchMapPanel({
             />
           ) : null}
         </MapContainer>
+        </div>
         )}
       </div>
 

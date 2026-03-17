@@ -122,7 +122,7 @@ export async function getUnreadCount(
 export async function isNotificationEnabled(
   supabase: SupabaseClient,
   userId: string,
-  channel: "in_app" | "email",
+  channel: "in_app" | "email" | "sms",
   category: string
 ): Promise<boolean> {
   const { data } = await supabase
@@ -140,7 +140,7 @@ export async function isNotificationEnabled(
 export async function setNotificationPreference(
   supabase: SupabaseClient,
   userId: string,
-  channel: "in_app" | "email",
+  channel: "in_app" | "email" | "sms",
   category: string,
   enabled: boolean
 ): Promise<void> {
@@ -150,7 +150,7 @@ export async function setNotificationPreference(
   );
 }
 
-/** Ensure default preference rows exist for a user (all categories, in_app + email, enabled). */
+/** Ensure default preference rows exist for a user (all categories, in_app + email + sms, enabled). */
 export async function ensureDefaultPreferences(
   supabase: SupabaseClient,
   userId: string
@@ -165,7 +165,7 @@ export async function ensureDefaultPreferences(
     "inventory",
     "portal_requests",
   ];
-  for (const channel of ["in_app", "email"] as const) {
+  for (const channel of ["in_app", "email", "sms"] as const) {
     for (const category of categories) {
       await supabase.from("notification_preferences").upsert(
         { user_id: userId, channel, category, enabled: true },
