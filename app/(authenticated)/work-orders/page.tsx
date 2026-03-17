@@ -37,6 +37,7 @@ type WorkOrderFilters = {
   today: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyWorkOrderFilters(query: any, filters: WorkOrderFilters) {
   const {
     q,
@@ -216,6 +217,19 @@ export default async function WorkOrdersPage({
       .order("name"),
   ]);
 
+  type BuildingRow = {
+    id: string;
+    building_name: string | null;
+    name: string | null;
+    property_id: string;
+  };
+  type UnitRow = {
+    id: string;
+    unit_name: string | null;
+    name_or_number: string | null;
+    building_id: string;
+  };
+
   const propertyIds = (properties ?? []).map((p) => p.id);
   const { data: buildingsData } = propertyIds.length
     ? await supabase
@@ -224,9 +238,9 @@ export default async function WorkOrdersPage({
         .in("property_id", propertyIds)
         .order("building_name")
         .order("name")
-    : { data: [] as unknown[] };
+    : { data: [] as BuildingRow[] };
 
-  const buildingIds = (buildingsData ?? []).map((b) => (b as { id: string }).id);
+  const buildingIds = ((buildingsData ?? []) as BuildingRow[]).map((b) => b.id);
   const { data: unitsData } = buildingIds.length
     ? await supabase
         .from("units")
@@ -234,7 +248,7 @@ export default async function WorkOrdersPage({
         .in("building_id", buildingIds)
         .order("unit_name")
         .order("name_or_number")
-    : { data: [] as unknown[] };
+    : { data: [] as UnitRow[] };
   const assetHierarchyRows = (assetsData ?? []) as Array<{
     id: string;
     asset_name: string | null;
@@ -307,12 +321,12 @@ export default async function WorkOrdersPage({
     name: (p as { property_name?: string }).property_name ?? (p as { name?: string }).name ?? p.id,
     company_id: (p as { company_id: string }).company_id,
   }));
-  const buildingOptions = (buildingsData ?? []).map((b) => ({
+  const buildingOptions = ((buildingsData ?? []) as BuildingRow[]).map((b) => ({
     id: b.id,
     name: (b as { building_name?: string }).building_name ?? (b as { name?: string }).name ?? b.id,
     property_id: (b as { property_id: string }).property_id,
   }));
-  const unitOptions = (unitsData ?? []).map((u) => ({
+  const unitOptions = ((unitsData ?? []) as UnitRow[]).map((u) => ({
     id: u.id,
     name: (u as { unit_name?: string }).unit_name ?? (u as { name_or_number?: string }).name_or_number ?? u.id,
     building_id: (u as { building_id: string }).building_id,
@@ -437,12 +451,11 @@ export default async function WorkOrdersPage({
             : sortBy === "status"
               ? "status"
               : "updated_at";
-  const buildWorkOrdersQuery = () =>
-    applyWorkOrderFilters(
-      supabase
-        .from("work_orders")
-        .select(
-          `
+  const buildWorkOrdersQuery = () => {
+    const baseQuery = supabase
+      .from("work_orders")
+      .select(
+        `
       id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id, vendor_id,
       description, category, priority, status,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date,
@@ -462,11 +475,11 @@ export default async function WorkOrdersPage({
       crews!assigned_crew_id(name),
       vendors(name)
     `,
-          { count: "exact" }
-        )
-        .in("company_id", companyIds),
-      listFilters
-    );
+        { count: "exact" }
+      )
+      .in("company_id", companyIds);
+    return applyWorkOrderFilters(baseQuery, listFilters) as typeof baseQuery;
+  };
 
   const fetchWorkOrdersPage = async (targetPage: number) => {
     const from = (targetPage - 1) * pageSize;
@@ -477,12 +490,10 @@ export default async function WorkOrdersPage({
   };
 
   let currentPage = page;
-  let {
-    data: workOrdersRaw,
-    error,
-    count: totalCountRaw,
-  } = await fetchWorkOrdersPage(currentPage);
-  const totalCount = totalCountRaw ?? 0;
+  const firstPageResult = await fetchWorkOrdersPage(currentPage);
+  let workOrdersRaw = firstPageResult.data;
+  let error = firstPageResult.error;
+  const totalCount = firstPageResult.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   if (currentPage > totalPages) {
     currentPage = totalPages;
@@ -495,14 +506,13 @@ export default async function WorkOrdersPage({
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const weekAgoStart = `${oneWeekAgo.toISOString().slice(0, 10)}T00:00:00.000Z`;
 
-  const buildStatsQuery = () =>
-    applyWorkOrderFilters(
-      supabase
-        .from("work_orders")
-        .select("id", { count: "exact", head: true })
-        .in("company_id", companyIds),
-      listFilters
-    );
+  const buildStatsQuery = () => {
+    const baseQuery = supabase
+      .from("work_orders")
+      .select("id", { count: "exact", head: true })
+      .in("company_id", companyIds);
+    return applyWorkOrderFilters(baseQuery, listFilters) as typeof baseQuery;
+  };
   const [openStats, inProgressStats, onHoldStats, overdueStats, dueTodayStats, completedTodayStats, newStats, readyStats, scheduledStats, completedWeekStats] =
     await Promise.all([
       buildStatsQuery().in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]),
@@ -542,7 +552,16 @@ export default async function WorkOrdersPage({
     const vendor_name = ven && typeof ven === "object" && "name" in ven ? (ven as { name?: string }).name : null;
     const locationParts = [property_name, building_name, unit_name].filter(Boolean);
     const location = locationParts.length ? locationParts.join(" / ") : null;
-    const { technicians: _, crews: __, companies: ___, customers: ____, properties: _____, buildings: ______, units: _______, assets: ________, vendors: _________, ...rest } = row;
+    const rest = { ...row };
+    delete rest.technicians;
+    delete rest.crews;
+    delete rest.companies;
+    delete rest.customers;
+    delete rest.properties;
+    delete rest.buildings;
+    delete rest.units;
+    delete rest.assets;
+    delete rest.vendors;
     return {
       ...rest,
       technician_name: technician_name ?? undefined,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState, useCallback, useEffect } from "react";
+import { useTransition, useState } from "react";
 
 type FilterOptions = {
   companies: { id: string; name: string }[];
@@ -48,10 +48,8 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [searchLocal, setSearchLocal] = useState("");
 
   const q = searchParams.get("q") ?? "";
-  useEffect(() => setSearchLocal(q), [q]);
   const status = searchParams.get("status") ?? "";
   const priority = searchParams.get("priority") ?? "";
   const category = searchParams.get("category") ?? "";
@@ -97,15 +95,12 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
     return next.toString();
   };
 
-  const apply = useCallback(
-    (updates: Record<string, string>, options?: { keepPage?: boolean }) => {
-      const query = buildParams(updates, options?.keepPage ?? false);
-      startTransition(() => {
-        router.replace(`/work-orders${query ? `?${query}` : ""}`, { scroll: false });
-      });
-    },
-    [router, searchParams, startTransition]
-  );
+  const apply = (updates: Record<string, string>, options?: { keepPage?: boolean }) => {
+    const query = buildParams(updates, options?.keepPage ?? false);
+    startTransition(() => {
+      router.replace(`/work-orders${query ? `?${query}` : ""}`, { scroll: false });
+    });
+  };
 
   const handleSearch = (value: string) => apply({ q: value });
   const clearAll = () => {
@@ -144,17 +139,19 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
                 Search (title, #, description, requested by)
               </label>
               <input
+                key={q}
                 id="wo-filter-q"
                 type="text"
                 placeholder="Search..."
-                value={searchLocal}
+                defaultValue={q}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setSearchLocal(v);
                   if (!v) apply({ q: "" });
                 }}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch(searchLocal)}
-                onBlur={() => handleSearch(searchLocal)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch(e.currentTarget.value);
+                }}
+                onBlur={(e) => handleSearch(e.currentTarget.value)}
                 className={inputClass}
               />
             </div>
