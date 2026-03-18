@@ -1,9 +1,8 @@
 "use client";
 
+import React, { Suspense, useTransition, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { useTransition, useState, useEffect, useRef } from "react";
 import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus, bulkUpdateWorkOrderStatus, bulkDeleteWorkOrders, exportWorkOrdersCsv } from "../actions";
 import type { WorkOrder, WorkOrderPrefill } from "./work-order-form-modal";
 import { WorkOrderFormModal } from "./work-order-form-modal";
@@ -14,7 +13,8 @@ import { TodaysFocusPanel } from "./todays-focus-panel";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import { WorkOrderFilters } from "./work-order-filters";
-import { WorkOrderDetailDrawer } from "./work-order-detail-drawer";
+import { CommandCenterLayout } from "@/src/components/command-center";
+import { WorkOrderCommandCenterPane } from "./work-order-command-center-pane";
 import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
 import { ClipboardList } from "lucide-react";
 import { PageHeader } from "@/src/components/ui/page-header";
@@ -25,6 +25,8 @@ import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Pagination } from "@/src/components/ui/pagination";
+import { CornerstoneAiPanel } from "@/app/(authenticated)/components/cornerstone-ai-panel";
+import { Sparkles } from "lucide-react";
 
 import { formatDate } from "@/src/lib/date-utils";
 import type {
@@ -106,6 +108,136 @@ function assignedDisplay(wo: WorkOrderListRow): string {
   return "—";
 }
 
+type WorkOrderRowProps = {
+  wo: WorkOrderListRow;
+  selected: boolean;
+  isActive: boolean;
+  isPending: boolean;
+  onToggleSelect: (id: string) => void;
+  onOpenDetail: (wo: WorkOrderListRow) => void;
+  onChangeStatus: (wo: WorkOrderListRow, status: (typeof STATUS_OPTIONS_QUICK)[number]) => void;
+  onAssign: (wo: WorkOrderListRow) => void;
+};
+
+const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
+  wo,
+  selected,
+  isActive,
+  isPending,
+  onToggleSelect,
+  onOpenDetail,
+  onChangeStatus,
+  onAssign,
+}: WorkOrderRowProps) {
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const handleRowClick = () => onOpenDetail(wo);
+  const isOverdue = (() => {
+    const dueDate = (wo as Record<string, unknown>).due_date as string | null | undefined;
+    return dueDate && dueDate < today && wo.status !== "completed" && wo.status !== "cancelled";
+  })();
+  const unassigned = !wo.assigned_technician_id && !wo.assigned_crew_id && !wo.vendor_id;
+  const isUrgent = wo.priority === "emergency" || wo.priority === "urgent";
+  const isHigh = wo.priority === "high" && !isUrgent;
+  const secondaryParts = [wo.company_name, wo.location, wo.asset_name].filter(Boolean);
+  const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join(" · ") : "—";
+
+  return (
+    <tr
+      key={wo.id}
+      onClick={handleRowClick}
+      className={`group border-b border-[var(--card-border)]/80 last:border-0 cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 ease-out ${
+        isActive
+          ? "bg-[var(--accent)]/8 ring-inset ring-1 ring-[var(--accent)]/25"
+          : "hover:bg-[var(--background)]/50 hover:shadow-[0_1px_0_0_rgba(0,0,0,0.03)]"
+      } ${
+        wo.status === "completed" ? "bg-[var(--muted)]/5 opacity-90" : ""
+      } ${
+        isOverdue
+          ? "border-l-[3px] border-l-red-400/90 bg-red-50/50 dark:border-l-red-500/80 dark:bg-red-950/20"
+          : isUrgent
+            ? "border-l-[3px] border-l-red-400/80 bg-red-50/40 dark:border-l-red-500/70 dark:bg-red-950/15"
+            : isHigh
+              ? "border-l-[3px] border-l-amber-400/80 bg-amber-50/40 dark:border-l-amber-500/60 dark:bg-amber-950/20"
+              : "border-l-[3px] border-l-transparent"
+      }`}
+    >
+      <td className="w-10 px-3 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(wo.id)}
+          aria-label={`Select ${wo.title ?? wo.id}`}
+          className="rounded border-[var(--card-border)]"
+        />
+      </td>
+      <td className="min-w-0 max-w-[320px] px-4 py-4 align-top">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-baseline gap-2">
+            <Link
+              href={`/work-orders/${wo.id}`}
+              className="shrink-0 text-[13px] font-medium text-[var(--accent)] transition-colors hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {wo.work_order_number ?? "—"}
+            </Link>
+            <span className="min-w-0 truncate text-[13px] font-medium text-[var(--foreground)]">
+              {wo.title}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--muted)] leading-snug" title={secondaryLine}>
+            {secondaryLine}
+          </p>
+        </div>
+      </td>
+      <td className="px-3 py-4 align-top">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <PriorityBadge priority={wo.priority ?? "medium"} />
+          <StatusBadge status={wo.status ?? "new"} />
+          {isOverdue && (
+            <span className="ui-badge border-red-200 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200 dark:border-red-700">
+              Overdue
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-4 align-top text-xs text-[var(--muted)]">
+        <span className="block">{formatDate(wo.scheduled_date as string | null)}</span>
+        {wo.due_date ? (
+          <span className="block">Due {formatDate(wo.due_date as string)}</span>
+        ) : null}
+      </td>
+      <td className="px-3 py-4 align-top">
+        {unassigned ? (
+          <span className="ui-badge inline-flex items-center gap-1.5 border-amber-200 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200 dark:border-amber-700">
+            <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
+            Unassigned
+          </span>
+        ) : (
+          <span className="text-xs text-[var(--muted)]">{assignedDisplay(wo)}</span>
+        )}
+      </td>
+      <td className="w-24 px-3 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+        <ActionsDropdown
+          align="right"
+          items={[
+            { type: "link", label: "View", href: `/work-orders/${wo.id}` },
+            { type: "button", label: "Assign", onClick: () => onAssign(wo) },
+            ...STATUS_OPTIONS_QUICK.map((s) => ({
+              type: "button" as const,
+              label: `Mark ${s.replace(/_/g, " ")}`,
+              onClick: () => onChangeStatus(wo, s),
+              disabled: isPending,
+            })),
+          ]}
+        />
+      </td>
+    </tr>
+  );
+});
+
+WorkOrderTableRow.displayName = "WorkOrderTableRow";
+
 export function WorkOrdersList({
   workOrders: initialList,
   stats,
@@ -142,6 +274,7 @@ export function WorkOrdersList({
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [slaModalOpen, setSlaModalOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
 
@@ -364,6 +497,19 @@ export function WorkOrdersList({
           </Tooltip>
           <Tooltip placement="bottom">
             <TooltipTrigger>
+              <button
+                type="button"
+                onClick={() => setAiPanelOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/80 px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] hover:text-[var(--accent)]"
+              >
+                <Sparkles className="size-4" aria-hidden />
+                Summarize queue
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Get an AI summary of the current work order queue</TooltipContent>
+          </Tooltip>
+          <Tooltip placement="bottom">
+            <TooltipTrigger>
               <HelpTriggerButton onClick={() => setHelpOpen(true)} />
             </TooltipTrigger>
             <TooltipContent>Open a simple guide for this screen</TooltipContent>
@@ -538,164 +684,81 @@ export function WorkOrdersList({
           </div>
         </div>
       ) : (
-        <div data-tour="demo-guided:execution">
-        <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/90 shadow-[var(--shadow-soft)]" data-tour="work-orders:assignment">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
-                  <th className="w-10 px-2 py-3">
-                    <input
-                      type="checkbox"
-                      checked={initialList.length > 0 && selectedIds.size === initialList.length}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all"
-                      className="rounded border-[var(--card-border)]"
-                    />
-                  </th>
-                  <th className="px-4 py-3 font-semibold">Work Order #</th>
-                  <th className="px-4 py-3 font-semibold">Title</th>
-                  <th className="px-4 py-3 font-semibold">Company</th>
-                  <th className="px-4 py-3 font-semibold">Customer</th>
-                  <th className="px-4 py-3 font-semibold">Property / Location</th>
-                  <th className="px-4 py-3 font-semibold">Asset</th>
-                  <th className="px-4 py-3 font-semibold">Source</th>
-                  <th className="px-4 py-3 font-semibold">Priority</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Scheduled</th>
-                  <th className="px-4 py-3 font-semibold">Assigned To</th>
-                  <th className="px-4 py-3 font-semibold">Updated</th>
-                  <th className="w-28 px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody data-tour="work-orders:completion">
-                {initialList.map((wo) => (
-                  <tr
-                    key={wo.id}
-                    onClick={() => setDetailDrawerRow(wo)}
-                    className={`border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/60 cursor-pointer ${
-                      wo.status === "completed"
-                        ? "bg-[var(--muted)]/5 opacity-80"
-                        : ""
-                    } ${
-                      wo.priority === "emergency" || wo.priority === "urgent"
-                        ? "border-l-4 border-l-red-500 bg-red-500/5 dark:border-l-red-400 dark:bg-red-500/10"
-                        : wo.priority === "high"
-                        ? "border-l-4 border-l-amber-400 bg-amber-50/40 dark:border-l-amber-400 dark:bg-amber-500/5"
-                        : ""
-                    }`}
-                  >
-                    <td className="w-10 px-2 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(wo.id)}
-                        onChange={() => toggleSelect(wo.id)}
-                        aria-label={`Select ${wo.title ?? wo.id}`}
-                        className="rounded border-[var(--card-border)]"
-                      />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Link
-                        href={`/work-orders/${wo.id}`}
-                        className="font-medium text-[var(--accent)] hover:underline"
-                      >
-                        {wo.work_order_number ?? "—"}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--foreground)]">
-                      <Link href={`/work-orders/${wo.id}`} className="hover:underline">
-                        {wo.title}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.company_name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.customer_name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)] max-w-[140px] truncate" title={wo.location ?? undefined}>{wo.location ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{wo.asset_name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">
-                      {(wo.source_type as string | undefined) === "preventive_maintenance" ? (
-                        (wo.preventive_maintenance_plan_id as string | undefined) ? (
-                          <Link
-                            href={`/preventive-maintenance/${wo.preventive_maintenance_plan_id as string}`}
-                            className="text-[var(--accent)] hover:underline"
-                          >
-                            PM
-                          </Link>
-                        ) : (
-                          "PM"
-                        )
-                      ) : (
-                        "Manual"
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <PriorityBadge priority={wo.priority ?? "medium"} />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={wo.status ?? "new"} />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {(() => {
-                        const today = new Date().toISOString().slice(0, 10);
-                        const dueDate = (wo as Record<string, unknown>).due_date as string | null | undefined;
-                        const isOverdue = dueDate && dueDate < today && wo.status !== "completed" && wo.status !== "cancelled";
-                        return (
-                          <span className="flex items-center gap-1.5">
-                            <span className="text-[var(--muted)]">{formatDate(wo.scheduled_date as string | null)}</span>
-                            {isOverdue && (
-                              <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
-                                Overdue
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {(() => {
-                        const display = assignedDisplay(wo);
-                        const unassigned = !wo.assigned_technician_id && !wo.assigned_crew_id && !wo.vendor_id;
-                        if (unassigned) {
-                          return (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-400">
-                              <span className="size-1.5 rounded-full bg-orange-400" aria-hidden />
-                              Unassigned
-                            </span>
-                          );
-                        }
-                        return <span className="text-[var(--muted)]">{display}</span>;
-                      })()}
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{formatDate(wo.updated_at as string | null)}</td>
-                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <ActionsDropdown
-                        align="right"
-                        items={[
-                          { type: "link", label: "View", href: `/work-orders/${wo.id}` },
-                          { type: "button", label: "Assign", onClick: () => setAssigningWorkOrder(wo) },
-                          ...STATUS_OPTIONS_QUICK.map((s) => ({
-                            type: "button" as const,
-                            label: `Mark ${s.replace(/_/g, " ")}`,
-                            onClick: () => setStatusForRow(wo, s),
-                            disabled: isPending,
-                          })),
-                          { type: "button", label: "Edit", onClick: () => openEdit(wo) },
-                          { type: "button", label: "Delete", onClick: () => handleDelete(wo.id, wo.title), disabled: isPending, destructive: true },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            totalCount={totalCount}
-            onPageChange={handlePageChange}
-          />
-        </div>
-        </div>
+        <CommandCenterLayout
+          listContent={
+            <div data-tour="demo-guided:execution">
+              <div
+                className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)]/80 bg-[var(--card)] shadow-sm"
+                data-tour="work-orders:assignment"
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--card-border)]/80 bg-[var(--background)]/50 text-xs uppercase tracking-wider text-[var(--muted)]">
+                        <th className="w-10 px-3 py-3.5 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={initialList.length > 0 && selectedIds.size === initialList.length}
+                            onChange={toggleSelectAll}
+                            aria-label="Select all"
+                            className="rounded border-[var(--card-border)]"
+                          />
+                        </th>
+                        <th className="px-4 py-3.5 font-medium">Work order</th>
+                        <th className="px-3 py-3.5 font-medium">Priority · Status</th>
+                        <th className="px-3 py-3.5 font-medium">Scheduled</th>
+                        <th className="px-3 py-3.5 font-medium">Assigned</th>
+                        <th className="w-24 px-3 py-3.5 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody data-tour="work-orders:completion">
+                      {initialList.map((wo) => (
+                        <WorkOrderTableRow
+                          key={wo.id}
+                          wo={wo}
+                          selected={selectedIds.has(wo.id)}
+                          isActive={detailDrawerRow?.id === wo.id}
+                          isPending={isPending}
+                          onToggleSelect={toggleSelect}
+                          onOpenDetail={setDetailDrawerRow}
+                          onChangeStatus={setStatusForRow}
+                          onAssign={setAssigningWorkOrder}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  page={page}
+                  pageSize={pageSize}
+                  totalCount={totalCount}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            </div>
+          }
+          detailContent={
+            detailDrawerRow ? (
+              <WorkOrderCommandCenterPane
+                workOrder={detailDrawerRow}
+                onClose={() => setDetailDrawerRow(null)}
+                onAssign={() => {
+                  setAssigningWorkOrder(detailDrawerRow);
+                  setDetailDrawerRow(null);
+                }}
+                onEdit={() => {
+                  setEditingWorkOrder(detailDrawerRow as WorkOrder);
+                  setModalOpen(true);
+                  setDetailDrawerRow(null);
+                }}
+                onStatusChange={(wo, s) => setStatusForRow(wo as WorkOrderListRow, s)}
+                isPending={isPending}
+              />
+            ) : null
+          }
+          isDetailOpen={!!detailDrawerRow}
+          onCloseDetail={() => setDetailDrawerRow(null)}
+        />
       )}
 
       {modalOpen ? (
@@ -718,22 +781,12 @@ export function WorkOrdersList({
         />
       ) : null}
 
-      <WorkOrderDetailDrawer
-        workOrder={detailDrawerRow}
-        onClose={() => setDetailDrawerRow(null)}
-        onAssign={() => {
-          if (detailDrawerRow) setAssigningWorkOrder(detailDrawerRow);
-          setDetailDrawerRow(null);
-        }}
-        onEdit={() => {
-          if (detailDrawerRow) {
-            setEditingWorkOrder(detailDrawerRow as WorkOrder);
-            setModalOpen(true);
-          }
-          setDetailDrawerRow(null);
-        }}
+      <CornerstoneAiPanel
+        open={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        context={{ entityType: "list", listFilters: { entityType: "work_orders" } }}
+        initialQuery="Summarize the current open work order queue."
       />
-
       <HelpDrawer
         title="How to use Work Orders"
         open={helpOpen}

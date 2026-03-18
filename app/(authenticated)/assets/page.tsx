@@ -6,6 +6,7 @@ import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { saveAsset } from "./actions";
 import { ASSET_TYPE_OPTIONS } from "./constants";
 import { AssetsList, type AssetRow } from "./components/assets-list";
+import { AssetListAiSummary } from "./components/asset-list-ai-summary";
 import { saveWorkOrder } from "../work-orders/actions";
 import { savePreventiveMaintenancePlan } from "../preventive-maintenance/actions";
 import { PageHeader } from "@/src/components/ui/page-header";
@@ -52,6 +53,7 @@ export default async function AssetsPage({
   const statusFilter = getStringParam(params ?? {}, "status");
   const rawHealthStatus = getStringParam(params ?? {}, "health_status");
   const rawHierarchy = getStringParam(params ?? {}, "hierarchy");
+  const viewPreset = getStringParam(params ?? {}, "view");
   const pageParam = getStringParam(params ?? {}, "page");
   const pageSizeParam = getStringParam(params ?? {}, "page_size");
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
@@ -123,6 +125,47 @@ export default async function AssetsPage({
         .filter(Boolean) as string[]
     )
   );
+
+  // Stable summary counts: tenant/company scope only. Do NOT apply view or list filters.
+  const buildStatsBaseQuery = () =>
+    supabase
+      .from("assets")
+      .select("id", { count: "exact", head: true })
+      .in("company_id", companyIds);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const [activeStats, needsAttentionStats, outOfServiceStats] = await Promise.all([
+    buildStatsBaseQuery().eq("status", "active"),
+    buildStatsBaseQuery()
+      .or("health_score.lt.70,condition.in.(fair,poor)")
+      .eq("status", "active"),
+    buildStatsBaseQuery().in("status", ["inactive", "retired"]),
+  ]);
+
+  const { data: dueForPmPlans } = await supabase
+    .from("preventive_maintenance_plans")
+    .select("asset_id")
+    .in("company_id", companyIds)
+    .eq("status", "active")
+    .not("asset_id", "is", null)
+    .lte("next_run_date", sevenDaysFromNow);
+  const dueForPmAssetIds = Array.from(
+    new Set(
+      (dueForPmPlans ?? [])
+        .map((r) => (r as { asset_id: string | null }).asset_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  const dueForPmCount = dueForPmAssetIds.length;
+
+  const assetStats = {
+    active: activeStats.count ?? 0,
+    needsAttention: needsAttentionStats.count ?? 0,
+    outOfService: outOfServiceStats.count ?? 0,
+    dueForPm: dueForPmCount,
+  };
 
   const { data: techniciansData } = await supabase
     .from("technicians")
@@ -305,6 +348,14 @@ export default async function AssetsPage({
     )
     .in("company_id", companyIds);
 
+  if (viewPreset === "active") assetsQuery = assetsQuery.eq("status", "active");
+  else if (viewPreset === "needs_attention")
+    assetsQuery = assetsQuery.or("health_score.lt.70,condition.in.(fair,poor)").eq("status", "active");
+  else if (viewPreset === "out_of_service") assetsQuery = assetsQuery.in("status", ["inactive", "retired"]);
+  else if (viewPreset === "due_for_pm" && dueForPmAssetIds.length > 0)
+    assetsQuery = assetsQuery.in("id", dueForPmAssetIds);
+  else if (viewPreset === "due_for_pm") assetsQuery = assetsQuery.eq("id", "never-matches"); // empty result
+
   if (companyId) assetsQuery = assetsQuery.eq("company_id", companyId);
   if (propertyId) assetsQuery = assetsQuery.eq("property_id", propertyId);
   if (typeFilter) assetsQuery = assetsQuery.eq("asset_type", typeFilter);
@@ -341,6 +392,12 @@ export default async function AssetsPage({
       .from("assets")
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds);
+    if (viewPreset === "active") countQuery = countQuery.eq("status", "active");
+    else if (viewPreset === "needs_attention")
+      countQuery = countQuery.or("health_score.lt.70,condition.in.(fair,poor)").eq("status", "active");
+    else if (viewPreset === "out_of_service") countQuery = countQuery.in("status", ["inactive", "retired"]);
+    else if (viewPreset === "due_for_pm" && dueForPmAssetIds.length > 0) countQuery = countQuery.in("id", dueForPmAssetIds);
+    else if (viewPreset === "due_for_pm") countQuery = countQuery.eq("id", "never-matches");
     if (companyId) countQuery = countQuery.eq("company_id", companyId);
     if (propertyId) countQuery = countQuery.eq("property_id", propertyId);
     if (typeFilter) countQuery = countQuery.eq("asset_type", typeFilter);
@@ -470,12 +527,15 @@ export default async function AssetsPage({
         title="Assets"
         subtitle="Track equipment and assets by location."
         actions={
-          <Link
-            href="/assets/intelligence"
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-          >
-            Open Asset Intelligence
-          </Link>
+          <div className="flex items-center gap-2">
+            <AssetListAiSummary />
+            <Link
+              href="/assets/intelligence"
+              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+            >
+              Open Asset Intelligence
+            </Link>
+          </div>
         }
       />
       <AssetsList
@@ -496,7 +556,9 @@ export default async function AssetsPage({
           status: statusFilter ?? "",
           health_status: healthStatusFilter ?? "",
           hierarchy: hierarchyFilter ?? "",
+          view: viewPreset ?? "",
         }}
+        assetStats={assetStats}
         totalCount={totalCount ?? 0}
         page={page}
         pageSize={pageSize}

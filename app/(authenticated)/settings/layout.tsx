@@ -16,6 +16,7 @@ const settingsNav = [
   { label: "Users", href: "/settings/users" },
   { label: "Roles & Permissions", href: "/settings/roles" },
   { label: "Notifications", href: "/settings/notifications" },
+  { label: "AI usage", href: "/settings/ai-usage" },
   { label: "Tours", href: "/settings/tours" },
 ] as const;
 

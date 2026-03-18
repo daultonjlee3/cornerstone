@@ -12,7 +12,9 @@
     "seed:demo:refresh": "tsx scripts/seed-demo/reset.ts && tsx scripts/seed-demo/run.ts",
     "seed:demo:users": "tsx scripts/seed-demo/create-demo-users.ts",
     "make-super-admin": "tsx scripts/make-super-admin.ts",
-    "generate:screenshots": "tsx scripts/generateMarketingScreenshots.ts"
+    "generate:screenshots": "tsx scripts/generateMarketingScreenshots.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -42,6 +44,7 @@
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

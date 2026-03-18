@@ -18,6 +18,31 @@ export async function saveCompany(
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "Company name is required." };
 
+  const slug = (formData.get("portal_slug") as string | null)?.trim() || null;
+  const portalEnabled =
+    (formData.get("portal_enabled") as string | null)?.trim() === "on";
+  const allowPublicRequests =
+    (formData.get("allow_public_requests") as string | null)?.trim() === "on";
+  const portalName =
+    (formData.get("portal_name") as string | null)?.trim() || null;
+  const autoCreateWorkOrdersFromRequests =
+    (formData.get("auto_create_work_orders_from_requests") as string | null)?.trim() === "on";
+
+  if (slug) {
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      return { error: "Portal slug must be URL-safe (lowercase letters, numbers, and dashes only)." };
+    }
+    const { data: existing } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("slug", slug)
+      .neq("id", id || "")
+      .maybeSingle();
+    if (existing) {
+      return { error: "Portal slug is already in use. Choose another." };
+    }
+  }
+
   const payload = {
     name,
     legal_name: (formData.get("legal_name") as string)?.trim() || null,
@@ -26,6 +51,11 @@ export async function saveCompany(
     primary_contact_name: (formData.get("primary_contact_name") as string)?.trim() || null,
     primary_contact_email: (formData.get("primary_contact_email") as string)?.trim() || null,
     phone: (formData.get("phone") as string)?.trim() || null,
+    slug: slug || null,
+    portal_enabled: portalEnabled,
+    allow_public_requests: allowPublicRequests,
+    portal_name: portalName,
+    auto_create_work_orders_from_requests: autoCreateWorkOrdersFromRequests,
   };
 
   if (id) {

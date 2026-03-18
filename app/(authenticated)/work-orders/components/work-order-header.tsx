@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 
@@ -21,6 +22,7 @@ type WorkOrderHeaderProps = {
   onAssignCrew: () => void;
   onChangeStatusClick: () => void;
   onCompleteClick: () => void;
+  onSummarize?: () => void;
   isPending?: boolean;
 };
 
@@ -36,6 +38,7 @@ export function WorkOrderHeader({
   onAssignCrew,
   onChangeStatusClick,
   onCompleteClick,
+  onSummarize,
   isPending = false,
 }: WorkOrderHeaderProps) {
   return (
@@ -58,6 +61,12 @@ export function WorkOrderHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onSummarize && (
+            <button type="button" onClick={onSummarize} className={btnBase}>
+              <Sparkles className="mr-1.5 inline size-4 text-[var(--accent)]" aria-hidden />
+              Summarize
+            </button>
+          )}
           <Link href={`/work-orders?edit=${workOrderId}`} className={btnBase}>
             Edit Work Order
           </Link>

@@ -185,36 +185,42 @@ export default async function WorkOrdersPage({
       .select("id, property_name, name, company_id")
       .in("company_id", companyIds)
       .order("property_name")
-      .order("name"),
+      .order("name")
+      .limit(200),
     supabase
       .from("assets")
       .select("id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id")
       .in("company_id", companyIds)
       .order("asset_name")
-      .order("name"),
+      .order("name")
+      .limit(500),
     supabase
       .from("technicians")
       .select("id, technician_name, name")
       .in("company_id", companyIds)
       .eq("status", "active")
       .order("technician_name")
-      .order("name"),
+      .order("name")
+      .limit(200),
     supabase
       .from("customers")
       .select("id, name, company_id")
       .in("company_id", companyIds)
-      .order("name"),
+      .order("name")
+      .limit(200),
     supabase
       .from("vendors")
       .select("id, name, company_id, service_type")
       .in("company_id", companyIds)
-      .order("name"),
+      .order("name")
+      .limit(200),
     supabase
       .from("crews")
       .select("id, name, company_id")
       .eq("tenant_id", tenantId)
       .eq("is_active", true)
-      .order("name"),
+      .order("name")
+      .limit(100),
   ]);
 
   type BuildingRow = {
@@ -238,6 +244,7 @@ export default async function WorkOrdersPage({
         .in("property_id", propertyIds)
         .order("building_name")
         .order("name")
+        .limit(300)
     : { data: [] as BuildingRow[] };
 
   const buildingIds = ((buildingsData ?? []) as BuildingRow[]).map((b) => b.id);
@@ -248,6 +255,7 @@ export default async function WorkOrdersPage({
         .in("building_id", buildingIds)
         .order("unit_name")
         .order("name_or_number")
+        .limit(500)
     : { data: [] as UnitRow[] };
   const assetHierarchyRows = (assetsData ?? []) as Array<{
     id: string;
@@ -506,28 +514,28 @@ export default async function WorkOrdersPage({
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const weekAgoStart = `${oneWeekAgo.toISOString().slice(0, 10)}T00:00:00.000Z`;
 
-  const buildStatsQuery = () => {
-    const baseQuery = supabase
+  // Summary card counts: global for tenant/company scope only. Do NOT apply saved view or list filters.
+  const buildStatsBaseQuery = () =>
+    supabase
       .from("work_orders")
       .select("id", { count: "exact", head: true })
       .in("company_id", companyIds);
-    return applyWorkOrderFilters(baseQuery, listFilters) as typeof baseQuery;
-  };
+
   const [openStats, inProgressStats, onHoldStats, overdueStats, dueTodayStats, completedTodayStats, newStats, readyStats, scheduledStats, completedWeekStats] =
     await Promise.all([
-      buildStatsQuery().in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]),
-      buildStatsQuery().eq("status", "in_progress"),
-      buildStatsQuery().eq("status", "on_hold"),
-      buildStatsQuery().lt("due_date", today).not("status", "in", "(completed,cancelled)"),
-      buildStatsQuery().eq("due_date", today).not("status", "in", "(completed,cancelled)"),
-      buildStatsQuery()
+      buildStatsBaseQuery().in("status", ["new", "open", "ready_to_schedule", "assigned", "scheduled"]),
+      buildStatsBaseQuery().eq("status", "in_progress"),
+      buildStatsBaseQuery().eq("status", "on_hold"),
+      buildStatsBaseQuery().lt("due_date", today).not("status", "in", "(completed,cancelled)"),
+      buildStatsBaseQuery().eq("due_date", today).not("status", "in", "(completed,cancelled)"),
+      buildStatsBaseQuery()
         .eq("status", "completed")
         .gte("completed_at", `${today}T00:00:00`)
         .lte("completed_at", `${today}T23:59:59.999`),
-      buildStatsQuery().in("status", ["new", "open"]),
-      buildStatsQuery().in("status", ["ready_to_schedule", "assigned"]),
-      buildStatsQuery().eq("status", "scheduled"),
-      buildStatsQuery().eq("status", "completed").gte("updated_at", weekAgoStart),
+      buildStatsBaseQuery().in("status", ["new", "open"]),
+      buildStatsBaseQuery().in("status", ["ready_to_schedule", "assigned"]),
+      buildStatsBaseQuery().eq("status", "scheduled"),
+      buildStatsBaseQuery().eq("status", "completed").gte("updated_at", weekAgoStart),
     ]);
 
   const workOrders = (workOrdersRaw ?? []).map((wo) => {

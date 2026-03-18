@@ -21,10 +21,28 @@ async function getPortalCompanyBySlug(slug: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("companies")
-    .select("id, tenant_id, portal_enabled, status")
+    .select("id, tenant_id, portal_enabled, portal_name, allow_public_requests, status")
     .eq("slug", slug)
     .maybeSingle();
-  return data as { id: string; tenant_id: string; portal_enabled?: boolean | null; status?: string | null } | null;
+  const company = data as {
+    id: string;
+    tenant_id: string;
+    portal_enabled?: boolean | null;
+    portal_name?: string | null;
+    allow_public_requests?: boolean | null;
+    status?: string | null;
+  } | null;
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[RequestPortal] resolve company by slug", {
+      slug,
+      found: !!company,
+      tenantId: company?.tenant_id,
+      portal_enabled: company?.portal_enabled,
+      allow_public_requests: company?.allow_public_requests,
+      status: company?.status,
+    });
+  }
+  return company;
 }
 
 async function getPortalProperties(companyId: string | undefined): Promise<PropertyOption[]> {
@@ -82,8 +100,9 @@ export default async function RequestPortalBySlugPage(props: PageProps) {
   }
 
   const portalEnabled = company.portal_enabled ?? false;
+  const allowPublic = company.allow_public_requests ?? true;
   const isActive = (company.status ?? "active") === "active";
-  const configured = portalEnabled && isActive;
+  const configured = portalEnabled && isActive && allowPublic;
 
   const locale = await getRequestPageLocale();
   const [properties, assets] = await Promise.all([
@@ -99,6 +118,7 @@ export default async function RequestPortalBySlugPage(props: PageProps) {
       configured={configured}
       tenantId={company.tenant_id}
       companyId={company.id}
+      portalName={company.portal_name ?? null}
     />
   );
 }

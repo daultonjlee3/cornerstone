@@ -13,6 +13,9 @@ import { Hint } from "@/src/components/ui/hint";
 import { ActionsDropdown, type ActionsDropdownItem } from "@/src/components/ui/actions-dropdown";
 import { Pagination } from "@/src/components/ui/pagination";
 import { PreventiveMaintenancePlanFormModal } from "@/app/(authenticated)/preventive-maintenance/components/pm-plan-form-modal";
+import { SummaryCardsBar, SavedViewsBar, CommandCenterLayout } from "@/src/components/command-center";
+import { Activity, AlertTriangle, PauseCircle, CalendarClock } from "lucide-react";
+import { AssetCommandCenterPane } from "./asset-command-center-pane";
 
 type CompanyOption = { id: string; name: string };
 type PropertyOption = { id: string; name: string; company_id?: string | undefined };
@@ -43,6 +46,7 @@ type FilterParams = {
   status: string;
   health_status: string;
   hierarchy: string;
+  view: string;
 };
 
 type StatusOption = { value: string; label: string };
@@ -86,6 +90,13 @@ type AssetsListProps = {
   totalCount?: number | null;
   page?: number;
   pageSize?: number;
+  /** Stable summary counts (tenant scope only). Used for cards; do not mix with list filters. */
+  assetStats?: {
+    active: number;
+    needsAttention: number;
+    outOfService: number;
+    dueForPm: number;
+  };
 };
 
 function assetDisplayName(a: AssetRow): string {
@@ -154,6 +165,7 @@ export function AssetsList({
   totalCount: totalCountProp,
   page: pageProp = 1,
   pageSize: pageSizeProp = 25,
+  assetStats,
 }: AssetsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -163,6 +175,7 @@ export function AssetsList({
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [selectedAssetForWO, setSelectedAssetForWO] = useState<AssetRow | null>(null);
   const [selectedAssetForPM, setSelectedAssetForPM] = useState<AssetRow | null>(null);
+  const [detailDrawerAsset, setDetailDrawerAsset] = useState<AssetRow | null>(null);
 
   const applyFilters = useCallback(
     (updates: Record<string, string>) => {
@@ -188,6 +201,7 @@ export function AssetsList({
       status: get("status"),
       health_status: get("health_status"),
       hierarchy: get("hierarchy"),
+      view: get("view"),
       page: "1",
     });
   };
@@ -274,6 +288,51 @@ export function AssetsList({
             </Link>
           }
         />
+      )}
+      {assetStats != null && (
+        <>
+          <SummaryCardsBar
+            path="/assets"
+            cards={[
+              { key: "active", label: "Active", value: assetStats.active, view: "active", icon: Activity },
+              {
+                key: "needsAttention",
+                label: "Needs Attention",
+                value: assetStats.needsAttention,
+                view: "needs_attention",
+                tone: "bad",
+                icon: AlertTriangle,
+                variant: assetStats.needsAttention > 0 ? "danger" : "default",
+              },
+              {
+                key: "outOfService",
+                label: "Out of Service",
+                value: assetStats.outOfService,
+                view: "out_of_service",
+                icon: PauseCircle,
+              },
+              {
+                key: "dueForPm",
+                label: "Due for PM",
+                value: assetStats.dueForPm,
+                view: "due_for_pm",
+                tone: assetStats.dueForPm > 0 ? "bad" : "neutral",
+                icon: CalendarClock,
+                variant: assetStats.dueForPm > 0 ? "danger" : "default",
+              },
+            ]}
+          />
+          <SavedViewsBar
+            path="/assets"
+            views={[
+              { id: "all", label: "All", value: "" },
+              { id: "active", label: "Active", value: "active" },
+              { id: "needs_attention", label: "Needs Attention", value: "needs_attention" },
+              { id: "out_of_service", label: "Out of Service", value: "out_of_service" },
+              { id: "due_for_pm", label: "Due for PM", value: "due_for_pm" },
+            ]}
+          />
+        </>
       )}
       <div className="flex flex-wrap items-center justify-between gap-4" data-tour="assets:schedule-pm">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Assets</h2>
@@ -438,7 +497,7 @@ export function AssetsList({
           >
             Search
           </button>
-          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy) && (
+          {(filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy || filterParams.view) && (
             <button
               type="button"
               onClick={() =>
@@ -451,6 +510,7 @@ export function AssetsList({
                   status: "",
                   health_status: "",
                   hierarchy: "",
+                  view: "",
                 })
               }
               className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
@@ -463,7 +523,7 @@ export function AssetsList({
 
       {initialAssets.length === 0 ? (
         <div className="space-y-4">
-          {!filterParams.q && !filterParams.company_id && !filterParams.property_id && !filterParams.type && !filterParams.condition && !filterParams.status && !filterParams.health_status && !filterParams.hierarchy && (
+          {!filterParams.q && !filterParams.company_id && !filterParams.property_id && !filterParams.type && !filterParams.condition && !filterParams.status && !filterParams.health_status && !filterParams.hierarchy && !filterParams.view && (
             <Hint
               id="assets-no-assets"
               variant="empty-state"
@@ -472,7 +532,7 @@ export function AssetsList({
           )}
           <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
             <p className="text-[var(--muted)]">
-              {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy
+              {filterParams.q || filterParams.company_id || filterParams.property_id || filterParams.type || filterParams.condition || filterParams.status || filterParams.health_status || filterParams.hierarchy || filterParams.view
                 ? "No assets match your filters."
                 : "No assets yet."}
             </p>
@@ -486,144 +546,169 @@ export function AssetsList({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm" data-tour="assets:asset-detail">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
-                  <th className="px-4 py-3 font-semibold">Asset</th>
-                  <th className="px-4 py-3 font-semibold">Type</th>
-                  <th className="px-4 py-3 font-semibold">Hierarchy</th>
-                  <th className="px-4 py-3 font-semibold">Health</th>
-                  <th className="px-4 py-3 font-semibold">Property</th>
-                  <th className="px-4 py-3 font-semibold">Building</th>
-                  <th className="px-4 py-3 font-semibold">Unit</th>
-                  <th className="px-4 py-3 font-semibold">Manufacturer</th>
-                  <th className="px-4 py-3 font-semibold">Model</th>
-                  <th className="px-4 py-3 font-semibold">Condition</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="w-28 px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody data-tour="assets:maintenance-history">
-                {initialAssets.map((a) => (
-                  <tr
-                    key={a.id}
-                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
-                  >
-                    <td className="px-4 py-3.5 text-[var(--foreground)]">
-                      <div>
-                        <Link
-                          href={`/assets/${a.id}`}
-                          className="font-medium text-[var(--accent)] hover:underline"
-                        >
-                          {assetDisplayName(a)}
-                        </Link>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {(a.child_count ?? 0) > 0 ? (
-                            <span className="inline-flex rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
-                              Parent
+        <CommandCenterLayout
+          listContent={
+            <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)]/80 bg-[var(--card)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1080px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
+                      <th className="px-4 py-3 font-semibold">Asset</th>
+                      <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Hierarchy</th>
+                      <th className="px-4 py-3 font-semibold">Health</th>
+                      <th className="px-4 py-3 font-semibold">Property</th>
+                      <th className="px-4 py-3 font-semibold">Building</th>
+                      <th className="px-4 py-3 font-semibold">Unit</th>
+                      <th className="px-4 py-3 font-semibold">Manufacturer</th>
+                      <th className="px-4 py-3 font-semibold">Model</th>
+                      <th className="px-4 py-3 font-semibold">Condition</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="w-28 px-4 py-3 font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody data-tour="assets:maintenance-history">
+                    {initialAssets.map((a) => (
+                      <tr
+                        key={a.id}
+                        onClick={() => setDetailDrawerAsset(a)}
+                        className={`border-b border-[var(--card-border)] last:border-0 transition-colors cursor-pointer hover:bg-[var(--background)]/50 ${
+                          detailDrawerAsset?.id === a.id ? "bg-[var(--accent)]/10" : ""
+                        }`}
+                      >
+                        <td className="px-4 py-3.5 text-[var(--foreground)]">
+                          <div>
+                            <span className="font-medium text-[var(--accent)]">
+                              {assetDisplayName(a)}
                             </span>
-                          ) : null}
-                          {a.parent_asset_id ? (
-                            <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300">
-                              Sub-asset
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {(a.child_count ?? 0) > 0 ? (
+                                <span className="inline-flex rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                                  Parent
+                                </span>
+                              ) : null}
+                              {a.parent_asset_id ? (
+                                <span className="inline-flex rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300">
+                                  Sub-asset
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">{typeDisplay(a)}</td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">
+                          {a.parent_asset_id && a.parent_asset_name ? (
+                            <span>Child of {a.parent_asset_name}</span>
+                          ) : (a.child_count ?? 0) > 0 ? (
+                            <span>{a.child_count} sub-assets</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {a.health_score != null ? (
+                            <div className="space-y-1">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${healthToneClass(
+                                  Number(a.health_score)
+                                )}`}
+                              >
+                                {Number(a.health_score).toFixed(0)}
+                              </span>
+                              <p className="text-[11px] text-[var(--muted)]">
+                                Risk {a.failure_risk != null ? Number(a.failure_risk).toFixed(0) : "—"}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-[var(--muted)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">{a.property_name ?? "—"}</td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">{a.building_name ?? "—"}</td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">{a.unit_name ?? "—"}</td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">{a.manufacturer ?? "—"}</td>
+                        <td className="px-4 py-3.5 text-[var(--muted)]">{a.model ?? "—"}</td>
+                        <td className="px-4 py-3.5">
+                          {a.condition ? (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                a.condition === "excellent"
+                                  ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+                                  : a.condition === "good"
+                                  ? "bg-[var(--accent)]/20 text-[var(--accent)]"
+                                  : a.condition === "fair"
+                                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                                  : "bg-red-500/20 text-red-600 dark:text-red-400"
+                              }`}
+                            >
+                              {a.condition}
                             </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{typeDisplay(a)}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">
-                      {a.parent_asset_id && a.parent_asset_name ? (
-                        <span>Child of {a.parent_asset_name}</span>
-                      ) : (a.child_count ?? 0) > 0 ? (
-                        <span>{a.child_count} sub-assets</span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {a.health_score != null ? (
-                        <div className="space-y-1">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${healthToneClass(
-                              Number(a.health_score)
-                            )}`}
-                          >
-                            {Number(a.health_score).toFixed(0)}
-                          </span>
-                          <p className="text-[11px] text-[var(--muted)]">
-                            Risk {a.failure_risk != null ? Number(a.failure_risk).toFixed(0) : "—"}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-[var(--muted)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.property_name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.building_name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.unit_name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.manufacturer ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">{a.model ?? "—"}</td>
-                    <td className="px-4 py-3.5">
-                      {a.condition ? (
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            a.condition === "excellent"
-                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
-                              : a.condition === "good"
-                              ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                              : a.condition === "fair"
-                              ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                              : "bg-red-500/20 text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {a.condition}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={a.status} />
-                    </td>
-                    <td className="px-4 py-3.5" data-tour="assets:create-wo" onClick={(e) => e.stopPropagation()}>
-                      <ActionsDropdown
-                        align="right"
-                        items={[
-                          { type: "link", label: "View", href: `/assets/${a.id}` },
-                          { type: "button", label: "Edit", onClick: () => openEdit(a) },
-                          ...(a.status === "active"
-                            ? [
-                                { type: "button" as const, label: "Set inactive", onClick: () => handleStatusChange(a.id, "inactive", assetDisplayName(a)), disabled: isPending },
-                                { type: "button" as const, label: "Retire", onClick: () => handleStatusChange(a.id, "retired", assetDisplayName(a)), disabled: isPending },
-                              ]
-                            : []),
-                          { type: "button", label: "Create WO", onClick: () => openCreateWO(a) },
-                          ...(pmModalData
-                            ? [{ type: "button" as const, label: "Schedule PM", onClick: () => setSelectedAssetForPM(a) }]
-                            : [{ type: "link" as const, label: "Schedule PM", href: `/preventive-maintenance?new=1&company_id=${encodeURIComponent(a.company_id)}&asset_id=${encodeURIComponent(a.id)}` }]),
-                          { type: "button", label: "Delete", onClick: () => handleDelete(a.id, assetDisplayName(a)), disabled: isPending, destructive: true },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {totalCountProp != null && (
-            <Pagination
-              page={pageProp}
-              pageSize={pageSizeProp}
-              totalCount={totalCountProp}
-              onPageChange={(p) => applyFilters({ page: String(p) })}
-              pageSizeOptions={[10, 25, 50, 100]}
-              onPageSizeChange={(size) => applyFilters({ page_size: String(size), page: "1" })}
-            />
-          )}
-        </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <StatusBadge status={a.status} />
+                        </td>
+                        <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <ActionsDropdown
+                            align="right"
+                            items={[
+                              { type: "link", label: "View", href: `/assets/${a.id}` },
+                              { type: "button", label: "Edit", onClick: () => openEdit(a) },
+                              ...(a.status === "active"
+                                ? [
+                                    { type: "button" as const, label: "Set inactive", onClick: () => handleStatusChange(a.id, "inactive", assetDisplayName(a)), disabled: isPending },
+                                    { type: "button" as const, label: "Retire", onClick: () => handleStatusChange(a.id, "retired", assetDisplayName(a)), disabled: isPending },
+                                  ]
+                                : []),
+                              { type: "button", label: "Create WO", onClick: () => openCreateWO(a) },
+                              ...(pmModalData
+                                ? [{ type: "button" as const, label: "Schedule PM", onClick: () => setSelectedAssetForPM(a) }]
+                                : [{ type: "link" as const, label: "Schedule PM", href: `/preventive-maintenance?new=1&company_id=${encodeURIComponent(a.company_id)}&asset_id=${encodeURIComponent(a.id)}` }]),
+                              { type: "button", label: "Delete", onClick: () => handleDelete(a.id, assetDisplayName(a)), disabled: isPending, destructive: true },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalCountProp != null && (
+                <Pagination
+                  page={pageProp}
+                  pageSize={pageSizeProp}
+                  totalCount={totalCountProp}
+                  onPageChange={(p) => applyFilters({ page: String(p) })}
+                  pageSizeOptions={[10, 25, 50, 100]}
+                  onPageSizeChange={(size) => applyFilters({ page_size: String(size), page: "1" })}
+                />
+              )}
+            </div>
+          }
+          detailContent={
+            detailDrawerAsset ? (
+              <AssetCommandCenterPane
+                asset={detailDrawerAsset}
+                onClose={() => setDetailDrawerAsset(null)}
+              />
+            ) : null
+          }
+          isDetailOpen={!!detailDrawerAsset}
+          onCloseDetail={() => setDetailDrawerAsset(null)}
+          emptyStateTitle="Asset Details"
+          emptyDetailMessage={
+            <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+              <p className="text-sm leading-relaxed text-[var(--muted)] max-w-[260px]">
+                Select an asset to view details, work orders, and PM schedules.
+              </p>
+              <p className="text-xs text-[var(--muted)]/80">
+                Tip: Use the summary cards or saved views to filter the list.
+              </p>
+            </div>
+          }
+        />
       )}
 
       <AssetFormModal

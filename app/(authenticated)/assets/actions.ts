@@ -401,3 +401,110 @@ export async function updateAssetStatus(
   revalidatePath(`/assets/${id}`);
   return { success: true };
 }
+
+/** Data for the asset command-center detail pane. Scoped by tenant. */
+export async function getAssetPaneData(assetId: string): Promise<{
+  data?: {
+    asset: {
+      id: string;
+      asset_name: string | null;
+      name: string | null;
+      status: string | null;
+      condition: string | null;
+      asset_type: string | null;
+      company_name: string | null;
+      property_name: string | null;
+      building_name: string | null;
+      unit_name: string | null;
+      manufacturer: string | null;
+      model: string | null;
+      serial_number: string | null;
+      health_score: number | null;
+      description: string | null;
+    };
+    workOrders: { id: string; work_order_number: string | null; title: string | null; status: string | null; created_at: string | null }[];
+    pmPlans: { id: string; name: string | null; next_run_date: string | null; status: string | null }[];
+  };
+  error?: string;
+}> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized" };
+
+  const { data: assetRow, error: assetError } = await supabase
+    .from("assets")
+    .select(
+      "id, asset_name, name, status, condition, asset_type, manufacturer, model, serial_number, health_score, description, company_id, property_id, building_id, unit_id, companies(name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number)"
+    )
+    .eq("id", assetId)
+    .single();
+
+  if (assetError || !assetRow) {
+    return { error: assetRow ? assetError?.message ?? "Asset not found" : "Asset not found" };
+  }
+
+  const row = assetRow as Record<string, unknown>;
+  const companyId = row.company_id as string;
+  if (!(await companyBelongsToTenant(companyId, tenantId, supabase))) {
+    return { error: "Asset not found" };
+  }
+
+  const comp = Array.isArray(row.companies) ? row.companies[0] : row.companies;
+  const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+  const bld = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
+  const un = Array.isArray(row.units) ? row.units[0] : row.units;
+
+  const asset = {
+    id: row.id as string,
+    asset_name: (row.asset_name as string | null) ?? null,
+    name: (row.name as string | null) ?? null,
+    status: (row.status as string | null) ?? null,
+    condition: (row.condition as string | null) ?? null,
+    asset_type: (row.asset_type as string | null) ?? null,
+    company_name: comp && typeof comp === "object" && "name" in comp ? (comp as { name?: string }).name ?? null : null,
+    property_name: prop && typeof prop === "object" ? (prop as { property_name?: string }).property_name ?? (prop as { name?: string }).name ?? null : null,
+    building_name: bld && typeof bld === "object" ? (bld as { building_name?: string }).building_name ?? (bld as { name?: string }).name ?? null : null,
+    unit_name: un && typeof un === "object" ? (un as { unit_name?: string }).unit_name ?? (un as { name_or_number?: string }).name_or_number ?? null : null,
+    manufacturer: (row.manufacturer as string | null) ?? null,
+    model: (row.model as string | null) ?? null,
+    serial_number: (row.serial_number as string | null) ?? null,
+    health_score: (row.health_score as number | null) ?? null,
+    description: (row.description as string | null) ?? null,
+  };
+
+  const [{ data: woData }, { data: pmData }] = await Promise.all([
+    supabase
+      .from("work_orders")
+      .select("id, work_order_number, title, status, created_at")
+      .eq("asset_id", assetId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("preventive_maintenance_plans")
+      .select("id, name, next_run_date, status")
+      .eq("asset_id", assetId)
+      .order("next_run_date", { ascending: true, nullsFirst: false }),
+  ]);
+
+  const workOrders = (woData ?? []).map((r) => {
+    const x = r as Record<string, unknown>;
+    return {
+      id: x.id as string,
+      work_order_number: (x.work_order_number as string | null) ?? null,
+      title: (x.title as string | null) ?? null,
+      status: (x.status as string | null) ?? null,
+      created_at: (x.created_at as string | null) ?? null,
+    };
+  });
+  const pmPlans = (pmData ?? []).map((r) => {
+    const x = r as Record<string, unknown>;
+    return {
+      id: x.id as string,
+      name: (x.name as string | null) ?? null,
+      next_run_date: (x.next_run_date as string | null) ?? null,
+      status: (x.status as string | null) ?? null,
+    };
+  });
+
+  return { data: { asset, workOrders, pmPlans } };
+}

@@ -68,8 +68,10 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
   const sourceType = searchParams.get("source_type") ?? "";
   const overdue = searchParams.get("overdue") ?? "";
   const unassigned = searchParams.get("unassigned") ?? "";
-  const sort = searchParams.get("sort") ?? "updated_at";
-  const order = searchParams.get("order") ?? "desc";
+  const sortParam = searchParams.get("sort") ?? "updated_at";
+  const sort = SORT_OPTIONS.some((o) => o.value === sortParam) ? sortParam : "updated_at";
+  const orderParam = searchParams.get("order") ?? "desc";
+  const order = orderParam === "asc" || orderParam === "desc" ? orderParam : "desc";
 
   const propertiesFiltered = companyId ? options.properties.filter((p) => p.company_id === companyId) : options.properties;
   const buildingsFiltered = propertyId ? options.buildings.filter((b) => b.property_id === propertyId) : options.buildings;
@@ -216,7 +218,15 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
               <select
                 id="wo-filter-company"
                 value={companyId}
-                onChange={(e) => apply({ company_id: e.target.value, property_id: "" })}
+                onChange={(e) =>
+                  apply({
+                    company_id: e.target.value,
+                    property_id: "",
+                    building_id: "",
+                    unit_id: "",
+                    asset_id: "",
+                  })
+                }
                 className={inputClass}
               >
                 <option value="">All</option>
@@ -311,6 +321,7 @@ export function WorkOrderFilters({ options }: WorkOrderFiltersProps) {
               >
                 <option value="">All</option>
                 <option value="manual">Manual</option>
+                <option value="portal">Portal</option>
                 <option value="preventive_maintenance">Preventive Maintenance</option>
                 <option value="reactive">Reactive</option>
                 <option value="inspection">Inspection</option>

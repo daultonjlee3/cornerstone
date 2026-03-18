@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImpersonateButton } from "./impersonate-button";
 import { WorkInTenantButton } from "../work-in-tenant-button";
+import { Suspense } from "react";
+import { TenantAiAllowanceModalWrapper } from "./tenant-ai-allowance-wrapper";
 
 export default async function PlatformTenantDetailPage({
   params,
@@ -78,6 +80,17 @@ export default async function PlatformTenantDetailPage({
         {(tenant as { slug?: string }).slug ? (
           <p className="text-xs text-[var(--muted)]">Slug: {(tenant as { slug: string }).slug}</p>
         ) : null}
+      </section>
+      <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+            AI allowance
+          </h2>
+        </div>
+        <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading AI allowance…</p>}>
+          {/* Modal is client-side; we render a button that opens it */}
+          <TenantAiAllowanceModalWrapper tenantId={tenantId} />
+        </Suspense>
       </section>
       <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">

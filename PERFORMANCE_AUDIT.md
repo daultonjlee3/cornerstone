@@ -1,83 +1,130 @@
-# Performance Audit (Phase 1)
+# Performance Audit — Cornerstone OS
 
-Prioritized bottlenecks discovered across auth, routing, work orders, dispatch, dashboard, detail pages, and data access.
+**Date:** 2025-03  
+**Scope:** Full-stack performance across login, navigation, dashboard, work orders, dispatch, assets, lists, and API/data.
 
-## 1) Work Orders list overfetch + render pressure
-- **Issue:** `work-orders` list query fetched full filtered result sets with no pagination and rendered every row.
-- **Why it is slow:** Large payloads, expensive joins, and large DOM trees scale poorly with tenant size.
-- **Severity:** **Critical**
-- **Impacted screens:** `work-orders`
-- **Proposed fix:** Add server-side pagination (`range` + `count`), keep sorting/filtering server-side, and render pagination controls.
-- **Expected impact:** Major reduction in initial load time, memory usage, and table interaction latency.
+---
 
-## 2) Work order detail server waterfall
-- **Issue:** Detail page executed many independent Supabase reads sequentially.
-- **Why it is slow:** Avoidable serial round trips increase time-to-first-render.
-- **Severity:** **High**
-- **Impacted screens:** `work-orders/[id]`
-- **Proposed fix:** Parallelize independent fetch groups with `Promise.all`.
-- **Expected impact:** Faster detail page render and lower long-tail latency.
+## Summary
 
-## 3) Dispatch duplicate modal mounts
-- **Issue:** `DispatchView` mounted assignment/create modals twice (unconditional + conditional duplicate trees).
-- **Why it is slow:** Duplicate React subtree mount/update work and extra prop/hook processing.
-- **Severity:** **High**
-- **Impacted screens:** `dispatch`
-- **Proposed fix:** Keep single modal instances and control visibility via state.
-- **Expected impact:** Reduced UI jank during dispatch interactions.
+The app uses Next.js App Router with Supabase. The authenticated layout already parallelizes 8 independent queries. Several high-impact improvements were identified: option-list overfetching on work orders, missing loading skeletons for operations, middleware/profile lookup on every request, and client-side re-renders on large lists. The audit below is ordered by **severity (critical → low)** and **impacted screens**.
 
-## 4) Dispatch filter route churn
-- **Issue:** Dispatch filters triggered route pushes on each change.
-- **Why it is slow:** Frequent route transitions re-run heavy server loading paths and add history churn.
-- **Severity:** **High**
-- **Impacted screens:** `dispatch`
-- **Proposed fix:** Use replace-style URL updates for high-frequency filter changes and skip no-op updates.
-- **Expected impact:** Faster-feeling filter interactions and smoother navigation.
+---
 
-## 5) N+1 material availability queries
-- **Issue:** Material availability fetched balances/reservations pair-by-pair.
-- **Why it is slow:** Query count scales with number of product/location pairs.
-- **Severity:** **High**
-- **Impacted screens:** `work-orders/[id]` materials flows
-- **Proposed fix:** Batch balances/reservations by product/location sets and aggregate in memory.
-- **Expected impact:** Significant reduction in DB round trips and response time.
+## 1. Work orders page: overfetching option lists (assets, properties, buildings, units)
 
-## 6) Middleware profile lookup on most navigations
-- **Issue:** Middleware performed user profile lookup broadly.
-- **Why it is slow:** Extra DB round trip before route render on many requests.
-- **Severity:** **High**
-- **Impacted screens:** Most authenticated routes
-- **Proposed fix:** Limit profile lookup to paths that require portal-vs-main redirect logic.
-- **Expected impact:** Better authenticated-route TTFB and navigation responsiveness.
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Option lists | Fetches all assets, all properties, all buildings, all units for the tenant with no limit | Large tenants can have thousands of rows; each query blocks the server render; assets query already orders by name but no `.limit()` | **High** | Work orders list page | Add `.limit(500)` (or 300) to assets, and limits to properties/buildings/units where sensible. Keep pagination for work orders themselves. | Faster TTFB for work orders page; less memory and DB load. |
 
-## 7) Post-login transition overhead
-- **Issue:** Login/signup/auth hash flows had avoidable redirect/query overhead.
-- **Why it is slow:** Extra auth/profile round trips and redirect hops delay post-login landing.
-- **Severity:** **High**
-- **Impacted screens:** `login`, `signup`, auth callback/hash flows
-- **Proposed fix:** Redirect directly to operational landing and remove redundant profile lookup in login action.
-- **Expected impact:** Faster sign-in completion and first meaningful paint after auth.
+---
 
-## 8) Work order filters causing heavy transition churn
-- **Issue:** Filter interactions frequently trigger full navigations and stale search state behavior.
-- **Why it is slow:** Frequent URL transitions and avoidable rerender churn degrade perceived speed.
-- **Severity:** **Medium**
-- **Impacted screens:** `work-orders`
-- **Proposed fix:** Improve client filter state handling, prefer replace for iterative filter updates, and reset pagination on filter changes.
-- **Expected impact:** Faster-feeling filter/search workflows.
+## 2. Operations (dashboard) has no route-level loading skeleton
 
-## 9) Heavy dashboard intelligence path blocks render
-- **Issue:** Operations page computes broad intelligence datasets even when only portions are needed.
-- **Why it is slow:** Expensive data loading/aggregation increases response time.
-- **Severity:** **Medium**
-- **Impacted screens:** `operations`, reports/export
-- **Proposed fix:** Split report-specific loaders and/or stream lower-priority sections behind Suspense.
-- **Expected impact:** Faster first contentful dashboard paint.
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Navigation | Visiting `/operations` shows blank or layout-only until `loadOperationsDashboardData` + `loadOperationsIntelligenceData` finish | No `loading.tsx` for the operations route; user sees nothing until full data loads | **High** | Operations Center (landing) | Add `app/(authenticated)/operations/loading.tsx` with a skeleton matching the dashboard layout (header, KPI placeholders, cards). | Perceived speed: instant feedback on navigation; content streams in. |
 
-## 10) Index opportunities for common work-order access patterns
-- **Issue:** Some common filters/sorts/searches can still degrade under large tenant data.
-- **Why it is slow:** Missing or non-optimal indexes increase scan cost.
-- **Severity:** **Medium**
-- **Impacted screens:** `work-orders`, `dispatch`, dashboard/reporting
-- **Proposed fix:** Add/validate indexes for `(company_id, updated_at)`, scheduled/date/status combinations, assignment filters, and search strategy.
-- **Expected impact:** Better query latency and lower database load at scale.
+---
+
+## 3. Authenticated layout: sequential auth + optional profile lookup
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Layout | `getUser` → `getTenantId` → membership → then 8 queries in parallel; for non–portal users, `users.is_portal_only` and profile are still fetched every time | Two round-trips before the parallel batch; profile/tour data could be deferred for non-portal users | **Medium** | Every authenticated page | Already optimized with Promise.all for phase 3. Consider caching tenant membership in cookie/short TTL to avoid DB on every request (follow-up). No change in this pass. | — |
+
+---
+
+## 4. Middleware: `getUser()` on every matched request
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Auth | Middleware calls `supabase.auth.getUser()` for every protected/auth path | Adds ~50–200 ms per navigation depending on network | **Medium** | All route transitions | Necessary for correct auth. Could use Edge config or short-lived cookie to skip full getUser when a recent session is known (future). No change in this pass. | — |
+
+---
+
+## 5. Work orders: buildings/units fetched after first parallel batch
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Data loading | `buildings` depends on `propertyIds`; `units` depends on `buildingIds`; so they run after the first Promise.all | One extra round-trip (buildings then units) after the main option batch | **Medium** | Work orders page | Run buildings and units in parallel: `Promise.all([buildingsQuery, unitsQuery])` where units use a subquery or `in('building_id', buildingIds)` and buildingIds come from the same batch as properties (e.g. fetch buildings with property_id in propertyIds, then units with building_id in buildingIds from that result). Already structured that way; only minor tuning (e.g. ensure single round-trip for buildings+units). | Slightly faster work orders load. |
+
+---
+
+## 6. Dispatch: single large `loadDispatchData` payload
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Data loading | All work orders for the selected date/filters, all crews, all technicians, filter options, and insights loaded in one go | Large payload and multiple queries in one function; map and board wait for everything | **Medium** | Dispatch page | Already one server round-trip. Add `loading.tsx` (exists) and consider streaming or splitting: e.g. show board with work orders first, load map or secondary panels with dynamic import. Implemented: ensure loading skeleton is shown; lazy load map component. | Perceived speed; faster interactive board. |
+
+---
+
+## 7. Client components: large subtree re-renders (work orders list)
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Re-renders | `WorkOrdersList` is a single large client component; filter changes or state updates re-render the whole list | Every keystroke or filter change can re-render many rows | **Medium** | Work orders list | Memoize list row component with `React.memo`; ensure option arrays from server are stable (same reference when filters don’t change). Use `useDeferredValue` for search input so the list doesn’t block. | Smoother filter/search; less jank. |
+
+---
+
+## 8. Map component: loaded eagerly on dispatch
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| JS bundle | Dispatch map (e.g. Leaflet/Mapbox) is part of the main dispatch chunk | Increases initial JS for the dispatch page | **Medium** | Dispatch | Dynamic import the map panel: `const DispatchMapPanel = dynamic(() => import('./DispatchMapPanel'), { loading: () => <MapSkeleton /> })`. | Faster TTI on dispatch; map loads after board. |
+
+---
+
+## 9. Dashboard (operations): two large data loads
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Data loading | `loadOperationsDashboardData` and `loadOperationsIntelligenceData` both run; PM section uses Suspense | Dashboard waits for both until PM section suspends; good use of Suspense for PM | **Low** | Operations | Already using Promise.all internally and Suspense for PM. Add operations `loading.tsx` (see #2). Optionally defer “backlog” or “alerts” below the fold. | Perceived speed from skeleton. |
+
+---
+
+## 10. Assets list: sequential companies → properties → buildings → assets
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Data loading | Companies, then properties, then buildings, then assets with pagination | Four round-trips before assets; first three could be parallelized with a single query or parallel queries | **Low** | Assets list | Run companies + (properties + buildings in parallel where buildings use property ids from properties). If properties query is fast, do companies then Promise.all([properties, buildings(propertyIds)]). Requires fetching propertyIds from properties first or a different query shape. Leave for follow-up if needed. | — |
+
+---
+
+## 11. No stale-while-revalidate for static option data
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Caching | Companies, technicians, properties (option lists) are refetched on every visit | No caching; every navigation to work orders refetches dropdown data | **Low** | Work orders, dispatch, assets | Use `unstable_cache` or route segment config `revalidate` for option-list fetches where data is not highly dynamic. Risk: stale options (e.g. new company added). Use short revalidate (e.g. 60). | Fewer DB hits; faster repeat visits. |
+
+---
+
+## 12. Bundle: fonts and root layout
+
+| Field | Issue | Why slow | Severity | Impacted | Fix | Expected impact |
+|-------|--------|----------|----------|----------|-----|------------------|
+| Fonts | Geist and Geist Mono loaded in root layout | Blocking or render-blocking if not optimized | **Low** | All pages | Next.js font optimization already in use; ensure `display: 'swap'` or similar. No change unless metrics show font delay. | — |
+
+---
+
+## Implementation order (Phase 2)
+
+1. **Work orders option limits** — Add `.limit(500)` to assets and reasonable limits to other option queries.
+2. **Operations loading skeleton** — Add `operations/loading.tsx`.
+3. **Work orders list memoization** — Memoize row component; consider `useDeferredValue` for search.
+4. **Dispatch map lazy load** — Dynamic import for map panel with skeleton.
+5. **Work orders buildings/units** — Ensure single parallel round-trip (already structured; verify).
+6. **Perceived performance pass** — Skeletons, progressive loading, and defer non-critical UI where applicable.
+
+---
+
+## DB indexes (recommendations)
+
+Ensure indexes exist for:
+
+- `work_orders (company_id, status)`, `work_orders (company_id, due_date)`, `work_orders (assigned_technician_id)`, `work_orders (scheduled_date)`
+- `assets (company_id)`, `assets (property_id)`, `assets (building_id)`, `assets (unit_id)`
+- `technicians (company_id, status)`
+- `preventive_maintenance_plans (company_id, status, next_run_date)`
+
+These are likely already present from initial schema; verify and add any missing.

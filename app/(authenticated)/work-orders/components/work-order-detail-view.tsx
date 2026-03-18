@@ -22,6 +22,7 @@ import { WorkOrderStatusTimeline } from "./work-order-status-timeline";
 import { WorkOrderCompletionCard } from "./work-order-completion-card";
 import { AttachmentUploader } from "@/src/components/ui/attachment-uploader";
 import { HelperTip } from "@/src/components/ui/helper-tip";
+import { CornerstoneAiPanel } from "@/app/(authenticated)/components/cornerstone-ai-panel";
 
 const STATUS_OPTIONS_FOR_DROPDOWN = [
   "new",
@@ -126,6 +127,7 @@ export function WorkOrderDetailView({
   const [statusDropdown, setStatusDropdown] = useState(false);
   const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
   const [completionModalOpen, setCompletionModalOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   const id = workOrder.id as string;
@@ -214,7 +216,14 @@ export function WorkOrderDetailView({
           onAssignCrew={openAssignmentModal}
           onChangeStatusClick={() => setStatusDropdown((v) => !v)}
           onCompleteClick={() => setCompletionModalOpen(true)}
+          onSummarize={() => setAiPanelOpen(true)}
           isPending={isPending}
+        />
+        <CornerstoneAiPanel
+          open={aiPanelOpen}
+          onClose={() => setAiPanelOpen(false)}
+          context={{ entityType: "work_order", entityId: id }}
+          initialQuery="Summarize this work order for a supervisor."
         />
         {sla.responseBreached ? (
           <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-300">

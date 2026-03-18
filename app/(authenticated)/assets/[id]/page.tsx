@@ -6,6 +6,7 @@ import { AssetHealthIndicator } from "../components/asset-health-indicator";
 import { AssetIntelligencePanel } from "../components/asset-intelligence-panel";
 import { AssetTimeline } from "../components/asset-timeline";
 import { AssetDetailHelperTip } from "../components/asset-detail-helper-tip";
+import { AssetDetailAiSummary } from "../components/asset-detail-ai-summary";
 import { getAssetIntelligenceSnapshot } from "@/src/lib/assets/assetIntelligenceService";
 import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
@@ -463,12 +464,15 @@ export default async function AssetDetailPage({
             <p className="text-sm font-medium text-[var(--foreground)]">
               {formatDateTime(lastServicedAt)}
             </p>
-            <Link
-              href="/assets/intelligence"
-              className="mt-3 inline-flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
-            >
-              Portfolio Intelligence
-            </Link>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <AssetDetailAiSummary assetId={id} />
+              <Link
+                href="/assets/intelligence"
+                className="inline-flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"
+              >
+                Portfolio Intelligence
+              </Link>
+            </div>
           </div>
         </div>
       </header>

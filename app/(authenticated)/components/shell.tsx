@@ -7,10 +7,12 @@ import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { DemoWelcomeModal } from "./demo-welcome-modal";
-import { TooltipProvider } from "@/src/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 import { TourProvider, TourOverlay } from "@/src/components/ui/tour";
 import { GuidedTourProvider } from "@/hooks/useGuidedTour";
 import { GuidedTour } from "@/components/tour/GuidedTour";
+import { CornerstoneAiPanel } from "./cornerstone-ai-panel";
+import { Sparkles } from "lucide-react";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -83,6 +85,8 @@ export function Shell({
     ? ALL_TOUR_IDS
     : completedTourIds;
 
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
   return (
     <TooltipProvider>
       <GuidedTourProvider
@@ -144,6 +148,26 @@ export function Shell({
               </div>
             </div>
           </div>
+          {!isDispatchFullscreen && !isScreenshotMode ? (
+            <>
+              <div className="fixed bottom-5 right-5 z-40">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setAiPanelOpen(true)}
+                      className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[var(--shadow-glow)] transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+                      aria-label="Ask Cornerstone"
+                    >
+                      <Sparkles className="size-5" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Ask Cornerstone</TooltipContent>
+                </Tooltip>
+              </div>
+              <CornerstoneAiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+            </>
+          ) : null}
         </TourProvider>
       </GuidedTourProvider>
     </TooltipProvider>

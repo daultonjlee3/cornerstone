@@ -1,57 +1,86 @@
-# Perceived Performance Pass (Phase 2b)
+# Perceived Performance Pass — User-Facing Speed
 
-This pass focused on making the app *feel* faster in user interactions and route transitions, beyond pure backend throughput.
+**Goal:** Make the app *feel* dramatically faster through instant feedback, skeletons, and progressive loading without breaking correctness.
 
-## What was changed
+---
 
-## 1) Faster-feeling login and protected route flow
-- Removed extra post-login profile lookup from login action.
-- Redirects now go directly to operational landing (`/operations`) instead of extra alias hops.
-- Auth hash handler now routes directly to `/operations`.
+## Priorities (in order)
 
-**User-perceived effect:** less waiting after sign-in, fewer transition hops.
+1. Login and post-login transition  
+2. Work orders  
+3. Dashboards (Operations Center)  
+4. Map / Dispatch  
+5. Assets / Inventory lists  
+6. Detail pages and forms  
 
-## 2) Work orders now become usable faster
-- Added true server pagination (50 rows/page) for the work-orders list.
-- Added explicit pagination controls and total counts.
-- Kept filter/sort server-side while reducing row payload size.
-- Converted filter URL updates to replace-style transitions and reset pagination on filter changes.
-- Fixed search input behavior to avoid stale controlled-value churn.
+---
 
-**User-perceived effect:** first render is much quicker on large datasets, interactions feel lighter, and filtering/searching no longer causes excessive state churn.
+## Changes Implemented
 
-## 3) Dispatch interaction smoothness improvements
-- Removed duplicate modal subtree mounts in `DispatchView`.
-- Added no-op guards + replace transitions for dispatch URL state updates.
+### 1. Login and post-login transition
 
-**User-perceived effect:** less UI jank during dispatch interactions and reduced route/history churn from frequent filter changes.
+- **Current behavior:** Login form submits via server action; redirect to `next` or `/operations`. Auth callback handles magic link / OAuth with `exchangeCodeForSession` or `setSession` then `router.replace(next)`.
+- **Changes:** No code change. Auth callback already shows a loading state; redirect is a single client navigation. Recommendation: ensure `next` is set so users land where they expect (e.g. `/operations`) without an extra hop.
+- **Perceived win:** Already reasonable; optional improvement is a short “Redirecting…” message with a spinner if the redirect takes >200 ms.
 
-## 4) Progressive operations dashboard rendering
-- Split PM intelligence section behind Suspense with a skeleton fallback.
-- Core operations KPIs/cards can render while intelligence section resolves.
+### 2. Work orders
 
-**User-perceived effect:** page feels available sooner; users can start reading and acting before all secondary analytics finish loading.
+- **Skeleton:** `work-orders/loading.tsx` already exists and shows header + filter bar + table skeleton. Verified in place.
+- **Data:** Option list limits (see PERFORMANCE_AUDIT.md and PERFORMANCE_RESULTS.md) reduce server work and payload so the page can paint faster.
+- **Filter/search:** Filters apply via URL (router.replace); no client-side filtering of a huge list. Search applies on blur/Enter in the filter panel; list is server-driven and paginated (50 per page). No blocking spinner over the whole page.
+- **Perceived win:** Skeleton shows immediately on navigation; first content appears as soon as server responds; limits keep response time lower.
 
-## 5) Faster detail-page responsiveness
-- Parallelized independent work-order detail queries with `Promise.all`.
+### 3. Dashboards (Operations Center)
 
-**User-perceived effect:** less “waiting on blank detail page” before content appears.
+- **Skeleton:** Added `operations/loading.tsx` with placeholders for:
+  - Page title and subtitle
+  - KPI cards (7)
+  - Asset health + technician activity cards
+  - PM Compliance section (heading + 4 KPIs + 2 cards)
+  - Backlog metrics (4 cards)
+- **Data loading:** Dashboard uses `loadOperationsDashboardData` and `loadOperationsIntelligenceData`; PM section already uses Suspense with `PmComplianceSectionSkeleton`. No change to data flow.
+- **Perceived win:** Navigating to Operations shows the new skeleton immediately; then content fills in. No blank screen.
 
-## 6) Backend interaction latency improvements surfaced in UI
-- Replaced N+1 material availability queries with batched reads.
+### 4. Map / Dispatch
 
-**User-perceived effect:** materials-related sections and actions on detail pages respond faster, especially as line-item count grows.
+- **Loading:** `dispatch/loading.tsx` shows header + technician columns skeleton. No change.
+- **Map:** `DispatchMapPanel` is already loaded with `dynamic(..., { ssr: false, loading: () => <div>Loading dispatch map…</div> })`. Board and filters render first; map loads after.
+- **Perceived win:** Board is interactive quickly; map appears when ready. No change in this pass.
 
-## Design correctness and safety
+### 5. Assets / Inventory lists
 
-- No business logic removed.
-- No tenant scoping removed.
-- No CRUD semantics intentionally changed.
-- Routing/auth guards preserved (validated unauth redirect behavior for protected routes).
+- **Loading:** `assets/loading.tsx` and `inventory/loading.tsx` exist. No change.
+- **Lists:** Server-rendered with pagination; no client-side filtering of full dataset. Perceived speed is already good; optional improvement is to ensure loading skeletons match the list layout.
 
-## Follow-up perceived-speed opportunities
+### 6. Detail pages and forms
 
-1. Add optimistic UI for safe assignment/status updates on work-order list rows.
-2. Introduce table virtualization for largest tenant datasets.
-3. Add deferred/lazy map panel hydration for low-priority map widgets.
-4. Persist previous list data during filter transitions in all large list pages.
+- **Work order detail:** Full-page load; no skeleton for detail in this pass. Optional: add `work-orders/[id]/loading.tsx` for the detail view.
+- **Forms:** Modals (e.g. create work order) open on client; no blocking full-page load. No change.
+
+---
+
+## Patterns applied
+
+- **Skeletons instead of blocking spinners:** Operations and work orders (and dispatch, assets, inventory) use route-level `loading.tsx` so navigation shows structure immediately.
+- **Progressive loading:** Dispatch loads the board first and the map dynamically; Operations uses Suspense for the PM section.
+- **Preserving previous data during transitions:** Next.js keeps the previous route visible until the new one is ready when using loading.tsx, which avoids a flash of empty content.
+- **Reducing layout shift:** Skeleton placeholders reserve space for KPIs and cards so when real content loads, layout shift is minimal.
+- **Deferring below-the-fold / secondary content:** Map on dispatch and PM section on operations load after primary content.
+
+---
+
+## What was not changed (by design)
+
+- **Auth flows:** No change to middleware or layout auth checks; correctness and security preserved.
+- **Tenant scoping:** All queries still respect tenant/company; no change to data isolation.
+- **CRUD and filters:** No removal of fields or filter options; only limits on option list size for work orders.
+- **Optimistic UI:** Not added in this pass to avoid risk of inconsistent state; can be added later for actions like “mark complete” or “assign.”
+
+---
+
+## Follow-up recommendations
+
+- Add `work-orders/[id]/loading.tsx` for the work order detail page.
+- Consider a small “Redirecting…” state in the auth callback if `router.replace` takes longer than ~200 ms.
+- For very large work order lists, consider virtualizing the table (e.g. react-window) if 50 rows ever feel slow to render.
+- List row memoization in work-orders-list (see PERFORMANCE_RESULTS.md) for smoother selection and drawer interactions.

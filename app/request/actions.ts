@@ -11,6 +11,15 @@ export type PortalSubmissionState = {
   workOrderNumber?: string;
 };
 
+export type PortalPastRequestSummary = {
+  id: string;
+  requester_name: string | null;
+  requester_email: string;
+  description: string;
+  status: string;
+  created_at: string;
+};
+
 const VALID_PRIORITY = new Set(["low", "medium", "high", "urgent", "emergency"]);
 
 const SUPPORTED: RequestPortalLocaleCode[] = ["en", "es", "fr"];
@@ -63,7 +72,7 @@ export async function submitMaintenanceRequestPortal(
   const supabase = await createClient();
   const { data: company } = await supabase
     .from("companies")
-    .select("id, tenant_id")
+    .select("id, tenant_id, auto_create_work_orders_from_requests")
     .eq("id", companyId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -108,6 +117,40 @@ export async function submitMaintenanceRequestPortal(
     .filter(Boolean)
     .join("\n\n");
 
+  // Always create a work request record from the portal submission.
+  const workRequestPayload = {
+    tenant_id: company.tenant_id as string,
+    company_id: companyId,
+    requester_name: requesterName,
+    requester_email: requesterEmail.toLowerCase(),
+    location,
+    asset_id: validatedAssetId,
+    description,
+    priority,
+    status: "submitted" as "submitted",
+  };
+
+  const { data: insertedRequest, error: requestError } = await supabase
+    .from("work_requests")
+    .insert(workRequestPayload)
+    .select("id")
+    .single();
+
+  if (requestError) {
+    return { error: requestError.message };
+  }
+
+  const workRequestId = (insertedRequest as { id?: string } | null)?.id ?? null;
+
+  const autoCreate =
+    (company as { auto_create_work_orders_from_requests?: boolean | null })
+      .auto_create_work_orders_from_requests ?? true;
+
+  if (!autoCreate || !workRequestId) {
+    // Request-only mode: do not create a work order, but still show a success state.
+    return { success: true, workOrderNumber: undefined };
+  }
+
   const workOrderForm = new FormData();
   workOrderForm.set("company_id", companyId);
   workOrderForm.set("title", buildTitle(description, location));
@@ -116,6 +159,7 @@ export async function submitMaintenanceRequestPortal(
   workOrderForm.set("status", "new");
   workOrderForm.set("requested_by_name", requesterName);
   workOrderForm.set("requested_by_email", requesterEmail);
+  workOrderForm.set("request_id", workRequestId);
   if (validatedAssetId) workOrderForm.set("asset_id", validatedAssetId);
 
   const result = await saveWorkOrder(
@@ -123,10 +167,27 @@ export async function submitMaintenanceRequestPortal(
     workOrderForm,
     { portalContext: { tenantId, companyId } }
   );
-  if (result.error) return { error: result.error };
+  if (result.error) {
+    const raw = String(result.error);
+    if (
+      raw.includes("uq_work_orders_work_order_number") ||
+      raw.toLowerCase().includes("duplicate key value violates unique constraint")
+    ) {
+      return { error: t(locale, "validation.portalDuplicateWorkOrderNumber") };
+    }
+    return { error: raw };
+  }
 
   const workOrderId = result.workOrderId ?? null;
   const workOrderNumber = result.workOrderNumber ?? undefined;
+
+  if (workOrderId) {
+    // Keep work request status in sync when auto-created.
+    await supabase
+      .from("work_requests")
+      .update({ status: "converted_to_work_order" })
+      .eq("id", workRequestId);
+  }
 
   const photoFile = formData.get("photo");
   if (
@@ -155,4 +216,48 @@ export async function submitMaintenanceRequestPortal(
   }
 
   return { success: true, workOrderNumber };
+}
+
+export async function fetchPortalPastRequests(
+  tenantId: string,
+  companyId: string,
+  email: string
+): Promise<{ requests: PortalPastRequestSummary[] }> {
+  const trimmedEmail = email.trim().toLowerCase();
+  if (!tenantId || !companyId || !trimmedEmail || !trimmedEmail.includes("@")) {
+    return { requests: [] };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("work_requests")
+    .select("id, requester_name, requester_email, description, status, created_at")
+    .eq("tenant_id", tenantId)
+    .eq("requester_email", trimmedEmail)
+    .order("created_at", { ascending: false })
+    .limit(15);
+
+  if (error || !data) {
+    return { requests: [] };
+  }
+
+  const rows = data as {
+    id: string;
+    requester_name?: string | null;
+    requester_email?: string | null;
+    description?: string | null;
+    status?: string | null;
+    created_at?: string | null;
+  }[];
+
+  const requests: PortalPastRequestSummary[] = rows.map((row) => ({
+    id: row.id,
+    requester_name: row.requester_name ?? null,
+    requester_email: (row.requester_email ?? "").toLowerCase(),
+    description: row.description ?? "",
+    status: row.status ?? "submitted",
+    created_at: row.created_at ?? new Date().toISOString(),
+  }));
+
+  return { requests };
 }

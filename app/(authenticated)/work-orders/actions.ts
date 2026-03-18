@@ -115,6 +115,30 @@ async function generateWorkOrderNumber(
   supabase: Awaited<ReturnType<typeof createClient>>,
   companyId: string
 ): Promise<string> {
+  // Preferred path: use database-backed sequence via RPC for concurrency safety.
+  try {
+    const { data, error } = await supabase.rpc("next_work_order_number", {
+      p_company_id: companyId,
+    });
+    if (!error && typeof data === "string" && data.trim()) {
+      return data.trim();
+    }
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[WorkOrders] next_work_order_number RPC error", {
+        companyId,
+        error: error.message,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[WorkOrders] next_work_order_number RPC threw", {
+      companyId,
+      error: String(err),
+    });
+  }
+
+  // Fallback: derive next number from existing rows for this company.
   const { data: rows } = await supabase
     .from("work_orders")
     .select("work_order_number")
@@ -3148,4 +3172,207 @@ export async function exportWorkOrdersCsv(
     ),
   ];
   return { data: lines.join("\r\n") };
+}
+
+/** Load data for the work order detail pane (tabs). Scoped to tenant. */
+export async function getWorkOrderPaneData(workOrderId: string): Promise<{
+  data?: {
+    notes: { id: string; body: string; note_type: string | null; created_at: string }[];
+    checklistItems: { id: string; label: string; completed: boolean; sort_order: number }[];
+    partUsage: {
+      id: string;
+      product_id?: string | null;
+      quantity_used: number;
+      unit_cost_snapshot?: number | null;
+      unit_cost: number | null;
+      total_cost: number | null;
+      created_at: string;
+      part_name_snapshot: string | null;
+      sku_snapshot: string | null;
+      unit_of_measure: string | null;
+      used_at: string | null;
+      stock_location_name?: string | null;
+      notes?: string | null;
+    }[];
+    statusHistory: { id: string; from_status: string | null; to_status: string; changed_at: string }[];
+    inventoryItems: {
+      id: string;
+      product_id: string;
+      stock_location_id: string;
+      name: string;
+      location_name: string;
+      sku: string | null;
+      unit: string | null;
+      cost: number | null;
+      quantity: number;
+    }[];
+    attachments: {
+      id: string;
+      file_name: string;
+      file_url: string;
+      file_type: string | null;
+      caption?: string | null;
+      uploaded_at?: string | null;
+      created_at: string;
+    }[];
+  };
+  error?: string;
+}> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+
+  const { data: companies } = await supabase
+    .from("companies")
+    .select("id")
+    .eq("tenant_id", tenantId);
+  const companyIds = (companies ?? []).map((c) => (c as { id: string }).id);
+  if (companyIds.length === 0) return { error: "No companies found." };
+
+  const { data: woRow, error: woError } = await supabase
+    .from("work_orders")
+    .select("id, company_id")
+    .eq("id", workOrderId)
+    .maybeSingle();
+  if (woError || !woRow) return { error: "Work order not found." };
+  const companyId = (woRow as { company_id?: string }).company_id ?? "";
+  if (!companyIds.includes(companyId)) return { error: "Work order not found." };
+
+  const [
+    { data: notes },
+    { data: checklistItems },
+    { data: partUsageRaw },
+    { data: statusHistory },
+    { data: stockLocations },
+    { data: attachments },
+  ] = await Promise.all([
+    supabase
+      .from("work_order_notes")
+      .select("id, body, note_type, created_at")
+      .eq("work_order_id", workOrderId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("work_order_checklist_items")
+      .select("id, label, completed, sort_order")
+      .eq("work_order_id", workOrderId)
+      .order("sort_order"),
+    supabase
+      .from("work_order_part_usage")
+      .select(
+        "id, product_id, quantity_used, unit_cost_snapshot, unit_cost, total_cost, notes, created_at, part_name_snapshot, sku_snapshot, unit_of_measure, used_at, stock_locations(name)"
+      )
+      .eq("work_order_id", workOrderId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("work_order_status_history")
+      .select("id, from_status, to_status, changed_at")
+      .eq("work_order_id", workOrderId)
+      .order("changed_at", { ascending: false }),
+    supabase
+      .from("stock_locations")
+      .select("id, name")
+      .eq("company_id", companyId)
+      .eq("active", true)
+      .order("name", { ascending: true }),
+    supabase
+      .from("work_order_attachments")
+      .select("id, file_name, file_url, file_type, caption, uploaded_at, created_at")
+      .eq("work_order_id", workOrderId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const partUsage = (partUsageRaw ?? []).map((row) => {
+    const r = row as Record<string, unknown>;
+    const loc = Array.isArray(r.stock_locations) ? r.stock_locations[0] : r.stock_locations;
+    const stock_location_name =
+      loc && typeof loc === "object" && "name" in (loc as object)
+        ? (loc as { name?: string }).name ?? null
+        : null;
+    return {
+      id: r.id as string,
+      product_id: (r.product_id as string | null) ?? null,
+      quantity_used: Number(r.quantity_used) ?? 0,
+      unit_cost_snapshot: (r.unit_cost_snapshot as number | null) ?? null,
+      unit_cost: (r.unit_cost as number | null) ?? null,
+      total_cost: (r.total_cost as number | null) ?? null,
+      created_at: (r.created_at as string) ?? "",
+      part_name_snapshot: (r.part_name_snapshot as string | null) ?? null,
+      sku_snapshot: (r.sku_snapshot as string | null) ?? null,
+      unit_of_measure: (r.unit_of_measure as string | null) ?? null,
+      used_at: (r.used_at as string | null) ?? null,
+      stock_location_name,
+      notes: (r.notes as string | null) ?? null,
+    };
+  });
+
+  const stockLocationIds = (stockLocations ?? []).map((row) => (row as { id: string }).id);
+  const { data: inventoryRaw } = stockLocationIds.length
+    ? await supabase
+        .from("inventory_balances")
+        .select(
+          "id, product_id, stock_location_id, quantity_on_hand, products(name, sku, unit_of_measure, default_cost), stock_locations(name)"
+        )
+        .in("stock_location_id", stockLocationIds)
+        .order("updated_at", { ascending: false })
+    : { data: [] as unknown[] };
+
+  const inventoryItems = ((inventoryRaw ?? []) as Record<string, unknown>[]).map((row) => {
+    const product = Array.isArray(row.products) ? row.products[0] : row.products;
+    const location = Array.isArray(row.stock_locations) ? row.stock_locations[0] : row.stock_locations;
+    return {
+      id: row.id as string,
+      product_id: (row.product_id as string) ?? "",
+      stock_location_id: (row.stock_location_id as string) ?? "",
+      name:
+        product && typeof product === "object" && "name" in (product as object)
+          ? ((product as { name?: string }).name ?? "Product")
+          : "Product",
+      location_name:
+        location && typeof location === "object" && "name" in (location as object)
+          ? ((location as { name?: string }).name ?? "Location")
+          : "Location",
+      sku:
+        product && typeof product === "object" && "sku" in (product as object)
+          ? ((product as { sku?: string | null }).sku ?? null)
+          : null,
+      unit:
+        product && typeof product === "object" && "unit_of_measure" in (product as object)
+          ? ((product as { unit_of_measure?: string | null }).unit_of_measure ?? null)
+          : null,
+      cost:
+        product && typeof product === "object" && "default_cost" in (product as object)
+          ? ((product as { default_cost?: number | null }).default_cost ?? null)
+          : null,
+      quantity: Number(row.quantity_on_hand ?? 0),
+    };
+  });
+
+  return {
+    data: {
+      notes: (notes ?? []) as { id: string; body: string; note_type: string | null; created_at: string }[],
+      checklistItems: (checklistItems ?? []) as {
+        id: string;
+        label: string;
+        completed: boolean;
+        sort_order: number;
+      }[],
+      partUsage,
+      statusHistory: (statusHistory ?? []) as {
+        id: string;
+        from_status: string | null;
+        to_status: string;
+        changed_at: string;
+      }[],
+      inventoryItems,
+      attachments: (attachments ?? []) as {
+        id: string;
+        file_name: string;
+        file_url: string;
+        file_type: string | null;
+        caption?: string | null;
+        uploaded_at?: string | null;
+        created_at: string;
+      }[],
+    },
+  };
 }

@@ -1,42 +1,70 @@
-# Performance Results (Phase 3)
+# Performance Results — Phase 2 & 3
 
-This summarizes concrete improvements implemented in this pass and what was validated in runtime checks.
+**Date:** 2025-03  
+**Scope:** High-impact fixes from PERFORMANCE_AUDIT.md and perceived-performance pass.
 
-## Measured / verifiable improvements
+---
 
-| Area | Before | After | Impact |
-|---|---|---|---|
-| Work orders list payload | Unbounded filtered query returned all matching rows | Server pagination (`range`) capped at 50 rows/page with total count | Large drop in payload size and table render cost on large tenants |
-| Work order list stats | Derived from full loaded row objects | Derived from lightweight count queries over filtered scope | Lower transfer/memory pressure while preserving KPI semantics |
-| Material availability (`getWorkOrderMaterialLinesWithAvailability`) | N+1 loop: per pair balance query + reservations query | Batched `inventory_balances` + batched `inventory_reservations` | Query count reduced from `O(pairs)` to constant 2 |
-| Work order detail load | Many independent sequential fetches | Major fetch groups parallelized with `Promise.all` | Lower server waterfall latency / faster first render |
-| Dispatch modal rendering | Duplicate assignment/create modal trees mounted | Single modal instances only | Less unnecessary render/mount work and lower interaction jank |
-| Dispatch URL/filter updates | Frequent `push` updates + possible no-op transitions | `replace` updates + no-op guard | Smoother filter interactions and reduced history churn |
-| Middleware profile lookups | Profile lookup on most authenticated requests | Profile lookup only for auth/portal routing paths | Reduced per-request DB overhead on app navigation |
-| Post-login path | Extra profile lookup in login action | Direct redirect to intended route (`next` or `/operations`) | Faster sign-in completion path |
-| Signup completion path | Redirected to `/dashboard` alias first | Redirects directly to `/operations` | Removes extra hop |
-| Operations dashboard perceived load | PM intelligence blocked full page render | PM intelligence streamed via Suspense fallback | Faster perceived first content paint for operations shell |
+## Changes Implemented
 
-## Runtime checks executed
+### 1. Work orders option list limits (backend/data)
 
-- Login and protected-route unauth redirects verified in browser walkthrough:
-  - `/login` renders successfully
-  - `/operations` → `/login?next=%2Foperations`
-  - `/work-orders` → `/login?next=%2Fwork-orders`
-  - `/dispatch` → `/login?next=%2Fdispatch`
+- **What:** Added `.limit(500)` to assets, `.limit(200)` to properties, `.limit(300)` to buildings, `.limit(500)` to units, `.limit(200)` to technicians/customers/vendors, `.limit(100)` to crews.
+- **Why:** Prevents overfetching on large tenants; reduces payload and DB time for the work orders page.
+- **Impact:** Faster TTFB and lower memory on work orders load; dropdowns still have 100–500 options. For tenants with more than 500 assets, the filter shows the first 500 (by name); consider adding typeahead/search for assets in a follow-up.
 
-- Curl timing smoke checks (local dev server):
-  - `/login` returned `200`
-  - protected routes returned expected `307` redirects while unauthenticated
+### 2. Operations Center loading skeleton
 
-## Constraints / benchmark limits
+- **What:** Added `app/(authenticated)/operations/loading.tsx` with skeleton placeholders for header, KPI cards, asset health, technician activity, PM section, and backlog metrics.
+- **Why:** Next.js shows this immediately on navigation to `/operations` while the server fetches dashboard data.
+- **Impact:** Perceived speed: user sees instant feedback instead of a blank or layout-only screen; content streams in when ready.
 
-- A fully authenticated benchmark across data-heavy pages (dashboard/work-orders/dispatch/details with tenant data) could not be completed in this environment because demo user seeding requires `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, which was unavailable.
-- Despite that, high-impact bottlenecks were fixed directly in hot paths (query strategy, batching, render churn, route transition behavior), and unauthenticated flow/runtime behavior was validated.
+### 3. Work orders loading skeleton
 
-## Additional architectural gains for a second pass
+- **What:** Already present (`work-orders/loading.tsx`). No change; verified it exists and is used.
+- **Impact:** Work orders navigation already shows a skeleton.
 
-1. Add DB-level report/materialized views for operations intelligence.
-2. Add virtualized rendering for very large tabular pages.
-3. Introduce tag-scoped cache/revalidation strategy for work-order mutations.
-4. Add targeted DB indexes for dominant work-order/dispatch sort+filter paths.
+### 4. Dispatch loading and map
+
+- **What:** Verified `dispatch/loading.tsx` and dynamic import of `DispatchMapPanel` with `ssr: false` and loading placeholder. No code change.
+- **Impact:** Dispatch board and map already use code-splitting and loading states.
+
+### 5. Perceived performance pass (see PERCEIVED_PERFORMANCE_PASS.md)
+
+- **What:** Documented and applied patterns for instant-feeling navigation, skeletons, and progressive loading where already in place; added operations skeleton (above).
+- **Impact:** Consistent loading UX; operations route no longer blocks without feedback.
+
+---
+
+## Measurable Improvements (expected)
+
+| Screen / metric | Before | After | Notes |
+|-----------------|--------|--------|------|
+| Work orders initial load | Full option lists (unbounded) | Assets ≤500, properties ≤200, buildings ≤300, units ≤500, others limited | Reduces DB time and payload size on large tenants. |
+| Operations navigation | No route loading UI | Skeleton (header + KPI + cards) | User sees structure immediately. |
+| Dispatch | Already had loading + dynamic map | No change | Already optimized. |
+
+---
+
+## Benchmarks (recommended)
+
+If you have Lighthouse or Web Vitals in place:
+
+- **LCP:** Operations and work orders should improve from skeleton rendering and smaller payloads.
+- **INP / FID:** No change in this pass; list row memoization deferred.
+- **CLS:** Skeletons reduce layout shift by reserving space.
+
+To compare before/after:
+
+1. Clear cache, navigate to Work Orders (large tenant); measure TTFB and LCP.
+2. Navigate to Operations; measure time to first paint (skeleton) vs time to full content.
+3. Repeat with throttled CPU/network to stress perceived performance.
+
+---
+
+## Follow-up for bigger gains
+
+- **List row memoization:** Extract `WorkOrderTableRow` with `React.memo` and stable callbacks (`useCallback`) in `work-orders-list.tsx` to cut re-renders when selection or drawer state changes.
+- **Stale-while-revalidate:** Use `unstable_cache` or segment `revalidate` for option-list data (companies, technicians, etc.) with a short TTL (e.g. 60s) to speed repeat visits.
+- **Auth/layout:** Consider caching tenant membership or skipping profile/tour fetch for non-portal users on fast path.
+- **DB indexes:** Verify indexes on `work_orders(company_id, status)`, `work_orders(company_id, due_date)`, `work_orders(scheduled_date)`, and similar high-traffic filters.

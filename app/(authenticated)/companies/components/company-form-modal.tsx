@@ -14,6 +14,11 @@ export type Company = {
   primary_contact_name: string | null;
   primary_contact_email: string | null;
   phone: string | null;
+  slug?: string | null;
+  portal_enabled?: boolean | null;
+  allow_public_requests?: boolean | null;
+  portal_name?: string | null;
+  auto_create_work_orders_from_requests?: boolean | null;
 };
 
 type CompanyFormModalProps = {
@@ -32,6 +37,11 @@ const emptyCompany: Company = {
   primary_contact_name: null,
   primary_contact_email: null,
   phone: null,
+  slug: null,
+  portal_enabled: false,
+  allow_public_requests: true,
+  portal_name: null,
+  auto_create_work_orders_from_requests: true,
 };
 
 export function CompanyFormModal({
@@ -129,6 +139,67 @@ export function CompanyFormModal({
               className="ui-input"
             />
           </FormField>
+          <div className="mt-4 rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              Request portal
+            </p>
+            <div className="mt-2 space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="portal_enabled"
+                  defaultChecked={Boolean(c.portal_enabled)}
+                />
+                <span>Enable public maintenance request portal for this company</span>
+              </label>
+              <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                <input
+                  type="checkbox"
+                  name="allow_public_requests"
+                  defaultChecked={c.allow_public_requests ?? true}
+                />
+                <span>Allow new requests from the public portal URL</span>
+              </label>
+              <FormField label="Portal slug (for /request/[slug])" htmlFor="portal_slug">
+                <input
+                  id="portal_slug"
+                  name="portal_slug"
+                  type="text"
+                  defaultValue={c.slug ?? ""}
+                  className="ui-input"
+                  placeholder="e.g. mercy-regional"
+                />
+              </FormField>
+              <FormField label="Portal display name (optional)" htmlFor="portal_name">
+                <input
+                  id="portal_name"
+                  name="portal_name"
+                  type="text"
+                  defaultValue={c.portal_name ?? ""}
+                  className="ui-input"
+                  placeholder="e.g. Mercy Regional Maintenance Portal"
+                />
+              </FormField>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                The portal slug must be unique and URL-safe (lowercase letters, numbers, and dashes).
+              </p>
+              <div className="mt-3 space-y-1 rounded-md bg-[var(--background)]/60 px-3 py-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="auto_create_work_orders_from_requests"
+                    defaultChecked={c.auto_create_work_orders_from_requests ?? true}
+                    disabled={!c.portal_enabled}
+                  />
+                  <span>Auto-create work orders from requests</span>
+                </label>
+                <p className="text-[11px] leading-snug text-[var(--muted)]">
+                  When enabled, new requests from the public portal are automatically converted into work
+                  orders. When disabled, requests stay in the Requests queue until reviewed.
+                </p>
+              </div>
+            </div>
+          </div>
           <div className="flex gap-3 pt-2">
             <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? "Saving…" : isEdit ? "Save" : "Create"}

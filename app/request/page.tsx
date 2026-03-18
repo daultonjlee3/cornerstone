@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { resolveRequestPortalLocale, t } from "@/src/lib/i18n/request-portal";
 import { RequestPortalLayout } from "./components/RequestPortalLayout";
@@ -60,24 +61,51 @@ export async function generateMetadata() {
 }
 
 export default async function RequestPage() {
-  const tenantId = process.env.PORTAL_TENANT_ID?.trim();
-  const companyId = process.env.PORTAL_COMPANY_ID?.trim();
-  const configured = Boolean(tenantId && companyId);
-
   const locale = await getRequestPageLocale();
-  const [properties, assets] = await Promise.all([
-    getPortalProperties(companyId),
-    getPortalAssets(companyId),
-  ]);
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("companies")
+    .select("slug, portal_enabled, allow_public_requests, status")
+    .eq("portal_enabled", true)
+    .eq("allow_public_requests", true);
+
+  const rows =
+    (data ?? []) as {
+      slug: string | null;
+      portal_enabled?: boolean | null;
+      allow_public_requests?: boolean | null;
+      status?: string | null;
+    }[];
+
+  const activeRows = rows.filter((c) => (c.status ?? "active") === "active" && c.slug);
+  const isDev = process.env.NODE_ENV !== "production";
+
+  if (activeRows.length > 0 && activeRows[0].slug) {
+    // In dev, always redirect to the first active portal to make testing easy.
+    // In prod, only auto-redirect when there is a single active portal.
+    if (isDev || activeRows.length === 1) {
+      if (isDev) {
+        console.log("[RequestPortal] /request dev redirect", {
+          targetSlug: activeRows[0].slug,
+          count: activeRows.length,
+        });
+      }
+      redirect(`/request/${activeRows[0].slug}`);
+    }
+  } else if (isDev) {
+    console.log("[RequestPortal] /request has no active portals", {
+      found: rows.length,
+    });
+  }
 
   return (
     <RequestPortalLayout
       initialLocale={locale}
-      properties={properties}
-      assets={assets}
-      configured={configured}
-      tenantId={tenantId || undefined}
-      companyId={companyId || undefined}
+      properties={[]}
+      assets={[]}
+      configured={false}
+      tenantId={undefined}
+      companyId={undefined}
     />
   );
 }
