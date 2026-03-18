@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  CORE_FEATURES_HOME,
-  FEATURE_SCREENSHOTS,
   HERO_SCREENSHOTS,
   INDUSTRIES,
   ROUTES,
@@ -13,8 +11,6 @@ import {
 } from "@/lib/marketing-site";
 import {
   CTASection,
-  FeatureCard,
-  FeatureSection,
   HeroSection,
   IndustryCard,
   PricingCard,
@@ -22,7 +18,23 @@ import {
   SeeHowItWorksButton,
   WorkflowSection,
 } from "../components/marketing";
-import { ArrowRight, CheckCircle2, Cloud, Settings2, Users2, Layers } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  Building2,
+  Boxes,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardList,
+  Cloud,
+  Layers,
+  Package,
+  Receipt,
+  Repeat,
+  Settings2,
+  Smartphone,
+  Users2,
+} from "lucide-react";
 
 const seo = SEO[ROUTES.home];
 
@@ -41,16 +53,64 @@ const WORKFLOW_STEPS = [
   "Operational Reporting",
 ] as const;
 
-const FEATURE_DESCRIPTIONS: Record<string, string> = {
-  "work-order-management": "Create, assign, and close work orders with full status tracking and asset history.",
-  "preventive-maintenance": "Automate recurring schedules and keep compliance records without spreadsheets.",
-  "asset-management": "Track every asset, its maintenance history, and condition in one register.",
-  "dispatch-scheduling": "Assign work to technicians by skill, location, or load—and keep the board live.",
-  "technician-mobile": "Technicians see their queue, update status, add photos, and close work from the field.",
-  "reporting-dashboards": "Real-time dashboards for backlog, labor, PM compliance, and asset performance.",
-  "request-portal": "Tenants and staff submit requests that convert to work orders in one click.",
-  "ai-automation": "Automate work order creation, surface exceptions, and reduce manual steps.",
-};
+const OPERATIONS_PLATFORM_FEATURES = [
+  {
+    title: "Work Order Management",
+    description:
+      "Create, assign, and close work orders with full status tracking and asset history.",
+    href: "/features/work-order-management",
+    Icon: ClipboardList,
+  },
+  {
+    title: "Preventive Maintenance",
+    description: "Automate recurring schedules and keep compliance records out of spreadsheets.",
+    href: "/features/preventive-maintenance",
+    Icon: Repeat,
+  },
+  {
+    title: "Asset Management",
+    description: "Track every asset, maintenance history, and condition in one place.",
+    href: "/features/asset-management",
+    Icon: Boxes,
+  },
+  {
+    title: "Dispatch & Scheduling",
+    description:
+      "Assign work to technicians by skill, location, or load and keep the board live.",
+    href: "/features/dispatch-scheduling",
+    Icon: CalendarClock,
+  },
+  {
+    title: "Technician Mobile App",
+    description: "Technicians see their queue, update status, add photos, and close work from the field.",
+    href: "/features/technician-mobile",
+    Icon: Smartphone,
+  },
+  {
+    title: "Inventory Management",
+    description: "Track parts, quantities, and stock locations across warehouses, properties, and trucks.",
+    href: ROUTES.productInventoryProcurement,
+    Icon: Package,
+  },
+  {
+    title: "Vendor Management",
+    description: "Manage vendors, track performance, and tie them directly to work orders and purchasing.",
+    href: ROUTES.productInventoryProcurement,
+    Icon: Building2,
+  },
+  {
+    title: "Purchase Orders",
+    description: "Create and track POs, manage approvals, and keep spend aligned with maintenance operations.",
+    href: ROUTES.productInventoryProcurement,
+    Icon: Receipt,
+  },
+  {
+    title: "Reporting & Dashboards",
+    description: "Real-time dashboards for backlog, labor, PM compliance, and asset performance.",
+    href: "/features/reporting-dashboards",
+    Icon: BarChart3,
+  },
+];
 
 export default function HomePage() {
   return (
@@ -285,34 +345,59 @@ export default function HomePage() {
         </div>
       </section>
 
-      <FeatureSection
-        variant="default"
-        title="Core features"
-        subtitle="Everything your team needs to manage maintenance operations in one platform."
-      >
-        {CORE_FEATURES_HOME.map((feature) => {
-          const screenshot = FEATURE_SCREENSHOTS[feature.slug];
-          const description = FEATURE_DESCRIPTIONS[feature.slug];
-          return (
-            <FeatureCard key={feature.slug} title={feature.title} href={feature.href}>
-              <ScreenshotContainer
-                src={screenshot ?? undefined}
-                alt={`${feature.title} — Cornerstone OS`}
-                caption=""
-                aspectRatio="video"
-                className="opacity-90"
-                width={1920}
-                height={1080}
-              />
-              {description && (
-                <p className="mt-3 text-sm text-[var(--muted)] leading-relaxed">
-                  {description}
-                </p>
-              )}
-            </FeatureCard>
-          );
-        })}
-      </FeatureSection>
+      {/* Section — Operations Platform Features (text-first, no screenshots) */}
+      <section className="min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8">
+        <div className="mx-auto min-w-0 max-w-7xl">
+          <div className="text-center">
+            <h2 className="mk-section-headline">The operating system for maintenance teams</h2>
+            <p className="mx-auto mt-4 max-w-2xl mk-body-lg">
+              Manage work orders, assets, technicians, inventory, vendors, and purchasing in one unified platform.
+            </p>
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 gap-6 sm:mt-14 sm:grid-cols-2 sm:gap-8 lg:gap-10">
+            {OPERATIONS_PLATFORM_FEATURES.map(({ title, description, href, Icon }) => (
+              <article
+                key={title}
+                className="group rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5 shadow-[var(--shadow-soft)] transition-all duration-200 hover:border-[var(--accent)] hover:shadow-[var(--shadow-card)] sm:p-6"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] transition-colors group-hover:bg-[var(--accent)]/15">
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
+                      {title}
+                    </h3>
+                    <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">
+                      {description}
+                    </p>
+
+                    <Link
+                      href={href}
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)]"
+                    >
+                      Learn more
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-10 flex justify-center sm:mt-12">
+            <Link
+              href={ROUTES.product}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] sm:min-h-[48px]"
+            >
+              Explore the full platform
+              <ArrowRight className="h-5 w-5" aria-hidden />
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Section 4 — Inventory, Vendors, Purchase Orders: screenshot left, text right */}
       <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
