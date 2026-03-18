@@ -6,8 +6,15 @@ import type { RequestPortalLocaleEn } from "./en";
 export const fr: Record<keyof RequestPortalLocaleEn, string> = {
   "requestPortal.title": "Demande de maintenance",
   "requestPortal.subtitle": "Soumettez une demande et nous vous recontacterons.",
+  "requestPortal.subtitleWithPortal": "Soumettez une demande à cette équipe en moins d'une minute.",
   "requestPortal.footer": "Cornerstone OS",
+  "requestPortal.trustIntro":
+    "Dites-nous ce qui ne va pas et où c'est situé. Votre demande est envoyée directement à l'équipe de maintenance de cette propriété.",
+  "requestPortal.trustFooter":
+    "Nous examinerons votre demande, créerons un ordre de travail si nécessaire, puis ferons un suivi avec des mises à jour.",
   "requestPortal.notConfiguredHint": "Contactez votre administrateur pour activer le portail de demandes.",
+  "requestPortal.portalTemporarilyUnavailable":
+    "Ce portail de demandes de maintenance n'accepte pas de nouvelles demandes pour le moment.",
 
   "requestPortal.yourName": "Votre nom",
   "requestPortal.email": "E-mail",
@@ -51,6 +58,10 @@ export const fr: Record<keyof RequestPortalLocaleEn, string> = {
   "requestPortal.successSubmitted": "Votre demande a bien été envoyée.",
   "requestPortal.successTicketId": "N° de ticket :",
   "requestPortal.successFollowUp": "Notre équipe l'examinera et assurera le suivi rapidement.",
+  "requestPortal.successStatusNew":
+    "Statut : Nouveau · En attente de validation par l'équipe de maintenance.",
+  "requestPortal.successSubmitAnother": "Soumettre une autre demande",
+  "requestPortal.successViewRecent": "Voir vos demandes récentes",
 
   "requestPortal.noAssetsMatch": "Aucun actif ne correspond",
   "requestPortal.clearSelection": "Effacer la sélection",
@@ -61,4 +72,6 @@ export const fr: Record<keyof RequestPortalLocaleEn, string> = {
   "validation.locationRequired": "Veuillez indiquer un emplacement (propriété, pièce ou adresse).",
   "validation.assetNotFound": "L'actif sélectionné est introuvable.",
   "validation.portalNotConfigured": "Le portail de demandes n'est pas configuré.",
+  "validation.portalDuplicateWorkOrderNumber":
+    "Nous n'avons pas pu créer un nouveau numéro de demande cette fois-ci. Veuillez réessayer.",
 };

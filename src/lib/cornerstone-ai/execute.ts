@@ -181,7 +181,12 @@ export async function executeCornerstoneAiRequest(
         );
       }
       const sum: RetrievedSummaryContext = {
-        workOrder: { ...ctx.workOrder, notesExcerpt: ctx.notesExcerpt },
+        workOrder: {
+          ...ctx.workOrder,
+          // WorkOrderSummaryRow expects `string | undefined` (not `null`)
+          description: ctx.workOrder.description ?? undefined,
+          notesExcerpt: ctx.notesExcerpt,
+        },
       };
       const built = buildAiPrompt(intent, trimmed, sum);
       system = built.system;

@@ -440,7 +440,10 @@ export async function getAssetPaneData(assetId: string): Promise<{
     .single();
 
   if (assetError || !assetRow) {
-    return { error: assetRow ? assetError?.message ?? "Asset not found" : "Asset not found" };
+    // Supabase typing can narrow `assetError` to `never` in this branch.
+    // Cast to a safe shape so we can reliably read `message` or fall back.
+    const message = (assetError as { message?: string } | null)?.message;
+    return { error: message ?? "Asset not found" };
   }
 
   const row = assetRow as Record<string, unknown>;

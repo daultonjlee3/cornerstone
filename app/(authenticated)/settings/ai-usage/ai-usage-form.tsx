@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { saveTenantAiConfig, type TenantAiConfigForm } from "./actions";
 import type { OveragePolicy } from "@/src/lib/ai/types";
-import type { OveragePolicy } from "@/src/lib/ai/types";
 
 type Props = {
   initial: TenantAiConfigForm;

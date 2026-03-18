@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Sparkles, Send, Loader2, AlertCircle, X, Lightbulb } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { submitCornerstoneAiQuery } from "@/app/(authenticated)/ai/actions";
-import type { CornerstoneAiResponse } from "@/src/lib/cornerstone-ai/types";
+import type { CornerstoneAiContext, CornerstoneAiResponse } from "@/src/lib/cornerstone-ai/types";
 
 const SUGGESTED_PROMPTS = [
   "What work orders are overdue today?",
@@ -16,7 +16,7 @@ const SUGGESTED_PROMPTS = [
 type CornerstoneAiPanelProps = {
   open: boolean;
   onClose: () => void;
-  context?: { entityType?: string; entityId?: string; listFilters?: Record<string, string> };
+  context?: CornerstoneAiContext;
   initialQuery?: string;
 };
 

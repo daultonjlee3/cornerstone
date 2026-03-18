@@ -96,6 +96,13 @@ export function WorkOrderCommandCenterPane({
   const requestedByName = (workOrder.requested_by_name as string | null | undefined) ?? null;
   const requestedByEmail = (workOrder.requested_by_email as string | null | undefined) ?? null;
 
+  const locationParts = [
+    workOrder.location,
+    workOrder.property_name,
+    workOrder.building_name,
+  ].filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+  const hasLocation = locationParts.length > 0;
+
   const labelClass = "text-xs font-normal text-[var(--muted)]";
   const valueClass = "text-sm font-medium text-[var(--foreground)] mt-0.5";
   const detailsTab = (
@@ -128,12 +135,10 @@ export function WorkOrderCommandCenterPane({
         </div>
         {/* Location + Asset */}
         <div className="grid gap-3 pt-2 border-t border-[var(--card-border)]/60">
-          {(workOrder.location ?? workOrder.property_name ?? workOrder.building_name) && (
+          {hasLocation && (
             <div>
               <dt className={labelClass}>Location</dt>
-              <dd className={valueClass}>
-                {workOrder.location ?? [workOrder.property_name, workOrder.building_name].filter(Boolean).join(" / ") ?? "—"}
-              </dd>
+              <dd className={valueClass}>{locationParts.join(" / ")}</dd>
             </div>
           )}
           {workOrder.asset_name && (

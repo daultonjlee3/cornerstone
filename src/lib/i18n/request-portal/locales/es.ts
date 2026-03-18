@@ -6,8 +6,15 @@ import type { RequestPortalLocaleEn } from "./en";
 export const es: Record<keyof RequestPortalLocaleEn, string> = {
   "requestPortal.title": "Solicitud de mantenimiento",
   "requestPortal.subtitle": "Envíe una solicitud y le responderemos.",
+  "requestPortal.subtitleWithPortal": "Envíe una solicitud a este equipo en menos de un minuto.",
   "requestPortal.footer": "Cornerstone OS",
+  "requestPortal.trustIntro":
+    "Cuéntenos qué está mal y dónde está. Su solicitud se envía directamente al equipo de mantenimiento de esta propiedad.",
+  "requestPortal.trustFooter":
+    "Revisaremos su solicitud, crearemos una orden de trabajo si es necesario y daremos seguimiento con actualizaciones.",
   "requestPortal.notConfiguredHint": "Contacte a su administrador para habilitar el portal de solicitudes.",
+  "requestPortal.portalTemporarilyUnavailable":
+    "Este portal de solicitudes de mantenimiento no está aceptando solicitudes nuevas en este momento.",
 
   "requestPortal.yourName": "Su nombre",
   "requestPortal.email": "Correo electrónico",
@@ -51,6 +58,9 @@ export const es: Record<keyof RequestPortalLocaleEn, string> = {
   "requestPortal.successSubmitted": "Su solicitud ha sido enviada correctamente.",
   "requestPortal.successTicketId": "ID de ticket:",
   "requestPortal.successFollowUp": "Nuestro equipo la revisará y dará seguimiento pronto.",
+  "requestPortal.successStatusNew": "Estado: Nuevo · En espera de revisión por el equipo de mantenimiento.",
+  "requestPortal.successSubmitAnother": "Enviar otra solicitud",
+  "requestPortal.successViewRecent": "Ver sus solicitudes recientes",
 
   "requestPortal.noAssetsMatch": "Ningún activo coincide",
   "requestPortal.clearSelection": "Borrar selección",
@@ -61,4 +71,6 @@ export const es: Record<keyof RequestPortalLocaleEn, string> = {
   "validation.locationRequired": "Indique una ubicación (propiedad, habitación o dirección).",
   "validation.assetNotFound": "El activo seleccionado no se encontró.",
   "validation.portalNotConfigured": "El portal de solicitudes no está configurado.",
+  "validation.portalDuplicateWorkOrderNumber":
+    "No pudimos crear un nuevo número de solicitud esta vez. Vuelva a intentarlo.",
 };

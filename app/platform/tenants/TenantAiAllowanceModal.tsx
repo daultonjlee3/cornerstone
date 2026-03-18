@@ -230,7 +230,7 @@ export function TenantAiAllowanceModal({ tenantId, onClose }: Props) {
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={onClose}
                 disabled={isPending}
               >
