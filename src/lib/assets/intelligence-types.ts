@@ -49,6 +49,8 @@ export type AssetHealthBreakdown = {
   expectedLifeYears: number | null;
   ageYears: number | null;
   remainingLifeYears: number | null;
+  /** Estimated replacement year (install year + expected life). */
+  estimatedReplacementYear: number | null;
   repairVsReplaceRatio: number | null;
   maintenanceSummary: {
     totalWorkOrdersLast12Months: number;

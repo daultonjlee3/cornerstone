@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState, useCallback } from "react";
+import { useTransition, useState, useCallback, useEffect } from "react";
 import { deleteAsset, updateAssetStatus } from "../actions";
 import type { Asset } from "./asset-form-modal";
 import { AssetFormModal } from "./asset-form-modal";
@@ -97,6 +97,8 @@ type AssetsListProps = {
     outOfService: number;
     dueForPm: number;
   };
+  /** When set (e.g. from /assets?edit=id), open the edit modal for this asset. */
+  initialEditAsset?: Asset | null;
 };
 
 function assetDisplayName(a: AssetRow): string {
@@ -166,6 +168,7 @@ export function AssetsList({
   page: pageProp = 1,
   pageSize: pageSizeProp = 25,
   assetStats,
+  initialEditAsset = null,
 }: AssetsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -237,6 +240,15 @@ export function AssetsList({
     setEditingAsset(a);
     setModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!initialEditAsset?.id) return;
+    if (searchParams.get("edit") !== initialEditAsset.id) return;
+    setEditingAsset(initialEditAsset);
+    setModalOpen(true);
+    router.replace("/assets", { scroll: false });
+  }, [initialEditAsset, searchParams, router]);
+
   const closeModal = () => {
     setModalOpen(false);
     setEditingAsset(null);

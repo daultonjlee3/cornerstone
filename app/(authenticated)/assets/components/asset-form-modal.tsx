@@ -87,6 +87,30 @@ const emptyAsset: Asset = {
 const inputClass =
   "ui-input";
 
+/** Years from install date to now; 0 if install is in the future. */
+function currentAgeYears(installDateIso: string | null): number | null {
+  if (!installDateIso?.trim()) return null;
+  const install = new Date(installDateIso.trim());
+  const now = new Date();
+  const years = (now.getTime() - install.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  return Number(Math.max(0, years).toFixed(2));
+}
+
+/** Estimated replacement year from install date + expected lifespan. */
+function estimatedReplacementYear(installDateIso: string | null, lifeYears: number | null): number | null {
+  if (!installDateIso?.trim() || lifeYears == null || !Number.isFinite(lifeYears) || lifeYears <= 0)
+    return null;
+  const install = new Date(installDateIso.trim());
+  const end = new Date(install);
+  end.setFullYear(install.getFullYear() + Math.round(lifeYears));
+  return end.getFullYear();
+}
+
+/** Format number as currency (no symbol in value). */
+function formatCurrency(value: number): string {
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 })}`;
+}
+
 export function AssetFormModal({
   open,
   onClose,
@@ -115,6 +139,14 @@ export function AssetFormModal({
     () => (a.asset_type ?? a.category ?? "").trim()
   );
 
+  const [installDate, setInstallDate] = useState(a.install_date ?? "");
+  const [expectedLifeYears, setExpectedLifeYears] = useState<string>(
+    a.expected_life_years != null ? String(a.expected_life_years) : ""
+  );
+  const [replacementCost, setReplacementCost] = useState<string>(
+    a.replacement_cost != null ? String(a.replacement_cost) : ""
+  );
+
   useEffect(() => {
     if (open && a) {
       const defaultCompany = a.company_id || (companies.length === 1 ? companies[0].id : "");
@@ -128,6 +160,9 @@ export function AssetFormModal({
       setParentSearch("");
       setLockedFromParent(hasParent);
       setAssetTypeSelect((a.asset_type ?? a.category ?? "").trim());
+      setInstallDate(a.install_date ?? "");
+      setExpectedLifeYears(a.expected_life_years != null ? String(a.expected_life_years) : "");
+      setReplacementCost(a.replacement_cost != null ? String(a.replacement_cost) : "");
     }
   }, [
     open,
@@ -139,6 +174,9 @@ export function AssetFormModal({
     a.parent_asset_id,
     a.asset_type,
     a.category,
+    a.install_date,
+    a.expected_life_years,
+    a.replacement_cost,
   ]);
 
   const selectedParent = useMemo(
@@ -563,7 +601,8 @@ export function AssetFormModal({
                 id="install_date"
                 name="install_date"
                 type="date"
-                defaultValue={a.install_date ?? ""}
+                value={installDate}
+                onChange={(e) => setInstallDate(e.target.value)}
                 className={inputClass}
               />
             </div>
@@ -577,7 +616,9 @@ export function AssetFormModal({
                 type="date"
                 defaultValue={a.warranty_expires ?? ""}
                 className={inputClass}
+                aria-describedby="warranty-optional"
               />
+              <p id="warranty-optional" className="mt-0.5 text-xs text-[var(--muted)]">Optional</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -586,14 +627,16 @@ export function AssetFormModal({
                 htmlFor="expected_life_years"
                 className="mb-1 block text-sm font-medium text-[var(--foreground)]"
               >
-                Expected life (years)
+                Expected lifespan (years)
               </label>
               <input
                 id="expected_life_years"
                 name="expected_life_years"
                 type="number"
                 min={1}
-                defaultValue={a.expected_life_years ?? ""}
+                placeholder="e.g. 15"
+                value={expectedLifeYears}
+                onChange={(e) => setExpectedLifeYears(e.target.value)}
                 className={inputClass}
               />
             </div>
@@ -610,10 +653,69 @@ export function AssetFormModal({
                 type="number"
                 min={0}
                 step="0.01"
-                defaultValue={a.replacement_cost ?? ""}
+                placeholder="e.g. 12000"
+                value={replacementCost}
+                onChange={(e) => setReplacementCost(e.target.value)}
                 className={inputClass}
               />
             </div>
+          </div>
+
+          {/* Lifecycle preview — live calculated from install date + lifespan (+ cost if present) */}
+          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--background)]/70 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              Lifecycle preview
+            </p>
+            {(() => {
+              const installIso = installDate?.trim() || null;
+              const lifeNum =
+                expectedLifeYears !== ""
+                  ? Number(expectedLifeYears?.trim() ?? NaN)
+                  : null;
+              const costNum =
+                replacementCost !== ""
+                  ? Number(replacementCost?.trim() ?? NaN)
+                  : null;
+              const hasLifeInputs =
+                installIso &&
+                lifeNum != null &&
+                Number.isFinite(lifeNum) &&
+                lifeNum > 0;
+              if (!hasLifeInputs) {
+                return (
+                  <p className="text-sm text-[var(--muted)]">
+                    Add install date and expected lifespan to generate a lifecycle estimate.
+                  </p>
+                );
+              }
+              const age = currentAgeYears(installIso);
+              const replacementYear = estimatedReplacementYear(installIso, lifeNum);
+              const remaining =
+                age != null && lifeNum != null
+                  ? Math.max(0, Number((lifeNum - age).toFixed(1)))
+                  : null;
+              const hasCost = costNum != null && Number.isFinite(costNum) && costNum >= 0;
+              const annualized =
+                hasCost && lifeNum != null && lifeNum > 0
+                  ? Number((costNum / lifeNum).toFixed(0))
+                  : null;
+              return (
+                <ul className="space-y-1.5 text-sm text-[var(--foreground)]">
+                  {replacementYear != null && (
+                    <li>Estimated replacement: {replacementYear}</li>
+                  )}
+                  {remaining != null && (
+                    <li>Remaining life: {remaining} years</li>
+                  )}
+                  {hasCost && (
+                    <li>Estimated replacement cost: {formatCurrency(costNum)}</li>
+                  )}
+                  {annualized != null && (
+                    <li>Estimated annual lifecycle cost: {formatCurrency(annualized)}/year</li>
+                  )}
+                </ul>
+              );
+            })()}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

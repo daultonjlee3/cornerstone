@@ -196,6 +196,10 @@ async function buildBreakdown(
     ageYears != null && expectedLifeYears != null
       ? Number((expectedLifeYears - ageYears).toFixed(2))
       : null;
+  const estimatedReplacementYear =
+    installDateRaw && expectedLifeYears != null && expectedLifeYears > 0
+      ? new Date(installDateRaw).getFullYear() + Math.round(expectedLifeYears)
+      : null;
   const repairVsReplaceRatio =
     replacementCost && replacementCost > 0
       ? Number((maintenanceCostLast12Months / replacementCost).toFixed(4))
@@ -379,6 +383,7 @@ async function buildBreakdown(
     expectedLifeYears,
     ageYears,
     remainingLifeYears,
+    estimatedReplacementYear,
     repairVsReplaceRatio,
     maintenanceSummary: {
       totalWorkOrdersLast12Months: completedWorkOrders.length,
@@ -455,6 +460,10 @@ export async function getAssetHealthBreakdown(
         ageYears != null && expectedLifeYears != null
           ? Number((expectedLifeYears - ageYears).toFixed(2))
           : null;
+      const estimatedReplacementYear =
+        installDateRaw && expectedLifeYears != null && expectedLifeYears > 0
+          ? new Date(installDateRaw).getFullYear() + Math.round(expectedLifeYears)
+          : null;
       const repairVsReplaceRatio =
         replacementCost && replacementCost > 0
           ? Number((maintenanceCostLast12Months / replacementCost).toFixed(4))
@@ -475,6 +484,7 @@ export async function getAssetHealthBreakdown(
         expectedLifeYears,
         ageYears,
         remainingLifeYears,
+        estimatedReplacementYear,
         repairVsReplaceRatio,
         maintenanceSummary: {
           totalWorkOrdersLast12Months: 0,

@@ -182,7 +182,11 @@ export function RequestsList({ requests }: { requests: WorkRequestListItem[] }) 
               const canConvert = request.status === "submitted" || request.status === "approved";
 
               return (
-                <Tr key={request.id}>
+                <Tr
+                  key={request.id}
+                  data-demo-scenario-target="request-row"
+                  data-work-request-id={request.id}
+                >
                   <Td>
                     <p className="font-medium text-[var(--foreground)]">{request.requester_name}</p>
                     <p className="text-xs text-[var(--muted)]">{request.requester_email}</p>

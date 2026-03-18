@@ -56,6 +56,7 @@ export default async function AssetsPage({
   const viewPreset = getStringParam(params ?? {}, "view");
   const pageParam = getStringParam(params ?? {}, "page");
   const pageSizeParam = getStringParam(params ?? {}, "page_size");
+  const editId = getStringParam(params ?? {}, "edit");
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(pageSizeParam ?? "25", 10) || 25));
   const healthStatusFilter =
@@ -74,6 +75,47 @@ export default async function AssetsPage({
     .order("name");
 
   const companyIds = (companies ?? []).map((c) => (c as { id: string }).id);
+
+  let initialEditAsset: AssetRow | null = null;
+  if (editId?.trim()) {
+    const { data: editRow } = await supabase
+      .from("assets")
+      .select(
+        "id, asset_name, name, company_id, parent_asset_id, property_id, building_id, unit_id, asset_tag, asset_type, category, manufacturer, model, serial_number, install_date, expected_life_years, replacement_cost, warranty_expires, status, condition, notes, description, location_notes"
+      )
+      .eq("id", editId.trim())
+      .in("company_id", companyIds)
+      .maybeSingle();
+    if (editRow) {
+      const r = editRow as Record<string, unknown>;
+      initialEditAsset = {
+        id: (r.id as string) ?? "",
+        asset_name: (r.asset_name as string | null) ?? null,
+        name: (r.name as string | undefined) ?? undefined,
+        company_id: (r.company_id as string) ?? "",
+        parent_asset_id: (r.parent_asset_id as string | null) ?? null,
+        property_id: (r.property_id as string | null) ?? null,
+        building_id: (r.building_id as string | null) ?? null,
+        unit_id: (r.unit_id as string | null) ?? null,
+        asset_tag: (r.asset_tag as string | null) ?? null,
+        asset_type: (r.asset_type as string | null) ?? null,
+        category: (r.category as string | null) ?? null,
+        manufacturer: (r.manufacturer as string | null) ?? null,
+        model: (r.model as string | null) ?? null,
+        serial_number: (r.serial_number as string | null) ?? null,
+        install_date: (r.install_date as string | null) ?? null,
+        expected_life_years: (r.expected_life_years as number | null) ?? null,
+        replacement_cost: (r.replacement_cost as number | null) ?? null,
+        warranty_expires: (r.warranty_expires as string | null) ?? null,
+        status: (r.status as string) ?? "active",
+        condition: (r.condition as string | null) ?? null,
+        notes: (r.notes as string | null) ?? null,
+        description: (r.description as string | null) ?? null,
+        location_notes: (r.location_notes as string | null) ?? null,
+      };
+    }
+  }
+
   if (companyIds.length === 0) {
     return (
       <div className="space-y-8">
@@ -584,6 +626,7 @@ export default async function AssetsPage({
           saveWorkOrder,
         }}
         parentCandidates={parentCandidates}
+        initialEditAsset={initialEditAsset}
       />
       </div>
     </div>

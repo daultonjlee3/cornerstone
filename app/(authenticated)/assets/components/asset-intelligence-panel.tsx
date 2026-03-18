@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type {
   AssetHealthBreakdown,
   AssetInsightRecord,
@@ -10,20 +11,32 @@ function severityClass(severity: AssetInsightRecord["severity"]): string {
   return "bg-blue-100 text-blue-700 border-blue-200";
 }
 
+function formatReplacementCost(value: number): string {
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 })}`;
+}
+
 type AssetIntelligencePanelProps = {
   health: AssetHealthBreakdown;
   insights: AssetInsightRecord[];
   upcomingPmCount: number;
+  /** When set, "Add lifecycle estimate" links to open this asset for edit. */
+  assetId?: string | null;
 };
 
 export function AssetIntelligencePanel({
   health,
   insights,
   upcomingPmCount,
+  assetId = null,
 }: AssetIntelligencePanelProps) {
-  const replacementHorizonLabel =
-    health.remainingLifeYears == null
-      ? "No lifecycle estimate set"
+  const hasLifecycle =
+    health.remainingLifeYears != null || health.estimatedReplacementYear != null;
+  const replacementHorizonLabel = !hasLifecycle
+    ? null
+    : health.remainingLifeYears == null
+      ? health.estimatedReplacementYear != null
+        ? `Estimated replacement in ${health.estimatedReplacementYear}`
+        : null
       : health.remainingLifeYears <= 0
       ? "Past expected lifecycle"
       : `${health.remainingLifeYears.toFixed(1)} years remaining`;
@@ -56,7 +69,25 @@ export function AssetIntelligencePanel({
         </div>
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--background)]/70 p-3">
           <p className="text-xs text-[var(--muted)]">Replacement Horizon</p>
-          <p className="text-lg font-semibold text-[var(--foreground)]">{replacementHorizonLabel}</p>
+          {replacementHorizonLabel != null ? (
+            <p className="text-lg font-semibold text-[var(--foreground)]">{replacementHorizonLabel}</p>
+          ) : assetId ? (
+            <p className="text-sm text-[var(--foreground)]">
+              <Link
+                href={`/assets?edit=${assetId}`}
+                className="font-medium text-[var(--accent)] hover:underline"
+              >
+                Add lifecycle estimate
+              </Link>
+            </p>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">Add lifecycle estimate</p>
+          )}
+          {health.replacementCost != null && health.replacementCost > 0 && (
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Replacement cost: {formatReplacementCost(health.replacementCost)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -87,7 +118,16 @@ export function AssetIntelligencePanel({
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
           Recommendation
         </p>
-        <p className="mt-1 text-sm text-[var(--foreground)]">{health.recommendation}</p>
+        <p className="mt-1 text-sm text-[var(--foreground)]">
+          {health.recommendation}
+          {health.remainingLifeYears != null &&
+          health.remainingLifeYears <= 2 &&
+          health.remainingLifeYears > 0 ? (
+            <span> This asset may require replacement within {health.remainingLifeYears.toFixed(1)} years.</span>
+          ) : health.estimatedReplacementYear != null ? (
+            <span> Estimated replacement in {health.estimatedReplacementYear}.</span>
+          ) : null}
+        </p>
         <p className="mt-2 text-xs text-[var(--muted)]">{costVsReplaceLabel}</p>
       </div>
     </section>

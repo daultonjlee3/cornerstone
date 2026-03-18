@@ -21,12 +21,17 @@ function Row({ label, value, prominent }: { label: string; value: React.ReactNod
 }
 
 export function WorkOrderLocationCard({ workOrder }: WorkOrderLocationCardProps) {
+  const workOrderId = (workOrder.id as string) ?? "";
   const assetId = (workOrder.asset_id as string) ?? null;
   const assetName = (workOrder.asset_name as string) ?? null;
   const hasAsset = !!(assetId || assetName);
 
   return (
-    <div className={cardClass}>
+    <div
+      data-demo-scenario-target="work-order-asset-card"
+      data-work-order-id={workOrderId}
+      className={cardClass}
+    >
       <h2 className={cardTitleClass}>Location & asset</h2>
       <dl className="space-y-3 text-sm">
         <Row label="Property" value={workOrder.property_name as string} />

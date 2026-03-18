@@ -361,7 +361,13 @@ export function WorkOrderDetailView({
 
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrderNotesCard workOrderId={id} notes={notes} onNotesChange={() => router.refresh()} />
-          <WorkOrderStatusTimeline entries={statusHistory} />
+          <div
+            data-demo-scenario-target="completion-history"
+            data-work-order-id={id}
+            className="min-w-0"
+          >
+            <WorkOrderStatusTimeline entries={statusHistory} />
+          </div>
         </div>
 
         <div className={cardClass}>

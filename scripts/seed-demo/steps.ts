@@ -844,6 +844,7 @@ async function topUpTechniciansAndWorkOrders(
     if ((wosWithoutCoords?.length ?? 0) > 0) {
       console.log(`  Resolved coordinates for ${wosWithoutCoords!.length} work orders (dispatch map).`);
     }
+    await ensureScenarioDataForTenant(supabase, tenantId, companyId);
     return;
   }
 
@@ -877,6 +878,429 @@ async function topUpTechniciansAndWorkOrders(
     }
   }
   console.log(`  Work orders added: ${woBatch.length}`);
+  await ensureScenarioDataForTenant(supabase, tenantId, companyId);
+}
+
+async function ensureScenarioDataForTenant(
+  supabase: SupabaseClient,
+  tenantId: string,
+  companyId: string
+): Promise<void> {
+  // Demo scenario wiring expects these exact values.
+  const REQUEST_TITLES = ["HVAC not cooling – Building A", "Water leak – Room 204", "Lights out – Gym"] as const;
+  const TECHNICIAN_NAMES = ["Mike Johnson", "Sarah Chen", "Luis Martinez"] as const;
+  const DISPATCH_WO_TITLE = "HVAC not cooling – Building A";
+  const COMPLETED_WO_TITLE = "Lights out – Gym";
+
+  const ASSET_BY_NAME = {
+    "RTU-3": { asset_type: "HVAC" },
+    "Electrical Panel L2": { asset_type: "Electrical" },
+    "Boiler System": { asset_type: "Boiler" },
+  } as const;
+
+  const today = todayISO();
+  const now = new Date();
+  const dueInDays = 2;
+  const dueDate = addDays(new Date(`${today}T12:00:00`), dueInDays).toISOString().slice(0, 10);
+
+  const completedAt = addDays(new Date(`${today}T12:00:00`), -1);
+  const completedAtISO = completedAt.toISOString();
+
+  const getFirstRowId = <T extends { id: string }>(rows: T[] | null | undefined): string | null =>
+    (rows ?? []).length ? (rows[0] as T).id : null;
+
+  async function getOrCreateTechnician(name: string, trade: string, phone: string): Promise<string | null> {
+    // Scenario actions resolve technicians by `technician_name` and/or `name`.
+    const { data: byTechName } = await supabase
+      .from("technicians")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("status", "active")
+      .eq("technician_name", name)
+      .limit(1);
+
+    const existingId = getFirstRowId((byTechName ?? []) as { id: string }[]);
+    if (existingId) return existingId;
+
+    const { data: byName } = await supabase
+      .from("technicians")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("status", "active")
+      .eq("name", name)
+      .limit(1);
+    const existingId2 = getFirstRowId((byName ?? []) as { id: string }[]);
+    if (existingId2) return existingId2;
+
+    const note = `Demo scenario technician (${trade}).`;
+    const { data: created } = await supabase
+      .from("technicians")
+      .insert({
+        tenant_id: tenantId,
+        company_id: companyId,
+        name,
+        technician_name: name,
+        email: null,
+        phone,
+        trade,
+        status: "active",
+        notes: note,
+      })
+      .select("id")
+      .single();
+
+    return (created as { id?: string } | null)?.id ?? null;
+  }
+
+  async function getOrCreateAsset(
+    assetName: string,
+    assetType: string
+  ): Promise<{ id: string; property_id: string | null; building_id: string | null; unit_id: string | null } | null> {
+    const { data: byAssetName } = await supabase
+      .from("assets")
+      .select("id, property_id, building_id, unit_id")
+      .eq("company_id", companyId)
+      .eq("asset_name", assetName)
+      .limit(1);
+
+    const existing = (byAssetName ?? []) as { id: string; property_id: string | null; building_id: string | null; unit_id: string | null }[];
+    const existingRow = existing[0] ?? null;
+    if (existingRow?.id) return existingRow;
+
+    const { data: byName } = await supabase
+      .from("assets")
+      .select("id, property_id, building_id, unit_id")
+      .eq("company_id", companyId)
+      .eq("name", assetName)
+      .limit(1);
+    const existingRow2 = ((byName ?? []) as typeof existing)[0] ?? null;
+    if (existingRow2?.id) return existingRow2;
+
+    const { data: defaultPropRows } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("company_id", companyId)
+      .order("name")
+      .limit(1);
+    const defaultPropertyId = getFirstRowId((defaultPropRows ?? []) as { id: string }[]);
+
+    const { data: defaultBldRows } = await supabase
+      .from("buildings")
+      .select("id, property_id")
+      .eq("company_id", companyId)
+      .order("name")
+      .limit(1);
+    const defaultBld = (defaultBldRows ?? []) as { id: string; property_id: string | null }[];
+    const defaultBuildingId = defaultBld[0]?.id ?? null;
+
+    const { data: unitRows } = defaultBuildingId
+      ? await supabase.from("units").select("id").eq("building_id", defaultBuildingId).limit(1)
+      : { data: [] as { id: string }[] };
+    const defaultUnitId = getFirstRowId((unitRows ?? []) as { id: string }[]);
+
+    const conditions = ["excellent", "good", "fair"] as const;
+    const criticalities = ["low", "medium", "high"] as const;
+    const condition = conditions[Math.floor(Math.random() * conditions.length)] ?? "good";
+    const criticality = criticalities[Math.floor(Math.random() * criticalities.length)] ?? "medium";
+
+    const manufacturerByType: Record<string, string> = {
+      HVAC: "Trane",
+      Electrical: "Eaton",
+      Boiler: "Weil-McLain",
+    };
+
+    const serial = `SN-${assetName.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase()}-${Math.floor(Math.random() * 900 + 100)}`;
+
+    const { data: created } = await supabase
+      .from("assets")
+      .insert({
+        tenant_id: tenantId,
+        company_id: companyId,
+        property_id: defaultPropertyId,
+        building_id: defaultBuildingId,
+        unit_id: defaultUnitId ?? undefined,
+        name: assetName,
+        asset_name: assetName,
+        asset_type: assetType,
+        status: "active",
+        manufacturer: manufacturerByType[assetType] ?? "Demo Industrial",
+        model: `M-${Math.floor(Math.random() * 900 + 100)}`,
+        serial_number: serial,
+        install_date: addDays(new Date(`${today}T12:00:00`), -365).toISOString().slice(0, 10),
+        description: `Demo asset: ${assetName}`,
+        location_notes: "Scenario top-up.",
+        condition,
+        criticality,
+        notes: "Demo asset",
+      })
+      .select("id, property_id, building_id, unit_id")
+      .single();
+
+    return created
+      ? (created as {
+          id: string;
+          property_id: string | null;
+          building_id: string | null;
+          unit_id: string | null;
+        })
+      : null;
+  }
+
+  async function getOrCreateWorkRequest(args: {
+    title: string;
+    assetId: string | null;
+    assetName: string | null;
+    assetLocation?: string | null;
+    requesterIdx: number;
+  }): Promise<string | null> {
+    const { data: existing } = await supabase
+      .from("work_requests")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("description", args.title)
+      .limit(1);
+    const existingId = getFirstRowId((existing ?? []) as { id: string }[]);
+    if (existingId) return existingId;
+
+    const requester = DEMO_REQUESTERS[args.requesterIdx % DEMO_REQUESTERS.length];
+    const { data: created } = await supabase
+      .from("work_requests")
+      .insert({
+        tenant_id: tenantId,
+        company_id: companyId,
+        requester_name: requester.name,
+        requester_email: requester.email,
+        location: args.assetLocation ?? "Demo location",
+        description: args.title,
+        priority: "medium",
+        status: "submitted",
+        asset_id: args.assetId,
+        created_at: now.toISOString(),
+      })
+      .select("id")
+      .single();
+    return (created as { id?: string } | null)?.id ?? null;
+  }
+
+  async function getOrCreateWorkOrder(args: {
+    title: string;
+    status: (typeof WO_STATUSES)[number];
+    requestId: string | null;
+    assetId: string | null;
+    technicianId: string | null;
+    scheduledDate: string | null;
+    scheduledStartISO: string | null;
+    scheduledEndISO: string | null;
+    dueDate: string | null;
+    completionNotes: string | null;
+    resolutionSummary: string | null;
+    completedAtISO: string | null;
+    assignedTechForCompleted: string | null;
+  }): Promise<string | null> {
+    const { data: existingRows } = await supabase
+      .from("work_orders")
+      .select("id, asset_id, assigned_technician_id, status, scheduled_date")
+      .eq("tenant_id", tenantId)
+      .eq("title", args.title)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const existing = (existingRows ?? []) as { id: string; asset_id: string | null; assigned_technician_id: string | null; status: string; scheduled_date: string | null }[];
+    const existingWo = existing[0] ?? null;
+
+    const woId = existingWo?.id ?? null;
+    const tenantCompanyKey = companyId.replace(/[^A-Za-z0-9]/g, "").slice(0, 10).toUpperCase();
+    const titleKey = args.title.replace(/[^A-Za-z0-9]/g, "").slice(0, 14).toUpperCase();
+    const woNumber = `WO-DEMO-${tenantCompanyKey}-${titleKey}`;
+
+    // Pull property/building/unit from the asset if possible; otherwise leave as null.
+    const assetId = args.assetId;
+    const { data: assetLocRows } = assetId
+      ? await supabase
+          .from("assets")
+          .select("property_id, building_id, unit_id")
+          .eq("id", assetId)
+          .limit(1)
+      : { data: [] as { property_id: string | null; building_id: string | null; unit_id: string | null }[] };
+    const assetLoc = (assetLocRows ?? []) as { property_id: string | null; building_id: string | null; unit_id: string | null }[];
+
+    const propertyId = assetLoc[0]?.property_id ?? null;
+    const buildingId = assetLoc[0]?.building_id ?? null;
+    const unitId = assetLoc[0]?.unit_id ?? null;
+
+    const basePayload = {
+      tenant_id: tenantId,
+      company_id: companyId,
+      work_order_number: woNumber,
+      title: args.title,
+      description: `Demo work order: ${args.title}`,
+      status: args.status,
+      priority: args.status === "completed" ? "medium" : "high",
+      category: "repair",
+      source_type: "manual",
+      asset_id: assetId,
+      property_id: propertyId,
+      building_id: buildingId,
+      unit_id: unitId ?? null,
+      request_id: args.requestId,
+      assigned_technician_id: args.technicianId,
+      assigned_crew_id: null,
+      requested_by_name: "Maintenance Lead",
+      requested_by_email: "maint@demo.local",
+      requested_at: now.toISOString(),
+      scheduled_date: args.scheduledDate,
+      due_date: args.dueDate,
+      scheduled_start: args.scheduledStartISO,
+      scheduled_end: args.scheduledEndISO,
+      completed_at: args.completedAtISO,
+      completion_notes: args.completionNotes,
+      resolution_summary: args.resolutionSummary,
+      completed_by_technician_id: args.status === "completed" ? args.assignedTechForCompleted : null,
+      vendor_id: null,
+      estimated_hours: 1,
+      actual_hours: args.status === "completed" ? 1 : null,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    };
+
+    if (woId) {
+      await supabase.from("work_orders").update(basePayload).eq("id", woId);
+      return woId;
+    }
+
+    const { data: created } = await supabase
+      .from("work_orders")
+      .insert(basePayload)
+      .select("id")
+      .single();
+
+    return (created as { id?: string } | null)?.id ?? null;
+  }
+
+  const techByName = new Map<string, string | null>();
+  techByName.set("Mike Johnson", await getOrCreateTechnician("Mike Johnson", "HVAC", "(555) 401-1001"));
+  techByName.set("Sarah Chen", await getOrCreateTechnician("Sarah Chen", "Electrical", "(555) 401-1002"));
+  techByName.set("Luis Martinez", await getOrCreateTechnician("Luis Martinez", "Plumbing", "(555) 401-1003"));
+
+  const [rtu3, electricalPanel, boilerSystem] = await Promise.all([
+    getOrCreateAsset("RTU-3", ASSET_BY_NAME["RTU-3"].asset_type),
+    getOrCreateAsset("Electrical Panel L2", ASSET_BY_NAME["Electrical Panel L2"].asset_type),
+    getOrCreateAsset("Boiler System", ASSET_BY_NAME["Boiler System"].asset_type),
+  ]);
+
+  const dispatchRequestId = await getOrCreateWorkRequest({
+    title: REQUEST_TITLES[0],
+    assetId: rtu3?.id ?? null,
+    assetName: "RTU-3",
+    assetLocation: "Building A / Roof",
+    requesterIdx: 0,
+  });
+
+  await getOrCreateWorkRequest({
+    title: REQUEST_TITLES[1],
+    assetId: boilerSystem?.id ?? null,
+    assetName: "Boiler System",
+    assetLocation: "Room 204 / Mechanical Room",
+    requesterIdx: 1,
+  });
+
+  await getOrCreateWorkRequest({
+    title: REQUEST_TITLES[2],
+    assetId: electricalPanel?.id ?? null,
+    assetName: "Electrical Panel L2",
+    assetLocation: "Gym / Electrical Room",
+    requesterIdx: 2,
+  });
+
+  // Dispatch + execution anchor work order (Step 3–5).
+  const scheduledStart = new Date(`${today}T12:00:00`);
+  scheduledStart.setHours(8, 30, 0, 0);
+  const scheduledEnd = new Date(scheduledStart.getTime() + 60 * 60 * 1000);
+  await getOrCreateWorkOrder({
+    title: DISPATCH_WO_TITLE,
+    status: "in_progress",
+    requestId: dispatchRequestId,
+    assetId: rtu3?.id ?? null,
+    technicianId: techByName.get("Mike Johnson") ?? null,
+    scheduledDate: today,
+    scheduledStartISO: scheduledStart.toISOString(),
+    scheduledEndISO: scheduledEnd.toISOString(),
+    dueDate,
+    completionNotes: null,
+    resolutionSummary: null,
+    completedAtISO: null,
+    assignedTechForCompleted: null,
+  });
+
+  // Completed work order (Step 6–7). Intentionally do NOT link via `request_id` to avoid
+  // breaking the step-3 anchor if the demo request row picked is "Lights out – Gym".
+  const { data: completedExisting } = await supabase
+    .from("work_orders")
+    .select("status")
+    .eq("tenant_id", tenantId)
+    .eq("title", COMPLETED_WO_TITLE)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const completedExistingStatus = ((completedExisting ?? []) as { status?: string | null }[])[0]?.status ?? null;
+
+  const scheduledStart2 = new Date(`${today}T12:00:00`);
+  scheduledStart2.setHours(10, 0, 0, 0);
+  const scheduledEnd2 = new Date(scheduledStart2.getTime() + 60 * 60 * 1000);
+
+  const scheduledStart2ISO = scheduledStart2.toISOString();
+  const scheduledEnd2ISO = scheduledEnd2.toISOString();
+  const assignedSarahId = techByName.get("Sarah Chen") ?? null;
+
+  if (completedExistingStatus === "completed") {
+    // Update fields but keep status stable (avoids extra status-history rows).
+    await getOrCreateWorkOrder({
+      title: COMPLETED_WO_TITLE,
+      status: "completed",
+      requestId: null,
+      assetId: electricalPanel?.id ?? null,
+      technicianId: assignedSarahId,
+      scheduledDate: null,
+      scheduledStartISO: null,
+      scheduledEndISO: null,
+      dueDate: null,
+      completionNotes: "Restored power to the gym circuit and verified stable operation.",
+      resolutionSummary: "Resolved: repair completed successfully.",
+      completedAtISO: completedAtISO,
+      assignedTechForCompleted: assignedSarahId,
+    });
+  } else {
+    // Two-step status progression so the UI shows meaningful history.
+    await getOrCreateWorkOrder({
+      title: COMPLETED_WO_TITLE,
+      status: "in_progress",
+      requestId: null,
+      assetId: electricalPanel?.id ?? null,
+      technicianId: assignedSarahId,
+      scheduledDate: today,
+      scheduledStartISO: scheduledStart2ISO,
+      scheduledEndISO: scheduledEnd2ISO,
+      dueDate,
+      completionNotes: null,
+      resolutionSummary: null,
+      completedAtISO: null,
+      assignedTechForCompleted: null,
+    });
+    await getOrCreateWorkOrder({
+      title: COMPLETED_WO_TITLE,
+      status: "completed",
+      requestId: null,
+      assetId: electricalPanel?.id ?? null,
+      technicianId: assignedSarahId,
+      scheduledDate: null,
+      scheduledStartISO: null,
+      scheduledEndISO: null,
+      dueDate: null,
+      completionNotes: "Restored power to the gym circuit and verified stable operation.",
+      resolutionSummary: "Resolved: repair completed successfully.",
+      completedAtISO: completedAtISO,
+      assignedTechForCompleted: assignedSarahId,
+    });
+  }
 }
 
 export async function seedTenant(
@@ -1587,4 +2011,6 @@ export async function seedTenant(
     });
   }
   console.log("  Activity logs: added");
+  // Ensure the guided demo scenario anchors exist even when this is a fresh tenant seed.
+  await ensureScenarioDataForTenant(supabase, tenantId, companyId);
 }

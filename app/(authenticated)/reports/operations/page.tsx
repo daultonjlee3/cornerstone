@@ -136,7 +136,10 @@ export default async function OperationsReportsPage() {
         }
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        data-demo-scenario-target="reporting-metrics"
+      >
         <MetricCard
           title="PM On-Time"
           value={intelligence.pmCompliance.completedOnTime}

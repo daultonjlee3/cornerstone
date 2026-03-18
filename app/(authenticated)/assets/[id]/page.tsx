@@ -580,6 +580,7 @@ export default async function AssetDetailPage({
         health={intelligence.health}
         insights={intelligence.insights}
         upcomingPmCount={upcomingPmCount}
+        assetId={id}
       />
 
       <AssetTimeline key={id} events={intelligence.timeline} assetId={id} />
@@ -652,7 +653,7 @@ export default async function AssetDetailPage({
               <dd className="text-[var(--foreground)]">{formatDate(asset.warranty_expires)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-[var(--muted)]">Expected life</dt>
+              <dt className="text-xs text-[var(--muted)]">Expected lifespan</dt>
               <dd className="text-[var(--foreground)]">
                 {asset.expected_life_years != null ? `${asset.expected_life_years} years` : "—"}
               </dd>

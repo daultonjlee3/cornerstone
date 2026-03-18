@@ -357,7 +357,12 @@ export default async function TechnicianWorkQueuePage({
               </thead>
               <tbody>
                 {filteredRows.map((workOrder) => (
-                  <tr key={workOrder.id} className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50">
+                  <tr
+                    key={workOrder.id}
+                    data-demo-scenario-target="technician-task-row"
+                    data-work-order-id={workOrder.id}
+                    className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
+                  >
                     <td className="px-3 py-3 text-[var(--foreground)]">
                       {workOrder.work_order_number ?? "—"}
                     </td>

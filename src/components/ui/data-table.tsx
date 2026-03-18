@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 type DataTableProps = {
   children: ReactNode;
@@ -39,11 +39,12 @@ type TrProps = {
   children: ReactNode;
   className?: string;
   clickable?: boolean;
-};
+} & HTMLAttributes<HTMLTableRowElement>;
 
-export function Tr({ children, className = "", clickable = false }: TrProps) {
+export function Tr({ children, className = "", clickable = false, ...rest }: TrProps) {
   return (
     <tr
+      {...rest}
       className={`border-b border-[var(--card-border)]/90 last:border-0 hover:bg-[var(--background)]/52 ${
         clickable ? "cursor-pointer" : ""
       } ${className}`}
