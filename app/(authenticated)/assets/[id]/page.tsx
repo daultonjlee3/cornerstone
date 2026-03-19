@@ -418,6 +418,40 @@ export default async function AssetDetailPage({
     (plan) => plan.status === "active" && plan.next_run_date && plan.next_run_date >= today
   ).length;
 
+  const assetLocationLabel =
+    [effectivePropertyName, effectiveBuildingName, effectiveUnitName].filter(Boolean).join(" / ") ||
+    null;
+
+  const recentActivity = serviceHistoryWithPhotos.length
+    ? serviceHistoryWithPhotos
+        .slice(0, 3)
+        .map((entry) => {
+          const woLabel = entry.work_order_number ?? entry.title ?? "Work order";
+          const dateLabel = entry.completed_at ? String(entry.completed_at).slice(0, 10) : null;
+          const crewLabel = entry.crew_name ? ` (${entry.crew_name})` : "";
+          const notesLabel = entry.completion_notes
+            ? String(entry.completion_notes).trim().slice(0, 140)
+            : null;
+          return `${woLabel}${dateLabel ? ` (${dateLabel})` : ""}${crewLabel}${
+            notesLabel ? ` - ${notesLabel}` : ""
+          }`;
+        })
+        .join(" | ")
+    : null;
+
+  const assetRecordSummaryPayload = {
+    id: asset.id,
+    name: asset.name ?? null,
+    asset_type: (asset.asset_type ?? asset.category ?? null) as string | null,
+    condition: asset.condition ?? null,
+    status: asset.status ?? null,
+    location: assetLocationLabel,
+    health_score: intelligence?.health?.healthScore ?? asset.health_score ?? null,
+    work_order_count: serviceHistoryWithPhotos.length,
+    pm_due_next: nextPmDue,
+    recentActivity,
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -465,7 +499,7 @@ export default async function AssetDetailPage({
               {formatDateTime(lastServicedAt)}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <AssetDetailAiSummary assetId={id} />
+              <AssetDetailAiSummary assetId={id} recordSummary={assetRecordSummaryPayload} />
               <Link
                 href="/assets/intelligence"
                 className="inline-flex rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"

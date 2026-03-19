@@ -785,7 +785,42 @@ export function WorkOrdersList({
       <CornerstoneAiPanel
         open={aiPanelOpen}
         onClose={() => setAiPanelOpen(false)}
-        context={{ entityType: "list", listFilters: { entityType: "work_orders" } }}
+        context={{
+          entityType: "list",
+          listFilters: { entityType: "work_orders" },
+          recordSummary: {
+            listSummary: {
+              total: stats.open + stats.inProgress + stats.onHold,
+              byStatus: {
+                open: stats.open,
+                in_progress: stats.inProgress,
+                on_hold: stats.onHold,
+              },
+            },
+          },
+          actionContext: {
+            workOrders: initialList.slice(0, 20).map((w) => ({
+              id: w.id,
+              work_order_number: (w.work_order_number as string | null | undefined) ?? null,
+              title: w.title ?? null,
+              status: w.status ?? null,
+              priority: w.priority ?? null,
+              due_date: w.due_date ?? null,
+              assigned_technician_id: w.assigned_technician_id ?? null,
+              assigned_crew_id: w.assigned_crew_id ?? null,
+              vendor_id: w.vendor_id ?? null,
+              assigned_to_label:
+                !w.assigned_technician_id && !w.assigned_crew_id && !w.vendor_id
+                  ? "Unassigned"
+                  : assignedDisplay(w),
+              location: w.location ?? null,
+            })),
+            technicians: technicians.map((t) => ({
+              id: t.id,
+              label: t.name,
+            })),
+          },
+        }}
         initialQuery="Summarize the current open work order queue."
       />
       <HelpDrawer

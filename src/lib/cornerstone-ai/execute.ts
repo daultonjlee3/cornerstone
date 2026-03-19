@@ -5,13 +5,14 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyAiIntent } from "./intent";
-import type { CornerstoneAiContext, CornerstoneAiResponse } from "./types";
+import type { AiIntent, CornerstoneAiContext, CornerstoneAiResponse } from "./types";
 import * as help from "./help";
 import * as retrieval from "./retrieval";
 import { buildAiPrompt } from "./prompts";
 import type { RetrievedHelpContext, RetrievedOpsContext, RetrievedSummaryContext } from "./prompts";
 import { callCornerstoneLlm } from "./llm";
 import { formatAiResponse, sourcesFromHelpSections } from "./format";
+import { planCornerstoneAiAction } from "./action-engine";
 import {
   checkAiQuotaBeforeRequest,
   recordAiUsage,
@@ -61,6 +62,22 @@ export async function executeCornerstoneAiRequest(
     entityId: context?.entityId,
   });
 
+  if (
+    intent === "ACTION_ASSIGN_WORK_ORDERS" ||
+    intent === "ACTION_CREATE_WORK_ORDER" ||
+    intent === "ACTION_SUMMARIZE_OPERATIONS"
+  ) {
+    return await planCornerstoneAiAction({
+      supabase,
+      tenantId,
+      userId,
+      companyIds,
+      query: trimmed,
+      context,
+      isPlatformSuperAdmin,
+    });
+  }
+
   let system = "";
   let user = "";
   let sources: { title: string; moduleKey?: string; path?: string }[] = [];
@@ -75,6 +92,7 @@ export async function executeCornerstoneAiRequest(
     user = built.user;
     sources = sourcesFromHelpSections(sections);
   } else if (intent === "OPS_QUERY") {
+    const opsIntent: AiIntent = "OPS_QUERY";
     const q = trimmed.toLowerCase();
     const today = new Date().toISOString().slice(0, 10);
     const ops: RetrievedOpsContext = {};
@@ -166,42 +184,65 @@ export async function executeCornerstoneAiRequest(
       percentHighPriority,
     };
 
-    const built = buildAiPrompt(intent, trimmed, ops);
+    const built = buildAiPrompt(opsIntent, trimmed, ops);
     system = built.system;
     user = built.user;
-  } else if (intent === "RECORD_SUMMARY" && context?.entityId && context?.entityType) {
+  } else if (intent === "RECORD_SUMMARY" && context?.entityType) {
     if (context.entityType === "work_order") {
-      const ctx = await retrieval.getWorkOrderSummaryContext(supabase, companyIds, context.entityId);
-      if (!ctx) {
+      // IMPORTANT: Never fetch by ID inside the AI layer.
+      const payload = context.recordSummary?.workOrder;
+      if (!payload?.id) {
         return formatAiResponse(
-          "This work order was not found or you don’t have access to it.",
+          "I don’t have the in-memory work order fields needed to summarize this. Open Cornerstone AI from inside the work order page (using the “Summarize” button) so I can use the data you’re already viewing.",
           intent,
-          "LIGHT",
-          { warnings: ["Record not found or out of scope."] }
+          "LIGHT"
         );
       }
+
       const sum: RetrievedSummaryContext = {
         workOrder: {
-          ...ctx.workOrder,
-          // WorkOrderSummaryRow expects `string | undefined` (not `null`)
-          description: ctx.workOrder.description ?? undefined,
-          notesExcerpt: ctx.notesExcerpt,
+          id: payload.id,
+          work_order_number: payload.work_order_number ?? null,
+          title: payload.title ?? null,
+          status: payload.status ?? null,
+          priority: payload.priority ?? null,
+          due_date: payload.due_date ?? null,
+          company_name: payload.company_name ?? null,
+          location: payload.location ?? null,
+          assigned_to: payload.assigned_to ?? null,
+          description: payload.description ?? undefined,
+          notesExcerpt: payload.notesExcerpt ?? undefined,
         },
       };
       const built = buildAiPrompt(intent, trimmed, sum);
       system = built.system;
       user = built.user;
     } else if (context.entityType === "asset") {
-      const asset = await retrieval.getAssetSummaryContext(supabase, companyIds, context.entityId);
-      if (!asset) {
+      // IMPORTANT: Never fetch by ID inside the AI layer.
+      const payload = context.recordSummary?.asset;
+      if (!payload?.id) {
         return formatAiResponse(
-          "This asset was not found or you don’t have access to it.",
+          "I don’t have the in-memory asset fields needed to summarize this. Open Cornerstone AI from inside the asset page (using the “Summarize” button) so I can use the data you’re already viewing.",
           intent,
-          "LIGHT",
-          { warnings: ["Record not found or out of scope."] }
+          "LIGHT"
         );
       }
-      const built = buildAiPrompt(intent, trimmed, { asset } as RetrievedSummaryContext);
+
+      const sum: RetrievedSummaryContext = {
+        asset: {
+          id: payload.id,
+          name: payload.name ?? null,
+          status: payload.status ?? null,
+          condition: payload.condition ?? null,
+          asset_type: payload.asset_type ?? payload.type ?? null,
+          location: payload.location ?? null,
+          health_score: payload.health_score ?? null,
+          work_order_count: payload.work_order_count ?? 0,
+          pm_due_next: payload.pm_due_next ?? null,
+          recentActivity: payload.recentActivity ?? undefined,
+        },
+      };
+      const built = buildAiPrompt(intent, trimmed, sum);
       system = built.system;
       user = built.user;
     } else {
@@ -210,11 +251,16 @@ export async function executeCornerstoneAiRequest(
       user = built.user;
     }
   } else if (intent === "LIST_SUMMARY" && context?.entityType === "list") {
-    const entityType = (context.listFilters?.entityType as "work_orders" | "assets") ?? "work_orders";
-    const listSummary = await retrieval.getListSummaryContext(supabase, companyIds, entityType, {
-      status: context.listFilters?.status,
-      priority: context.listFilters?.priority,
-    });
+    // IMPORTANT: Never fetch by ID inside the AI layer.
+    const listSummary = context.recordSummary?.listSummary;
+    if (!listSummary) {
+      return formatAiResponse(
+        "I can summarize the current queue only when the list breakdown is provided by the UI. Open Cornerstone AI from the Work Orders or Assets screen so I can use the real counts you’re viewing.",
+        intent,
+        "LIGHT"
+      );
+    }
+
     const built = buildAiPrompt(intent, trimmed, { listSummary } as RetrievedSummaryContext);
     system = built.system;
     user = built.user;

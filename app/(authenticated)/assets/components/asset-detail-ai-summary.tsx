@@ -4,9 +4,26 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { CornerstoneAiPanel } from "@/app/(authenticated)/components/cornerstone-ai-panel";
 
-type AssetDetailAiSummaryProps = { assetId: string };
+type AssetRecordSummaryPayload = {
+  id: string;
+  name?: string | null;
+  asset_type?: string | null;
+  type?: string | null;
+  condition?: string | null;
+  status?: string | null;
+  location?: string | null;
+  health_score?: number | null;
+  work_order_count?: number;
+  pm_due_next?: string | null;
+  recentActivity?: string | null;
+};
 
-export function AssetDetailAiSummary({ assetId }: AssetDetailAiSummaryProps) {
+type AssetDetailAiSummaryProps = {
+  assetId: string;
+  recordSummary: AssetRecordSummaryPayload;
+};
+
+export function AssetDetailAiSummary({ assetId, recordSummary }: AssetDetailAiSummaryProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -21,7 +38,14 @@ export function AssetDetailAiSummary({ assetId }: AssetDetailAiSummaryProps) {
       <CornerstoneAiPanel
         open={open}
         onClose={() => setOpen(false)}
-        context={{ entityType: "asset", entityId: assetId }}
+        context={{
+          entityType: "asset",
+          entityId: assetId,
+          recordSummary: { asset: recordSummary },
+          actionContext: {
+            assets: [{ id: recordSummary.id, name: recordSummary.name ?? recordSummary.id }],
+          },
+        }}
         initialQuery="Summarize this asset's service history and condition."
       />
     </>

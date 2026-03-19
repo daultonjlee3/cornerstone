@@ -24,6 +24,7 @@ import { DispatchOperationsJobList } from "./DispatchOperationsJobList";
 import { DispatchWorkOrderDrawer } from "./DispatchWorkOrderDrawer";
 import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
 import { DispatchWorkforcePanel } from "./DispatchWorkforcePanel";
+import { DispatchOptimizationCopilot } from "./DispatchOptimizationCopilot";
 import type { DispatchWorkOrder } from "../types";
 import type { LoadDispatchResult } from "../dispatch-data";
 import type { DispatchFilterState } from "../filter-state";
@@ -581,6 +582,7 @@ export function DispatchView({
         return;
       }
       router.refresh();
+      window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
     },
     [optimisticWorkOrders, router]
   );
@@ -1144,6 +1146,7 @@ export function DispatchView({
                 />
               </div>
               <aside className="hidden w-[280px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-[var(--card-border)] bg-[var(--background)]/30 p-2 xl:flex">
+                <DispatchOptimizationCopilot />
                 <DispatchWorkforcePanel
                   workforce={workforce}
                   insights={dispatchData.insights}

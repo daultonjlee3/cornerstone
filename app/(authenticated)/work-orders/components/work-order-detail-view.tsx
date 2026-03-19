@@ -134,6 +134,64 @@ export function WorkOrderDetailView({
   const status = (workOrder.status as string) ?? "new";
   const priority = (workOrder.priority as string) ?? "medium";
   const isCompleted = status === "completed";
+
+  // UI-provided summary context: avoid re-fetching from the backend (RLS/permissions can block).
+  const location = [
+    (workOrder.property_name as string | null | undefined) ?? null,
+    (workOrder.building_name as string | null | undefined) ?? null,
+    (workOrder.unit_name as string | null | undefined) ?? null,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  const locationOrNull = location ? location : null;
+
+  const assignedTechnicianName =
+    (workOrder.technician_name as string | null | undefined) ?? null;
+  const assignedCrewName = (workOrder.crew_name as string | null | undefined) ?? null;
+  const assigned_to =
+    assignedTechnicianName ?? (assignedCrewName ? `Crew: ${assignedCrewName}` : null);
+
+  const assetName = (workOrder.asset_name as string | null | undefined) ?? null;
+  const descriptionBase = (workOrder.description as string | null | undefined) ?? null;
+  const description =
+    assetName && descriptionBase
+      ? `Asset: ${assetName}. ${descriptionBase}`
+      : assetName
+        ? `Asset: ${assetName}.`
+        : descriptionBase;
+
+  const notesExcerptFromNotes = (notes ?? [])
+    .map((n) => (n.body ?? "").trim())
+    .filter(Boolean)
+    .slice(-3)
+    .join(" | ")
+    .slice(0, 500);
+
+  const notesExcerptFromStatus =
+    (statusHistory ?? []).length > 0
+      ? (statusHistory ?? [])
+          .slice(-2)
+          .map((h) => `${h.from_status ?? "—"} → ${h.to_status ?? "—"}`)
+          .join(" | ")
+          .slice(0, 500)
+      : null;
+
+  const notesExcerpt = notesExcerptFromNotes || notesExcerptFromStatus || null;
+
+  const workOrderRecordSummaryPayload = {
+    id,
+    work_order_number:
+      (workOrder.work_order_number as string | null | undefined) ?? null,
+    title: (workOrder.title as string | null | undefined) ?? null,
+    status,
+    priority,
+    due_date: (workOrder.due_date as string | null | undefined) ?? null,
+    location: locationOrNull,
+    assigned_to,
+    company_name: (workOrder.company_name as string | null | undefined) ?? null,
+    description: description ?? null,
+    notesExcerpt,
+  };
   const showUnassignedTip =
     !isCompleted &&
     !(workOrder.assigned_technician_id as string | null) &&
@@ -180,7 +238,10 @@ export function WorkOrderDetailView({
           estimatedHours={(workOrder.estimated_hours as number) ?? null}
           inventoryItems={inventoryItems}
           onClose={() => setCompletionModalOpen(false)}
-          onSuccess={() => router.refresh()}
+          onSuccess={() => {
+            router.refresh();
+            window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+          }}
         />
       )}
       <div className="space-y-6">
@@ -222,7 +283,34 @@ export function WorkOrderDetailView({
         <CornerstoneAiPanel
           open={aiPanelOpen}
           onClose={() => setAiPanelOpen(false)}
-          context={{ entityType: "work_order", entityId: id }}
+          context={{
+            entityType: "work_order",
+            entityId: id,
+            recordSummary: {
+              workOrder: workOrderRecordSummaryPayload,
+            },
+            actionContext: {
+              workOrders: [
+                {
+                  id,
+                  work_order_number: workOrderRecordSummaryPayload.work_order_number ?? null,
+                  title: workOrderRecordSummaryPayload.title ?? null,
+                  status: workOrderRecordSummaryPayload.status ?? null,
+                  priority: workOrderRecordSummaryPayload.priority ?? null,
+                  due_date: workOrderRecordSummaryPayload.due_date ?? null,
+                  assigned_technician_id: (workOrder.assigned_technician_id as string | null) ?? null,
+                  assigned_crew_id: (workOrder.assigned_crew_id as string | null) ?? null,
+                  vendor_id: (workOrder.vendor_id as string | null) ?? null,
+                  assigned_to_label: assigned_to,
+                  location: workOrderRecordSummaryPayload.location ?? null,
+                },
+              ],
+              technicians: technicians.map((t) => ({
+                id: t.id,
+                label: t.name,
+              })),
+            },
+          }}
           initialQuery="Summarize this work order for a supervisor."
         />
         {sla.responseBreached ? (
@@ -274,6 +362,7 @@ export function WorkOrderDetailView({
             onSuccess={() => {
               setMessage({ type: "success", text: "Assignment updated." });
               router.refresh();
+            window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
             }}
           />
         )}

@@ -69,6 +69,7 @@ export type RetrievedSummaryContext = {
     health_score: number | null;
     work_order_count: number;
     pm_due_next: string | null;
+    recentActivity?: string | null;
   };
   listSummary?: { total: number; byStatus: Record<string, number>; byPriority?: Record<string, number> };
 };
@@ -186,7 +187,7 @@ export function buildAiPrompt(
       if (sum.asset) {
         const a = sum.asset;
         parts.push(
-          `Asset: ${a.name ?? a.id} | status=${a.status} | condition=${a.condition} | type=${a.asset_type} | location=${a.location} | health=${a.health_score ?? "—"} | WO count=${a.work_order_count} | next PM=${a.pm_due_next ?? "—"}`
+          `Asset: ${a.name ?? a.id} | status=${a.status} | condition=${a.condition} | type=${a.asset_type} | location=${a.location} | health=${a.health_score ?? "—"} | WO count=${a.work_order_count} | next PM=${a.pm_due_next ?? "—"}${a.recentActivity ? "\nRecent activity: " + a.recentActivity : ""}`
         );
       }
       if (sum.listSummary)

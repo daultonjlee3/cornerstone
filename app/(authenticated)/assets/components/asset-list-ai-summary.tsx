@@ -4,7 +4,17 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { CornerstoneAiPanel } from "@/app/(authenticated)/components/cornerstone-ai-panel";
 
-export function AssetListAiSummary() {
+type AssetListSummaryPayload = {
+  total: number;
+  byStatus: Record<string, number>;
+  byPriority?: Record<string, number>;
+};
+
+type AssetListAiSummaryProps = {
+  listSummary: AssetListSummaryPayload;
+};
+
+export function AssetListAiSummary({ listSummary }: AssetListAiSummaryProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -19,7 +29,11 @@ export function AssetListAiSummary() {
       <CornerstoneAiPanel
         open={open}
         onClose={() => setOpen(false)}
-        context={{ entityType: "list", listFilters: { entityType: "assets" } }}
+        context={{
+          entityType: "list",
+          listFilters: { entityType: "assets" },
+          recordSummary: { listSummary },
+        }}
         initialQuery="Summarize the current assets list and any notable issues."
       />
     </>

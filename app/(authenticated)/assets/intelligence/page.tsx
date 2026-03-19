@@ -9,6 +9,7 @@ import { getAssetIntelligenceDashboard } from "@/src/lib/assets/assetIntelligenc
 import { AssetIntelligenceDashboardView } from "../components/asset-intelligence-dashboard-view";
 import { PageHeader } from "@/src/components/ui/page-header";
 import { Button } from "@/src/components/ui/button";
+import { AssetOptimizationCopilot } from "@/src/components/operation-optimization/AssetOptimizationCopilot";
 
 export const metadata = {
   title: "Asset Intelligence | Cornerstone Tech",
@@ -91,6 +92,8 @@ export default async function AssetIntelligencePage({
         </form>
         }
       />
+
+      <AssetOptimizationCopilot />
 
       <AssetIntelligenceDashboardView
         data={dashboardData}

@@ -209,6 +209,17 @@ export default async function AssetsPage({
     dueForPm: dueForPmCount,
   };
 
+  // Queue breakdown payload for the AI list summary. These counts are tenant/company scoped,
+  // and `needsAttention` is a subset of `active`.
+  const assetsListSummary = {
+    total: assetStats.active + assetStats.outOfService,
+    byStatus: {
+      active: Math.max(0, assetStats.active - assetStats.needsAttention),
+      needsAttention: assetStats.needsAttention,
+      outOfService: assetStats.outOfService,
+    },
+  };
+
   const { data: techniciansData } = await supabase
     .from("technicians")
     .select("id, technician_name, name, company_id")
@@ -570,7 +581,7 @@ export default async function AssetsPage({
         subtitle="Track equipment and assets by location."
         actions={
           <div className="flex items-center gap-2">
-            <AssetListAiSummary />
+            <AssetListAiSummary listSummary={assetsListSummary} />
             <Link
               href="/assets/intelligence"
               className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80"

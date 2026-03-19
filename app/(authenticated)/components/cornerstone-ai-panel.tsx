@@ -3,14 +3,23 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Sparkles, Send, Loader2, AlertCircle, X, Lightbulb } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-import { submitCornerstoneAiQuery } from "@/app/(authenticated)/ai/actions";
+import {
+  submitCornerstoneAiQuery,
+  executeCornerstoneAiActionRequest,
+  previewCornerstoneAiActionRequest,
+} from "@/app/(authenticated)/ai/actions";
 import type { CornerstoneAiContext, CornerstoneAiResponse } from "@/src/lib/cornerstone-ai/types";
+import { useRouter } from "next/navigation";
+import type { AssignWorkOrdersActionPreview, CreateWorkOrderActionPreview } from "@/src/lib/cornerstone-ai/types";
+import { useOperationOptimizationProposals } from "@/src/components/operation-optimization/OperationOptimizationProvider";
 
 const SUGGESTED_PROMPTS = [
   "What work orders are overdue today?",
   "Summarize open work orders",
   "Which technicians are overloaded?",
   "How do I create a work order?",
+  "Assign unassigned work orders",
+  "Create a work order for: broken HVAC in Building A",
 ];
 
 type CornerstoneAiPanelProps = {
@@ -26,6 +35,8 @@ export function CornerstoneAiPanel({
   context,
   initialQuery = "",
 }: CornerstoneAiPanelProps) {
+  const router = useRouter();
+  const { proposals: optimizationProposals } = useOperationOptimizationProposals();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,12 +114,80 @@ export function CornerstoneAiPanel({
     [runQuery]
   );
 
+  const handleOptimizationProposalClick = useCallback(
+    async (p: (typeof optimizationProposals)[number]) => {
+      if (loading) return;
+      if (!p.proposedAction) {
+        // Non-mutating recommendation: route user where it matters.
+        if (p.type === "prioritize" || p.type === "auto_dispatch" || p.type === "rebalance") {
+          router.push("/dispatch");
+          return;
+        }
+        router.push("/assets/intelligence");
+        return;
+      }
+
+      setError(null);
+      setLastQuestion(p.title);
+      setResponse(null);
+      setLoading(true);
+
+      try {
+        const result = await previewCornerstoneAiActionRequest({
+          actionType: p.proposedAction.actionType,
+          parameters: p.proposedAction.parameters,
+        });
+        if (!result.ok) {
+          setError(result.error);
+          setLastQuestion(null);
+          return;
+        }
+        setResponse(result.data);
+      } catch {
+        setError("Something went wrong. Try again.");
+        setLastQuestion(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading, optimizationProposals, router]
+  );
+
   const handleFollowUpClick = useCallback(
     (s: string) => {
       runQuery(s);
     },
     [runQuery]
   );
+
+  const handleCancelProposedAction = useCallback(() => {
+    setResponse((prev) => (prev ? { ...prev, proposedAction: undefined } : prev));
+  }, []);
+
+  const handleConfirmProposedAction = useCallback(async () => {
+    if (!response?.proposedAction || loading) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await executeCornerstoneAiActionRequest({
+        actionType: response.proposedAction.actionType,
+        executeSpec: response.proposedAction.executeSpec,
+      });
+
+      if (!result.ok) {
+        setError(result.error || "Something went wrong. Try again.");
+        return;
+      }
+
+      setResponse(result.data);
+      router.refresh();
+      window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+    } catch (e) {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [response?.proposedAction, loading, router]);
 
   // Sync initialQuery from parent (e.g. record summary)
   useEffect(() => {
@@ -190,6 +269,109 @@ export function CornerstoneAiPanel({
                 <p className="mt-0.5 text-sm text-[var(--foreground)]">{lastQuestion}</p>
               </div>
               <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm">
+                {response.proposedAction?.requiresConfirmation ? (
+                  <div className="mb-4 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/60 p-3">
+                    <p className="text-xs font-semibold text-[var(--foreground)]">Proposed action</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Confirm to perform this change. AI won’t modify data until you click Confirm.
+                    </p>
+
+                    {response.proposedAction.actionType === "assign_work_orders" ? (
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium text-[var(--muted)]">Assign to</span>
+                          <span className="rounded-md border border-[var(--card-border)] bg-[var(--background)] px-2 py-1 text-xs">
+                            {(response.proposedAction.preview as AssignWorkOrdersActionPreview).recommendedTechnician.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--muted)]">
+                          Affected work orders:{" "}
+                          <span className="font-medium text-[var(--foreground)]">
+                            {(response.proposedAction.preview as AssignWorkOrdersActionPreview).workOrders.length}
+                          </span>
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          Will assign them to{" "}
+                          <span className="font-medium text-[var(--foreground)]">
+                            {(response.proposedAction.preview as AssignWorkOrdersActionPreview).recommendedTechnician.label}
+                          </span>
+                          .
+                        </p>
+                        <div className="max-h-28 overflow-y-auto rounded-md border border-[var(--card-border)] bg-[var(--background)]/40 p-2">
+                          {(response.proposedAction.preview as AssignWorkOrdersActionPreview).workOrders.slice(0, 8).map((w) => (
+                            <div key={w.id} className="flex items-start justify-between gap-3 py-0.5">
+                              <span className="min-w-0 truncate text-[12px]">
+                                {w.work_order_number ?? w.id} {w.title ? `- ${w.title}` : ""}
+                                {w.currentlyAssignedTo ? ` (${w.currentlyAssignedTo})` : ""}
+                              </span>
+                              <span className="shrink-0 text-[12px] text-[var(--muted)]">
+                                {w.due_date ? `Due ${w.due_date}` : ""}
+                              </span>
+                            </div>
+                          ))}
+                          {(response.proposedAction.preview as AssignWorkOrdersActionPreview).workOrders.length > 8 ? (
+                            <p className="mt-1 text-[11px] text-[var(--muted)]">+ more</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {response.proposedAction.actionType === "create_work_order" ? (
+                      <div className="mt-3 space-y-2 text-sm">
+                        <p className="text-xs font-medium text-[var(--muted)]">New work order</p>
+                        <div className="rounded-md border border-[var(--card-border)] bg-[var(--background)]/40 p-2">
+                          <p className="text-sm font-medium text-[var(--foreground)]">
+                            {(response.proposedAction.preview as CreateWorkOrderActionPreview).title}
+                          </p>
+                          {(response.proposedAction.preview as CreateWorkOrderActionPreview).description ? (
+                            <p className="mt-0.5 text-xs text-[var(--muted)] line-clamp-2">
+                              {(response.proposedAction.preview as CreateWorkOrderActionPreview).description}
+                            </p>
+                          ) : null}
+                          {(response.proposedAction.preview as CreateWorkOrderActionPreview).due_date ? (
+                            <p className="mt-0.5 text-xs text-[var(--muted)]">
+                              Due: {(response.proposedAction.preview as CreateWorkOrderActionPreview).due_date}
+                            </p>
+                          ) : null}
+                          {(response.proposedAction.preview as CreateWorkOrderActionPreview).priority ? (
+                            <p className="mt-0.5 text-xs text-[var(--muted)]">
+                              Priority: {(response.proposedAction.preview as CreateWorkOrderActionPreview).priority}
+                            </p>
+                          ) : null}
+                          {(response.proposedAction.preview as CreateWorkOrderActionPreview).category ? (
+                            <p className="mt-0.5 text-xs text-[var(--muted)]">
+                              Category: {(response.proposedAction.preview as CreateWorkOrderActionPreview).category}
+                            </p>
+                          ) : null}
+                          {(response.proposedAction.preview as CreateWorkOrderActionPreview).assetId ? (
+                            <p className="mt-0.5 text-xs text-[var(--muted)]">
+                              Asset: {(response.proposedAction.preview as CreateWorkOrderActionPreview).assetId}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleConfirmProposedAction}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        Confirm
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleCancelProposedAction}
+                        variant="secondary"
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 {(() => {
                   const { title, steps, tip } = parseAnswer(response.answer);
                   return (
@@ -287,6 +469,38 @@ export function CornerstoneAiPanel({
                   Ask questions about your operations or how to use Cornerstone. Answers use your data and help content.
                 </p>
               </div>
+
+              {optimizationProposals.length ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-[var(--muted)]">Suggested next actions</p>
+                  <ul className="space-y-2">
+                    {optimizationProposals.slice(0, 3).map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          onClick={() => void handleOptimizationProposalClick(p)}
+                          className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 px-3 py-2.5 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background)] hover:border-[var(--accent)]/30"
+                        >
+                          <div className="font-medium">{p.title}</div>
+                          <div className="mt-1 text-xs text-[var(--muted)]">{p.summary}</div>
+                          <div className="mt-2">
+                            {p.proposedAction ? (
+                              <span className="inline-flex items-center rounded-md bg-[var(--accent)]/10 px-2 py-1 text-[11px] font-medium text-[var(--accent)]">
+                                Review & apply
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-md bg-[var(--background)]/80 px-2 py-1 text-[11px] font-medium text-[var(--muted)]">
+                                View details
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <p className="text-xs font-medium text-[var(--muted)]">Try asking</p>
               <ul className="space-y-2">
                 {SUGGESTED_PROMPTS.map((prompt, i) => (

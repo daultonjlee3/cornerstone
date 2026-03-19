@@ -33,6 +33,7 @@ import { DashboardSetupGuidance } from "../dashboard/components/dashboard-setup-
 import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
+import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
 
 export const metadata = {
   title: "Operations Center | Cornerstone Tech",
@@ -233,6 +234,8 @@ export default async function OperationsCenterPage() {
             </div>
           }
         />
+
+        <OperationOptimizationWidget maxVisible={3} />
 
       <DashboardHelperTips overdueWorkOrders={operations.kpis.overdueWorkOrders} />
 

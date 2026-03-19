@@ -36,6 +36,30 @@ const OPS_PATTERNS = [
   /biggest\s+(maintenance\s+)?issues/i,
 ];
 
+const ACTION_ASSIGN_PATTERNS = [
+  /assign\s+(work\s+orders?|jobs)\b/i,
+  /\bdispatch\b.*\bassign\b/i,
+  /route\s+(work\s+orders?|jobs)\b/i,
+  /who\s+should\s+i\s+assign\b/i,
+  /assign\s+(overdue\s+)?work\s+orders?/i,
+];
+
+const ACTION_CREATE_PATTERNS = [
+  /\bcreate\s+(a\s+)?work\s+order\b/i,
+  /\blog\s+(a\s+)?work\s+order\b/i,
+  /\bnew\s+work\s+order\b/i,
+  /\badd\s+(a\s+)?work\s+order\b/i,
+  /\breport\s+(an\s+)?issue\b/i,
+];
+
+const ACTION_SUMMARIZE_OPERATIONS_PATTERNS = [
+  /summarize\s+operations\b/i,
+  /operations\s+summary\b/i,
+  /key\s+insights\s+(about\s+)?operations\b/i,
+  /what\s+should\s+i\s+focus\s+on\b/i,
+  /what\s+matters\s+most\b/i,
+];
+
 const RECORD_SUMMARY_PATTERNS = [
   /summarize\s+this\s+(work\s+order|asset|record)/i,
   /summarize\s+(this\s+)?(work\s+order|asset)/i,
@@ -54,6 +78,13 @@ const LIST_SUMMARY_PATTERNS = [
 export function classifyAiIntent(query: string, context?: { entityType?: string; entityId?: string }): AiIntent {
   const q = query.trim();
   if (!q) return "UNKNOWN";
+
+  if (ACTION_ASSIGN_PATTERNS.some((p) => p.test(q))) return "ACTION_ASSIGN_WORK_ORDERS";
+  if (ACTION_CREATE_PATTERNS.some((p) => p.test(q))) return "ACTION_CREATE_WORK_ORDER";
+  if (ACTION_SUMMARIZE_OPERATIONS_PATTERNS.some((p) => p.test(q))) return "ACTION_SUMMARIZE_OPERATIONS";
+
+  // Prefer Help for instructional queries like "How do I ...".
+  if (HELP_PATTERNS.some((p) => p.test(q))) return "HELP";
 
   if (context?.entityId && context?.entityType) {
     if (RECORD_SUMMARY_PATTERNS.some((p) => p.test(q))) return "RECORD_SUMMARY";

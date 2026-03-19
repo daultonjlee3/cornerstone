@@ -18,6 +18,7 @@ import { ExploreModeTip } from "@/src/components/demo-scenario/ExploreModeTip";
 import { GetStartedOnboardingProvider } from "@/hooks/useGetStartedOnboarding";
 import { GetStartedChecklist } from "./get-started/GetStartedChecklist";
 import { GetStartedOverlay } from "./get-started/GetStartedOverlay";
+import { OperationOptimizationProvider } from "@/src/components/operation-optimization/OperationOptimizationProvider";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -103,81 +104,83 @@ export function Shell({
           {!isScreenshotMode && <GuidedTour />}
           <DemoScenarioProvider isDemoGuest={isDemoGuest && !isScreenshotMode}>
             <GetStartedOnboardingProvider disabled={isDemoGuest || isScreenshotMode}>
-              <GetStartedOverlay />
-              <GetStartedChecklist />
-              <DemoScenarioOverlay />
-              <ExploreModeTip />
-              <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
-                {!isDispatchFullscreen ? (
-                  <Sidebar
-                    open={sidebarOpen}
-                    onClose={() => setSidebarOpen(false)}
-                    collapsed={sidebarCollapsed}
-                    onToggleCollapse={handleToggleCollapse}
-                    showPlatformAdmin={showPlatformAdmin}
-                    isDemoGuest={isDemoGuest}
-                    showResumeOnboarding={!isDemoGuest && !isScreenshotMode}
-                  />
-                ) : null}
-                {/* Main panel: fills remaining width, column layout, scrollable content */}
-                <div
-                  className={`flex min-h-0 flex-1 flex-col ${
-                    isDispatchFullscreen
-                      ? ""
-                      : sidebarCollapsed
-                        ? "lg:pl-[4.25rem]"
-                        : "lg:pl-60"
-                  }`}
-                >
+              <OperationOptimizationProvider>
+                <GetStartedOverlay />
+                <GetStartedChecklist />
+                <DemoScenarioOverlay />
+                <ExploreModeTip />
+                <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
                   {!isDispatchFullscreen ? (
-                    <TopBar
-                      tenantName={tenantName}
-                      companyName={companyName}
-                      userName={userName}
-                      onMenuClick={() => setSidebarOpen(true)}
-                      isImpersonating={!!impersonationBanner}
-                      onReturnToProfile={
-                        impersonationBanner ? () => endImpersonation("/operations") : undefined
-                      }
+                    <Sidebar
+                      open={sidebarOpen}
+                      onClose={() => setSidebarOpen(false)}
+                      collapsed={sidebarCollapsed}
+                      onToggleCollapse={handleToggleCollapse}
+                      showPlatformAdmin={showPlatformAdmin}
+                      isDemoGuest={isDemoGuest}
+                      showResumeOnboarding={!isDemoGuest && !isScreenshotMode}
                     />
                   ) : null}
-                  {impersonationBanner ? (
-                    <ImpersonationBanner
-                      actingAsName={impersonationBanner.actingAsName}
-                      companyName={impersonationBanner.companyName}
-                    />
-                  ) : null}
-                  <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-                    {isDispatchFullscreen ? (
-                      <div className="h-full min-h-0 flex-1 px-2 py-2">{children}</div>
-                    ) : (
-                      <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 lg:max-w-[1200px] lg:px-6 lg:py-6">
-                        {children}
-                      </div>
-                    )}
+                  {/* Main panel: fills remaining width, column layout, scrollable content */}
+                  <div
+                    className={`flex min-h-0 flex-1 flex-col ${
+                      isDispatchFullscreen
+                        ? ""
+                        : sidebarCollapsed
+                          ? "lg:pl-[4.25rem]"
+                          : "lg:pl-60"
+                    }`}
+                  >
+                    {!isDispatchFullscreen ? (
+                      <TopBar
+                        tenantName={tenantName}
+                        companyName={companyName}
+                        userName={userName}
+                        onMenuClick={() => setSidebarOpen(true)}
+                        isImpersonating={!!impersonationBanner}
+                        onReturnToProfile={
+                          impersonationBanner ? () => endImpersonation("/operations") : undefined
+                        }
+                      />
+                    ) : null}
+                    {impersonationBanner ? (
+                      <ImpersonationBanner
+                        actingAsName={impersonationBanner.actingAsName}
+                        companyName={impersonationBanner.companyName}
+                      />
+                    ) : null}
+                    <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+                      {isDispatchFullscreen ? (
+                        <div className="h-full min-h-0 flex-1 px-2 py-2">{children}</div>
+                      ) : (
+                        <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 lg:max-w-[1200px] lg:px-6 lg:py-6">
+                          {children}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              {!isDispatchFullscreen && !isScreenshotMode ? (
-                <>
-                  <div className="fixed bottom-5 right-5 z-40">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setAiPanelOpen(true)}
-                          className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[var(--shadow-glow)] transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
-                          aria-label="Ask Cornerstone"
-                        >
-                          <Sparkles className="size-5" aria-hidden />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">Ask Cornerstone</TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <CornerstoneAiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
-                </>
-              ) : null}
+                {!isDispatchFullscreen && !isScreenshotMode ? (
+                  <>
+                    <div className="fixed bottom-5 right-5 z-40">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setAiPanelOpen(true)}
+                            className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[var(--shadow-glow)] transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+                            aria-label="Ask Cornerstone"
+                          >
+                            <Sparkles className="size-5" aria-hidden />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">Ask Cornerstone</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <CornerstoneAiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+                  </>
+                ) : null}
+              </OperationOptimizationProvider>
             </GetStartedOnboardingProvider>
           </DemoScenarioProvider>
         </TourProvider>
