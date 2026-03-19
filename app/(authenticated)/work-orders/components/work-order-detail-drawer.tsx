@@ -75,7 +75,7 @@ export function WorkOrderDetailDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
             aria-label="Close"
           >
             ×
@@ -137,7 +137,7 @@ export function WorkOrderDetailDrawer({
           <div className="flex flex-wrap gap-2 border-t border-[var(--card-border)] pt-4">
             <Link
               href={`/work-orders/${workOrder.id}`}
-              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+              className="inline-flex min-h-[44px] items-center rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
             >
               View full
             </Link>
@@ -146,7 +146,7 @@ export function WorkOrderDetailDrawer({
             <button
               type="button"
               onClick={() => { onEdit(); onClose(); }}
-              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
             >
               Edit
             </button>
@@ -158,7 +158,7 @@ export function WorkOrderDetailDrawer({
             <button
               type="button"
               onClick={() => { onAssign(); onClose(); }}
-              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
             >
               Assign
             </button>

@@ -247,8 +247,8 @@ export default async function TechnicianWorkQueuePage({
         }
       />
 
-      <form className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <form className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4 sm:p-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label htmlFor="technician_id" className="mb-1 block text-xs font-medium text-[var(--muted)]">
               Technician
@@ -311,16 +311,16 @@ export default async function TechnicianWorkQueuePage({
             Scheduled today
           </label>
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="submit"
-            className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+            className="min-h-[44px] rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
           >
             Apply filters
           </button>
           <Link
             href="/technicians/work-queue"
-            className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--background)]/80"
+            className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--card-border)] px-4 py-2.5 text-sm text-[var(--foreground)] hover:bg-[var(--background)]/80"
           >
             Reset
           </Link>
@@ -338,9 +338,9 @@ export default async function TechnicianWorkQueuePage({
           No work orders match the current technician queue filters.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
+            <table className="w-full min-w-[640px] text-left text-sm sm:min-w-[1000px]">
               <thead>
                 <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
                   <th className="px-3 py-2.5 font-semibold">Work Order</th>
@@ -393,7 +393,7 @@ export default async function TechnicianWorkQueuePage({
                     <td className="px-3 py-3">
                       <Link
                         href={`/technicians/work-queue/${workOrder.id}`}
-                        className="text-[var(--accent)] hover:underline"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-[var(--accent)]/50 bg-[var(--accent)]/10 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20 sm:min-w-0"
                       >
                         Open
                       </Link>

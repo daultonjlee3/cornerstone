@@ -143,22 +143,22 @@ export function DemoScenarioOverlay() {
         <div className="fixed inset-0 bg-black/60" aria-hidden />
       )}
 
-      {/* Floating restart (optional) */}
-      <div className="fixed bottom-6 right-6 z-[10000]">
+      {/* Floating restart: touch-friendly on mobile */}
+      <div className="fixed bottom-4 right-4 z-[10000] sm:bottom-6 sm:right-6">
         <button
           type="button"
           onClick={restartDemo}
-          className="rounded-xl border border-[var(--card-border)] bg-[var(--card)]/95 px-4 py-2 text-sm font-semibold text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--background)] transition-colors"
+          className="min-h-[44px] rounded-xl border border-[var(--card-border)] bg-[var(--card)]/95 px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-[var(--shadow-soft)] transition-colors hover:bg-[var(--background)]"
         >
           Demo Guide
         </button>
       </div>
 
-      {/* Step card */}
-      <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 sm:items-start sm:justify-end sm:pr-6 sm:pt-24">
+      {/* Step card: responsive padding and scroll on small screens */}
+      <div className="fixed inset-0 z-[10001] flex items-center justify-center p-3 sm:items-start sm:justify-end sm:p-4 sm:pr-6 sm:pt-24">
         <div
           key={`${step.key}-${stepIndex}`}
-          className="w-full max-w-[26rem] rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.25)] sm:max-w-sm"
+          className="w-full max-h-[90vh] min-w-0 max-w-[26rem] overflow-y-auto rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.25)] sm:max-w-sm sm:p-6"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">

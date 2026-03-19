@@ -124,10 +124,15 @@ body {
 
 .ui-table-shell {
   overflow: hidden;
+  min-width: 0;
   border-radius: var(--radius-card);
   border: 1px solid var(--card-border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.86));
   box-shadow: var(--shadow-soft);
+}
+
+.ui-table-shell .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Page header: icon + title block left, actions right, optional meta row */
@@ -344,24 +349,36 @@ body {
 }
 
 /* ===== Marketing design system ===== */
-/* Typography */
+/* Typography: mobile-first scaling (390px, 768px, 1024px) */
 .mk-hero-headline {
-  font-size: clamp(1.875rem, 5vw, 3.75rem);
+  font-size: clamp(1.5rem, 4.5vw + 1rem, 3.75rem);
   font-weight: 700;
   letter-spacing: -0.025em;
-  line-height: 1.1;
+  line-height: 1.15;
   color: var(--foreground);
+}
+
+@media (min-width: 768px) {
+  .mk-hero-headline {
+    font-size: clamp(2rem, 3.5vw + 1rem, 3.75rem);
+  }
 }
 
 .mk-section-headline {
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-size: clamp(1.25rem, 2.5vw + 0.75rem, 2.25rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--foreground);
 }
 
+@media (min-width: 768px) {
+  .mk-section-headline {
+    font-size: clamp(1.5rem, 2vw + 0.75rem, 2.25rem);
+  }
+}
+
 .mk-subheadline {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   line-height: 1.6;
   color: var(--muted);
 }

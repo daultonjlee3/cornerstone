@@ -177,7 +177,7 @@ export function TopBar({
       <button
         type="button"
         onClick={onMenuClick}
-        className="flex size-9 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)] lg:hidden"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)] lg:hidden"
         aria-label="Open menu"
       >
         <Menu className="size-5" />

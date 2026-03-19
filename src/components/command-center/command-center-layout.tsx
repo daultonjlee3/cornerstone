@@ -93,8 +93,8 @@ type DetailOverlayProps = {
 
 /**
  * Overlay container for detail on tablet (slide-over) and mobile (full-screen).
- * - Mobile: full-screen sheet with backdrop.
- * - md+: slide-over drawer from right (max-w-md).
+ * - Mobile: full-screen sheet with backdrop, touch-friendly.
+ * - md+: slide-over drawer from right (max-w-lg). lg handled by main grid.
  */
 function DetailOverlay({ onClose, children }: DetailOverlayProps) {
   const handleBackdrop = (e: React.MouseEvent) => {
@@ -103,17 +103,18 @@ function DetailOverlay({ onClose, children }: DetailOverlayProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/30"
+      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]"
       aria-modal
       role="dialog"
       onClick={handleBackdrop}
+      style={{ paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}
     >
       <div
-        className="h-full w-full overflow-hidden bg-[var(--card)] shadow-xl md:w-full md:max-w-md md:rounded-l-lg"
+        className="h-full w-full overflow-hidden overflow-y-auto bg-[var(--card)] shadow-xl md:max-w-lg md:rounded-l-xl"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxHeight: "100vh" }}
+        style={{ maxHeight: "100dvh" }}
       >
-        <div className="flex h-full max-h-[100vh] flex-col overflow-hidden">
+        <div className="flex min-h-full flex-col overflow-hidden">
           {children}
         </div>
       </div>

@@ -276,7 +276,7 @@ function NavGroupBlock({
               onClick={onClose}
               {...(item.tourId ? { "data-tour": item.tourId } : {})}
               className={`
-                group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150
+                group flex min-h-[44px] cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150
                 ${collapsed ? "justify-center px-2" : ""}
                 ${active
                   ? "bg-[var(--accent)]/15 font-medium text-[var(--accent)]"

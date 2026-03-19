@@ -18,7 +18,7 @@ export function FeatureSection({
   return (
     <section
       className={[
-        "min-w-0 px-4 py-12 sm:px-6 md:py-20 lg:px-8 lg:py-24",
+        "min-w-0 px-4 py-10 sm:px-6 sm:py-12 md:py-16 lg:px-8 lg:py-24",
         variant === "alt" ? "mk-section-alt" : "",
         className,
       ].filter(Boolean).join(" ")}
@@ -27,10 +27,10 @@ export function FeatureSection({
         <div className="text-center">
           <h2 className="mk-section-headline">{title}</h2>
           {subtitle && (
-            <p className="mx-auto mt-4 max-w-2xl px-2 mk-body-lg sm:px-0">{subtitle}</p>
+            <p className="mx-auto mt-3 max-w-2xl px-1 mk-body-lg sm:mt-4 sm:px-0">{subtitle}</p>
           )}
         </div>
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:mt-14 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-10">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:mt-12 sm:gap-6 md:gap-8 lg:grid-cols-2 lg:gap-10 xl:grid-cols-3">
           {children}
         </div>
       </div>

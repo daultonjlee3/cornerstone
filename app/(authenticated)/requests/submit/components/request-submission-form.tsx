@@ -32,8 +32,8 @@ export function RequestSubmissionForm({
   }, [assets, companyId]);
 
   return (
-    <Card className="max-w-3xl">
-      <CardHeader>
+    <Card className="w-full min-w-0 max-w-3xl">
+      <CardHeader className="space-y-1.5">
         <CardTitle>New maintenance request</CardTitle>
         <CardDescription>
           Requests start as <span className="font-medium">submitted</span> and can be approved, rejected, or converted.
@@ -50,7 +50,7 @@ export function RequestSubmissionForm({
             </div>
           ) : null}
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
             <label className="space-y-1">
               <span className="ui-label">Requester name</span>
               <input
@@ -74,7 +74,7 @@ export function RequestSubmissionForm({
             </label>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
             <label className="space-y-1">
               <span className="ui-label">Company</span>
               <select
@@ -137,11 +137,16 @@ export function RequestSubmissionForm({
 
           <label className="space-y-1">
             <span className="ui-label">Photo (optional)</span>
-            <input name="photo" type="file" accept="image/*" className="ui-input file:mr-3 file:rounded-md file:border file:border-[var(--card-border)] file:bg-[var(--card)] file:px-3 file:py-1.5 file:text-xs file:font-medium" />
+            <input
+              name="photo"
+              type="file"
+              accept="image/*"
+              className="ui-input w-full min-w-0 file:mr-3 file:min-h-[44px] file:rounded-md file:border file:border-[var(--card-border)] file:bg-[var(--card)] file:px-3 file:py-2 file:text-sm file:font-medium"
+            />
           </label>
 
-          <div className="flex justify-end">
-            <Button type="submit" disabled={pending}>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <Button type="submit" disabled={pending} className="min-h-[44px] min-w-[120px] sm:min-w-0">
               {pending ? "Submitting…" : "Submit request"}
             </Button>
           </div>

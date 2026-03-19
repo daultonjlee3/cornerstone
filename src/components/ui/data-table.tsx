@@ -7,8 +7,8 @@ type DataTableProps = {
 
 export function DataTable({ children, className = "" }: DataTableProps) {
   return (
-    <div className={`ui-table-shell ${className}`}>
-      <div className="overflow-x-auto">{children}</div>
+    <div className={`ui-table-shell min-w-0 ${className}`}>
+      <div className="overflow-x-auto min-w-0">{children}</div>
     </div>
   );
 }
@@ -28,7 +28,7 @@ export function TableHead({ children }: { children: ReactNode }) {
 }
 
 export function Th({ children, className = "" }: DataTableProps) {
-  return <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>;
+  return <th className={`px-3 py-2.5 font-semibold sm:px-4 sm:py-3 ${className}`}>{children}</th>;
 }
 
 export function TBody({ children }: { children: ReactNode }) {
@@ -55,13 +55,13 @@ export function Tr({ children, className = "", clickable = false, ...rest }: TrP
 }
 
 export function Td({ children, className = "" }: DataTableProps) {
-  return <td className={`px-4 py-3.5 align-top text-[var(--foreground)] ${className}`}>{children}</td>;
+  return <td className={`px-3 py-2.5 align-top text-[var(--foreground)] sm:px-4 sm:py-3.5 ${className}`}>{children}</td>;
 }
 
 export function TableToolbar({ children, className = "" }: DataTableProps) {
   return (
     <div
-      className={`flex flex-wrap items-end justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/75 p-3 ${className}`}
+      className={`flex min-w-0 flex-wrap items-end justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/75 p-3 sm:p-3 ${className}`}
     >
       {children}
     </div>

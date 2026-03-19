@@ -27,8 +27,8 @@ const linkClass =
 export function MarketingFooter() {
   return (
     <footer className="min-w-0 border-t border-[var(--card-border)] bg-[var(--card)]">
-      <div className="mx-auto min-w-0 max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-12 lg:grid-cols-4">
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-10 sm:px-6 sm:py-12 md:py-16 lg:px-8 lg:py-20">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-10 lg:grid-cols-4 lg:gap-12">
           {/* Brand */}
           <div>
             <Link
@@ -106,7 +106,7 @@ export function MarketingFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-[var(--card-border)] pt-8 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-[var(--card-border)] pt-6 sm:mt-12 sm:flex-row sm:gap-4 sm:pt-8">
           <p className="mk-caption">
             © {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
           </p>

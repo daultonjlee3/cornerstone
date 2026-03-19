@@ -139,15 +139,14 @@ export async function getDemoScenarioContextAction(): Promise<{ error?: string; 
     .maybeSingle();
 
   // Fallback: first request.
-  const resolvedRequestRow =
-    requestRow ??
-    (await supabase
-      .from("work_requests")
-      .select("id, description")
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle());
+  const fallback = await supabase
+    .from("work_requests")
+    .select("id, description")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const resolvedRequestRow = requestRow ?? fallback.data;
 
   if (!resolvedRequestRow?.id) {
     return { error: "No demo requests found." };
