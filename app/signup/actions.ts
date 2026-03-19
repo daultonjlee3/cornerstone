@@ -8,20 +8,33 @@ export type SignupState = { error?: string };
 export async function signupAction(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const email = formData.get("email") as string | null;
   const password = formData.get("password") as string | null;
-  const fullName = (formData.get("full_name") as string | null)?.trim() || undefined;
+  const organizationName = (formData.get("organization_name") as string | null)?.trim() || undefined;
+  const source = (formData.get("source") as string | null)?.trim() === "demo" ? "demo" : "";
   if (!email?.trim() || !password) {
     return { error: "Email and password are required." };
   }
 
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { organization_name: organizationName } },
     });
     if (error) {
       return { error: error.message };
+    }
+    if (!data.session) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) {
+        return {
+          error:
+            "Account created, but we couldn't start your session yet. Please check your inbox to verify your email, then sign in.",
+        };
+      }
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -37,5 +50,6 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
     return { error: message };
   }
 
-  redirect("/operations");
+  const orgParam = organizationName ? `&org=${encodeURIComponent(organizationName)}` : "";
+  redirect(`/onboarding?source=${source || "signup"}${orgParam}`);
 }

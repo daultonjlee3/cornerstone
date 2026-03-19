@@ -159,7 +159,7 @@ export function GetStartedChecklist() {
       return (
         <div className="fixed bottom-6 right-6 z-40 w-72 rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-lg">
           <div className="p-4">
-            <h3 className="font-semibold text-[var(--foreground)]">You're up and running</h3>
+            <h3 className="font-semibold text-[var(--foreground)]">You&apos;re up and running 🎉</h3>
             <p className="mt-1 text-sm text-[var(--muted)]">
               You've completed your first maintenance workflow.
             </p>
@@ -192,7 +192,7 @@ export function GetStartedChecklist() {
     return (
       <ResponsiveOverlayPanel zIndexClassName="z-40">
         <div className="p-4">
-          <h3 className="font-semibold text-[var(--foreground)]">You're up and running</h3>
+          <h3 className="font-semibold text-[var(--foreground)]">You&apos;re up and running 🎉</h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
             You've completed your first maintenance workflow.
           </p>

@@ -8,7 +8,12 @@ export const metadata = {
   description: "Create your account — Cornerstone OS, The Operations System for Maintenance Teams",
 };
 
-export default function SignupPage() {
+export default function SignupPage({
+  searchParams,
+}: {
+  searchParams?: { source?: string };
+}) {
+  const source = searchParams?.source === "demo" ? "demo" : "";
   return (
     <div className="flex min-h-screen min-h-[100dvh] flex-col lg:flex-row lg:items-start">
       {/* Left panel: brand + value prop — matches login */}
@@ -112,10 +117,12 @@ export default function SignupPage() {
                 Create your account
               </h2>
               <p className="mt-1.5 text-[15px] text-slate-600 dark:text-slate-300 sm:mt-2">
-                Enter your details to get started with Cornerstone OS
+                {source === "demo"
+                  ? "Let's set up your workspace in under 2 minutes"
+                  : "Enter your details to get started with Cornerstone OS"}
               </p>
             </div>
-            <SignupForm />
+            <SignupForm source={source} />
           </div>
           <p className="mt-6 text-center text-xs leading-relaxed text-[var(--muted)] sm:mt-8">
             By creating an account, you agree to our{" "}

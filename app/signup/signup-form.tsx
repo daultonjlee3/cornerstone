@@ -2,17 +2,22 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { User, Mail, Lock } from "lucide-react";
+import { Building2, Mail, Lock } from "lucide-react";
 import { signupAction } from "./actions";
 
 const inputBase =
   "w-full min-h-[52px] rounded-xl border bg-white py-3.5 pl-11 pr-4 text-base text-slate-900 placeholder:text-slate-500 transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 focus:border-[var(--accent)] dark:bg-slate-700/80 dark:text-slate-100 dark:placeholder:text-slate-400 dark:border-slate-600 dark:hover:border-slate-500 sm:min-h-0 sm:text-[15px]";
 
-export function SignupForm() {
+type SignupFormProps = {
+  source?: string;
+};
+
+export function SignupForm({ source = "" }: SignupFormProps) {
   const [state, formAction] = useActionState(signupAction, {});
 
   return (
     <form action={formAction} className="space-y-6 sm:space-y-6">
+      <input type="hidden" name="source" value={source} />
       {state?.error && (
         <div
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
@@ -23,22 +28,22 @@ export function SignupForm() {
       )}
       <div className="space-y-2">
         <label
-          htmlFor="signup-full-name"
+          htmlFor="signup-org-name"
           className="block text-sm font-semibold text-slate-700 dark:text-slate-200"
         >
-          Full name
+          Organization name (optional)
         </label>
         <div className="relative">
-          <User
+          <Building2
             className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
             aria-hidden
           />
           <input
-            id="signup-full-name"
-            name="full_name"
+            id="signup-org-name"
+            name="organization_name"
             type="text"
-            autoComplete="name"
-            placeholder="Your name"
+            autoComplete="organization"
+            placeholder="Acme Facilities"
             className={`${inputBase} border-slate-200 hover:border-slate-300 dark:hover:border-slate-500`}
           />
         </div>
@@ -98,7 +103,7 @@ export function SignupForm() {
       <p className="text-center text-[15px] text-slate-600 dark:text-slate-300">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href={source ? `/login?source=${encodeURIComponent(source)}` : "/login"}
           className="inline-block py-2 font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 rounded sm:py-0"
         >
           Sign in

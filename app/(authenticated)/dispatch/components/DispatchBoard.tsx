@@ -73,6 +73,8 @@ export type DispatchBoardProps = {
   onHoverWorkOrder?: (workOrderId: string | null) => void;
   /** When set, the matching technician lane (tech-{id}) is visually highlighted. */
   selectedTechnicianId?: string | null;
+  /** Suppress visual effects that conflict with demo overlays. */
+  isDemoMode?: boolean;
 };
 
 function addDays(dateStr: string, delta: number): string {
@@ -281,6 +283,7 @@ export function DispatchBoard({
   hoveredWorkOrderId = null,
   onHoverWorkOrder,
   selectedTechnicianId = null,
+  isDemoMode = false,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
   const dayScrollRef = useRef<HTMLDivElement | null>(null);
@@ -295,6 +298,7 @@ export function DispatchBoard({
     () => now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
     [now]
   );
+  const showCurrentTimeIndicator = !isDemoMode;
   useEffect(() => {
     if (view !== "day") return;
     if (nowPercent == null) return;
@@ -449,10 +453,12 @@ export function DispatchBoard({
             })}
           </div>
         </div>
-        <div className="relative flex min-h-0 flex-1">
-        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-          {nowLabel}
-        </div>
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {showCurrentTimeIndicator ? (
+          <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+            {nowLabel}
+          </div>
+        ) : null}
         <div className="flex shrink-0">
           <div className="sticky left-0 z-10 flex w-14 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
             <div
@@ -471,7 +477,7 @@ export function DispatchBoard({
                   style={{ height: `${100 / timeLabels.length}%`, minHeight: "40px" }}
                 >
                   {label}
-                  {isCurrentHour ? (
+                  {showCurrentTimeIndicator && isCurrentHour ? (
                     <div
                       className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
                       style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
@@ -499,7 +505,7 @@ export function DispatchBoard({
                   overDropId={overDropId}
                   isDraggingWorkOrder={isDraggingWorkOrder}
                   timeLabels={timeLabels}
-                  currentTime={currentTime}
+                  currentTime={showCurrentTimeIndicator ? currentTime : null}
                 >
                   {(workOrdersByLane.get(lane.id) ?? []).map((wo) => (
                     <DraggableBoardCard
@@ -529,7 +535,7 @@ export function DispatchBoard({
             })}
           </div>
         </div>
-        {nowPercent !== null ? (
+        {showCurrentTimeIndicator && nowPercent !== null ? (
           <div className="pointer-events-none absolute inset-x-0 z-30" style={{ top: `${nowPercent}%` }}>
             <div className="relative">
               <div className="h-0 border-t-2 border-red-500 shadow-sm" />

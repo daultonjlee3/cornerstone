@@ -18,6 +18,7 @@ export async function onboardingAction(
 ): Promise<OnboardingState> {
   const tenantName = (formData.get("tenant_name") as string | null)?.trim();
   const companyName = (formData.get("company_name") as string | null)?.trim();
+  const source = (formData.get("source") as string | null)?.trim() === "demo" ? "demo" : "signup";
   if (!tenantName || !companyName) {
     return { error: "Organization name and company name are required." };
   }
@@ -71,5 +72,8 @@ export async function onboardingAction(
     return { error: membershipError.message || "Failed to add you to the organization." };
   }
 
+  if (source === "demo") {
+    redirect("/operations?onboarding=1&guide=create-asset&source=demo");
+  }
   redirect("/onboarding-wizard");
 }

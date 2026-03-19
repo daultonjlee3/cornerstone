@@ -39,7 +39,7 @@ export function PostDemoOverlay() {
 
         <div className="mt-6 flex flex-col gap-3 sm:mt-8">
           <Link
-            href="/signup"
+            href="/signup?source=demo"
             className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)]"
           >
             Start Your Workspace

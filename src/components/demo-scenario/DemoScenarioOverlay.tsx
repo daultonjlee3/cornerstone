@@ -126,10 +126,10 @@ export function DemoScenarioOverlay() {
   );
 
   const overlay = (
-    <div className="fixed inset-0 z-[9999]">
-      {/* Spotlight backdrop: darkest at the edges, transparent around the active target. */}
+    <div className="fixed inset-0 z-[9999] pointer-events-none">
+      {/* Lightweight focus backdrop: keep app visible while guiding attention. */}
       <div
-        className="fixed inset-0 z-[9999] transition-opacity duration-200"
+        className="fixed inset-0 z-[9999] transition-opacity duration-200 backdrop-blur-[2px] md:backdrop-blur-[3px] pointer-events-none"
         aria-hidden
         style={
           targetRect
@@ -137,32 +137,32 @@ export function DemoScenarioOverlay() {
                 const cx = targetRect.left + targetRect.width / 2;
                 const cy = targetRect.top + targetRect.height / 2;
                 return {
-                  background: `radial-gradient(circle at ${cx}px ${cy}px, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.6) 100%)`,
+                  background: `radial-gradient(circle at ${cx}px ${cy}px, rgba(255,255,255,0) 0%, rgba(15,23,42,0.03) 52%, rgba(15,23,42,0.08) 100%)`,
                 };
               })()
-            : { background: "rgba(0,0,0,0.55)" }
+            : { background: "rgba(15,23,42,0.06)" }
         }
       />
 
-      {/* Active target ring + soft glow. */}
+      {/* Active target ring + subtle lift. */}
       {targetRect ? (
         <div
           className="fixed z-[10000] pointer-events-none"
           style={{
-            left: targetRect.left - 6,
-            top: targetRect.top - 6,
-            width: targetRect.width + 12,
-            height: targetRect.height + 12,
+            left: targetRect.left - 4,
+            top: targetRect.top - 4,
+            width: targetRect.width + 8,
+            height: targetRect.height + 8,
             background: "transparent",
             borderRadius: 12,
-            boxShadow: `0 0 0 2px var(--accent), 0 0 0 10px rgba(59,130,246,0.18), 0 18px 50px rgba(0,0,0,0.35)`,
-            transition: "all 180ms ease",
+            boxShadow: `0 0 0 2px rgba(59,130,246,0.3), 0 8px 28px rgba(15,23,42,0.16)`,
+            transition: "all 200ms ease",
           }}
         />
       ) : null}
 
       {/* Floating restart (hidden on mobile to avoid overlap with the bottom sheet) */}
-      <div className="hidden md:block fixed bottom-4 right-6 z-[10000]">
+      <div className="hidden md:block fixed bottom-4 right-6 z-[10000] pointer-events-auto">
         <button
           type="button"
           onClick={restartDemo}
@@ -173,7 +173,7 @@ export function DemoScenarioOverlay() {
       </div>
 
       {/* Step panel: always clamped within viewport (mobile bottom sheet, tablet slide-over, desktop right panel). */}
-      <ResponsiveOverlayPanel zIndexClassName="z-[10001]">
+      <ResponsiveOverlayPanel zIndexClassName="z-[10001] pointer-events-auto">
         <div key={`${step.key}-${stepIndex}`} className="min-w-0 p-4 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">

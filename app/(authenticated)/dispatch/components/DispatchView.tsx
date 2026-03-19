@@ -44,6 +44,7 @@ import { Button } from "@/src/components/ui/button";
 import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Hint } from "@/src/components/ui/hint";
+import { useDemoScenario } from "@/hooks/useDemoScenario";
 
 const DispatchMapPanel = dynamic(
   () => import("./DispatchMapPanel").then((module) => module.DispatchMapPanel),
@@ -99,6 +100,7 @@ export function DispatchView({
   initialData,
   filterState,
 }: DispatchViewProps) {
+  const { isDemoMode } = useDemoScenario();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1371,6 +1373,7 @@ export function DispatchView({
                               selectedDate={filterState.selectedDate}
                               overDropId={overDropId}
                               isDraggingWorkOrder={Boolean(activeWo)}
+                              isDemoMode={isDemoMode}
                               view="day"
                               workOrders={optimisticWorkOrders}
                               routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}
@@ -1527,6 +1530,7 @@ export function DispatchView({
                         selectedDate={filterState.selectedDate}
                         overDropId={overDropId}
                         isDraggingWorkOrder={Boolean(activeWo)}
+                        isDemoMode={isDemoMode}
                         view={filterState.viewMode}
                         workOrders={optimisticWorkOrders}
                         routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}

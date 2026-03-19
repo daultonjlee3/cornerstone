@@ -84,7 +84,7 @@ export function ExploreModeTip() {
           </p>
           <div className="mt-3 flex gap-2">
             <Link
-              href="/signup"
+              href="/signup?source=demo"
               onClick={dismissNudge}
               className="flex-1 rounded-lg bg-[var(--accent)] px-3 py-2 text-center text-sm font-semibold text-white hover:bg-[var(--accent-hover)]"
             >
