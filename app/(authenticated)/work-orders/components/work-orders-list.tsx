@@ -543,6 +543,7 @@ export function WorkOrdersList({
           <button
             type="button"
             onClick={openNew}
+            data-get-started="create-work-order"
             className="rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             New Work Order
@@ -569,7 +570,7 @@ export function WorkOrdersList({
           }
         />
       )}
-      <div data-tour="demo-guided:completion">
+      <div data-tour="demo-guided:completion" data-get-started="complete">
         <div data-tour="work-orders:statuses">
         <WorkOrderKpiBar
           stats={{

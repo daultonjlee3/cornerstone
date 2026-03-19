@@ -1026,6 +1026,7 @@ export function DispatchView({
         opsMode ? "gap-0" : isFullScreen ? "gap-1" : "gap-2"
       }`}
       data-tour="demo-guided:dispatch"
+      data-get-started="assign"
     >
       {opsMode ? (
         <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--card-border)] bg-[var(--card)] px-2 py-1.5">

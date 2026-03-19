@@ -15,6 +15,9 @@ import { Sparkles } from "lucide-react";
 import { DemoScenarioProvider } from "@/hooks/useDemoScenario";
 import { DemoScenarioOverlay } from "@/src/components/demo-scenario/DemoScenarioOverlay";
 import { ExploreModeTip } from "@/src/components/demo-scenario/ExploreModeTip";
+import { GetStartedOnboardingProvider } from "@/hooks/useGetStartedOnboarding";
+import { GetStartedChecklist } from "./get-started/GetStartedChecklist";
+import { GetStartedOverlay } from "./get-started/GetStartedOverlay";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -99,6 +102,10 @@ export function Shell({
           <TourOverlay />
           {!isScreenshotMode && <GuidedTour />}
           <DemoScenarioProvider isDemoGuest={isDemoGuest && !isScreenshotMode}>
+            <GetStartedOnboardingProvider disabled={isDemoGuest || isScreenshotMode}>
+              <GetStartedOverlay />
+              <GetStartedChecklist />
+            </GetStartedOnboardingProvider>
             <DemoScenarioOverlay />
             <ExploreModeTip />
             <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
@@ -110,6 +117,7 @@ export function Shell({
                   onToggleCollapse={handleToggleCollapse}
                   showPlatformAdmin={showPlatformAdmin}
                   isDemoGuest={isDemoGuest}
+                  showResumeOnboarding={!isDemoGuest && !isScreenshotMode}
                 />
               ) : null}
               {/* Main panel: fills remaining width, column layout, scrollable content */}

@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { DEMO_STEPS, type DemoScenarioStep } from "@/src/lib/demo-scenario/steps";
 import { useDemoScenario } from "@/hooks/useDemoScenario";
 import { PostDemoOverlay } from "./PostDemoOverlay";
+import { ResponsiveOverlayPanel } from "@/src/components/ui/panels/ResponsiveOverlayPanel";
 
 type Rect = { left: number; top: number; width: number; height: number };
 
@@ -107,7 +108,7 @@ export function DemoScenarioOverlay() {
       disabled={isStarting}
       className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] disabled:opacity-60"
     >
-      {isStarting ? "Loading demo…" : step.primaryAction?.label ?? "Start Demo"}
+      {isStarting ? "Loading demo…" : stepError ? "Try again" : (step.primaryAction?.label ?? "Start Demo")}
       {!isIntro ? null : <ArrowRight className="h-5 w-5" aria-hidden />}
     </button>
   );
@@ -143,8 +144,8 @@ export function DemoScenarioOverlay() {
         <div className="fixed inset-0 bg-black/60" aria-hidden />
       )}
 
-      {/* Floating restart: touch-friendly on mobile */}
-      <div className="fixed bottom-4 right-4 z-[10000] sm:bottom-6 sm:right-6">
+      {/* Floating restart (hidden on mobile to avoid overlap with the bottom sheet) */}
+      <div className="hidden md:block fixed bottom-4 right-6 z-[10000]">
         <button
           type="button"
           onClick={restartDemo}
@@ -154,12 +155,9 @@ export function DemoScenarioOverlay() {
         </button>
       </div>
 
-      {/* Step card: responsive padding and scroll on small screens */}
-      <div className="fixed inset-0 z-[10001] flex items-center justify-center p-3 sm:items-start sm:justify-end sm:p-4 sm:pr-6 sm:pt-24">
-        <div
-          key={`${step.key}-${stepIndex}`}
-          className="w-full max-h-[90vh] min-w-0 max-w-[26rem] overflow-y-auto rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.25)] sm:max-w-sm sm:p-6"
-        >
+      {/* Step panel: always clamped within viewport (mobile bottom sheet, tablet slide-over, desktop right panel). */}
+      <ResponsiveOverlayPanel zIndexClassName="z-[10001]">
+        <div key={`${step.key}-${stepIndex}`} className="min-w-0 p-4 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)] sm:text-xl">
@@ -212,7 +210,7 @@ export function DemoScenarioOverlay() {
             Tip: this demo is read-only; explore using the highlighted steps.
           </div>
         </div>
-      </div>
+      </ResponsiveOverlayPanel>
     </div>
   );
 

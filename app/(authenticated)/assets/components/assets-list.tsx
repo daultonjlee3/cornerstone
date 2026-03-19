@@ -249,6 +249,16 @@ export function AssetsList({
     router.replace("/assets", { scroll: false });
   }, [initialEditAsset, searchParams, router]);
 
+  // Get-started onboarding: open new asset form when guided here
+  useEffect(() => {
+    if (searchParams.get("guide") !== "create-asset") return;
+    setEditingAsset(null);
+    setModalOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("guide");
+    router.replace(params.toString() ? `/assets?${params}` : "/assets", { scroll: false });
+  }, [searchParams, router]);
+
   const closeModal = () => {
     setModalOpen(false);
     setEditingAsset(null);
@@ -351,6 +361,7 @@ export function AssetsList({
         <button
           type="button"
           onClick={openNew}
+          data-get-started="create-asset"
           className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
         >
           Create Asset
@@ -551,6 +562,7 @@ export function AssetsList({
             <button
               type="button"
               onClick={openNew}
+              data-get-started="create-asset"
               className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
             >
               Add your first asset

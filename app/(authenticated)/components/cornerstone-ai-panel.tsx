@@ -130,7 +130,7 @@ export function CornerstoneAiPanel({
   const isEmpty = !hasInteraction && !response && !error;
 
   return (
-    <div className="fixed bottom-20 right-4 z-50 w-full max-w-sm sm:max-w-md">
+    <div className="fixed bottom-20 right-6 z-50 w-full max-w-sm sm:max-w-md">
       <div className="flex h-[520px] max-h-[calc(100vh-6rem)] flex-col rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card)] shadow-[var(--shadow-card)]">
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between border-b border-[var(--card-border)] px-4 py-3">

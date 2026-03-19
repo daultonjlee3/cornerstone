@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { getDemoScenarioContextAction, type DemoScenarioContext } from "@/app/(authenticated)/demo-scenario/actions";
+import { ensureAndGetDemoScenarioContextAction, type DemoScenarioContext } from "@/app/(authenticated)/demo-scenario/actions";
 import { DEMO_STEPS, type DemoScenarioStepKey } from "@/src/lib/demo-scenario/steps";
 
 type DemoScenarioContextValue = {
@@ -83,9 +83,13 @@ export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProv
     setStepError(null);
     setIsStarting(true);
     void (async () => {
-      const res = await getDemoScenarioContextAction();
+      const res = await ensureAndGetDemoScenarioContextAction();
       if (res.error || !res.ctx) {
-        setStepError(res.error ?? "Failed to load demo context.");
+        setStepError(
+          res.error === "Unauthorized."
+            ? "Please sign in to run the demo."
+            : "Demo isn’t ready yet. Please try again in a moment."
+        );
         setIsStarting(false);
         return;
       }

@@ -33,10 +33,12 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
 import { navConfig, type NavGroup, type NavItem } from "../nav-config";
+import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -80,6 +82,8 @@ type SidebarProps = {
   onToggleCollapse?: () => void;
   showPlatformAdmin?: boolean;
   isDemoGuest?: boolean;
+  /** When true, show "Resume get started" when onboarding was skipped. */
+  showResumeOnboarding?: boolean;
 };
 
 function isActive(href: string, pathname: string): boolean {
@@ -94,8 +98,12 @@ export function Sidebar({
   onToggleCollapse,
   showPlatformAdmin = false,
   isDemoGuest = false,
+  showResumeOnboarding = false,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { skipped, allComplete, resumeOnboarding } = useGetStartedOnboarding();
+  const showResume = showResumeOnboarding && skipped && !allComplete;
+
   const navGroups = isDemoGuest
     ? navConfig.filter((g) => g.label !== "Organization")
     : navConfig;
@@ -169,6 +177,39 @@ export function Sidebar({
 
         <nav className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-y-auto py-3 scrollbar-thin">
+            {showResume && (
+              <div className={`mb-3 ${collapsed ? "flex justify-center px-2" : "px-2"}`}>
+                {collapsed ? (
+                  <SidebarTooltip label="Resume get started" side="right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resumeOnboarding();
+                        onClose();
+                      }}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
+                      aria-label="Resume get started"
+                    >
+                      <ListChecks className="size-4" />
+                    </button>
+                  </SidebarTooltip>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resumeOnboarding();
+                      onClose();
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/10">
+                      <ListChecks className="size-4" />
+                    </span>
+                    <span>Resume get started</span>
+                  </button>
+                )}
+              </div>
+            )}
             {navGroups.map((group) => (
               <NavGroupBlock
                 key={group.label}
