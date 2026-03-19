@@ -228,6 +228,7 @@ export default async function OperationsCenterPage() {
         <PageHeader
           icon={<LayoutGrid className="size-5" />}
           title="Operations Command Center"
+          titleTourId="operations-center-title"
           subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
           actions={
             <div className="flex items-center gap-2" data-tour="dashboard:quick-actions">

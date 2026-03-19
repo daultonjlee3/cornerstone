@@ -10,7 +10,6 @@ export function DemoWorkspaceBanner() {
 
   return (
     <div
-      data-tour="demo:banner"
       className="sticky top-14 z-40 border-b border-[var(--accent)]/25 bg-[var(--accent)]/12 px-4 py-2.5 backdrop-blur sm:px-5"
     >
       <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-3">
@@ -19,7 +18,9 @@ export function DemoWorkspaceBanner() {
             <FlaskConical className="size-4" aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[var(--foreground)]">Demo Workspace</p>
+            <p data-tour="demo-banner" className="truncate text-sm font-semibold text-[var(--foreground)]">
+              Demo Workspace
+            </p>
             <p className="truncate text-xs text-[var(--muted)]">
               Guided sample data. Changes here are isolated to your demo session.
             </p>

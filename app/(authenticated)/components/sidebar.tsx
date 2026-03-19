@@ -92,6 +92,14 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+function demoNavTourId(href: string): string | null {
+  if (href === "/work-orders") return "nav-work-orders";
+  if (href === "/dispatch") return "nav-dispatch";
+  if (href === "/assets") return "nav-assets";
+  if (href === "/preventive-maintenance") return "nav-preventive-maintenance";
+  return null;
+}
+
 export function Sidebar({
   open,
   onClose,
@@ -313,6 +321,7 @@ function NavGroupBlock({
         {group.items.map((item) => {
           const active = isActive(item.href, pathname);
           const Icon = getIcon(item);
+          const navTourId = demoNavTourId(item.href);
           const linkContent = (
             <Link
               href={item.href}
@@ -329,6 +338,7 @@ function NavGroupBlock({
             >
               {Icon ? (
                 <span
+                  {...(navTourId ? { "data-tour": navTourId } : {})}
                   className={`
                     flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105
                     ${active

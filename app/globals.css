@@ -124,13 +124,13 @@ body {
 
 /* Intro.js guidance theme */
 .introjs-overlay {
-  background-color: rgba(15, 23, 42, 0.08) !important;
-  backdrop-filter: blur(2px);
+  background-color: rgba(15, 23, 42, 0.045) !important;
+  backdrop-filter: blur(1px);
 }
 
 .introjs-helperLayer {
-  border-radius: 12px !important;
-  box-shadow: 0 0 0 2px rgba(47, 120, 255, 0.35), 0 12px 30px rgba(15, 23, 42, 0.18) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 0 2px rgba(47, 120, 255, 0.42), 0 8px 22px rgba(15, 23, 42, 0.14) !important;
 }
 
 .introjs-tooltipReferenceLayer {
@@ -138,12 +138,13 @@ body {
 }
 
 .introjs-tooltip {
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   border: 1px solid var(--card-border) !important;
   background: var(--card-solid) !important;
   color: var(--foreground) !important;
-  box-shadow: var(--shadow-card) !important;
-  min-width: 280px;
+  box-shadow: 0 16px 30px rgba(16, 35, 63, 0.12) !important;
+  min-width: 250px;
+  max-width: 320px;
 }
 
 .introjs-tooltip-header,
