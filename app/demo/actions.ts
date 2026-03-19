@@ -17,6 +17,10 @@ function randomPassword(): string {
   return crypto.randomBytes(24).toString("base64url");
 }
 
+function demoSessionId(): string {
+  return crypto.randomBytes(12).toString("hex");
+}
+
 /**
  * Create a temporary demo guest session: auth user + tenant_membership (demo_guest) + lead row,
  * then return a magic link URL so the client can redirect without showing login.
@@ -121,7 +125,9 @@ export async function enterDemoAction(
       ? rawEnvUrl
       : defaultProdUrl
     : rawEnvUrl || SITE_URL || defaultDevUrl;
-  const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=/operations`;
+  const sessionId = demoSessionId();
+  const next = `/operations?demo=true&demo_session=${encodeURIComponent(sessionId)}&industry=${encodeURIComponent(industrySlug)}`;
+  const redirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent(next)}`;
 
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: "magiclink",

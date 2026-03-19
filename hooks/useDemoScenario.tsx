@@ -6,11 +6,15 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
-import { ensureAndGetDemoScenarioContextAction, type DemoScenarioContext } from "@/app/(authenticated)/demo-scenario/actions";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  ensureAndGetDemoScenarioContextWithModeAction,
+  type DemoScenarioContext,
+} from "@/app/(authenticated)/demo-scenario/actions";
 import { DEMO_STEPS, type DemoScenarioStepKey } from "@/src/lib/demo-scenario/steps";
 
 type DemoScenarioContextValue = {
@@ -44,18 +48,51 @@ type DemoScenarioProviderProps = {
 };
 
 const INTRO_SHOWN_KEY = "cornerstone_demo_scenario_intro_shown_v1";
+const GET_STARTED_STORAGE_KEY = "cornerstone_get_started_v1";
+const DEMO_DISPATCH_RUNTIME_KEY = "cornerstone_demo_dispatch_runtime_v1";
 
 export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProviderProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [scenarioCtx, setScenarioCtx] = useState<DemoScenarioContext | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [isIntroOpen, setIsIntroOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [stepError, setStepError] = useState<string | null>(null);
   const [exploreMode, setExploreMode] = useState(false);
+  const lastResetTokenRef = useRef<string | null>(null);
 
   const isDemoMode = !exploreMode && (isIntroOpen || stepIndex > 0);
   const step = DEMO_STEPS[stepIndex] ?? DEMO_STEPS[0];
+  const isDemoEntry =
+    isDemoGuest ||
+    pathname.startsWith("/demo") ||
+    searchParams.get("demo") === "true";
+
+  useEffect(() => {
+    if (!isDemoEntry) {
+      lastResetTokenRef.current = null;
+      return;
+    }
+    const resetToken = `${pathname}|${searchParams.toString()}|${isDemoGuest ? "demo-guest" : "standard"}`;
+    if (lastResetTokenRef.current === resetToken) return;
+    lastResetTokenRef.current = resetToken;
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(INTRO_SHOWN_KEY);
+      sessionStorage.removeItem("cornerstone_demo_scenario_step");
+      sessionStorage.removeItem("cornerstone_demo_scenario_ctx");
+      localStorage.removeItem(GET_STARTED_STORAGE_KEY);
+      localStorage.removeItem("cornerstone_demo_scenario_state");
+      sessionStorage.removeItem(DEMO_DISPATCH_RUNTIME_KEY);
+    }
+    setScenarioCtx(null);
+    setStepError(null);
+    setIsStarting(false);
+    setExploreMode(false);
+    setStepIndex(0);
+    setIsIntroOpen(true);
+  }, [isDemoEntry, isDemoGuest, pathname, searchParams]);
 
   useEffect(() => {
     if (!isDemoGuest) return;
@@ -83,12 +120,16 @@ export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProv
     setStepError(null);
     setIsStarting(true);
     void (async () => {
-      const res = await ensureAndGetDemoScenarioContextAction();
+      let res = await ensureAndGetDemoScenarioContextWithModeAction(false);
+      if (res.error || !res.ctx) {
+        // Silent fallback: force reinitialize once before surfacing a user-facing error.
+        res = await ensureAndGetDemoScenarioContextWithModeAction(true);
+      }
       if (res.error || !res.ctx) {
         setStepError(
           res.error === "Unauthorized."
             ? "Please sign in to run the demo."
-            : "Demo isn’t ready yet. Please try again in a moment."
+            : "Setting up the demo. Please try again."
         );
         setIsStarting(false);
         return;

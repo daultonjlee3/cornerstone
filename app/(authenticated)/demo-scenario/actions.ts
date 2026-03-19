@@ -16,7 +16,9 @@ const DEMO_DISPATCH_TITLE = "HVAC not cooling – Building A";
 const DEMO_COMPLETED_TITLE = "Lights out – Gym";
 const DEMO_TECH_DISPATCH_NAME = "Mike Johnson";
 const DEMO_TECH_COMPLETED_NAME = "Sarah Chen";
-const DEMO_ASSET_NAME = "RTU-3";
+const DEMO_ASSET_NAME = "Air Compressor-1";
+const DEMO_SCENARIO_MARKER = "DEMO_SCENARIO_V1";
+const DEMO_REQUEST_EMAIL = "demo-scenario@cornerstone.local";
 
 /** Unique work_order_number per tenant so demo WOs are deterministic and globally unique. */
 function demoWorkOrderNumber(tenantId: string, suffix: "DISP" | "DONE"): string {
@@ -29,6 +31,13 @@ function demoWorkOrderNumber(tenantId: string, suffix: "DISP" | "DONE"): string 
  * then returns the context with exact IDs. No dynamic "first" or "latest" — always the same demo set.
  */
 export async function ensureAndGetDemoScenarioContextAction(): Promise<{
+  error?: string;
+  ctx?: DemoScenarioContext;
+}> {
+  return ensureAndGetDemoScenarioContextWithModeAction(false);
+}
+
+export async function ensureAndGetDemoScenarioContextWithModeAction(forceReset = false): Promise<{
   error?: string;
   ctx?: DemoScenarioContext;
 }> {
@@ -58,6 +67,7 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
     .select("id, property_id, building_id")
     .eq("company_id", companyId)
     .eq("asset_name", DEMO_ASSET_NAME)
+    .eq("notes", DEMO_SCENARIO_MARKER)
     .limit(1)
     .maybeSingle();
   const existingAsset =
@@ -68,6 +78,7 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
         .select("id, property_id, building_id")
         .eq("company_id", companyId)
         .eq("name", DEMO_ASSET_NAME)
+        .eq("notes", DEMO_SCENARIO_MARKER)
         .limit(1)
         .maybeSingle()
     ).data;
@@ -109,7 +120,7 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
         model: "M-DEMO-1",
         serial_number: "SN-DEMO-RTU3",
         description: "Demo scenario asset.",
-        notes: "Demo",
+        notes: DEMO_SCENARIO_MARKER,
       })
       .select("id, property_id, building_id")
       .single();
@@ -128,10 +139,22 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
       .eq("company_id", companyId)
       .eq("status", "active")
       .eq("technician_name", name)
+      .eq("notes", DEMO_SCENARIO_MARKER)
       .limit(1)
       .maybeSingle();
-    const existing = byTechName ?? (await supabase.from("technicians").select("id").eq("company_id", companyId).eq("status", "active").eq("name", name).limit(1).maybeSingle()).data;
-    if (existing?.id) return existing.id as string;
+    const existing = byTechName ?? (await supabase.from("technicians").select("id").eq("company_id", companyId).eq("status", "active").eq("name", name).eq("notes", DEMO_SCENARIO_MARKER).limit(1).maybeSingle()).data;
+    if (existing?.id) {
+      await supabase
+        .from("technicians")
+        .update({
+          trade,
+          phone,
+          status: "active",
+          notes: DEMO_SCENARIO_MARKER,
+        })
+        .eq("id", existing.id as string);
+      return existing.id as string;
+    }
     const { data: created } = await supabase
       .from("technicians")
       .insert({
@@ -143,7 +166,7 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
         phone,
         trade,
         status: "active",
-        notes: "Demo scenario technician.",
+        notes: DEMO_SCENARIO_MARKER,
       })
       .select("id")
       .single();
@@ -161,10 +184,24 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("description", DEMO_REQUEST_DESCRIPTION)
+    .eq("requester_email", DEMO_REQUEST_EMAIL)
     .limit(1)
     .maybeSingle();
   if (existingRequest?.id) {
     requestId = existingRequest.id as string;
+    await supabase
+      .from("work_requests")
+      .update({
+        company_id: companyId,
+        requester_name: "Demo Operations",
+        requester_email: DEMO_REQUEST_EMAIL,
+        location: "Building A / Roof",
+        description: DEMO_REQUEST_DESCRIPTION,
+        priority: "medium",
+        status: "submitted",
+        asset_id: demoAssetId,
+      })
+      .eq("id", requestId);
   } else {
     const { data: createdReq } = await supabase
       .from("work_requests")
@@ -172,7 +209,7 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
         tenant_id: tenantId,
         company_id: companyId,
         requester_name: "Demo Operations",
-        requester_email: "ops@demo.local",
+        requester_email: DEMO_REQUEST_EMAIL,
         location: "Building A / Roof",
         description: DEMO_REQUEST_DESCRIPTION,
         priority: "medium",
@@ -201,10 +238,35 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
     .maybeSingle();
   if (existingDispatchWo?.id) {
     dispatchWoId = existingDispatchWo.id as string;
-    dispatchWoStatus = (existingDispatchWo as { status?: string }).status ?? "in_progress";
-    dispatchWoAssignedId = (existingDispatchWo as { assigned_technician_id?: string | null }).assigned_technician_id ?? techDispatchId;
-    dispatchDate =
-      (existingDispatchWo as { scheduled_date?: string | null }).scheduled_date ?? today;
+    await supabase
+      .from("work_orders")
+      .update({
+        title: DEMO_DISPATCH_TITLE,
+        description: `Demo work order: ${DEMO_DISPATCH_TITLE}`,
+        status: "in_progress",
+        priority: "high",
+        category: "repair",
+        source_type: "manual",
+        asset_id: demoAssetId,
+        property_id: demoPropertyId,
+        building_id: demoBuildingId,
+        request_id: requestId,
+        assigned_technician_id: techDispatchId,
+        assigned_crew_id: null,
+        scheduled_date: today,
+        due_date: today,
+        scheduled_start: scheduledStart.toISOString(),
+        scheduled_end: scheduledEnd.toISOString(),
+        estimated_hours: 1,
+        completed_at: null,
+        completion_notes: null,
+        resolution_summary: null,
+        completed_by_technician_id: null,
+      })
+      .eq("id", dispatchWoId);
+    dispatchWoStatus = "in_progress";
+    dispatchWoAssignedId = techDispatchId;
+    dispatchDate = today;
   } else {
     const { data: createdWo } = await supabase
       .from("work_orders")
@@ -252,6 +314,31 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
     .maybeSingle();
   if (existingCompletedWo?.id) {
     completedWoId = existingCompletedWo.id as string;
+    await supabase
+      .from("work_orders")
+      .update({
+        title: DEMO_COMPLETED_TITLE,
+        description: `Demo work order: ${DEMO_COMPLETED_TITLE}`,
+        status: "completed",
+        priority: "medium",
+        category: "repair",
+        source_type: "manual",
+        asset_id: demoAssetId,
+        property_id: demoPropertyId,
+        building_id: demoBuildingId,
+        assigned_technician_id: techCompletedId,
+        completed_by_technician_id: techCompletedId,
+        requested_by_name: "Demo Operations",
+        requested_by_email: "ops@demo.local",
+        requested_at: completedAtDate.toISOString(),
+        due_date: today,
+        completed_at: completedAtDate.toISOString(),
+        completion_notes: "Restored power to the gym circuit and verified stable operation.",
+        resolution_summary: "Resolved: repair completed successfully.",
+        estimated_hours: 1,
+        actual_hours: 1,
+      })
+      .eq("id", completedWoId);
   } else {
     const { data: createdCompleted } = await supabase
       .from("work_orders")
@@ -291,6 +378,19 @@ export async function ensureAndGetDemoScenarioContextAction(): Promise<{
     id: techDispatchId,
     name: DEMO_TECH_DISPATCH_NAME,
   };
+
+  const missingCriticalRecord =
+    !requestId ||
+    !dispatchWoId ||
+    !completedWoId ||
+    !demoAssetId ||
+    !techDispatchId;
+  if (missingCriticalRecord && !forceReset) {
+    return ensureAndGetDemoScenarioContextWithModeAction(true);
+  }
+  if (missingCriticalRecord) {
+    return { error: "Demo setup is taking longer than expected. Please try again." };
+  }
 
   return {
     ctx: {

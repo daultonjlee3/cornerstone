@@ -15,7 +15,7 @@ import {
   type PreventiveMaintenanceFrequencyType,
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
-import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant, isDemoGuestUser } from "@/src/lib/auth-context";
 import { requirePermission } from "@/src/lib/permissions";
 import {
   TERMINAL_STATUSES,
@@ -408,6 +408,9 @@ export async function saveWorkOrder(
   options?: SaveWorkOrderOptions
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (!options?.portalContext && (await isDemoGuestUser(supabase))) {
+    return { success: true };
+  }
   const id = (formData.get("id") as string)?.trim() || null;
   const companyId = (formData.get("company_id") as string)?.trim();
   const title = (formData.get("title") as string)?.trim();
@@ -1180,6 +1183,9 @@ export async function updateWorkOrderAssignment(
   payload: WorkOrderAssignmentPayload
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoGuestUser(supabase)) {
+    return { success: true };
+  }
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
@@ -1463,6 +1469,9 @@ export async function completeWorkOrder(
   payload: WorkOrderCompletionPayload
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoGuestUser(supabase)) {
+    return { success: true };
+  }
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 

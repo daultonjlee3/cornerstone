@@ -101,6 +101,7 @@ export function DispatchView({
   filterState,
 }: DispatchViewProps) {
   const { isDemoMode } = useDemoScenario();
+  const DEMO_DISPATCH_STATE_KEY = "cornerstone_demo_dispatch_runtime_v1";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -133,8 +134,34 @@ export function DispatchView({
   );
 
   useEffect(() => {
+    if (isDemoMode && typeof window !== "undefined") {
+      const raw = window.sessionStorage.getItem(DEMO_DISPATCH_STATE_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as DispatchWorkOrder[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOptimisticWorkOrders(parsed);
+            return;
+          }
+        } catch {
+          // Fall back to server state below.
+        }
+      }
+    }
     setOptimisticWorkOrders(initialData.workOrders);
-  }, [initialData.workOrders]);
+  }, [initialData.workOrders, isDemoMode]);
+
+  useEffect(() => {
+    if (!isDemoMode || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(
+        DEMO_DISPATCH_STATE_KEY,
+        JSON.stringify(optimisticWorkOrders)
+      );
+    } catch {
+      // Best-effort persistence only.
+    }
+  }, [isDemoMode, optimisticWorkOrders]);
 
   useEffect(() => {
     setSelectedMapTechnicianId(filterState.technicianId || null);
@@ -583,10 +610,12 @@ export function DispatchView({
         setDropError(result.error);
         return;
       }
-      router.refresh();
-      window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+      if (!isDemoMode) {
+        router.refresh();
+        window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+      }
     },
-    [optimisticWorkOrders, router]
+    [isDemoMode, optimisticWorkOrders, router]
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
