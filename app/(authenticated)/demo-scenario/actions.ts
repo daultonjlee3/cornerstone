@@ -231,16 +231,15 @@ export async function getDemoScenarioContextAction(): Promise<{ error?: string; 
     .limit(1)
     .maybeSingle();
 
-  const resolvedCompletedRow =
-    completedRow ??
-    (await supabase
-      .from("work_orders")
-      .select("id, title")
-      .eq("tenant_id", tenantId)
-      .eq("status", "completed")
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle());
+  const completedFallback = await supabase
+    .from("work_orders")
+    .select("id, title")
+    .eq("tenant_id", tenantId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const resolvedCompletedRow = completedRow ?? completedFallback.data;
 
   if (!resolvedCompletedRow?.id) {
     return { error: "No completed demo work order found." };
