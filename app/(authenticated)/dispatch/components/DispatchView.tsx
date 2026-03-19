@@ -1056,8 +1056,13 @@ export function DispatchView({
 
   return (
     <div
-      className={`flex h-full min-h-0 flex-col ${
-        opsMode ? "gap-0" : isFullScreen ? "gap-1" : "gap-2"
+      className={`flex flex-col ${
+        isDemoMode && !isFullScreen
+          ? "h-auto min-h-[820px]"
+          : "h-full min-h-0"
+      } ${opsMode ? "gap-0" : isFullScreen ? "gap-1" : "gap-2"}
+      ${
+        isDemoMode && !isFullScreen ? "overflow-visible" : ""
       }`}
       data-tour="demo-guided:dispatch"
       data-get-started="assign"
@@ -1124,7 +1129,9 @@ export function DispatchView({
       )}
 
       <div
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
+        className={`flex min-h-0 flex-1 flex-col border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
+          isDemoMode && !isFullScreen ? "overflow-visible" : "overflow-hidden"
+        } ${
           opsMode ? "rounded-lg" : "rounded-xl"
         }`}
       >
@@ -1418,6 +1425,7 @@ export function DispatchView({
                               onSelectDate={handleSelectDate}
                               onResizeEnd={handleResizeEnd}
                               onOpenWorkOrder={handleOpenWorkOrder}
+                              usePageScroll={isDemoMode && !isFullScreen}
                             />
                             </div>
                           </div>
@@ -1575,6 +1583,7 @@ export function DispatchView({
                         onSelectDate={handleSelectDate}
                         onResizeEnd={handleResizeEnd}
                         onOpenWorkOrder={handleOpenWorkOrder}
+                        usePageScroll={isDemoMode && !isFullScreen}
                       />
                       </div>
                     </div>

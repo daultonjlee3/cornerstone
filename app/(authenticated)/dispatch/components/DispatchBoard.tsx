@@ -75,6 +75,8 @@ export type DispatchBoardProps = {
   selectedTechnicianId?: string | null;
   /** Suppress visual effects that conflict with demo overlays. */
   isDemoMode?: boolean;
+  /** In demo mode, let the page own vertical scrolling. */
+  usePageScroll?: boolean;
 };
 
 function addDays(dateStr: string, delta: number): string {
@@ -284,6 +286,7 @@ export function DispatchBoard({
   onHoverWorkOrder,
   selectedTechnicianId = null,
   isDemoMode = false,
+  usePageScroll = false,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
   const dayScrollRef = useRef<HTMLDivElement | null>(null);
@@ -420,12 +423,22 @@ export function DispatchBoard({
   return (
     <div
       ref={dayScrollRef}
-      className="flex h-full flex-col overflow-auto bg-[var(--background)] overscroll-contain"
+      className={`flex flex-col bg-[var(--background)] overscroll-contain ${
+        usePageScroll ? "h-auto overflow-visible" : "h-full overflow-auto"
+      }`}
       style={{ touchAction: "pan-y" }}
     >
       {/* Single horizontal scroll container so header and body stay in sync */}
-      <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-x-auto">
-        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+      <div
+        className={`flex min-w-0 flex-col overflow-x-auto ${
+          usePageScroll ? "h-auto min-h-[820px]" : "min-h-0 flex-1"
+        }`}
+      >
+        <div
+          className={`relative flex ${
+            usePageScroll ? "h-auto min-h-[820px] overflow-visible" : "min-h-0 flex-1 overflow-hidden"
+          }`}
+        >
         {showCurrentTimeIndicator ? (
           <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
             {nowLabel}

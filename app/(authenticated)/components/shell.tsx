@@ -52,6 +52,10 @@ export function Shell({
   const searchParams = useSearchParams();
   const isDispatchFullscreen =
     pathname === "/dispatch" && searchParams.get("dispatch_fullscreen") === "1";
+  const isDemoWorkspace =
+    isDemoGuest ||
+    pathname.startsWith("/demo") ||
+    searchParams.get("demo") === "true";
 
   // When ?screenshotMode=true is present, suppress all tours, modals, and
   // onboarding overlays so Playwright captures clean product UI.
@@ -120,7 +124,11 @@ export function Shell({
                       {isDispatchFullscreen ? (
                         <div className="h-full min-h-0 flex-1 px-2 py-2">{children}</div>
                       ) : (
-                        <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 lg:max-w-[1200px] lg:px-6 lg:py-6">
+                        <div
+                          className={`mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-col px-3 py-4 sm:px-4 sm:py-5 lg:max-w-[1200px] lg:px-6 lg:py-6 ${
+                            isDemoWorkspace ? "" : "flex-1"
+                          }`}
+                        >
                           <DemoWelcomePanel />
                           {children}
                         </div>
