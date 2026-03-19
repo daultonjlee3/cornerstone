@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import introJs, { type Tour } from "intro.js";
+import introJs from "intro.js";
 import { markTourComplete } from "@/app/(authenticated)/tours/actions";
 import { getGuidanceTourById, getLiveDemoTour, getProductTourForPath } from "@/src/lib/guidance/registry";
 import { resolveAvailableSteps } from "@/src/lib/guidance/utils";
@@ -42,7 +42,7 @@ export function GuidanceProvider({
   const query = useSearchParams();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const router = useRouter();
-  const introRef = useRef<Tour | null>(null);
+  const introRef = useRef<ReturnType<typeof introJs> | null>(null);
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
   const isLiveDemoMode =
     isDemoGuest ||
@@ -80,7 +80,7 @@ export function GuidanceProvider({
         element: step.selector,
         title: step.title,
         intro: step.content,
-        position: step.position ?? "auto",
+        ...(step.position && step.position !== "auto" ? { position: step.position } : {}),
       }));
 
       const intro = introJs();
