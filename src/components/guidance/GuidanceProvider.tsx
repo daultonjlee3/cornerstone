@@ -16,7 +16,7 @@ import introJs from "intro.js";
 import { markTourComplete } from "@/app/(authenticated)/tours/actions";
 import { getGuidanceTourById, getLiveDemoTour, getProductTourForPath } from "@/src/lib/guidance/registry";
 import { resolveAvailableSteps } from "@/src/lib/guidance/utils";
-import type { GuidanceStartOptions } from "@/src/lib/guidance/types";
+import type { GuidanceStartOptions, GuidanceStep } from "@/src/lib/guidance/types";
 
 type GuidanceContextValue = {
   activeTourId: string | null;
@@ -28,6 +28,29 @@ type GuidanceContextValue = {
 };
 
 const GuidanceContext = createContext<GuidanceContextValue | null>(null);
+
+function isVisibleElement(el: Element | null): el is HTMLElement {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function toIntroStep(step: GuidanceStep): {
+  element?: HTMLElement;
+  title: string;
+  intro: string;
+  position?: "top" | "right" | "bottom" | "left";
+} {
+  const target = document.querySelector(step.selector);
+  const visibleTarget = isVisibleElement(target) ? target : undefined;
+
+  return {
+    ...(visibleTarget ? { element: visibleTarget } : {}),
+    title: step.title,
+    intro: step.content,
+    ...(step.position && step.position !== "auto" ? { position: step.position } : {}),
+  };
+}
 
 type GuidanceProviderProps = {
   children: ReactNode;
@@ -73,15 +96,9 @@ export function GuidanceProvider({
         return normalized === route || normalized.startsWith(`${route}/`);
       });
 
-      const availableSteps = await resolveAvailableSteps(routedSteps);
-      if (availableSteps.length === 0) return;
-
-      const introSteps = availableSteps.map((step) => ({
-        element: step.selector,
-        title: step.title,
-        intro: step.content,
-        ...(step.position && step.position !== "auto" ? { position: step.position } : {}),
-      }));
+      await resolveAvailableSteps(routedSteps);
+      const introSteps = routedSteps.map(toIntroStep);
+      if (introSteps.length === 0) return;
 
       const intro = introJs();
       introRef.current = intro;

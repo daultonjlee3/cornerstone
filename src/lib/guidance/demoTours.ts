@@ -15,12 +15,6 @@ export const demoTours: GuidanceTour[] = [
         selector: '[data-tour="demo:banner"]',
       },
       {
-        id: "start-tour",
-        title: "Start Demo Tour Anytime",
-        content: "Use this button to replay the guided walkthrough whenever you want.",
-        selector: '[data-tour="demo:start-tour"]',
-      },
-      {
         id: "command-center",
         title: "Operations Center",
         content: "See open, overdue, and scheduled work in one command view.",
@@ -37,12 +31,6 @@ export const demoTours: GuidanceTour[] = [
         title: "Urgent Work Focus",
         content: "Prioritize high-risk and overdue tasks from one focused panel.",
         selector: '[data-tour="dashboard:urgent"]',
-      },
-      {
-        id: "quick-actions",
-        title: "Quick Actions",
-        content: "Jump from overview to core workflows with one click.",
-        selector: '[data-tour="dashboard:quick-actions"]',
       },
     ],
   },
