@@ -118,10 +118,10 @@ export function ScheduleLane({
       }`}
     >
       <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/90 px-3 py-2">
-        <p className="truncate text-sm font-semibold text-[var(--foreground)]">{name}</p>
+        <p className="truncate leading-tight text-sm font-semibold text-[var(--foreground)]">{name}</p>
         {cap > 0 ? (
           <>
-            <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+            <p className="text-[11px] leading-tight text-[var(--muted)]">
               {totalScheduledHours.toFixed(1)} / {cap.toFixed(0)} hrs scheduled
             </p>
             <div className="mt-1 flex gap-0.5" aria-hidden>
@@ -135,13 +135,13 @@ export function ScheduleLane({
               ))}
             </div>
             {nextOpeningFormatted ? (
-              <p className="mt-0.5 text-[10px] text-[var(--muted-strong)]">
+              <p className="text-[10px] leading-tight text-[var(--muted-strong)]">
                 Next opening: {nextOpeningFormatted}
               </p>
             ) : null}
           </>
         ) : (
-          <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+          <p className="text-[11px] leading-tight text-[var(--muted)]">
             {totalScheduledHours.toFixed(1)}h · {jobCount} jobs · {remaining.toFixed(1)}h left
           </p>
         )}

@@ -425,34 +425,6 @@ export function DispatchBoard({
     >
       {/* Single horizontal scroll container so header and body stay in sync */}
       <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-x-auto">
-        {/* Sticky header row: time column + lane headers */}
-        <div className="sticky top-0 z-10 flex shrink-0 border-b-2 border-[var(--card-border)] bg-[var(--card)]">
-          <div className="sticky left-0 z-20 w-14 shrink-0 border-r border-[var(--card-border)] bg-[var(--card)] px-1.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Time
-          </div>
-          <div className="flex min-w-max">
-            {lanes.map((lane) => {
-              const displayName = lane.name ?? (lane.id === UNASSIGNED_LANE_ID ? "Unassigned" : lane.id.slice(0, 8));
-              const hasRemaining = lane.remainingHours !== undefined;
-              const cap = lane.capacityHours ?? 0;
-              return (
-                <div
-                  key={lane.id}
-                  className="min-w-[13rem] flex-shrink-0 border-r border-[var(--card-border)] bg-[var(--background)] px-2.5 py-2 last:border-r-0"
-                >
-                  <p className="truncate text-xs font-semibold text-[var(--foreground)]">
-                    {displayName}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-[var(--muted)]">
-                    {cap > 0
-                      ? `${(lane.total_scheduled_hours ?? 0).toFixed(1)} / ${cap.toFixed(0)} hrs`
-                      : `${(lane.total_scheduled_hours ?? 0).toFixed(1)}h scheduled${hasRemaining ? ` · ${Math.max(0, lane.remainingHours ?? 0).toFixed(1)}h left` : ` · ${lane.job_count ?? 0} jobs`}`}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {showCurrentTimeIndicator ? (
           <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
@@ -462,10 +434,11 @@ export function DispatchBoard({
         <div className="flex shrink-0">
           <div className="sticky left-0 z-10 flex w-14 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
             <div
-              className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/80"
+              className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-1.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
               style={{ height: "56px" }}
-              aria-hidden
-            />
+            >
+              Time
+            </div>
             {timeLabels.map(({ hour, label }, index) => {
               const isCurrentHour = currentTime?.hour === hour;
               return (
