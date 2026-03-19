@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import { useDemoScenario } from "@/hooks/useDemoScenario";
 
 const GUIDE_CONFIG: Record<
   string,
@@ -37,6 +38,8 @@ export function GetStartedOverlay() {
   const config = guide ? GUIDE_CONFIG[guide] : null;
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
+  const { isDemoMode } = useDemoScenario();
+
   const dismiss = useCallback(() => {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("guide");
@@ -71,7 +74,7 @@ export function GetStartedOverlay() {
     };
   }, [config]);
 
-  if (!config) return null;
+  if (isDemoMode || !config) return null;
 
   return (
     <div className="fixed inset-0 z-[9998]" role="dialog" aria-modal="true" aria-labelledby="get-started-overlay-title">

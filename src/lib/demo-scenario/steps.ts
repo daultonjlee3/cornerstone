@@ -52,7 +52,7 @@ export const DEMO_STEPS: DemoScenarioStep[] = [
     key: "request",
     title: "Request",
     content: "A request comes in — no calls, no emails, no chaos.",
-    primaryAction: { label: "Next" },
+    primaryAction: { label: "Next: Work Order" },
     route: () => "/requests",
     target: (ctx) => ({
       selectors: [`tr[data-demo-scenario-target="request-row"][data-work-request-id="${ctx.request.id}"]`],
@@ -63,7 +63,7 @@ export const DEMO_STEPS: DemoScenarioStep[] = [
     title: "Work Order",
     content:
       "It’s automatically turned into a structured work order with priority, asset, and history.",
-    primaryAction: { label: "Next" },
+    primaryAction: { label: "Next: Dispatch" },
     route: (ctx) => `/work-orders/${ctx.workOrder.id}`,
     target: (ctx) => ({
       selectors: [
@@ -76,7 +76,7 @@ export const DEMO_STEPS: DemoScenarioStep[] = [
     key: "dispatch",
     title: "Dispatch",
     content: "Assign the right technician based on availability and workload.",
-    primaryAction: { label: "Next" },
+    primaryAction: { label: "Next: Technician" },
     route: (ctx) => dispatchPath(ctx),
     target: (ctx) => ({
       selectors: [`[data-dispatch-work-order-id="${ctx.workOrder.id}"]`],
@@ -86,7 +86,7 @@ export const DEMO_STEPS: DemoScenarioStep[] = [
     key: "technician",
     title: "Technician",
     content: "Technicians see exactly what to do, update status, and add notes from the field.",
-    primaryAction: { label: "Next" },
+    primaryAction: { label: "Next: Completion" },
     route: (ctx) => `/technicians/work-queue?technician_id=${encodeURIComponent(ctx.technician.id)}&me=1&crew=0`,
     target: (ctx) => ({
       selectors: [`tr[data-demo-scenario-target="technician-task-row"][data-work-order-id="${ctx.workOrder.id}"]`],
@@ -96,7 +96,7 @@ export const DEMO_STEPS: DemoScenarioStep[] = [
     key: "completion",
     title: "Completion",
     content: "Once completed, everything is logged — full history, no lost information.",
-    primaryAction: { label: "Next" },
+    primaryAction: { label: "Next: Reporting" },
     route: (ctx) => `/work-orders/${ctx.completedWorkOrder.id}`,
     target: (ctx) => ({
       selectors: [
@@ -108,7 +108,7 @@ export const DEMO_STEPS: DemoScenarioStep[] = [
     key: "reporting",
     title: "Reporting",
     content: "Now you can see what’s getting done and what’s falling behind in real time.",
-    primaryAction: { label: "Next" },
+    primaryAction: { label: "Next: Finish" },
     route: () => "/reports/operations",
     target: () => ({
       selectors: [`[data-demo-scenario-target="reporting-metrics"]`],

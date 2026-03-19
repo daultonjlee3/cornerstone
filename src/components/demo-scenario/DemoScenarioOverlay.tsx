@@ -127,22 +127,39 @@ export function DemoScenarioOverlay() {
 
   const overlay = (
     <div className="fixed inset-0 z-[9999]">
+      {/* Spotlight backdrop: darkest at the edges, transparent around the active target. */}
+      <div
+        className="fixed inset-0 z-[9999] transition-opacity duration-200"
+        aria-hidden
+        style={
+          targetRect
+            ? (() => {
+                const cx = targetRect.left + targetRect.width / 2;
+                const cy = targetRect.top + targetRect.height / 2;
+                return {
+                  background: `radial-gradient(circle at ${cx}px ${cy}px, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.6) 100%)`,
+                };
+              })()
+            : { background: "rgba(0,0,0,0.55)" }
+        }
+      />
+
+      {/* Active target ring + soft glow. */}
       {targetRect ? (
         <div
-          className="fixed pointer-events-none"
+          className="fixed z-[10000] pointer-events-none"
           style={{
-            left: targetRect.left,
-            top: targetRect.top,
-            width: targetRect.width,
-            height: targetRect.height,
+            left: targetRect.left - 6,
+            top: targetRect.top - 6,
+            width: targetRect.width + 12,
+            height: targetRect.height + 12,
             background: "transparent",
-            boxShadow: `0 0 0 2px var(--accent), 0 0 0 9999px rgba(0,0,0,0.6)`,
             borderRadius: 12,
+            boxShadow: `0 0 0 2px var(--accent), 0 0 0 10px rgba(59,130,246,0.18), 0 18px 50px rgba(0,0,0,0.35)`,
+            transition: "all 180ms ease",
           }}
         />
-      ) : (
-        <div className="fixed inset-0 bg-black/60" aria-hidden />
-      )}
+      ) : null}
 
       {/* Floating restart (hidden on mobile to avoid overlap with the bottom sheet) */}
       <div className="hidden md:block fixed bottom-4 right-6 z-[10000]">
@@ -206,9 +223,6 @@ export function DemoScenarioOverlay() {
             )}
           </div>
 
-          <div className="mt-5 text-xs text-[var(--muted)]">
-            Tip: this demo is read-only; explore using the highlighted steps.
-          </div>
         </div>
       </ResponsiveOverlayPanel>
     </div>

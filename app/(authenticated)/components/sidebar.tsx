@@ -39,6 +39,7 @@ import {
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
 import { navConfig, type NavGroup, type NavItem } from "../nav-config";
 import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
+import { useDemoScenario } from "@/hooks/useDemoScenario";
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -102,7 +103,8 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { skipped, allComplete, resumeOnboarding } = useGetStartedOnboarding();
-  const showResume = showResumeOnboarding && skipped && !allComplete;
+  const { isDemoMode } = useDemoScenario();
+  const showResume = showResumeOnboarding && skipped && !allComplete && !isDemoMode;
 
   const navGroups = isDemoGuest
     ? navConfig.filter((g) => g.label !== "Organization")

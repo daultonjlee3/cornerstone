@@ -17,6 +17,7 @@ import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
 import { useIsLg } from "@/src/lib/use-media-query";
 import Link from "next/link";
 import { ResponsiveOverlayPanel } from "@/src/components/ui/panels/ResponsiveOverlayPanel";
+import { useDemoScenario } from "@/hooks/useDemoScenario";
 
 const STEPS = [
   {
@@ -77,8 +78,12 @@ export function GetStartedChecklist() {
     markSkipped,
     resumeOnboarding,
   } = useGetStartedOnboarding();
+  const { isDemoMode } = useDemoScenario();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dismissedSuccess, setDismissedSuccess] = useState(false);
+
+  // When the live demo is active, it becomes the only guidance system on screen.
+  if (isDemoMode) return null;
 
   if (loading || skipped) return null;
 
