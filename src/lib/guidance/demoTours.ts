@@ -10,27 +10,38 @@ export const demoTours: GuidanceTour[] = [
     steps: [
       {
         id: "demo-banner",
-        title: "You are in Demo Workspace",
-        content: "This banner confirms you are in a safe demo environment with isolated sample behavior.",
+        title: "Demo Workspace",
+        content:
+          "You are in a safe demo environment with sample data. You can explore freely without affecting a real customer workspace.",
         selector: '[data-tour="demo:banner"]',
       },
       {
         id: "command-center",
         title: "Operations Center",
-        content: "See open, overdue, and scheduled work in one command view.",
+        content:
+          "This is the command center where teams monitor urgent work, overdue items, and daily priorities.",
         selector: '[data-tour="demo-guided:command-center"]',
       },
       {
-        id: "metrics",
-        title: "Core Metrics",
-        content: "Track open, in-progress, completed, and overdue work at a glance.",
-        selector: '[data-tour="dashboard:metrics"]',
+        id: "work-orders-nav",
+        title: "Work Orders",
+        content:
+          "Work orders are where maintenance is tracked end-to-end, from intake through completion.",
+        selector: '[data-tour="work-orders"]',
       },
       {
-        id: "urgent-work",
-        title: "Urgent Work Focus",
-        content: "Prioritize high-risk and overdue tasks from one focused panel.",
-        selector: '[data-tour="dashboard:urgent"]',
+        id: "dispatch-nav",
+        title: "Dispatch Coordination",
+        content:
+          "Dispatch helps coordinators assign technicians, balance workload, and keep execution on schedule.",
+        selector: '[data-tour="dispatch"]',
+      },
+      {
+        id: "assets-pm-nav",
+        title: "Assets + Preventive Maintenance",
+        content:
+          "Assets and PM connect work history to reliability, so teams can prevent repeat failures and plan ahead.",
+        selector: '[data-tour="preventive-maintenance"]',
       },
     ],
   },

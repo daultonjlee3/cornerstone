@@ -67,6 +67,7 @@ export function GuidanceProvider({
   const router = useRouter();
   const introRef = useRef<ReturnType<typeof introJs> | null>(null);
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
+  const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
   const isLiveDemoMode =
     isDemoGuest ||
     pathname.startsWith("/demo") ||
@@ -81,6 +82,7 @@ export function GuidanceProvider({
         introRef.current.exit(true);
         introRef.current = null;
       }
+      setDemoCompleteOpen(false);
 
       let routedSteps = tour.steps;
       const firstRoute = routedSteps.find((step) => step.route)?.route ?? null;
@@ -124,6 +126,9 @@ export function GuidanceProvider({
       intro.oncomplete(() => {
         setActiveTourId(null);
         introRef.current = null;
+        if (tourId === "live-demo-overview") {
+          setDemoCompleteOpen(true);
+        }
         if (options.force !== true) {
           void markTourComplete(tourId);
         }
@@ -151,8 +156,12 @@ export function GuidanceProvider({
   const startLiveDemoTour = useCallback(async () => {
     const liveDemoTour = getLiveDemoTour();
     if (!liveDemoTour) return;
+    if (pathname !== "/operations") {
+      router.push("/operations");
+      await new Promise((resolve) => setTimeout(resolve, 260));
+    }
     await launchTour(liveDemoTour.id, { force: true });
-  }, [launchTour]);
+  }, [launchTour, pathname, router]);
 
   const value = useMemo<GuidanceContextValue>(
     () => ({
@@ -183,7 +192,51 @@ export function GuidanceProvider({
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
   }, [launchTour, pathname, query, router]);
 
-  return <GuidanceContext.Provider value={value}>{children}</GuidanceContext.Provider>;
+  return (
+    <GuidanceContext.Provider value={value}>
+      {children}
+      {demoCompleteOpen ? (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)]">
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">Demo walkthrough complete</h3>
+            <p className="mt-1.5 text-sm text-[var(--muted)]">
+              You have seen how teams orient work, track execution, coordinate dispatch, and connect asset
+              reliability to preventive maintenance.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setDemoCompleteOpen(false)}
+                className="rounded-lg border border-[var(--card-border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              >
+                Explore Demo
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDemoCompleteOpen(false);
+                  router.push("/work-orders");
+                }}
+                className="rounded-lg border border-[var(--card-border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              >
+                Go to Work Orders
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDemoCompleteOpen(false);
+                  router.push("/signup?source=demo");
+                }}
+                className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--accent-hover)]"
+              >
+                Start Free Trial
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </GuidanceContext.Provider>
+  );
 }
 
 export function useGuidance(): GuidanceContextValue {
