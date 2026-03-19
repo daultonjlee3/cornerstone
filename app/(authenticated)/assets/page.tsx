@@ -10,6 +10,7 @@ import { AssetListAiSummary } from "./components/asset-list-ai-summary";
 import { saveWorkOrder } from "../work-orders/actions";
 import { savePreventiveMaintenancePlan } from "../preventive-maintenance/actions";
 import { PageHeader } from "@/src/components/ui/page-header";
+import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 export const metadata = {
   title: "Assets | Cornerstone Tech",
@@ -123,6 +124,7 @@ export default async function AssetsPage({
           icon={<Factory className="size-5" />}
           title="Assets"
           subtitle="Track equipment and assets by location."
+          actions={<TakeTourButton />}
         />
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add assets.</p>
@@ -581,6 +583,7 @@ export default async function AssetsPage({
         subtitle="Track equipment and assets by location."
         actions={
           <div className="flex items-center gap-2">
+            <TakeTourButton />
             <AssetListAiSummary listSummary={assetsListSummary} />
             <Link
               href="/assets/intelligence"

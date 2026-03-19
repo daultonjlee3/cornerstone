@@ -10,13 +10,12 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/src/
 import { CornerstoneAiPanel } from "./cornerstone-ai-panel";
 import { Sparkles } from "lucide-react";
 import { DemoScenarioProvider } from "@/hooks/useDemoScenario";
-import { DemoScenarioOverlay } from "@/src/components/demo-scenario/DemoScenarioOverlay";
-import { ExploreModeTip } from "@/src/components/demo-scenario/ExploreModeTip";
 import { GetStartedOnboardingProvider } from "@/hooks/useGetStartedOnboarding";
 import { GetStartedChecklist } from "./get-started/GetStartedChecklist";
 import { GetStartedOverlay } from "./get-started/GetStartedOverlay";
 import { OperationOptimizationProvider } from "@/src/components/operation-optimization/OperationOptimizationProvider";
 import { GuidanceProvider } from "@/src/components/guidance/GuidanceProvider";
+import { DemoWorkspaceBanner } from "@/src/components/guidance/DemoWorkspaceBanner";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -77,8 +76,6 @@ export function Shell({
             <OperationOptimizationProvider>
               <GetStartedOverlay />
               <GetStartedChecklist />
-              <DemoScenarioOverlay />
-              <ExploreModeTip />
               <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
                   {!isDispatchFullscreen ? (
                     <Sidebar
@@ -113,6 +110,7 @@ export function Shell({
                         }
                       />
                     ) : null}
+                    {!isDispatchFullscreen ? <DemoWorkspaceBanner /> : null}
                     {impersonationBanner ? (
                       <ImpersonationBanner
                         actingAsName={impersonationBanner.actingAsName}

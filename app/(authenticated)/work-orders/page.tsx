@@ -4,6 +4,7 @@ import { getTenantIdForUser } from "@/src/lib/auth-context";
 import type { WorkOrder } from "./components/work-order-form-modal";
 import { WorkOrdersList } from "./components/work-orders-list";
 import { PageHeader } from "@/src/components/ui/page-header";
+import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 export const metadata = {
   title: "Work Order Command Center | Cornerstone OS",
@@ -159,6 +160,7 @@ export default async function WorkOrdersPage({
         <PageHeader
           title="Work Orders"
           subtitle="Create and track maintenance and repair work."
+          actions={<TakeTourButton />}
         />
         <div className="ui-card py-12 text-center">
           <p className="text-[var(--muted)]">Create a company first, then add work orders.</p>

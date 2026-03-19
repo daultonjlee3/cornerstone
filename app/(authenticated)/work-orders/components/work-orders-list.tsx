@@ -26,6 +26,7 @@ import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Pagination } from "@/src/components/ui/pagination";
 import { CornerstoneAiPanel } from "@/app/(authenticated)/components/cornerstone-ai-panel";
+import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 import { Sparkles } from "lucide-react";
 
 import { formatDate } from "@/src/lib/date-utils";
@@ -441,6 +442,7 @@ export function WorkOrdersList({
         subtitle="Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations."
         actions={
           <div className="flex items-center gap-2">
+          <TakeTourButton />
           <Tooltip placement="bottom">
             <TooltipTrigger>
             <div className="relative">

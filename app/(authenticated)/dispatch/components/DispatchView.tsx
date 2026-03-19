@@ -45,6 +45,7 @@ import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Hint } from "@/src/components/ui/hint";
 import { useDemoScenario } from "@/hooks/useDemoScenario";
+import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 const DispatchMapPanel = dynamic(
   () => import("./DispatchMapPanel").then((module) => module.DispatchMapPanel),
@@ -1066,14 +1067,17 @@ export function DispatchView({
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Dispatch · Ops
           </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="h-7 shrink-0 px-2 text-xs"
-            onClick={() => setFullScreen(false)}
-          >
-            Exit Full Screen
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <TakeTourButton compact />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-xs"
+              onClick={() => setFullScreen(false)}
+            >
+              Exit Full Screen
+            </Button>
+          </div>
         </header>
       ) : (
         <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--card-border)] bg-[var(--card)] px-3 py-2">
@@ -1103,6 +1107,7 @@ export function DispatchView({
             >
               {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
             </Button>
+            <TakeTourButton compact />
             <HelpTriggerButton onClick={() => setHelpOpen(true)} />
           </div>
         </header>

@@ -83,6 +83,8 @@ export function GetStartedChecklist() {
   const { startTour } = useGuidance();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dismissedSuccess, setDismissedSuccess] = useState(false);
+  const completedCount = STEPS.filter((step) => stepComplete(step.id, checklist)).length;
+  const progressPct = Math.round((completedCount / STEPS.length) * 100);
 
   // When the live demo is active, it becomes the only guidance system on screen.
   if (isDemoMode) return null;
@@ -149,11 +151,16 @@ export function GetStartedChecklist() {
 
   const header = (
     <div className="flex items-center justify-between gap-2 border-b border-[var(--card-border)] px-4 py-3">
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
           <Sparkles className="h-4 w-4" aria-hidden />
         </span>
-        <h2 className="text-sm font-semibold text-[var(--foreground)]">Get started</h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Onboarding checklist</h2>
+          <p className="text-xs text-[var(--muted)]">
+            {completedCount}/{STEPS.length} complete
+          </p>
+        </div>
       </div>
       <button
         type="button"
@@ -168,6 +175,12 @@ export function GetStartedChecklist() {
 
   const skipFooter = (
     <div className="border-t border-[var(--card-border)] px-4 py-2">
+      <div className="mb-2 h-2 overflow-hidden rounded-full bg-[var(--background)]">
+        <div
+          className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
       <button
         type="button"
         onClick={markSkipped}
@@ -248,7 +261,7 @@ export function GetStartedChecklist() {
 
   if (isLg) {
     return (
-      <div className="fixed bottom-6 right-6 z-40 w-72 rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-lg">
+      <div className="fixed right-6 top-20 z-40 w-80 rounded-xl border border-[var(--accent)]/20 bg-[var(--card)] shadow-[0_16px_34px_rgba(2,6,23,0.14)]">
         {header}
         <div className="max-h-64 overflow-y-auto p-3">{listContent}</div>
         {skipFooter}

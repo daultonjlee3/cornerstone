@@ -34,6 +34,7 @@ import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
+import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 export const metadata = {
   title: "Operations Center | Cornerstone Tech",
@@ -230,6 +231,7 @@ export default async function OperationsCenterPage() {
           subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
           actions={
             <div className="flex items-center gap-2" data-tour="dashboard:quick-actions">
+              <TakeTourButton />
               <DashboardHeaderActions />
             </div>
           }

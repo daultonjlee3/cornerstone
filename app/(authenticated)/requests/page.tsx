@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { RequestsList, type WorkRequestListItem } from "./components/requests-list";
 import { PageHeader } from "@/src/components/ui/page-header";
+import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 export const metadata = {
   title: "Work Requests | Cornerstone Tech",
@@ -86,6 +87,7 @@ export default async function RequestsPage() {
         icon={<Inbox className="size-5" />}
         title="Work requests"
         subtitle="Review incoming requests, approve or reject them, and convert approved requests into work orders."
+        actions={<TakeTourButton />}
       />
       <RequestsList requests={requests} />
     </div>
