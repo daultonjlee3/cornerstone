@@ -15,7 +15,7 @@ import { GetStartedChecklist } from "./get-started/GetStartedChecklist";
 import { GetStartedOverlay } from "./get-started/GetStartedOverlay";
 import { OperationOptimizationProvider } from "@/src/components/operation-optimization/OperationOptimizationProvider";
 import { GuidanceProvider } from "@/src/components/guidance/GuidanceProvider";
-import { DemoWorkspaceBanner } from "@/src/components/guidance/DemoWorkspaceBanner";
+import { DemoWelcomePanel } from "@/src/components/guidance/DemoWelcomePanel";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -110,7 +110,6 @@ export function Shell({
                         }
                       />
                     ) : null}
-                    {!isDispatchFullscreen ? <DemoWorkspaceBanner /> : null}
                     {impersonationBanner ? (
                       <ImpersonationBanner
                         actingAsName={impersonationBanner.actingAsName}
@@ -122,6 +121,7 @@ export function Shell({
                         <div className="h-full min-h-0 flex-1 px-2 py-2">{children}</div>
                       ) : (
                         <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 lg:max-w-[1200px] lg:px-6 lg:py-6">
+                          <DemoWelcomePanel />
                           {children}
                         </div>
                       )}

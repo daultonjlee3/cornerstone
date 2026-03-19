@@ -65,7 +65,6 @@ export function TopBar({
   const router = useRouter();
   const {
     startProductTourForCurrentPage,
-    startLiveDemoTour,
     hasProductTourForCurrentPage,
     isLiveDemoMode,
   } = useGuidance();
@@ -211,13 +210,9 @@ export function TopBar({
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         {isLiveDemoMode ? (
-          <button
-            type="button"
-            onClick={() => void startLiveDemoTour()}
-            className="hidden rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)] sm:inline-flex"
-          >
-            Demo Workspace · Start Tour
-          </button>
+          <span className="hidden rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)] sm:inline-flex">
+            Demo Workspace
+          </span>
         ) : null}
         <div className="relative" ref={notificationPanelRef}>
           <button
@@ -318,23 +313,15 @@ export function TopBar({
               <button
                 type="button"
                 role="menuitem"
-                disabled={!hasProductTourForCurrentPage && !isLiveDemoMode}
+                disabled={!hasProductTourForCurrentPage}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={async () => {
                   setAccountOpen(false);
-                  if (isLiveDemoMode) {
-                    await startLiveDemoTour();
-                    return;
-                  }
                   await startProductTourForCurrentPage();
                 }}
               >
                 <MapPin className="size-4 text-[var(--accent)]" aria-hidden />
-                {hasProductTourForCurrentPage || isLiveDemoMode
-                  ? isLiveDemoMode
-                    ? "Start Demo Tour"
-                    : "Take Tour"
-                  : "Tour Unavailable"}
+                {hasProductTourForCurrentPage ? "Take Tour" : "Tour Unavailable"}
               </button>
               <div className="border-t border-[var(--card-border)] px-3 py-2">
                 <SignOutButton />
