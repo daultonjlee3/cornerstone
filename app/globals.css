@@ -122,6 +122,67 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+/* Intro.js guidance theme */
+.introjs-overlay {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+  backdrop-filter: blur(2px);
+}
+
+.introjs-helperLayer {
+  border-radius: 12px !important;
+  box-shadow: 0 0 0 2px rgba(47, 120, 255, 0.35), 0 12px 30px rgba(15, 23, 42, 0.18) !important;
+}
+
+.introjs-tooltipReferenceLayer {
+  z-index: 220 !important;
+}
+
+.introjs-tooltip {
+  border-radius: 14px !important;
+  border: 1px solid var(--card-border) !important;
+  background: var(--card-solid) !important;
+  color: var(--foreground) !important;
+  box-shadow: var(--shadow-card) !important;
+  min-width: 280px;
+}
+
+.introjs-tooltip-header,
+.introjs-tooltip-title {
+  color: var(--foreground) !important;
+}
+
+.introjs-tooltiptext {
+  color: var(--muted-strong) !important;
+}
+
+.introjs-progressbar {
+  background-color: var(--accent) !important;
+}
+
+.introjs-button {
+  border-radius: 10px !important;
+  border: 1px solid var(--card-border) !important;
+  color: var(--foreground) !important;
+  text-shadow: none !important;
+  background: var(--background) !important;
+}
+
+.introjs-button:hover,
+.introjs-button:focus {
+  box-shadow: 0 0 0 2px var(--accent-glow) !important;
+  border-color: var(--accent) !important;
+}
+
+.introjs-nextbutton {
+  background: var(--accent) !important;
+  color: white !important;
+  border-color: var(--accent) !important;
+}
+
+.introjs-skipbutton {
+  color: var(--muted) !important;
+}
+
 .ui-table-shell {
   overflow: hidden;
   min-width: 0;

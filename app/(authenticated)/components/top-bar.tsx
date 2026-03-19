@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Menu, Bell, MapPin } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
-import { useGuidedTour } from "@/hooks/useGuidedTour";
+import { useGuidance } from "@/hooks/useGuidance";
 
 type NotificationItem = {
   id: string;
@@ -63,7 +63,12 @@ export function TopBar({
   onReturnToProfile,
 }: TopBarProps) {
   const router = useRouter();
-  const { openWelcome } = useGuidedTour();
+  const {
+    startProductTourForCurrentPage,
+    startLiveDemoTour,
+    hasProductTourForCurrentPage,
+    isLiveDemoMode,
+  } = useGuidance();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,6 +210,15 @@ export function TopBar({
         </form>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
+        {isLiveDemoMode ? (
+          <button
+            type="button"
+            onClick={() => void startLiveDemoTour()}
+            className="hidden rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)] sm:inline-flex"
+          >
+            Demo Workspace · Start Tour
+          </button>
+        ) : null}
         <div className="relative" ref={notificationPanelRef}>
           <button
             type="button"
@@ -304,14 +318,23 @@ export function TopBar({
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
-                onClick={() => {
+                disabled={!hasProductTourForCurrentPage && !isLiveDemoMode}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={async () => {
                   setAccountOpen(false);
-                  openWelcome();
+                  if (isLiveDemoMode) {
+                    await startLiveDemoTour();
+                    return;
+                  }
+                  await startProductTourForCurrentPage();
                 }}
               >
                 <MapPin className="size-4 text-[var(--accent)]" aria-hidden />
-                Start Product Tour
+                {hasProductTourForCurrentPage || isLiveDemoMode
+                  ? isLiveDemoMode
+                    ? "Start Demo Tour"
+                    : "Take Tour"
+                  : "Tour Unavailable"}
               </button>
               <div className="border-t border-[var(--card-border)] px-3 py-2">
                 <SignOutButton />

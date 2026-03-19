@@ -2,33 +2,25 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { tourConfigs } from "@/src/lib/tours/config";
 import { resetTour } from "@/app/(authenticated)/tours/actions";
-import { useTour } from "@/src/components/ui/tour";
 import { Button } from "@/src/components/ui/button";
+import { guidanceTours } from "@/src/lib/guidance/registry";
 
 export default function SettingsToursPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const { refreshCompleted, startTour } = useTour();
 
   const handleRestart = (tourId: string) => {
     startTransition(async () => {
       await resetTour(tourId);
-      await refreshCompleted();
       router.refresh();
     });
   };
 
   const handleStartTour = (tourId: string) => {
-    const config = tourConfigs.find((t) => t.id === tourId);
-    const path = config?.path ?? "/operations";
-    if (tourId === "demo-guided") {
-      router.push(path + "?startTour=demo-guided");
-      return;
-    }
-    startTour(tourId);
-    router.push(path);
+    const config = guidanceTours.find((t) => t.id === tourId);
+    const path = config?.routePrefix ?? "/operations";
+    router.push(`${path}?startTour=${encodeURIComponent(tourId)}`);
   };
 
   return (
@@ -41,7 +33,7 @@ export default function SettingsToursPage() {
           Restart a guided tour to see it again. After restarting, go to that module to run the tour.
         </p>
         <ul className="space-y-3">
-          {tourConfigs.map((tour) => (
+          {guidanceTours.map((tour) => (
             <li
               key={tour.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 px-4 py-3"
@@ -49,7 +41,7 @@ export default function SettingsToursPage() {
               <div>
                 <p className="font-medium text-[var(--foreground)]">{tour.name}</p>
                 <p className="text-xs text-[var(--muted)]">
-                  {tour.steps.length} steps · {tour.path}
+                  {tour.steps.length} steps · {tour.routePrefix ?? "/operations"}
                 </p>
               </div>
               <div className="flex gap-2">

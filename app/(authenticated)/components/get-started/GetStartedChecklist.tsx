@@ -18,6 +18,7 @@ import { useIsLg } from "@/src/lib/use-media-query";
 import Link from "next/link";
 import { ResponsiveOverlayPanel } from "@/src/components/ui/panels/ResponsiveOverlayPanel";
 import { useDemoScenario } from "@/hooks/useDemoScenario";
+import { useGuidance } from "@/hooks/useGuidance";
 
 const STEPS = [
   {
@@ -79,6 +80,7 @@ export function GetStartedChecklist() {
     resumeOnboarding,
   } = useGetStartedOnboarding();
   const { isDemoMode } = useDemoScenario();
+  const { startTour } = useGuidance();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dismissedSuccess, setDismissedSuccess] = useState(false);
 
@@ -102,21 +104,43 @@ export function GetStartedChecklist() {
         const Icon = step.icon;
         return (
           <li key={step.id}>
-            <button
-              type="button"
-              onClick={() => handleStepClick(step.href)}
-              className="flex w-full min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-[var(--background)]/80"
-            >
-              {done ? (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
-              ) : (
-                <Circle className="h-5 w-5 shrink-0 text-[var(--muted)]" aria-hidden />
-              )}
-              <Icon className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
-              <span className={done ? "text-[var(--muted)] line-through" : "text-[var(--foreground)]"}>
-                {step.label}
-              </span>
-            </button>
+            <div className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-[var(--background)]/80">
+              <button
+                type="button"
+                onClick={() => handleStepClick(step.href)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                {done ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+                ) : (
+                  <Circle className="h-5 w-5 shrink-0 text-[var(--muted)]" aria-hidden />
+                )}
+                <Icon className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+                <span className={done ? "text-[var(--muted)] line-through" : "text-[var(--foreground)]"}>
+                  {step.label}
+                </span>
+              </button>
+              {!done ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void startTour(
+                      step.id === "asset"
+                        ? "onboarding-create-asset"
+                        : step.id === "work-order"
+                          ? "onboarding-create-work-order"
+                          : step.id === "assign"
+                            ? "onboarding-assign-technician"
+                            : "onboarding-complete-work-order",
+                      { force: true }
+                    )
+                  }
+                  className="shrink-0 rounded-md border border-[var(--card-border)] px-2 py-1 text-[11px] font-medium text-[var(--muted-strong)] hover:bg-[var(--background)]"
+                >
+                  Tour
+                </button>
+              ) : null}
+            </div>
           </li>
         );
       })}

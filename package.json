@@ -21,6 +21,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
+    "intro.js": "^8.3.2",
     "jsonwebtoken": "^9.0.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",

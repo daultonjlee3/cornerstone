@@ -81,7 +81,7 @@ export default async function RequestsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="requests:header">
       <PageHeader
         icon={<Inbox className="size-5" />}
         title="Work requests"
