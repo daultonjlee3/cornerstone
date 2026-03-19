@@ -906,8 +906,10 @@ async function ensureScenarioDataForTenant(
   const completedAt = addDays(new Date(`${today}T12:00:00`), -1);
   const completedAtISO = completedAt.toISOString();
 
-  const getFirstRowId = <T extends { id: string }>(rows: T[] | null | undefined): string | null =>
-    (rows ?? []).length ? (rows[0] as T).id : null;
+  const getFirstRowId = <T extends { id: string }>(rows: T[] | null | undefined): string | null => {
+    const arr = rows ?? [];
+    return arr.length ? arr[0].id : null;
+  };
 
   async function getOrCreateTechnician(name: string, trade: string, phone: string): Promise<string | null> {
     // Scenario actions resolve technicians by `technician_name` and/or `name`.
