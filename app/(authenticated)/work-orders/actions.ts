@@ -1183,7 +1183,12 @@ export async function updateWorkOrderAssignment(
   payload: WorkOrderAssignmentPayload
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
-  if (await isDemoGuestUser(supabase)) {
+  const isDemoGuest = await isDemoGuestUser(supabase);
+  // eslint-disable-next-line no-console
+  console.log("[DEBUG][server] updateWorkOrderAssignment called", { id, payload, isDemoGuest });
+  if (isDemoGuest) {
+    // eslint-disable-next-line no-console
+    console.log("[DEBUG][server] isDemoGuestUser=true — skipping DB save, returning success");
     return { success: true };
   }
   const tenantId = await getTenantIdForUser(supabase);
@@ -1254,12 +1259,22 @@ export async function updateWorkOrderAssignment(
   update.scheduled_start = nextScheduledStart;
   update.scheduled_end = nextScheduledEnd;
 
+  // eslint-disable-next-line no-console
+  console.log("[DEBUG][server] STEP3 DB update payload for updateWorkOrderAssignment", { id, update });
   const { data: updated, error } = await supabase
     .from("work_orders")
     .update(update)
     .eq("id", id)
     .select("*")
     .single();
+  // eslint-disable-next-line no-console
+  console.log("[DEBUG][server] STEP4 DB update result", {
+    error: error?.message ?? null,
+    updatedId: (updated as { id?: string } | null)?.id ?? null,
+    updatedScheduledDate: (updated as { scheduled_date?: string } | null)?.scheduled_date ?? null,
+    updatedTechnicianId: (updated as { assigned_technician_id?: string } | null)?.assigned_technician_id ?? null,
+    updatedStatus: (updated as { status?: string } | null)?.status ?? null,
+  });
   if (error) return { error: error.message };
 
   const afterState = (updated as Record<string, unknown>) ?? {};

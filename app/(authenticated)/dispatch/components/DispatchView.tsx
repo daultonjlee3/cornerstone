@@ -221,6 +221,17 @@ export function DispatchView({
         }
       }
     }
+    // eslint-disable-next-line no-console
+    console.log("[DEBUG][dispatch] STEP5 mergeWorkOrdersFromServer fired — server has", initialData.workOrders.length, "work orders");
+    // eslint-disable-next-line no-console
+    const scheduledInServer = initialData.workOrders.filter((w) => w.scheduled_date || w.assigned_technician_id);
+    console.log("[DEBUG][dispatch] STEP5 server scheduled/assigned WOs:", scheduledInServer.map((w) => ({
+      id: w.id,
+      scheduled_date: w.scheduled_date,
+      assigned_technician_id: w.assigned_technician_id,
+      assigned_crew_id: w.assigned_crew_id,
+      status: w.status,
+    })));
     setOptimisticWorkOrders((prev) => mergeWorkOrdersFromServer(prev, initialData.workOrders));
   }, [initialData.workOrders, isDemoMode]);
 
@@ -701,6 +712,12 @@ export function DispatchView({
     ) => {
       setDropError(null);
       const previous = optimisticWorkOrders;
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP3 applyOptimisticAssignment called", {
+        workOrderId: workOrder.id,
+        payload,
+        patchKeys: Object.keys(patch),
+      });
       setOptimisticWorkOrders((current) => {
         const idx = current.findIndex((row) => row.id === workOrder.id);
         const merged = { ...workOrder, ...patch } as DispatchWorkOrder;
@@ -715,14 +732,11 @@ export function DispatchView({
         }
         return current.map((row) => (row.id === workOrder.id ? merged : row));
       });
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.debug("[dispatch] updateWorkOrderAssignment request", {
-          workOrderId: workOrder.id,
-          payload,
-          patchKeys: Object.keys(patch),
-        });
-      }
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP3 calling updateWorkOrderAssignment", {
+        workOrderId: workOrder.id,
+        payload,
+      });
       let result: Awaited<ReturnType<typeof updateWorkOrderAssignment>>;
       try {
         result = await updateWorkOrderAssignment(workOrder.id, payload);
@@ -732,23 +746,25 @@ export function DispatchView({
           err instanceof Error ? err.message : "Failed to save assignment. Check your connection.";
         setDropError(message);
         // eslint-disable-next-line no-console
-        console.error("[dispatch] updateWorkOrderAssignment threw", err);
+        console.error("[DEBUG][dispatch] STEP3 updateWorkOrderAssignment threw", err);
         return;
       }
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.debug("[dispatch] updateWorkOrderAssignment response", {
-          workOrderId: workOrder.id,
-          result,
-        });
-      }
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP4 updateWorkOrderAssignment response", {
+        workOrderId: workOrder.id,
+        result,
+        hasError: Boolean(result?.error),
+        isSuccess: Boolean(result?.success),
+      });
       if (result?.error) {
         setOptimisticWorkOrders(previous);
         setDropError(result.error);
         // eslint-disable-next-line no-console
-        console.warn("[dispatch] assignment rejected by server", { workOrderId: workOrder.id, error: result.error });
+        console.warn("[DEBUG][dispatch] STEP4 assignment rejected by server — ROLLING BACK", { workOrderId: workOrder.id, error: result.error });
         return;
       }
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP5 assignment saved, isDemoMode=", isDemoMode, "calling router.refresh():", !isDemoMode);
       if (!isDemoMode) {
         router.refresh();
         window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
@@ -799,7 +815,20 @@ export function DispatchView({
       setDropError(null);
 
       const { active, over } = event;
-      if (!over) return;
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP1 handleDragEnd fired", {
+        activeId: active?.id,
+        overId: over?.id ?? null,
+        overData: over?.data?.current ?? null,
+        activeData: active?.data?.current
+          ? { type: (active.data.current as { type?: string }).type, woId: (active.data.current as { workOrder?: { id?: string } }).workOrder?.id }
+          : null,
+      });
+      if (!over) {
+        // eslint-disable-next-line no-console
+        console.log("[DEBUG][dispatch] STEP1 drop ignored — no over target");
+        return;
+      }
 
       const overId = String(over.id);
       const dropData = over.data.current as
@@ -867,12 +896,22 @@ export function DispatchView({
         return;
       }
 
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP2 drop target parsed", {
+        overId,
+        crewId,
+        dropDate,
+        defaultHour,
+        dropData,
+        workOrderId: workOrder?.id ?? null,
+      });
+
       if (!crewId || !dropDate) {
         const msg =
           "Could not read that drop target. Drop onto a technician time cell (grid), not the header.";
         setDropError(msg);
         // eslint-disable-next-line no-console
-        console.warn("[dispatch] drop ignored — missing crewId or dropDate", {
+        console.warn("[DEBUG][dispatch] STEP2 drop ignored — missing crewId or dropDate", {
           overId,
           crewId,
           dropDate,
@@ -905,6 +944,18 @@ export function DispatchView({
           : null;
       const crewName =
         assignedCrewId != null ? initialData.crews.find((c) => c.id === assignedCrewId)?.name ?? null : null;
+
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG][dispatch] STEP2 drop payload", {
+        work_order_id: workOrder.id,
+        technician_id: assignedTechnicianId,
+        crew_id: assignedCrewId,
+        scheduled_date: dropDate,
+        scheduled_start: startISO,
+        scheduled_end: endISO,
+        techFound: techName !== null || assignedTechnicianId === null,
+        crewFound: crewName !== null || assignedCrewId === null,
+      });
 
       await applyOptimisticAssignment(
         workOrder,
