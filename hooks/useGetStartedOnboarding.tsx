@@ -18,6 +18,7 @@ const STORAGE_KEY = "cornerstone_get_started_v1";
 type StoredState = {
   skipped?: boolean;
   completedAt?: string;
+  assignedStepDone?: boolean;
 };
 
 function readStored(): StoredState {
@@ -26,7 +27,11 @@ function readStored(): StoredState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as StoredState;
-    return { skipped: parsed.skipped, completedAt: parsed.completedAt };
+    return {
+      skipped: parsed.skipped,
+      completedAt: parsed.completedAt,
+      assignedStepDone: parsed.assignedStepDone,
+    };
   } catch {
     return {};
   }
@@ -58,6 +63,7 @@ type GetStartedOnboardingContextValue = {
   markSkipped: () => void;
   resumeOnboarding: () => void;
   refreshProgress: () => Promise<void>;
+  markAssignedTechnician: () => void;
 };
 
 const GetStartedOnboardingContext = createContext<GetStartedOnboardingContextValue | null>(null);
@@ -115,13 +121,22 @@ export function GetStartedOnboardingProvider({
   }, [pathname, disabled, fetchProgress]);
 
   const checklist = useMemo(
-    () => (progress ? progressToChecklist(progress) : {
-      hasCreatedAsset: false,
-      hasCreatedWorkOrder: false,
-      hasAssignedTechnician: false,
-      hasCompletedWorkOrder: false,
-    }),
-    [progress]
+    () => {
+      const base = progress
+        ? progressToChecklist(progress)
+        : {
+            hasCreatedAsset: false,
+            hasCreatedWorkOrder: false,
+            hasAssignedTechnician: false,
+            hasCompletedWorkOrder: false,
+          };
+      return {
+        ...base,
+        hasAssignedTechnician:
+          base.hasAssignedTechnician || Boolean(stored.assignedStepDone),
+      };
+    },
+    [progress, stored.assignedStepDone]
   );
 
   const allComplete =
@@ -143,6 +158,14 @@ export function GetStartedOnboardingProvider({
     void fetchProgress();
   }, [fetchProgress]);
 
+  const markAssignedTechnician = useCallback(() => {
+    const current = readStored();
+    if (current.assignedStepDone) return;
+    const next = { ...current, assignedStepDone: true };
+    writeStored(next);
+    setStored(next);
+  }, []);
+
   useEffect(() => {
     if (allComplete && !stored.completedAt) {
       const next = { ...readStored(), completedAt: new Date().toISOString() };
@@ -162,6 +185,7 @@ export function GetStartedOnboardingProvider({
       markSkipped,
       resumeOnboarding,
       refreshProgress: fetchProgress,
+      markAssignedTechnician,
     }),
     [
       progress,
@@ -173,6 +197,7 @@ export function GetStartedOnboardingProvider({
       markSkipped,
       resumeOnboarding,
       fetchProgress,
+      markAssignedTechnician,
     ]
   );
 

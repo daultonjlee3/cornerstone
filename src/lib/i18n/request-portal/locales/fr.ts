@@ -7,6 +7,8 @@ export const fr: Record<keyof RequestPortalLocaleEn, string> = {
   "requestPortal.title": "Demande de maintenance",
   "requestPortal.subtitle": "Soumettez une demande et nous vous recontacterons.",
   "requestPortal.subtitleWithPortal": "Soumettez une demande à cette équipe en moins d'une minute.",
+  "requestPortal.chooseOrgTitle": "Choisissez votre organisation",
+  "requestPortal.chooseOrgSubtitle": "Sélectionnez le portail de maintenance de votre site ou propriété.",
   "requestPortal.footer": "Cornerstone OS",
   "requestPortal.trustIntro":
     "Dites-nous ce qui ne va pas et où c'est situé. Votre demande est envoyée directement à l'équipe de maintenance de cette propriété.",

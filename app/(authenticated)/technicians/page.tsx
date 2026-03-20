@@ -12,7 +12,17 @@ export const metadata = {
   description: "Manage technicians",
 };
 
-export default async function TechniciansPage() {
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function TechniciansPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const showPortalHint =
+    searchParams?.portal === "1" ||
+    searchParams?.portal === "true" ||
+    (Array.isArray(searchParams?.portal) && searchParams.portal[0] === "1");
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -213,6 +223,21 @@ export default async function TechniciansPage() {
 
   return (
     <div className="space-y-8">
+      {showPortalHint ? (
+        <div
+          className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3 text-sm text-[var(--foreground)]"
+          role="status"
+        >
+          <p className="font-medium text-[var(--foreground)]">Technician Portal (mobile)</p>
+          <p className="mt-1 text-[var(--muted)]">
+            The technician app at <span className="font-mono text-[var(--foreground)]">/portal</span> is for{" "}
+            <strong>technician logins</strong> (portal-only users) or when an{" "}
+            <strong>admin previews as a technician</strong>. Open a technician below → view their profile → use{" "}
+            <strong>Open the portal as…</strong> to preview. To use the portal yourself, sign in with a technician
+            account that has portal access enabled.
+          </p>
+        </div>
+      ) : null}
       <PageHeader
         icon={<Wrench className="size-5" />}
         title="Technicians"
@@ -226,10 +251,10 @@ export default async function TechniciansPage() {
               Open Technician Work Queue
             </Link>
             <Link
-              href="/portal"
+              href="/technicians?portal=1"
               className="inline-flex rounded-[var(--radius-control)] bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)]"
             >
-              Open Technician Portal
+              How to open Technician Portal
             </Link>
           </>
         }

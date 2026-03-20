@@ -51,6 +51,10 @@ export default async function DispatchPage({
     assignment_type: filterState.assignmentType || null,
     asset_id: filterState.assetId || null,
     category: filterState.category || null,
+    trace_work_order_id:
+      typeof params?.trace_wo === "string" && params.trace_wo.trim()
+        ? params.trace_wo.trim()
+        : null,
   });
 
   return (

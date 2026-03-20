@@ -84,7 +84,8 @@ export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProv
       sessionStorage.removeItem("cornerstone_demo_scenario_ctx");
       localStorage.removeItem(GET_STARTED_STORAGE_KEY);
       localStorage.removeItem("cornerstone_demo_scenario_state");
-      sessionStorage.removeItem(DEMO_DISPATCH_RUNTIME_KEY);
+      // Keep dispatch runtime so drag/drop assignments survive page refresh in demo mode.
+      // This key is intentionally cleared only when the browser tab/session is reset.
     }
     setScenarioCtx(null);
     setStepError(null);

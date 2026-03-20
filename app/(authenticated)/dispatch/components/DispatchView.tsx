@@ -48,6 +48,7 @@ import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Hint } from "@/src/components/ui/hint";
 import { useDemoScenario } from "@/hooks/useDemoScenario";
+import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
 import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 import { toDateOnlyString } from "@/src/lib/date-utils";
 
@@ -188,6 +189,98 @@ function applyAssignmentSnapshotToRow(
   };
 }
 
+const PENDING_ASSIGNMENTS_KEY = "cornerstone_dispatch_pending_assignments_v1";
+const PENDING_ASSIGNMENT_TTL_MS = 10 * 60 * 1000;
+const TRACE_WORK_ORDER_SESSION_KEY = "cornerstone_dispatch_trace_wo_id";
+
+type PendingAssignmentMap = Record<string, WorkOrderAssignmentSnapshot & { savedAtMs: number }>;
+
+function readPendingAssignments(): PendingAssignmentMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_ASSIGNMENTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as PendingAssignmentMap;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePendingAssignments(map: PendingAssignmentMap): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (Object.keys(map).length === 0) {
+      window.sessionStorage.removeItem(PENDING_ASSIGNMENTS_KEY);
+      return;
+    }
+    window.sessionStorage.setItem(PENDING_ASSIGNMENTS_KEY, JSON.stringify(map));
+  } catch {
+    // Best-effort cache only.
+  }
+}
+
+function rowMatchesAssignmentSnapshot(row: DispatchWorkOrder, snap: WorkOrderAssignmentSnapshot): boolean {
+  return (
+    (row.assigned_technician_id ?? null) === (snap.assigned_technician_id ?? null) &&
+    (row.assigned_crew_id ?? null) === (snap.assigned_crew_id ?? null) &&
+    (row.vendor_id ?? null) === (snap.vendor_id ?? null) &&
+    (toDateOnlyString(row.scheduled_date) ?? null) === (toDateOnlyString(snap.scheduled_date) ?? null) &&
+    (row.scheduled_start ?? null) === (snap.scheduled_start ?? null) &&
+    (row.scheduled_end ?? null) === (snap.scheduled_end ?? null)
+  );
+}
+
+function reconcilePendingAssignments(
+  workOrders: DispatchWorkOrder[],
+  technicians: { id: string; name?: string | null }[],
+  crews: { id: string; name?: string | null }[]
+): DispatchWorkOrder[] {
+  const map = readPendingAssignments();
+  const now = Date.now();
+  const nextMap: PendingAssignmentMap = {};
+  let touched = false;
+
+  const next = workOrders.map((row) => {
+    const pending = map[row.id];
+    if (!pending) return row;
+    if (now - pending.savedAtMs > PENDING_ASSIGNMENT_TTL_MS) {
+      touched = true;
+      return row;
+    }
+    if (rowMatchesAssignmentSnapshot(row, pending)) {
+      nextMap[row.id] = pending;
+      return row;
+    }
+    touched = true;
+    nextMap[row.id] = pending;
+    return applyAssignmentSnapshotToRow(row, pending, technicians, crews);
+  });
+
+  // Keep non-expired pending assignments for ids not present in this payload yet.
+  for (const [id, pending] of Object.entries(map)) {
+    if (nextMap[id]) continue;
+    if (now - pending.savedAtMs <= PENDING_ASSIGNMENT_TTL_MS) {
+      nextMap[id] = pending;
+    } else {
+      touched = true;
+    }
+  }
+
+  if (touched) writePendingAssignments(nextMap);
+  return next;
+}
+
+function readTraceWorkOrderIdFromBrowser(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const id = window.sessionStorage.getItem(TRACE_WORK_ORDER_SESSION_KEY);
+    return id && id.trim() ? id.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Toolbar + URL filters (assignment, status, priority, category) are applied client-side so the board
  * always receives full WO rows after refresh; DB filters on status would drop jobs that transition
@@ -237,6 +330,7 @@ export function DispatchView({
   filterState,
 }: DispatchViewProps) {
   const { isDemoMode } = useDemoScenario();
+  const { markAssignedTechnician } = useGetStartedOnboarding();
   const DEMO_DISPATCH_STATE_KEY = "cornerstone_demo_dispatch_runtime_v1";
   const router = useRouter();
   const pathname = usePathname();
@@ -290,7 +384,13 @@ export function DispatchView({
         try {
           const parsed = JSON.parse(raw) as DispatchWorkOrder[];
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setOptimisticWorkOrders(parsed);
+            setOptimisticWorkOrders(
+              reconcilePendingAssignments(
+                parsed,
+                initialData.workforce.technicians,
+                initialData.crews
+              )
+            );
             return;
           }
         } catch {
@@ -298,8 +398,15 @@ export function DispatchView({
         }
       }
     }
-    setOptimisticWorkOrders((prev) => mergeWorkOrdersFromServer(prev, initialData.workOrders));
-  }, [initialData.workOrders, isDemoMode]);
+    setOptimisticWorkOrders((prev) => {
+      const merged = mergeWorkOrdersFromServer(prev, initialData.workOrders);
+      return reconcilePendingAssignments(
+        merged,
+        initialData.workforce.technicians,
+        initialData.crews
+      );
+    });
+  }, [initialData.workOrders, isDemoMode, initialData.workforce.technicians, initialData.crews]);
 
   useEffect(() => {
     setSelectedMapTechnicianId(filterState.technicianId || null);
@@ -665,6 +772,62 @@ export function DispatchView({
     dispatchData.ready.length === 0 &&
     boardCrews.every((crew) => (crew.scheduled_today?.length ?? 0) === 0);
 
+  useEffect(() => {
+    const traceFromQuery = searchParams.get("trace_wo")?.trim() || null;
+    const traceFromSession = readTraceWorkOrderIdFromBrowser();
+    const tracedWorkOrderId = traceFromQuery ?? traceFromSession ?? null;
+    if (!tracedWorkOrderId) return;
+    const raw = optimisticWorkOrders.find((w) => w.id === tracedWorkOrderId) ?? null;
+    const toolbarVisible = workOrdersMatchingToolbarFilters.some((w) => w.id === tracedWorkOrderId);
+    const scheduledDate = toDateOnlyString(raw?.scheduled_date);
+    const dateBucket =
+      !raw ? "missing"
+      : !scheduledDate ? "unscheduled"
+      : scheduledDate === filterState.selectedDate
+        ? "scheduled_for_selected_date"
+        : `scheduled_for_other_date:${scheduledDate}`;
+    let laneId: string | null = null;
+    for (const [candidateLaneId, rows] of boardWorkOrdersByLane.entries()) {
+      if (rows.some((w) => w.id === tracedWorkOrderId)) {
+        laneId = candidateLaneId;
+        break;
+      }
+    }
+    const classification = !raw
+      ? "missing"
+      : scheduledDate === filterState.selectedDate && (raw.assigned_technician_id || raw.assigned_crew_id)
+        ? "scheduled_on_board"
+        : !scheduledDate
+          ? "queue_unscheduled"
+          : "not_on_selected_date";
+    // eslint-disable-next-line no-console
+    console.log("[dispatch-trace][step6][frontend-mapping]", {
+      tracedWorkOrderId,
+      selectedDate: filterState.selectedDate,
+      raw,
+      toolbarVisible,
+      classification,
+      dateBucket,
+      laneId,
+      excludedReasons: {
+        missingFromOptimisticState: raw == null,
+        filteredByToolbar: raw != null && !toolbarVisible,
+        scheduledDateMismatch: raw != null && scheduledDate != null && scheduledDate !== filterState.selectedDate,
+        missingAssignmentForBoard:
+          raw != null &&
+          scheduledDate === filterState.selectedDate &&
+          !raw.assigned_technician_id &&
+          !raw.assigned_crew_id,
+      },
+    });
+  }, [
+    boardWorkOrdersByLane,
+    filterState.selectedDate,
+    optimisticWorkOrders,
+    searchParams,
+    workOrdersMatchingToolbarFilters,
+  ]);
+
   const selectedMapTechnician = useMemo(
     () =>
       initialData.workforce.technicians.find(
@@ -773,6 +936,7 @@ export function DispatchView({
         scheduled_date: string | null;
         scheduled_start: string | null;
         scheduled_end: string | null;
+        debug_trace_work_order_id?: string | null;
       },
       patch: Partial<DispatchWorkOrder>
     ) => {
@@ -818,6 +982,9 @@ export function DispatchView({
 
       if (result.success && result.assignmentSnapshot) {
         const snap = result.assignmentSnapshot;
+        const pending = readPendingAssignments();
+        pending[snap.id] = { ...snap, savedAtMs: Date.now() };
+        writePendingAssignments(pending);
         setOptimisticWorkOrders((current) => {
           const idx = current.findIndex((r) => r.id === snap.id);
           const base = idx >= 0 ? current[idx] : workOrder;
@@ -831,6 +998,14 @@ export function DispatchView({
           return current.map((row) => (row.id === snap.id ? next : row));
         });
       }
+      if (
+        result.success &&
+        (payload.assigned_technician_id != null ||
+          payload.assigned_crew_id != null ||
+          payload.assigned_vendor_id != null)
+      ) {
+        markAssignedTechnician();
+      }
 
       if (!isDemoMode) {
         queueMicrotask(() => {
@@ -839,19 +1014,55 @@ export function DispatchView({
         });
       }
     },
-    [isDemoMode, optimisticWorkOrders, router, initialData.workforce.technicians, initialData.crews]
+    [
+      isDemoMode,
+      optimisticWorkOrders,
+      router,
+      initialData.workforce.technicians,
+      initialData.crews,
+      markAssignedTechnician,
+    ]
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
     const data = active.data.current;
-    if (data?.type === "dispatch-work-order" && data.workOrder) {
-      setActiveWo(data.workOrder as DispatchWorkOrder);
+    const workOrder =
+      data?.type === "dispatch-work-order" && data.workOrder
+        ? (data.workOrder as DispatchWorkOrder)
+        : data?.type === "dispatch-work-order-board" && data.workOrder
+          ? (data.workOrder as DispatchWorkOrder)
+          : null;
+    if (!workOrder) return;
+    setActiveWo(workOrder);
+    const traceFromQuery = searchParams.get("trace_wo")?.trim() || null;
+    const traceFromSession = readTraceWorkOrderIdFromBrowser();
+    const traceWorkOrderId = traceFromQuery ?? traceFromSession ?? workOrder.id;
+    if (!traceFromQuery && typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(TRACE_WORK_ORDER_SESSION_KEY, traceWorkOrderId);
+      } catch {
+        // Best-effort only.
+      }
+      const next = new URLSearchParams(searchParams.toString());
+      next.set("trace_wo", traceWorkOrderId);
+      const nextQuery = next.toString();
+      if (nextQuery !== searchParams.toString()) {
+        router.replace(`${pathname}?${nextQuery}`, { scroll: false });
+      }
     }
-    if (data?.type === "dispatch-work-order-board" && data.workOrder) {
-      setActiveWo(data.workOrder as DispatchWorkOrder);
+    if (traceWorkOrderId === workOrder.id) {
+      // eslint-disable-next-line no-console
+      console.log("[dispatch-trace][step2][pre-drop-state]", {
+        id: workOrder.id,
+        technician_id: workOrder.assigned_technician_id ?? null,
+        scheduled_start: workOrder.scheduled_start ?? null,
+        scheduled_end: workOrder.scheduled_end ?? null,
+        status: workOrder.status ?? null,
+        tenant_id: (workOrder as { tenant_id?: string | null }).tenant_id ?? null,
+      });
     }
-  }, []);
+  }, [pathname, router, searchParams]);
 
   const handleDragOver = useCallback(
     (event: import("@dnd-kit/core").DragOverEvent) => {
@@ -913,6 +1124,9 @@ export function DispatchView({
             : undefined;
 
       if (!workOrder) return;
+      const traceFromQuery = searchParams.get("trace_wo")?.trim() || null;
+      const traceFromSession = readTraceWorkOrderIdFromBrowser();
+      const tracedWorkOrderId = traceFromQuery ?? traceFromSession ?? null;
 
       const isQueueUnscheduleTarget =
         dropData?.target === "queue-unschedule" ||
@@ -988,6 +1202,7 @@ export function DispatchView({
           scheduled_date: dropDate,
           scheduled_start: startISO,
           scheduled_end: endISO,
+          debug_trace_work_order_id: tracedWorkOrderId,
         },
         {
           assigned_technician_id: assignedTechnicianId,
@@ -1003,8 +1218,35 @@ export function DispatchView({
           status: "scheduled",
         }
       );
+      if (tracedWorkOrderId && tracedWorkOrderId === workOrder.id) {
+        // eslint-disable-next-line no-console
+        console.log("[dispatch-trace][step3][drop-payload]", {
+          id: workOrder.id,
+          target_technician_id: assignedTechnicianId,
+          target_crew_id: assignedCrewId,
+          scheduled_date: dropDate,
+          scheduled_start: startISO,
+          scheduled_end: endISO,
+          status_change_to: "scheduled",
+          payload: {
+            assigned_technician_id: assignedTechnicianId,
+            assigned_crew_id: assignedCrewId,
+            assigned_vendor_id: null,
+            scheduled_date: dropDate,
+            scheduled_start: startISO,
+            scheduled_end: endISO,
+            debug_trace_work_order_id: tracedWorkOrderId,
+          },
+        });
+      }
     },
-    [applyOptimisticAssignment, filterState.selectedDate, initialData.workforce.technicians, initialData.crews]
+    [
+      applyOptimisticAssignment,
+      filterState.selectedDate,
+      initialData.workforce.technicians,
+      initialData.crews,
+      searchParams,
+    ]
   );
 
   const handleDragCancel = useCallback(() => {

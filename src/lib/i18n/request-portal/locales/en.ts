@@ -7,6 +7,8 @@ export const en = {
   "requestPortal.title": "Maintenance Request",
   "requestPortal.subtitle": "Submit a maintenance request in under a minute.",
   "requestPortal.subtitleWithPortal": "Submit a maintenance request to this team in under a minute.",
+  "requestPortal.chooseOrgTitle": "Choose your organization",
+  "requestPortal.chooseOrgSubtitle": "Select the maintenance portal for your site or property.",
   "requestPortal.footer": "Powered by Cornerstone OS",
   "requestPortal.trustIntro": "Tell us what’s wrong and where it is. Your request goes straight to the maintenance team for this property.",
   "requestPortal.trustFooter": "We’ll review your request, create a work order if needed, and follow up with updates.",

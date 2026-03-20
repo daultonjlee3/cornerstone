@@ -1191,15 +1191,62 @@ export type WorkOrderAssignmentPayload = {
   scheduled_date?: string | null;
   scheduled_start?: string | null;
   scheduled_end?: string | null;
+  debug_trace_work_order_id?: string | null;
 };
 
 export async function updateWorkOrderAssignment(
   id: string,
   payload: WorkOrderAssignmentPayload
 ): Promise<WorkOrderFormState> {
+  const tracedId =
+    (payload.debug_trace_work_order_id && payload.debug_trace_work_order_id.trim()) ||
+    process.env.DISPATCH_TRACE_WO_ID ||
+    null;
+  const traceEnabled = tracedId != null && tracedId === id;
+  if (traceEnabled) {
+    // eslint-disable-next-line no-console
+    console.log("[dispatch-trace][step4][incoming-payload]", { id, payload });
+  }
   const supabase = await createClient();
   if (await isDemoGuestUser(supabase)) {
-    return { success: true };
+    const nextTechnicianId = payload.assigned_technician_id || null;
+    const nextCrewId = payload.assigned_crew_id || null;
+    const nextVendorId = payload.assigned_vendor_id || null;
+    const nextScheduledDate = payload.scheduled_date ?? null;
+    const nextScheduledStart = payload.scheduled_start
+      ? new Date(payload.scheduled_start).toISOString()
+      : null;
+    const nextScheduledEnd = payload.scheduled_end
+      ? new Date(payload.scheduled_end).toISOString()
+      : null;
+    const hasSchedule = Boolean(nextScheduledDate || nextScheduledStart || nextScheduledEnd);
+    const hasAssignment = Boolean(nextTechnicianId || nextCrewId || nextVendorId);
+    const demoStatus = hasSchedule && hasAssignment ? "scheduled" : "ready_to_schedule";
+    if (traceEnabled) {
+      // eslint-disable-next-line no-console
+      console.log("[dispatch-trace][step4][demo-short-circuit]", {
+        id,
+        nextTechnicianId,
+        nextCrewId,
+        nextScheduledStart,
+        nextScheduledEnd,
+        demoStatus,
+      });
+    }
+    return {
+      success: true,
+      assignmentSnapshot: {
+        id,
+        assigned_technician_id: nextTechnicianId,
+        assigned_crew_id: nextCrewId,
+        vendor_id: nextVendorId,
+        scheduled_date: nextScheduledDate,
+        scheduled_start: nextScheduledStart,
+        scheduled_end: nextScheduledEnd,
+        status: demoStatus,
+        updated_at: new Date().toISOString(),
+      },
+    };
   }
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
@@ -1248,6 +1295,26 @@ export async function updateWorkOrderAssignment(
         ? new Date(payload.scheduled_end).toISOString()
         : null
       : ((beforeState.scheduled_end as string | null) ?? null);
+  if (traceEnabled) {
+    // eslint-disable-next-line no-console
+    console.log("[dispatch-trace][step4][validated-payload]", {
+      id,
+      tenantId,
+      nextTechnicianId,
+      nextCrewId,
+      nextVendorId,
+      nextScheduledDate,
+      nextScheduledStart,
+      nextScheduledEnd,
+      prior: {
+        tenant_id: beforeState.tenant_id ?? null,
+        status: beforeState.status ?? null,
+        assigned_technician_id: beforeState.assigned_technician_id ?? null,
+        scheduled_start: beforeState.scheduled_start ?? null,
+        scheduled_end: beforeState.scheduled_end ?? null,
+      },
+    });
+  }
 
   const hasSchedule = Boolean(nextScheduledDate || nextScheduledStart || nextScheduledEnd);
   const hasAssignment = Boolean(nextTechnicianId || nextCrewId || nextVendorId);
@@ -1268,6 +1335,10 @@ export async function updateWorkOrderAssignment(
   update.scheduled_date = nextScheduledDate;
   update.scheduled_start = nextScheduledStart;
   update.scheduled_end = nextScheduledEnd;
+  if (traceEnabled) {
+    // eslint-disable-next-line no-console
+    console.log("[dispatch-trace][step4][db-update-input]", { id, update });
+  }
 
   const { data: updated, error } = await supabase
     .from("work_orders")
@@ -1278,14 +1349,23 @@ export async function updateWorkOrderAssignment(
   if (error) return { error: error.message };
 
   const afterState = (updated as Record<string, unknown>) ?? {};
-  if (process.env.NODE_ENV === "development") {
+  if (traceEnabled) {
+    const { data: refetched } = await supabase
+      .from("work_orders")
+      .select("id, tenant_id, assigned_technician_id, scheduled_start, scheduled_end, status")
+      .eq("id", id)
+      .maybeSingle();
     // eslint-disable-next-line no-console
-    console.log("[dispatch-drop] server DB row after update", {
+    console.log("[dispatch-trace][step4][db-row-after-update]", {
       id,
-      scheduled_date: afterState.scheduled_date,
-      assigned_technician_id: afterState.assigned_technician_id,
-      assigned_crew_id: afterState.assigned_crew_id,
-      status: afterState.status,
+      afterState: {
+        tenant_id: afterState.tenant_id ?? null,
+        assigned_technician_id: afterState.assigned_technician_id ?? null,
+        scheduled_start: afterState.scheduled_start ?? null,
+        scheduled_end: afterState.scheduled_end ?? null,
+        status: afterState.status ?? null,
+      },
+      refetched,
     });
   }
   const beforeHadAssignment = Boolean(

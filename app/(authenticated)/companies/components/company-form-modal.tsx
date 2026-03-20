@@ -167,7 +167,7 @@ export function CompanyFormModal({
                   type="text"
                   defaultValue={c.slug ?? ""}
                   className="ui-input"
-                  placeholder="e.g. mercy-regional"
+                  placeholder="e.g. acme-facilities"
                 />
               </FormField>
               <FormField label="Portal display name (optional)" htmlFor="portal_name">
@@ -177,7 +177,7 @@ export function CompanyFormModal({
                   type="text"
                   defaultValue={c.portal_name ?? ""}
                   className="ui-input"
-                  placeholder="e.g. Mercy Regional Maintenance Portal"
+                  placeholder="e.g. Acme Facilities Maintenance Portal"
                 />
               </FormField>
               <p className="mt-1 text-xs text-[var(--muted)]">

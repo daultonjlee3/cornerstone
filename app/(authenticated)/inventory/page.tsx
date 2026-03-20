@@ -22,26 +22,35 @@ export default async function InventoryPage() {
     );
   }
 
-  const [balancesResult, locationsResult, propertiesResult] = await Promise.all([
-      scope.supabase
-        .from("inventory_balances")
-        .select(
-          "id, product_id, stock_location_id, quantity_on_hand, minimum_stock, reorder_point, updated_at, products(id, company_id, name, sku, category, companies(name)), stock_locations(id, name, location_type, company_id)"
-        )
-        .in("products.company_id", scope.companyIds)
-        .in("stock_locations.company_id", scope.companyIds)
-        .order("updated_at", { ascending: false }),
-      scope.supabase
-        .from("stock_locations")
-        .select("id, company_id, property_id, building_id, unit_id, name, location_type, active, is_default, companies(name)")
-        .in("company_id", scope.companyIds)
-        .order("name", { ascending: true }),
-      scope.supabase
-        .from("properties")
-        .select("id, property_name, name, company_id")
-        .in("company_id", scope.companyIds)
-        .order("property_name", { ascending: true }),
-    ]);
+  const [locationsResult, propertiesResult, productsResult] = await Promise.all([
+    scope.supabase
+      .from("stock_locations")
+      .select("id, company_id, property_id, building_id, unit_id, name, location_type, active, is_default, companies(name)")
+      .in("company_id", scope.companyIds)
+      .order("name", { ascending: true }),
+    scope.supabase
+      .from("properties")
+      .select("id, property_name, name, company_id")
+      .in("company_id", scope.companyIds)
+      .order("property_name", { ascending: true }),
+    scope.supabase
+      .from("products")
+      .select("id")
+      .in("company_id", scope.companyIds),
+  ]);
+  const scopedLocationIds = (locationsResult.data ?? []).map((row) => (row as { id: string }).id);
+  const scopedProductIds = (productsResult.data ?? []).map((row) => (row as { id: string }).id);
+  const balancesResult =
+    scopedLocationIds.length > 0 && scopedProductIds.length > 0
+      ? await scope.supabase
+          .from("inventory_balances")
+          .select(
+            "id, product_id, stock_location_id, quantity_on_hand, minimum_stock, reorder_point, updated_at, products(id, company_id, name, sku, category, companies(name)), stock_locations(id, name, location_type, company_id)"
+          )
+          .in("product_id", scopedProductIds)
+          .in("stock_location_id", scopedLocationIds)
+          .order("updated_at", { ascending: false })
+      : ({ data: [] as unknown[] } as { data: unknown[] });
   const { data: transactionRowsRaw } = await scope.supabase
     .from("inventory_transactions")
     .select(

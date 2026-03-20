@@ -127,6 +127,7 @@ type LoadDispatchParams = {
   assignment_type: string | null;
   asset_id: string | null;
   category: string | null;
+  trace_work_order_id?: string | null;
 };
 
 function toComparableStatus(value: string | null | undefined): string {
@@ -157,6 +158,7 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     company_id,
     property_id,
     building_id,
+    trace_work_order_id,
   } = params;
 
   const supabase = await createClient();
@@ -384,6 +386,35 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   if (params.asset_id) query = query.eq("asset_id", params.asset_id);
 
   const { data: workOrdersRaw, error } = await query.order("scheduled_date", { ascending: true });
+
+  if (trace_work_order_id) {
+    const tracedRaw = ((workOrdersRaw ?? []) as Array<Record<string, unknown>>).find(
+      (row) => String(row.id ?? "") === trace_work_order_id
+    );
+    // eslint-disable-next-line no-console
+    console.log("[dispatch-trace][step5][server-fetch]", {
+      trace_work_order_id,
+      tenantId,
+      companyIds,
+      selectedDate,
+      filters: {
+        q: q?.trim() || null,
+        company_id: company_id ?? null,
+        property_id: property_id ?? null,
+        building_id: building_id ?? null,
+        asset_id: params.asset_id ?? null,
+        status: params.status ?? null,
+        priority: params.priority ?? null,
+        category: params.category ?? null,
+        crew_id: params.crew_id ?? null,
+        technician_id: params.technician_id ?? null,
+        assignment_type: params.assignment_type ?? null,
+      },
+      returnedCount: (workOrdersRaw ?? []).length,
+      tracedReturned: Boolean(tracedRaw),
+      tracedRaw,
+    });
+  }
 
   if (error) {
     return {

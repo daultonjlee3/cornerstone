@@ -18,6 +18,8 @@ import type {
   MappedAssetRow,
   ParsedSpreadsheet,
 } from "./onboarding-import-types";
+import type { OnboardingDatasetImportState } from "../actions";
+import { DataImportsStep } from "./DataImportsStep";
 
 type ExistingCounts = {
   properties: number;
@@ -34,6 +36,10 @@ type OnboardingWizardProps = {
   importAction: (prev: AssetImportState, formData: FormData) => Promise<AssetImportState>;
   demoAction: (prev: DemoDataState, formData: FormData) => Promise<DemoDataState>;
   completeAction: () => Promise<void>;
+  datasetImportAction: (
+    prev: OnboardingDatasetImportState,
+    formData: FormData
+  ) => Promise<OnboardingDatasetImportState>;
 };
 
 const FIELD_LABELS: Record<AssetImportField, string> = {
@@ -168,8 +174,9 @@ export function OnboardingWizard({
   importAction,
   demoAction,
   completeAction,
+  datasetImportAction,
 }: OnboardingWizardProps) {
-  const [mode, setMode] = useState<"entry" | "upload" | "mapping" | "preview" | "success" | "manual">(
+  const [mode, setMode] = useState<"entry" | "upload" | "mapping" | "preview" | "success" | "manual" | "imports">(
     "entry"
   );
   const [spreadsheet, setSpreadsheet] = useState<ParsedSpreadsheet | null>(null);
@@ -244,7 +251,31 @@ export function OnboardingWizard({
               Continue Manually
             </button>
           </article>
+          <article className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+              <span aria-hidden>📥</span>
+              Import Your Data (Optional)
+            </div>
+            <p className="mb-4 text-sm text-[var(--muted)]">
+              Import work orders, technicians, PM, inventory, and vendors. Optional and skippable.
+            </p>
+            <button
+              type="button"
+              onClick={() => setMode("imports")}
+              className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+            >
+              Open Data Imports
+            </button>
+          </article>
         </section>
+      ) : null}
+
+      {resolvedMode === "imports" ? (
+        <DataImportsStep
+          action={datasetImportAction}
+          onBack={() => setMode("entry")}
+          onDone={() => setMode("manual")}
+        />
       ) : null}
 
       {resolvedMode === "upload" ? (

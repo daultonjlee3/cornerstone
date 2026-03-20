@@ -5,6 +5,7 @@ import {
   generateDemoDataAction,
   importAssetSpreadsheetAction,
 } from "./asset-first-actions";
+import { importOnboardingDatasetAction } from "./actions";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 
 export const metadata = {
@@ -92,6 +93,7 @@ export default async function OnboardingWizardPage() {
       importAction={importAssetSpreadsheetAction}
       demoAction={generateDemoDataAction}
       completeAction={completeOnboardingWizardAction}
+      datasetImportAction={importOnboardingDatasetAction}
     />
   );
 }

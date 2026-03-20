@@ -18,8 +18,11 @@ export default async function PortalLayout({
     supabase as unknown as SupabaseClient
   );
   if (!context) redirect("/login");
+  // Office users are not allowed in the technician portal shell. Sending them back to
+  // /operations felt like a broken nav (same page when already on Operations). Send them
+  // to Technicians with a query flag so we can explain how to preview the portal.
   if (!context.isPortalOnlyUser && !context.impersonation) {
-    redirect("/operations");
+    redirect("/technicians?portal=1");
   }
 
   const technicianName = context.technicianName ?? "Technician";
