@@ -9,6 +9,9 @@ import {
   addHours,
   toSlotISO,
   DAY_START_HOUR,
+  DISPATCH_DAY_ROW_HEIGHT_PX,
+  DISPATCH_LANE_HEADER_HEIGHT_PX,
+  getDispatchDayBodyHeightPx,
 } from "./dispatch-board-utils";
 import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
 import type { DispatchViewMode } from "../filter-state";
@@ -226,7 +229,7 @@ function DraggableBoardCard({
       id={`dispatch-board-card-${workOrder.id}`}
       data-dispatch-work-order-id={workOrder.id}
       ref={setNodeRef}
-      className={`absolute left-1 right-1 z-20 pointer-events-auto ${
+      className={`absolute left-0.5 right-0.5 z-20 pointer-events-auto ${
         isHighlighted ? "drop-shadow-[0_0_0.45rem_rgba(15,151,173,0.35)]" : ""
       }`}
       style={{
@@ -426,17 +429,17 @@ export function DispatchBoard({
       className={`flex flex-col bg-[var(--background)] overscroll-contain ${
         usePageScroll ? "h-auto overflow-visible" : "h-full overflow-auto"
       }`}
-      style={{ touchAction: "pan-y" }}
+      style={{ touchAction: "pan-x pan-y" }}
     >
-      {/* Single horizontal scroll container so header and body stay in sync */}
+      {/* Horizontal scroll: inner row must be w-max so it wider than viewport and can scroll */}
       <div
         className={`flex min-w-0 flex-col overflow-x-auto ${
           usePageScroll ? "h-auto min-h-[820px]" : "min-h-0 flex-1"
         }`}
       >
         <div
-          className={`relative flex ${
-            usePageScroll ? "h-auto min-h-[820px] overflow-visible" : "min-h-0 flex-1 overflow-hidden"
+          className={`relative flex w-max max-w-none self-start ${
+            usePageScroll ? "h-auto min-h-[820px]" : "min-h-0 flex-1"
           }`}
         >
         {showCurrentTimeIndicator ? (
@@ -445,33 +448,38 @@ export function DispatchBoard({
           </div>
         ) : null}
         <div className="flex shrink-0">
-          <div className="sticky left-0 z-10 flex w-14 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
+          <div className="sticky left-0 z-10 flex w-14 shrink-0 flex-col border-r border-[var(--card-border)] bg-[var(--background)]">
             <div
-              className="shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-1.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
-              style={{ height: "56px" }}
+              className="flex shrink-0 items-center border-b border-[var(--card-border)] bg-[var(--card)]/80 px-1.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
+              style={{ height: DISPATCH_LANE_HEADER_HEIGHT_PX }}
             >
               Time
             </div>
-            {timeLabels.map(({ hour, label }, index) => {
-              const isCurrentHour = currentTime?.hour === hour;
-              return (
-                <div
-                  key={hour}
-                  className={`relative flex h-[40px] items-start justify-end border-b border-[var(--card-border)] pr-2 pt-0.5 text-[11px] text-[var(--muted)] ${
-                    index % 2 === 0 ? "bg-[var(--card)]/40" : "bg-[var(--background)]"
-                  } ${isCurrentHour ? "bg-red-50/80" : ""}`}
-                  style={{ height: `${100 / timeLabels.length}%`, minHeight: "40px" }}
-                >
-                  {label}
-                  {showCurrentTimeIndicator && isCurrentHour ? (
-                    <div
-                      className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
-                      style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
-                    />
-                  ) : null}
-                </div>
-              );
-            })}
+            <div
+              className="flex shrink-0 flex-col"
+              style={{ height: getDispatchDayBodyHeightPx(timeLabels.length) }}
+            >
+              {timeLabels.map(({ hour, label }, index) => {
+                const isCurrentHour = currentTime?.hour === hour;
+                return (
+                  <div
+                    key={hour}
+                    className={`relative flex shrink-0 items-start justify-end border-b border-[var(--card-border)] pr-2 pt-0.5 text-[11px] text-[var(--muted)] ${
+                      index % 2 === 0 ? "bg-[var(--card)]/40" : "bg-[var(--background)]"
+                    } ${isCurrentHour ? "bg-red-50/80" : ""}`}
+                    style={{ height: DISPATCH_DAY_ROW_HEIGHT_PX }}
+                  >
+                    {label}
+                    {showCurrentTimeIndicator && isCurrentHour ? (
+                      <div
+                        className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
+                        style={{ top: `${((currentTime?.minute ?? 0) / 60) * 100}%` }}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </div>
           <div className="flex min-w-max">
             {lanes.map((lane) => {

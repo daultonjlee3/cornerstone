@@ -5,6 +5,16 @@ export const DAY_START_HOUR = 8;
 export const DAY_END_HOUR = 18;
 export const DAY_TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60;
 
+/** Fixed lane header height so time column + all technician columns align. */
+export const DISPATCH_LANE_HEADER_HEIGHT_PX = 96;
+
+/** One hour row height in the day grid (time ruler + lane slots must match). */
+export const DISPATCH_DAY_ROW_HEIGHT_PX = 40;
+
+export function getDispatchDayBodyHeightPx(timeSlotCount: number): number {
+  return timeSlotCount * DISPATCH_DAY_ROW_HEIGHT_PX;
+}
+
 export function getTimeSlotLabels(): { hour: number; label: string }[] {
   const labels: { hour: number; label: string }[] = [];
   for (let h = DAY_START_HOUR; h <= DAY_END_HOUR; h++) {
@@ -63,16 +73,22 @@ export function getSlotId(crewId: string, hour: number): string {
   return `slot-${crewId}-${hour}`;
 }
 
-/** Parse slot id to get crewId and hour; returns null if not a slot id. */
+/**
+ * Parse slot id to get lane id (crew / tech / unassigned) and hour.
+ * Format: `slot-{laneId}-{hour}` where `laneId` may contain dashes
+ * (e.g. `tech-<uuid>`, `__unassigned__`). We take the segment after the last `-` as hour.
+ */
 export function parseSlotId(
   slotId: string
 ): { crewId: string; hour: number } | null {
   if (!slotId.startsWith("slot-")) return null;
-  const parts = slotId.split("-");
-  if (parts.length < 3) return null;
-  const crewId = parts.slice(1, -1).join("-");
-  const hour = parseInt(parts[parts.length - 1]!, 10);
+  const rest = slotId.slice("slot-".length);
+  const lastDash = rest.lastIndexOf("-");
+  if (lastDash === -1) return null;
+  const hour = parseInt(rest.slice(lastDash + 1), 10);
   if (Number.isNaN(hour)) return null;
+  const crewId = rest.slice(0, lastDash);
+  if (!crewId) return null;
   return { crewId, hour };
 }
 

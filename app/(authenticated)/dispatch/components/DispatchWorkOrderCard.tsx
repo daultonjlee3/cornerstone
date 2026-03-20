@@ -1,8 +1,6 @@
 "use client";
 
 import type { DispatchWorkOrder } from "../types";
-import { PriorityBadge } from "@/src/components/ui/priority-badge";
-import { StatusBadge } from "@/src/components/ui/status-badge";
 import { DispatchCard } from "./DispatchCard";
 
 export type DispatchWorkOrderCardProps = {
@@ -176,92 +174,87 @@ export function DispatchWorkOrderCard({
       isOverdue={overdue}
       isSlaBreached={slaBreached}
       isDragging={isDragging}
-      contentClassName={isQueueSize ? "p-3" : undefined}
+      contentClassName={isQueueSize ? "p-2.5" : "p-2"}
       className={`h-full cursor-grab active:cursor-grabbing ${
         isHighlighted ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : ""
       } ${isQueueSize ? "min-h-[4.5rem]" : ""}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <p className={`truncate font-semibold uppercase tracking-wide ${
-        isQueueSize ? "text-xs text-[var(--foreground)]" : "text-[11px] text-[var(--muted)]"
-      }`}>
-        {workOrder.work_order_number ?? "Work order"}
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={`truncate uppercase tracking-wide ${
+            isQueueSize ? "text-[10px] font-semibold text-[var(--muted-strong)]" : "text-[10px] font-medium text-[var(--muted)]"
+          }`}
+        >
+          {workOrder.work_order_number ?? "Work order"}
+        </p>
+        {showActions && variant === "block" ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              data-dispatch-quick-action="1"
+              className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted-strong)] hover:bg-[var(--background)]"
+              onPointerDown={preventDragFromAction}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenWorkOrder?.(workOrder.id, "unschedule");
+              }}
+            >
+              Unschedule
+            </button>
+            <button
+              type="button"
+              data-dispatch-quick-action="1"
+              className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted-strong)] hover:bg-[var(--background)]"
+              onPointerDown={preventDragFromAction}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenWorkOrder?.(workOrder.id, "open");
+              }}
+            >
+              Open
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <p
+        className={`truncate font-semibold leading-tight text-[var(--foreground)] ${
+          isQueueSize ? "mt-0.5 text-sm" : "mt-0.5 text-[14px]"
+        }`}
+        title={title}
+      >
+        {title}
       </p>
-      <p className={`truncate font-semibold leading-tight text-[var(--foreground)] ${isQueueSize ? "text-sm mt-0.5" : "text-sm"}`}>{title}</p>
 
       {(workOrder.asset_name || location) && (
-        <p className="mt-0.5 truncate text-[11px] text-[var(--muted-strong)]" title={location ?? undefined}>
+        <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]" title={location ?? undefined}>
           {[workOrder.asset_name, location].filter(Boolean).join(" • ")}
         </p>
       )}
-
-      <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        <PriorityBadge priority={priority} />
-        <span className={`ui-badge ${typeBadgeClass}`}>
-          {getJobTypeLabel(jobType)}
-        </span>
-        {workOrder.status ? <StatusBadge status={workOrder.status} /> : null}
-        {overdue ? (
-          <span className="ui-badge border-red-200 bg-red-100 text-red-700">
-            Overdue
+      {(timeRange || showCrew || travelEstimate || overdue || slaBreached) ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--muted)]">
+          {timeRange ? <span>{timeRange}</span> : null}
+          {showCrew ? <span className={assignment.tone}>{assignment.label}</span> : null}
+          {travelEstimate ? <span>{travelEstimate}</span> : null}
+          {overdue ? <span className="font-semibold text-red-700">Overdue</span> : null}
+          {slaBreached ? <span className="font-semibold text-red-700">SLA breach</span> : null}
+          <span className={`rounded-sm border px-1 py-0 text-[10px] font-medium ${typeBadgeClass}`}>
+            {getJobTypeLabel(jobType)}
           </span>
-        ) : null}
-        {slaBreached ? (
-          <span className="ui-badge border-red-200 bg-red-100 text-red-700">
-            SLA Breach
-          </span>
-        ) : null}
-        {travelEstimate ? (
-          <span className="ui-badge border-indigo-200 bg-indigo-50 text-indigo-700">
-            {travelEstimate}
-          </span>
-        ) : null}
-      </div>
-
-      {timeRange && (
-        <p className="mt-1 text-[11px] text-[var(--muted)]">{timeRange}</p>
-      )}
-
-      {showCrew ? <p className={`mt-1 text-[11px] font-semibold ${assignment.tone}`}>{assignment.label}</p> : null}
+        </div>
+      ) : null}
       {showActions
         ? variant === "block"
-          ? (
-            <div className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1">
-              <button
-                type="button"
-                data-dispatch-quick-action="1"
-                className="rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 hover:bg-amber-200/80"
-                onPointerDown={preventDragFromAction}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onOpenWorkOrder?.(workOrder.id, "unschedule");
-                }}
-              >
-                Unschedule
-              </button>
-              <button
-                type="button"
-                data-dispatch-quick-action="1"
-                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--card-border)]/35"
-                onPointerDown={preventDragFromAction}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onOpenWorkOrder?.(workOrder.id, "open");
-                }}
-              >
-                Open
-              </button>
-            </div>
-          )
+          ? null
           : (
-            <div className="mt-2 flex flex-wrap gap-1 border-t border-[var(--card-border)] pt-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1 border-t border-[var(--card-border)]/80 pt-1.5">
               <button
                 type="button"
                 data-dispatch-quick-action="1"
-                className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+                className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] text-[var(--muted-strong)] hover:bg-[var(--background)]"
                 onPointerDown={preventDragFromAction}
                 onClick={(e) => {
                   e.preventDefault();
@@ -274,7 +267,7 @@ export function DispatchWorkOrderCard({
               <button
                 type="button"
                 data-dispatch-quick-action="1"
-                className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+                className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] text-[var(--muted-strong)] hover:bg-[var(--background)]"
                 onPointerDown={preventDragFromAction}
                 onClick={(e) => {
                   e.preventDefault();
@@ -287,7 +280,7 @@ export function DispatchWorkOrderCard({
               <button
                 type="button"
                 data-dispatch-quick-action="1"
-                className="rounded px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--card-border)]/50"
+                className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] text-[var(--muted-strong)] hover:bg-[var(--background)]"
                 onPointerDown={preventDragFromAction}
                 onClick={(e) => {
                   e.preventDefault();
@@ -300,7 +293,7 @@ export function DispatchWorkOrderCard({
               <button
                 type="button"
                 data-dispatch-quick-action="1"
-                className="rounded px-2 py-1 text-xs text-amber-700 hover:bg-amber-100/60"
+                className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-50"
                 onPointerDown={preventDragFromAction}
                 onClick={(e) => {
                   e.preventDefault();
@@ -313,7 +306,7 @@ export function DispatchWorkOrderCard({
               <button
                 type="button"
                 data-dispatch-quick-action="1"
-                className="rounded px-2 py-1 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                className="rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
                 onPointerDown={preventDragFromAction}
                 onClick={(e) => {
                   e.preventDefault();

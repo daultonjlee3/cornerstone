@@ -1,7 +1,14 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { DAY_START_HOUR, DEFAULT_AVAILABLE_HOURS, getSlotId } from "./dispatch-board-utils";
+import {
+  DEFAULT_AVAILABLE_HOURS,
+  DISPATCH_DAY_ROW_HEIGHT_PX,
+  DISPATCH_LANE_HEADER_HEIGHT_PX,
+  getDispatchDayBodyHeightPx,
+  getSlotId,
+  parseSlotId,
+} from "./dispatch-board-utils";
 
 type ScheduleLaneProps = {
   id: string;
@@ -49,9 +56,10 @@ function LaneSlot({
   return (
     <div
       ref={setNodeRef}
-      className={`relative min-h-[30px] flex-1 border-b border-[var(--card-border)]/80 transition-colors ${
+      className={`relative shrink-0 border-b border-[var(--card-border)]/80 transition-colors ${
         hourIndex % 2 === 0 ? "bg-[var(--card)]/30" : "bg-[var(--background)]"
       } ${isOver ? "bg-[var(--accent)]/12 ring-1 ring-inset ring-[var(--accent)]/25" : ""}`}
+      style={{ height: DISPATCH_DAY_ROW_HEIGHT_PX }}
     >
       {showCurrentLine ? (
         <div
@@ -88,28 +96,26 @@ export function ScheduleLane({
   currentTime,
   children,
 }: ScheduleLaneProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `crew-${id}`,
-    data: {
-      crewId: id,
-      date: selectedDate,
-      defaultHour: DAY_START_HOUR,
-    },
-  });
   const remaining =
     remainingHoursProp !== undefined
       ? Math.max(0, remainingHoursProp)
       : Math.max(0, DEFAULT_AVAILABLE_HOURS - totalScheduledHours);
+  /** No lane-level droppable — it overlapped hour slots and won collisions, so drops didn't resolve to `slot-*`. */
   const highlight =
-    isOver || (overDropId != null && String(overDropId).startsWith(`crew-${id}`));
+    overDropId != null &&
+    (() => {
+      const oid = String(overDropId);
+      if (!oid.startsWith("slot-")) return false;
+      const parsed = parseSlotId(oid);
+      return parsed?.crewId === id;
+    })();
   const cap = capacityHours ?? 0;
   const ratio = cap > 0 ? totalScheduledHours / cap : 0;
   const filledBlocks = cap > 0 ? Math.min(CAPACITY_BAR_BLOCKS, Math.round((totalScheduledHours / cap) * CAPACITY_BAR_BLOCKS)) : 0;
 
   return (
     <div
-      ref={setNodeRef}
-      className={`relative flex min-w-[14rem] flex-1 flex-col border-r border-[var(--card-border)] last:border-r-0 ${
+      className={`relative flex w-[14rem] min-w-[14rem] max-w-[14rem] flex-none flex-col border-r border-[var(--card-border)] last:border-r-0 ${
         isSelected
           ? "bg-[var(--accent)]/12 ring-2 ring-inset ring-[var(--accent)]/30"
           : highlight
@@ -117,7 +123,10 @@ export function ScheduleLane({
             : "bg-[var(--background)]"
       }`}
     >
-      <div className="sticky top-0 z-10 shrink-0 border-b border-[var(--card-border)] bg-[var(--card)]/90 px-3 py-2">
+      <div
+        className="sticky top-0 z-10 flex shrink-0 flex-col justify-center border-b border-[var(--card-border)] bg-[var(--card)]/90 px-3 py-2"
+        style={{ height: DISPATCH_LANE_HEADER_HEIGHT_PX }}
+      >
         <p className="truncate leading-tight text-sm font-semibold text-[var(--foreground)]">{name}</p>
         {cap > 0 ? (
           <>
@@ -141,12 +150,25 @@ export function ScheduleLane({
             ) : null}
           </>
         ) : (
-          <p className="text-[11px] leading-tight text-[var(--muted)]">
-            {totalScheduledHours.toFixed(1)}h · {jobCount} jobs · {remaining.toFixed(1)}h left
-          </p>
+          <>
+            <p className="text-[11px] leading-tight text-[var(--muted)]">
+              {totalScheduledHours.toFixed(1)}h · {jobCount} jobs · {remaining.toFixed(1)}h left
+            </p>
+            <div className="mt-1 flex gap-0.5" aria-hidden>
+              {Array.from({ length: CAPACITY_BAR_BLOCKS }, (_, i) => (
+                <div key={i} className="h-1.5 flex-1 rounded-sm bg-[var(--card-border)]" />
+              ))}
+            </div>
+            <p className="text-[10px] leading-tight text-transparent select-none" aria-hidden>
+              &nbsp;
+            </p>
+          </>
         )}
       </div>
-      <div className="relative flex min-h-[360px] flex-1 flex-col">
+      <div
+        className="relative flex shrink-0 flex-col"
+        style={{ height: getDispatchDayBodyHeightPx(timeLabels.length) }}
+      >
         <div className="absolute inset-0 flex flex-col">
           {timeLabels.map(({ hour }, hourIndex) => (
             <LaneSlot

@@ -1,3 +1,4 @@
+import { toDateOnlyString } from "@/src/lib/date-utils";
 import type { DispatchWorkOrder } from "./types";
 import type { DispatchTechnicianWorkload } from "./dispatch-data";
 
@@ -96,7 +97,7 @@ export function buildTechnicianRoute(
   }
 
   const selectedDayJobs = activeAssigned.filter(
-    (workOrder) => workOrder.scheduled_date === selectedDate
+    (workOrder) => toDateOnlyString(workOrder.scheduled_date) === selectedDate
   );
   const candidateJobs = selectedDayJobs.length > 0 ? selectedDayJobs : activeAssigned;
 

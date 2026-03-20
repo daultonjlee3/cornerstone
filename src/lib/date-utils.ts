@@ -10,6 +10,25 @@ export function dateOnlyUTC(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Normalize Postgres/Supabase date or timestamptz strings to YYYY-MM-DD for comparisons
+ * (e.g. with dispatch filter `selectedDate`). Avoids `"2026-03-19T00:00:00" === "2026-03-19"` false negatives.
+ */
+export function toDateOnlyString(value: string | null | undefined): string | null {
+  if (value == null || value === "") return null;
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+  try {
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return dateOnlyUTC(d);
+  } catch {
+    return null;
+  }
+}
+
 /** Today as YYYY-MM-DD (UTC). */
 export function todayISOUTC(): string {
   return dateOnlyUTC(new Date());

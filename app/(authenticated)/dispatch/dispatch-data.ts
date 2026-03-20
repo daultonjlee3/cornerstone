@@ -1,4 +1,5 @@
 import { createClient } from "@/src/lib/supabase/server";
+import { toDateOnlyString } from "@/src/lib/date-utils";
 import type { DispatchWorkOrder, DispatchCrew } from "./types";
 import {
   calculateWorkOrderSlaSnapshot,
@@ -156,11 +157,6 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     company_id,
     property_id,
     building_id,
-    priority,
-    status,
-    crew_id,
-    technician_id,
-    category,
   } = params;
 
   const supabase = await createClient();
@@ -380,24 +376,12 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
   if (company_id) query = query.eq("company_id", company_id);
   if (property_id) query = query.eq("property_id", property_id);
   if (building_id) query = query.eq("building_id", building_id);
-  if (priority) query = query.eq("priority", priority);
-  if (status) query = query.eq("status", status);
-  if (crew_id) query = query.eq("assigned_crew_id", crew_id);
-  if (technician_id) query = query.eq("assigned_technician_id", technician_id);
-  if (params.assignment_type === "unassigned") {
-    query = query
-      .is("assigned_technician_id", null)
-      .is("assigned_crew_id", null)
-      .is("vendor_id", null);
-  } else if (params.assignment_type === "technician") {
-    query = query.not("assigned_technician_id", "is", null);
-  } else if (params.assignment_type === "crew") {
-    query = query.not("assigned_crew_id", "is", null);
-  } else if (params.assignment_type === "vendor") {
-    query = query.not("vendor_id", "is", null);
-  }
+  /**
+   * Do not filter by technician, crew, assignment-type, status, priority, or category at the DB layer.
+   * Those filters are applied in DispatchView so that after drag-assign + router.refresh(),
+   * rows that no longer match (e.g. status ready_to_schedule → scheduled) are still in the payload.
+   */
   if (params.asset_id) query = query.eq("asset_id", params.asset_id);
-  if (category) query = query.eq("category", category);
 
   const { data: workOrdersRaw, error } = await query.order("scheduled_date", { ascending: true });
 
@@ -563,6 +547,8 @@ export async function loadDispatchData(params: LoadDispatchParams): Promise<Load
     });
     return {
       ...rest,
+      scheduled_date: toDateOnlyString(rest.scheduled_date as string | null | undefined) ?? null,
+      due_date: toDateOnlyString(rest.due_date as string | null | undefined) ?? null,
       property_name: propertyName,
       building_name: buildingName,
       unit_name: unitName,

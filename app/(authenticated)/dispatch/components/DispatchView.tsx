@@ -23,8 +23,6 @@ import { DispatchBoard, type BoardLane } from "./DispatchBoard";
 import { DispatchOperationsJobList } from "./DispatchOperationsJobList";
 import { DispatchWorkOrderDrawer } from "./DispatchWorkOrderDrawer";
 import { DispatchWorkOrderCard } from "./DispatchWorkOrderCard";
-import { DispatchWorkforcePanel } from "./DispatchWorkforcePanel";
-import { DispatchOptimizationCopilot } from "./DispatchOptimizationCopilot";
 import type { DispatchWorkOrder } from "../types";
 import type { LoadDispatchResult } from "../dispatch-data";
 import type { DispatchFilterState } from "../filter-state";
@@ -46,6 +44,7 @@ import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Hint } from "@/src/components/ui/hint";
 import { useDemoScenario } from "@/hooks/useDemoScenario";
 import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
+import { toDateOnlyString } from "@/src/lib/date-utils";
 
 const DispatchMapPanel = dynamic(
   () => import("./DispatchMapPanel").then((module) => module.DispatchMapPanel),
@@ -92,6 +91,65 @@ function parseScheduledHours(workOrder: DispatchWorkOrder): number {
   return workOrder.estimated_hours ?? 1;
 }
 
+/**
+ * After router.refresh(), server rows win. Rows only present on the client are appended so a
+ * just-scheduled job is not lost if the server payload is briefly stale or missing an id.
+ */
+function mergeWorkOrdersFromServer(
+  prev: DispatchWorkOrder[],
+  server: DispatchWorkOrder[]
+): DispatchWorkOrder[] {
+  const serverIds = new Set(server.map((w) => w.id));
+  const out = server.map((w) => ({
+    ...w,
+    scheduled_date: toDateOnlyString(w.scheduled_date) ?? w.scheduled_date ?? null,
+    due_date: toDateOnlyString(w.due_date as string | null | undefined) ?? w.due_date ?? null,
+  }));
+  for (const w of prev) {
+    if (!serverIds.has(w.id)) out.push(w);
+  }
+  return out;
+}
+
+/**
+ * Toolbar + URL filters (assignment, status, priority, category) are applied client-side so the board
+ * always receives full WO rows after refresh; DB filters on status would drop jobs that transition
+ * (e.g. ready_to_schedule → scheduled) after a drop.
+ */
+function filterWorkOrdersByToolbarFilters(
+  workOrders: DispatchWorkOrder[],
+  filterState: DispatchFilterState
+): DispatchWorkOrder[] {
+  const { technicianId, crewId, assignmentType, status, priority, category } = filterState;
+  const hasAssignmentFilters = !!(technicianId || crewId || assignmentType);
+  const hasMetaFilters = !!(status || priority || category);
+  if (!hasAssignmentFilters && !hasMetaFilters) return workOrders;
+
+  return workOrders.filter((wo) => {
+    if (technicianId && wo.assigned_technician_id !== technicianId) return false;
+    if (crewId && wo.assigned_crew_id !== crewId) return false;
+    if (assignmentType === "unassigned") {
+      if (wo.assigned_technician_id || wo.assigned_crew_id || wo.vendor_id) return false;
+    } else if (assignmentType === "technician") {
+      if (!wo.assigned_technician_id) return false;
+    } else if (assignmentType === "crew") {
+      if (!wo.assigned_crew_id) return false;
+    } else if (assignmentType === "vendor") {
+      if (!wo.vendor_id) return false;
+    }
+
+    if (status) {
+      const woSt = normalizeWorkOrderStatus(wo.status ?? "");
+      const want = normalizeWorkOrderStatus(status);
+      if (woSt !== want) return false;
+    }
+    if (priority && (wo.priority ?? "").toLowerCase() !== priority.toLowerCase()) return false;
+    if (category && (wo.category ?? "") !== category) return false;
+
+    return true;
+  });
+}
+
 type DispatchViewProps = {
   initialData: LoadDispatchResult;
   filterState: DispatchFilterState;
@@ -129,10 +187,24 @@ export function DispatchView({
   const [sortTechniciansByDistance, setSortTechniciansByDistance] = useState(false);
   const [technicianPage, setTechnicianPage] = useState(0);
   const TECHNICIAN_PAGE_SIZE = 8;
-  const [combinedMapVisible, setCombinedMapVisible] = useState(true);
+  /** Map+ split: on &lt;xl screens the map opens in a slide-over; desktop shows map column always. */
+  const [mobileMapPanelOpen, setMobileMapPanelOpen] = useState(false);
   const [optimisticWorkOrders, setOptimisticWorkOrders] = useState<DispatchWorkOrder[]>(
     initialData.workOrders
   );
+
+  /** Persist demo state before syncing from server/sessionStorage so the next effect reads fresh data. */
+  useEffect(() => {
+    if (!isDemoMode || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(
+        DEMO_DISPATCH_STATE_KEY,
+        JSON.stringify(optimisticWorkOrders)
+      );
+    } catch {
+      // Best-effort persistence only.
+    }
+  }, [isDemoMode, optimisticWorkOrders]);
 
   useEffect(() => {
     if (isDemoMode && typeof window !== "undefined") {
@@ -149,20 +221,8 @@ export function DispatchView({
         }
       }
     }
-    setOptimisticWorkOrders(initialData.workOrders);
+    setOptimisticWorkOrders((prev) => mergeWorkOrdersFromServer(prev, initialData.workOrders));
   }, [initialData.workOrders, isDemoMode]);
-
-  useEffect(() => {
-    if (!isDemoMode || typeof window === "undefined") return;
-    try {
-      window.sessionStorage.setItem(
-        DEMO_DISPATCH_STATE_KEY,
-        JSON.stringify(optimisticWorkOrders)
-      );
-    } catch {
-      // Best-effort persistence only.
-    }
-  }, [isDemoMode, optimisticWorkOrders]);
 
   useEffect(() => {
     setSelectedMapTechnicianId(filterState.technicianId || null);
@@ -192,6 +252,10 @@ export function DispatchView({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [filterState.viewMode, selectedMapWorkOrderId]);
 
+  useEffect(() => {
+    if (filterState.viewMode !== "combined") setMobileMapPanelOpen(false);
+  }, [filterState.viewMode]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -202,7 +266,12 @@ export function DispatchView({
     NonNullable<React.ComponentProps<typeof DndContext>["collisionDetection"]>
   >((args) => {
     const pointerCollisions = pointerWithin(args);
-    if (pointerCollisions.length > 0) return pointerCollisions;
+    if (pointerCollisions.length > 0) {
+      /** Prefer hour-slot droppables over any larger overlapping region. */
+      const slotHits = pointerCollisions.filter((c) => String(c.id).startsWith("slot-"));
+      if (slotHits.length > 0) return slotHits;
+      return pointerCollisions;
+    }
     return rectIntersection(args);
   }, []);
 
@@ -254,6 +323,33 @@ export function DispatchView({
     [filterState, pushFilterState]
   );
 
+  const workOrdersMatchingToolbarFilters = useMemo(
+    () => filterWorkOrdersByToolbarFilters(optimisticWorkOrders, filterState),
+    [
+      optimisticWorkOrders,
+      filterState.technicianId,
+      filterState.crewId,
+      filterState.assignmentType,
+      filterState.status,
+      filterState.priority,
+      filterState.category,
+    ]
+  );
+
+  /** Full list (ignore toolbar filters) so crew lanes / rebalance stay correct when filters narrow the queue. */
+  const scheduledTodayUnfiltered = useMemo(() => {
+    const today = filterState.selectedDate;
+    const scheduledToday: DispatchWorkOrder[] = [];
+    for (const wo of optimisticWorkOrders) {
+      const scheduled = toDateOnlyString(wo.scheduled_date);
+      const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
+      if (scheduled === today && hasAssignment) {
+        scheduledToday.push(wo);
+      }
+    }
+    return scheduledToday;
+  }, [filterState.selectedDate, optimisticWorkOrders]);
+
   const dispatchData = useMemo(() => {
     const today = filterState.selectedDate;
     const overdue: DispatchWorkOrder[] = [];
@@ -267,9 +363,9 @@ export function DispatchView({
     let dueToday = 0;
     let unassignedWorkOrders = 0;
 
-    for (const wo of optimisticWorkOrders) {
-      const scheduled = wo.scheduled_date ?? null;
-      const due = wo.due_date ?? null;
+    for (const wo of workOrdersMatchingToolbarFilters) {
+      const scheduled = toDateOnlyString(wo.scheduled_date);
+      const due = toDateOnlyString(wo.due_date);
       const comparableStatus = normalizeWorkOrderStatus(wo.status ?? "");
       const isTerminal = comparableStatus === "completed" || comparableStatus === "cancelled";
       const hasAssignment = Boolean(wo.assigned_crew_id || wo.assigned_technician_id);
@@ -327,7 +423,7 @@ export function DispatchView({
       unscheduled,
       scheduledToday,
       insights: {
-        total: optimisticWorkOrders.length,
+        total: workOrdersMatchingToolbarFilters.length,
         dueToday,
         overdue: overdue.length,
         ready: ready.length,
@@ -340,12 +436,12 @@ export function DispatchView({
         crewsWorkingToday: crewsWorkingToday.size,
       },
     };
-  }, [filterState.selectedDate, optimisticWorkOrders]);
+  }, [filterState.selectedDate, workOrdersMatchingToolbarFilters]);
 
   const boardCrews = useMemo(() => {
     const scheduledByCrew = new Map<string, DispatchWorkOrder[]>();
     initialData.crews.forEach((crew) => scheduledByCrew.set(crew.id, []));
-    dispatchData.scheduledToday.forEach((wo) => {
+    scheduledTodayUnfiltered.forEach((wo) => {
       if (!wo.assigned_crew_id) return;
       const list = scheduledByCrew.get(wo.assigned_crew_id);
       if (!list) return;
@@ -361,11 +457,13 @@ export function DispatchView({
         job_count: scheduled.length,
       };
     });
-  }, [dispatchData.scheduledToday, initialData.crews]);
+  }, [scheduledTodayUnfiltered, initialData.crews]);
 
   const { lanes: boardLanes, workOrdersByLane: boardWorkOrdersByLane } = useMemo(() => {
     const selectedDate = filterState.selectedDate;
-    const scheduledTodayForDate = optimisticWorkOrders.filter((wo) => (wo.scheduled_date ?? null) === selectedDate);
+    const scheduledTodayForDate = optimisticWorkOrders.filter(
+      (wo) => toDateOnlyString(wo.scheduled_date) === selectedDate
+    );
     const unassignedLaneId = "__unassigned__";
     const { technicians, crews: workforceCrews } = initialData.workforce;
 
@@ -508,14 +606,15 @@ export function DispatchView({
   }, [filterState.selectedDate, optimisticWorkOrders, selectedMapTechnician]);
 
   const operationsListWorkOrders = useMemo(() => {
-    const filtered = optimisticWorkOrders.filter((workOrder) => {
+    const filtered = workOrdersMatchingToolbarFilters.filter((workOrder) => {
       const comparableStatus = normalizeWorkOrderStatus(workOrder.status ?? "");
       if (comparableStatus === "completed" || comparableStatus === "cancelled") return false;
-      return !workOrder.scheduled_date || workOrder.scheduled_date === filterState.selectedDate;
+      const sd = toDateOnlyString(workOrder.scheduled_date);
+      return !sd || sd === filterState.selectedDate;
     });
     return [...filtered].sort((a, b) => {
-      const aScheduled = a.scheduled_date === filterState.selectedDate ? 0 : 1;
-      const bScheduled = b.scheduled_date === filterState.selectedDate ? 0 : 1;
+      const aScheduled = toDateOnlyString(a.scheduled_date) === filterState.selectedDate ? 0 : 1;
+      const bScheduled = toDateOnlyString(b.scheduled_date) === filterState.selectedDate ? 0 : 1;
       if (aScheduled !== bScheduled) return aScheduled - bScheduled;
       const startSort = (a.scheduled_start ?? "").localeCompare(b.scheduled_start ?? "");
       if (startSort !== 0) return startSort;
@@ -525,7 +624,7 @@ export function DispatchView({
       if (dueSort !== 0) return dueSort;
       return (a.work_order_number ?? "").localeCompare(b.work_order_number ?? "");
     });
-  }, [filterState.selectedDate, optimisticWorkOrders]);
+  }, [filterState.selectedDate, workOrdersMatchingToolbarFilters]);
 
   const operationsListTravelByWorkOrderId = useMemo((): Map<string, WorkOrderTravelInfo> | null => {
     const list = operationsListWorkOrders;
@@ -572,7 +671,7 @@ export function DispatchView({
   }, []);
 
   const rebalanceSuggestions = useMemo(() => {
-    const scheduledCrewOnly = dispatchData.scheduledToday.filter(
+    const scheduledCrewOnly = scheduledTodayUnfiltered.filter(
       (wo) => wo.assigned_crew_id != null
     );
     return computeRebalanceSuggestions({
@@ -582,7 +681,7 @@ export function DispatchView({
       maxSuggestions: 10,
     });
   }, [
-    dispatchData.scheduledToday,
+    scheduledTodayUnfiltered,
     initialData.workforce.crews,
     filterState.selectedDate,
   ]);
@@ -602,13 +701,52 @@ export function DispatchView({
     ) => {
       setDropError(null);
       const previous = optimisticWorkOrders;
-      setOptimisticWorkOrders((current) =>
-        current.map((row) => (row.id === workOrder.id ? { ...row, ...patch } : row))
-      );
-      const result = await updateWorkOrderAssignment(workOrder.id, payload);
+      setOptimisticWorkOrders((current) => {
+        const idx = current.findIndex((row) => row.id === workOrder.id);
+        const merged = { ...workOrder, ...patch } as DispatchWorkOrder;
+        if (merged.scheduled_date != null && merged.scheduled_date !== "") {
+          merged.scheduled_date = toDateOnlyString(merged.scheduled_date as string) ?? merged.scheduled_date;
+        }
+        if (merged.due_date != null && merged.due_date !== "") {
+          merged.due_date = toDateOnlyString(merged.due_date as string) ?? merged.due_date;
+        }
+        if (idx === -1) {
+          return [...current, merged];
+        }
+        return current.map((row) => (row.id === workOrder.id ? merged : row));
+      });
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.debug("[dispatch] updateWorkOrderAssignment request", {
+          workOrderId: workOrder.id,
+          payload,
+          patchKeys: Object.keys(patch),
+        });
+      }
+      let result: Awaited<ReturnType<typeof updateWorkOrderAssignment>>;
+      try {
+        result = await updateWorkOrderAssignment(workOrder.id, payload);
+      } catch (err) {
+        setOptimisticWorkOrders(previous);
+        const message =
+          err instanceof Error ? err.message : "Failed to save assignment. Check your connection.";
+        setDropError(message);
+        // eslint-disable-next-line no-console
+        console.error("[dispatch] updateWorkOrderAssignment threw", err);
+        return;
+      }
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.debug("[dispatch] updateWorkOrderAssignment response", {
+          workOrderId: workOrder.id,
+          result,
+        });
+      }
       if (result?.error) {
         setOptimisticWorkOrders(previous);
         setDropError(result.error);
+        // eslint-disable-next-line no-console
+        console.warn("[dispatch] assignment rejected by server", { workOrderId: workOrder.id, error: result.error });
         return;
       }
       if (!isDemoMode) {
@@ -671,6 +809,7 @@ export function DispatchView({
       let dropDate = dropData?.date ?? (overId.startsWith("crew-") ? filterState.selectedDate : null);
       let defaultHour = dropData?.defaultHour ?? 8;
 
+      /** Slot ids carry lane + hour; always parse from id so we do not rely on droppable data being present. */
       if (overId.startsWith("slot-")) {
         const parsed = parseSlotId(overId);
         if (parsed) {
@@ -728,11 +867,35 @@ export function DispatchView({
         return;
       }
 
-      if (!crewId || !dropDate) return;
+      if (!crewId || !dropDate) {
+        const msg =
+          "Could not read that drop target. Drop onto a technician time cell (grid), not the header.";
+        setDropError(msg);
+        // eslint-disable-next-line no-console
+        console.warn("[dispatch] drop ignored — missing crewId or dropDate", {
+          overId,
+          crewId,
+          dropDate,
+          dropData,
+        });
+        return;
+      }
 
       const startISO = toSlotISO(dropDate, defaultHour);
       const hours = workOrder.estimated_hours ?? 1;
       const endISO = addHours(startISO, hours);
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.debug("[dispatch] drop on board", {
+          overId,
+          crewId,
+          dropDate,
+          slotHour: defaultHour,
+          startISO,
+          endISO,
+          durationHours: hours,
+        });
+      }
       const isTechnicianDrop = crewId.startsWith("tech-");
       const assignedTechnicianId = isTechnicianDrop ? crewId.slice(5) : null;
       const assignedCrewId = crewId === "__unassigned__" || isTechnicianDrop ? null : crewId;
@@ -926,7 +1089,7 @@ export function DispatchView({
         .filter(
           (row) =>
             row.assigned_technician_id === technicianId &&
-            row.scheduled_date === filterState.selectedDate
+            toDateOnlyString(row.scheduled_date) === filterState.selectedDate
         )
         .sort((a, b) => (a.scheduled_start ?? "").localeCompare(b.scheduled_start ?? ""));
       const latestEndHour = scheduledForTechnician.reduce((latest, row) => {
@@ -1053,10 +1216,153 @@ export function DispatchView({
 
   const opsMode = isFullScreen && filterState.viewMode === "combined";
   const [helpOpen, setHelpOpen] = useState(false);
+  const showCombinedSidePanel =
+    filterState.viewMode === "combined" &&
+    (mobileMapPanelOpen || selectedMapWorkOrderId != null);
+
+  const renderBoardToolbar = ({
+    showAvailabilityFilters,
+    showMobileMapButton,
+  }: {
+    showAvailabilityFilters: boolean;
+    /** Opens map slide-over on narrow screens (Map+ split mode). */
+    showMobileMapButton?: boolean;
+  }) => (
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-medium text-[var(--muted)]">Timeline:</span>
+        <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
+          <button
+            type="button"
+            onClick={() => setDispatchBoardMode("technicians")}
+            className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+              dispatchBoardMode === "technicians"
+                ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Technicians
+          </button>
+          <button
+            type="button"
+            onClick={() => setDispatchBoardMode("crews")}
+            className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+              dispatchBoardMode === "crews"
+                ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Crews
+          </button>
+        </div>
+        {filterState.viewMode === "day" &&
+          dispatchBoardMode === "technicians" &&
+          initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
+                disabled={technicianPage === 0}
+                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
+                aria-label="Previous page"
+              >
+                ←
+              </button>
+              <span className="text-[10px] text-[var(--muted)]">
+                {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
+                {Math.min(
+                  (technicianPage + 1) * TECHNICIAN_PAGE_SIZE,
+                  initialData.workforce.technicians.length
+                )}{" "}
+                of {initialData.workforce.technicians.length}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setTechnicianPage((p) =>
+                    Math.min(
+                      p + 1,
+                      Math.ceil(
+                        initialData.workforce.technicians.length /
+                          TECHNICIAN_PAGE_SIZE
+                      ) - 1
+                    )
+                  )
+                }
+                disabled={
+                  technicianPage >=
+                  Math.ceil(
+                    initialData.workforce.technicians.length /
+                      TECHNICIAN_PAGE_SIZE
+                  ) - 1
+                }
+                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
+                aria-label="Next page"
+              >
+                →
+              </button>
+            </div>
+          )}
+        {showAvailabilityFilters && dispatchBoardMode === "technicians" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+              <input
+                type="checkbox"
+                checked={hideFullyScheduledTechnicians}
+                onChange={(e) => setHideFullyScheduledTechnicians(e.target.checked)}
+                className="rounded border-[var(--card-border)]"
+              />
+              Hide fully scheduled
+            </label>
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+              <input
+                type="checkbox"
+                checked={showOnlyAvailableTechnicians}
+                onChange={(e) => setShowOnlyAvailableTechnicians(e.target.checked)}
+                className="rounded border-[var(--card-border)]"
+              />
+              Show only available
+            </label>
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+              <input
+                type="checkbox"
+                checked={sortTechniciansByDistance}
+                onChange={(e) => setSortTechniciansByDistance(e.target.checked)}
+                className="rounded border-[var(--card-border)]"
+              />
+              Sort by distance
+            </label>
+          </div>
+        )}
+      </div>
+      {showMobileMapButton ? (
+        <div className="flex items-center gap-1 xl:hidden">
+          <Button
+            variant={mobileMapPanelOpen ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-[11px]"
+            onClick={() => setMobileMapPanelOpen((open) => !open)}
+          >
+            {mobileMapPanelOpen ? "Close map" : "Map"}
+          </Button>
+          {selectedMapWorkOrderId ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => setSelectedMapWorkOrderId(null)}
+            >
+              Hide details
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
     <div
-      className={`flex flex-col ${
+      className={`flex min-w-0 flex-col ${
         isDemoMode && !isFullScreen
           ? "h-auto min-h-[820px]"
           : "h-full min-h-0"
@@ -1129,7 +1435,7 @@ export function DispatchView({
       )}
 
       <div
-        className={`flex min-h-0 flex-1 flex-col border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
+        className={`flex min-h-0 min-w-0 flex-1 flex-col border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
           isDemoMode && !isFullScreen ? "overflow-visible" : "overflow-hidden"
         } ${
           opsMode ? "rounded-lg" : "rounded-xl"
@@ -1166,39 +1472,27 @@ export function DispatchView({
 
         <div className="flex min-h-0 flex-1 min-w-0">
           {filterState.viewMode === "map" ? (
-            <>
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2" data-tour="dispatch:routing">
-                <DispatchMapPanel
-                  viewMode={filterState.viewMode}
-                  mapPanelVisible={true}
-                  workOrders={optimisticWorkOrders}
-                  workforce={workforce}
-                  filterState={filterState}
-                  filterOptions={filterOptions}
-                  selectedTechnicianId={selectedMapTechnicianId}
-                  selectedWorkOrderId={selectedMapWorkOrderId}
-                  hoveredWorkOrderId={hoveredWorkOrderId}
-                  assignmentPending={mapAssigning}
-                  onSelectTechnician={setSelectedMapTechnicianId}
-                  onSelectWorkOrder={setSelectedMapWorkOrderId}
-                  onHoverWorkOrder={setHoveredWorkOrderId}
-                  onOpenWorkOrderDrawer={openWorkOrderDrawer}
-                  onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                  onAssignFromMap={handleAssignFromMap}
-                  onPatchFilters={patchFilterState}
-                />
-              </div>
-              <aside className="hidden w-[280px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-[var(--card-border)] bg-[var(--background)]/30 p-2 xl:flex">
-                <DispatchOptimizationCopilot />
-                <DispatchWorkforcePanel
-                  workforce={workforce}
-                  insights={dispatchData.insights}
-                  onCreateWorkOrder={handleCreateWorkOrder}
-                  onAssignUnscheduled={handleAssignUnscheduled}
-                  onRebalance={handleRebalance}
-                />
-              </aside>
-            </>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2" data-tour="dispatch:routing">
+              <DispatchMapPanel
+                viewMode={filterState.viewMode}
+                mapPanelVisible={true}
+                workOrders={optimisticWorkOrders}
+                workforce={workforce}
+                filterState={filterState}
+                filterOptions={filterOptions}
+                selectedTechnicianId={selectedMapTechnicianId}
+                selectedWorkOrderId={selectedMapWorkOrderId}
+                hoveredWorkOrderId={hoveredWorkOrderId}
+                assignmentPending={mapAssigning}
+                onSelectTechnician={setSelectedMapTechnicianId}
+                onSelectWorkOrder={setSelectedMapWorkOrderId}
+                onHoverWorkOrder={setHoveredWorkOrderId}
+                onOpenWorkOrderDrawer={openWorkOrderDrawer}
+                onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                onAssignFromMap={handleAssignFromMap}
+                onPatchFilters={patchFilterState}
+              />
+            </div>
           ) : filterState.viewMode === "combined" ? (
             <DndContext
               sensors={sensors}
@@ -1208,206 +1502,45 @@ export function DispatchView({
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
             >
-              <div className="flex min-h-0 flex-1 flex-col">
-                {/* SECTION 1 (Top): Map ~38% + Work Order Details Panel; map collapses to toggle on small screens */}
-                <section
-                  className="grid min-h-[300px] grid-cols-1 shrink-0 gap-2 p-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
-                  style={{ minHeight: 320, flex: "0 0 38%" }}
+              <div className="flex min-h-0 min-w-0 flex-1">
+                <DispatchSidebarQueue
+                  unscheduled={dispatchData.unscheduled}
+                  overdue={dispatchData.overdue}
+                  ready={dispatchData.ready}
+                  collapsed={queueCollapsed}
+                  overDropId={overDropId}
+                  isDraggingWorkOrder={Boolean(activeWo)}
+                  onToggleCollapse={() => setQueueCollapsed((current) => !current)}
+                  onOpenWorkOrder={(id, action) => {
+                    setSelectedMapWorkOrderId(id);
+                    handleOpenWorkOrder(id, action);
+                  }}
+                  selectedWorkOrderId={selectedMapWorkOrderId}
+                />
+                <main
+                  className={`flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--background)] ${
+                    queueCollapsed ? "" : "border-l border-[var(--card-border)]"
+                  }`}
                 >
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden relative" style={{ minHeight: 280 }}>
-                    {/* Keep map mounted when hidden so it does not remount on toggle (avoids jitter/flicker) */}
-                    <div
-                      className={combinedMapVisible ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "hidden"}
-                      aria-hidden={!combinedMapVisible}
-                    >
-                      <div className="flex items-center justify-between gap-2 border-b border-[var(--card-border)] pb-1 xl:hidden">
-                        <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">Map</span>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setCombinedMapVisible(false)}>
-                          Hide map
-                        </Button>
-                      </div>
-                      <div className="min-h-[260px] h-full min-w-0 flex-1 overflow-hidden" data-tour="dispatch:routing" style={{ minHeight: 260 }}>
-                        <DispatchMapPanel
-                          viewMode="combined"
-                          mapPanelVisible={combinedMapVisible}
-                          workOrders={optimisticWorkOrders}
-                          workforce={workforce}
-                          filterState={filterState}
-                          filterOptions={filterOptions}
-                          selectedTechnicianId={selectedMapTechnicianId}
-                          selectedWorkOrderId={selectedMapWorkOrderId}
-                          hoveredWorkOrderId={hoveredWorkOrderId}
-                          assignmentPending={mapAssigning}
-                          onSelectTechnician={setSelectedMapTechnicianId}
-                          onSelectWorkOrder={setSelectedMapWorkOrderId}
-                          onHoverWorkOrder={setHoveredWorkOrderId}
-                          onOpenWorkOrderDrawer={openWorkOrderDrawer}
-                          onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                          onAssignFromMap={handleAssignFromMap}
-                          onPatchFilters={patchFilterState}
-                        />
-                      </div>
-                    </div>
-                    {!combinedMapVisible && (
-                      <Button variant="secondary" size="sm" className="h-8 w-full text-[11px]" onClick={() => setCombinedMapVisible(true)}>
-                        Show map
-                      </Button>
-                    )}
-                  </div>
-                  <div className="flex min-h-0 min-w-0 flex-col">
-                    <CombinedWorkOrderDetailsPanel
-                      selectedWorkOrder={
-                        selectedMapWorkOrderId
-                          ? optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
-                          : null
-                      }
-                      technicians={initialData.workforce.technicians}
-                      workOrders={optimisticWorkOrders}
-                      selectedDate={filterState.selectedDate}
-                      onAssign={(workOrderId, technicianId) => void handleAssignFromMap(workOrderId, technicianId)}
-                      assigning={mapAssigning}
-                      onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
-                    />
-                  </div>
-                </section>
-                {/* SECTION 2 (Bottom): Queue + Dispatch Board ~62% */}
-                <section className="min-h-0 flex-1 border-t border-[var(--card-border)]" style={{ minHeight: 280 }}>
-                  <div className="flex h-full min-h-0">
-                    <DispatchSidebarQueue
-                      unscheduled={dispatchData.unscheduled}
-                      overdue={dispatchData.overdue}
-                      ready={dispatchData.ready}
-                      collapsed={queueCollapsed}
-                      overDropId={overDropId}
-                      isDraggingWorkOrder={Boolean(activeWo)}
-                      onToggleCollapse={() => setQueueCollapsed((current) => !current)}
-                      onOpenWorkOrder={(id, action) => {
-                        setSelectedMapWorkOrderId(id);
-                        handleOpenWorkOrder(id, action);
-                      }}
-                      selectedWorkOrderId={selectedMapWorkOrderId}
-                    />
-                    <main
-                      className={`min-w-0 flex-1 bg-[var(--background)] ${
-                        queueCollapsed ? "" : "border-l border-[var(--card-border)]"
-                      }`}
-                    >
-                      <div className="flex h-full min-h-0 flex-col">
-                        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-0.5">
-                          <span className="text-[10px] font-medium text-[var(--muted)]">Timeline:</span>
-                          <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
-                            <button
-                              type="button"
-                              onClick={() => setDispatchBoardMode("technicians")}
-                              className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                                dispatchBoardMode === "technicians"
-                                  ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                              }`}
-                            >
-                              Technicians
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDispatchBoardMode("crews")}
-                              className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                                dispatchBoardMode === "crews"
-                                  ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                              }`}
-                            >
-                              Crews
-                            </button>
-                          </div>
-                          {dispatchBoardMode === "technicians" &&
-                            initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
-                                disabled={technicianPage === 0}
-                                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
-                                aria-label="Previous page"
-                              >
-                                ←
-                              </button>
-                              <span className="text-[10px] text-[var(--muted)]">
-                                {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
-                                {Math.min(
-                                  (technicianPage + 1) * TECHNICIAN_PAGE_SIZE,
-                                  initialData.workforce.technicians.length
-                                )}{" "}
-                                of {initialData.workforce.technicians.length}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setTechnicianPage((p) =>
-                                    Math.min(
-                                      p + 1,
-                                      Math.ceil(
-                                        initialData.workforce.technicians.length /
-                                          TECHNICIAN_PAGE_SIZE
-                                      ) - 1
-                                    )
-                                  )
-                                }
-                                disabled={
-                                  technicianPage >=
-                                  Math.ceil(
-                                    initialData.workforce.technicians.length /
-                                      TECHNICIAN_PAGE_SIZE
-                                  ) - 1
-                                }
-                                className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
-                                aria-label="Next page"
-                              >
-                                →
-                              </button>
-                            </div>
-                          )}
-                          {dispatchBoardMode === "technicians" && (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                                <input
-                                  type="checkbox"
-                                  checked={hideFullyScheduledTechnicians}
-                                  onChange={(e) => setHideFullyScheduledTechnicians(e.target.checked)}
-                                  className="rounded border-[var(--card-border)]"
-                                />
-                                Hide fully scheduled
-                              </label>
-                              <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                                <input
-                                  type="checkbox"
-                                  checked={showOnlyAvailableTechnicians}
-                                  onChange={(e) => setShowOnlyAvailableTechnicians(e.target.checked)}
-                                  className="rounded border-[var(--card-border)]"
-                                />
-                                Show only available
-                              </label>
-                              <label className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                                <input
-                                  type="checkbox"
-                                  checked={sortTechniciansByDistance}
-                                  onChange={(e) => setSortTechniciansByDistance(e.target.checked)}
-                                  className="rounded border-[var(--card-border)]"
-                                />
-                                Sort by distance
-                              </label>
-                            </div>
-                          )}
-                        </div>
+                  <div className="flex h-full min-h-0 flex-col">
+                    {renderBoardToolbar({
+                      showAvailabilityFilters: true,
+                      showMobileMapButton: true,
+                    })}
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
+                      <section
+                        className="min-h-0 min-w-0 flex-1 overflow-hidden"
+                        data-tour="dispatch:technician-columns"
+                      >
                         {dispatchBoardMode === "technicians" &&
                         initialData.workforce.technicians.length === 0 ? (
-                          <div className="flex flex-1 items-center justify-center border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-8">
+                          <div className="flex h-full items-center justify-center border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-8">
                             <p className="text-sm font-medium text-[var(--muted)]">
                               No technicians available. Add technicians to begin scheduling.
                             </p>
                           </div>
                         ) : (
-                          <div className="min-h-0 flex-1 overflow-hidden" data-tour="dispatch:technician-columns">
-                            <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
+                          <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
                             <DispatchBoard
                               lanes={filteredLanes}
                               workOrdersByLane={filteredWorkOrdersByLane}
@@ -1427,13 +1560,137 @@ export function DispatchView({
                               onOpenWorkOrder={handleOpenWorkOrder}
                               usePageScroll={isDemoMode && !isFullScreen}
                             />
-                            </div>
                           </div>
                         )}
-                      </div>
-                    </main>
+                      </section>
+                      <aside className="relative hidden min-h-0 w-[min(38%,420px)] min-w-[280px] max-w-[40%] shrink-0 flex-col border-l border-[var(--card-border)] bg-[var(--card)]/70 xl:flex">
+                        {selectedMapWorkOrderId ? (
+                          <div className="absolute inset-0 z-30 flex flex-col overflow-hidden border-l border-[var(--card-border)] bg-[var(--card)] shadow-xl">
+                            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--card-border)] px-2 py-1.5">
+                              <p className="text-xs font-semibold text-[var(--foreground)]">Job details</p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 shrink-0 px-2 text-[11px]"
+                                onClick={() => setSelectedMapWorkOrderId(null)}
+                              >
+                                Close
+                              </Button>
+                            </div>
+                            <div className="min-h-0 flex-1 overflow-y-auto">
+                              <CombinedWorkOrderDetailsPanel
+                                selectedWorkOrder={
+                                  optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
+                                }
+                                technicians={initialData.workforce.technicians}
+                                workOrders={optimisticWorkOrders}
+                                selectedDate={filterState.selectedDate}
+                                onAssign={(workOrderId, technicianId) =>
+                                  void handleAssignFromMap(workOrderId, technicianId)
+                                }
+                                assigning={mapAssigning}
+                                onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                        <div
+                          className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-2"
+                          data-tour="dispatch:routing"
+                        >
+                          <DispatchMapPanel
+                            viewMode="combined"
+                            mapPanelVisible={true}
+                            workOrders={optimisticWorkOrders}
+                            workforce={workforce}
+                            filterState={filterState}
+                            filterOptions={filterOptions}
+                            selectedTechnicianId={selectedMapTechnicianId}
+                            selectedWorkOrderId={selectedMapWorkOrderId}
+                            hoveredWorkOrderId={hoveredWorkOrderId}
+                            assignmentPending={mapAssigning}
+                            onSelectTechnician={setSelectedMapTechnicianId}
+                            onSelectWorkOrder={setSelectedMapWorkOrderId}
+                            onHoverWorkOrder={setHoveredWorkOrderId}
+                            onOpenWorkOrderDrawer={openWorkOrderDrawer}
+                            onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                            onAssignFromMap={handleAssignFromMap}
+                            onPatchFilters={patchFilterState}
+                          />
+                        </div>
+                      </aside>
+                    </div>
                   </div>
-                </section>
+                </main>
+                {showCombinedSidePanel ? (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-40 bg-black/25 xl:hidden"
+                      aria-label="Close dispatch side panel"
+                      onClick={() => {
+                        setMobileMapPanelOpen(false);
+                        setSelectedMapWorkOrderId(null);
+                      }}
+                    />
+                    <aside className="fixed inset-y-0 right-0 z-50 flex w-[min(92vw,380px)] flex-col border-l border-[var(--card-border)] bg-[var(--card)] shadow-xl xl:hidden">
+                      <div className="flex items-center justify-between border-b border-[var(--card-border)] px-3 py-2">
+                        <p className="text-xs font-semibold text-[var(--foreground)]">Map & routing</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => {
+                            setMobileMapPanelOpen(false);
+                            setSelectedMapWorkOrderId(null);
+                          }}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                        {selectedMapWorkOrderId ? (
+                          <div className="shrink-0 border-b border-[var(--card-border)]">
+                            <CombinedWorkOrderDetailsPanel
+                              selectedWorkOrder={
+                                optimisticWorkOrders.find((w) => w.id === selectedMapWorkOrderId) ?? null
+                              }
+                              technicians={initialData.workforce.technicians}
+                              workOrders={optimisticWorkOrders}
+                              selectedDate={filterState.selectedDate}
+                              onAssign={(workOrderId, technicianId) =>
+                                void handleAssignFromMap(workOrderId, technicianId)
+                              }
+                              assigning={mapAssigning}
+                              onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                            />
+                          </div>
+                        ) : null}
+                        <div className="min-h-[min(50vh,360px)] flex-1 overflow-hidden p-2" data-tour="dispatch:routing">
+                          <DispatchMapPanel
+                            viewMode="combined"
+                            mapPanelVisible={true}
+                            workOrders={optimisticWorkOrders}
+                            workforce={workforce}
+                            filterState={filterState}
+                            filterOptions={filterOptions}
+                            selectedTechnicianId={selectedMapTechnicianId}
+                            selectedWorkOrderId={selectedMapWorkOrderId}
+                            hoveredWorkOrderId={hoveredWorkOrderId}
+                            assignmentPending={mapAssigning}
+                            onSelectTechnician={setSelectedMapTechnicianId}
+                            onSelectWorkOrder={setSelectedMapWorkOrderId}
+                            onHoverWorkOrder={setHoveredWorkOrderId}
+                            onOpenWorkOrderDrawer={openWorkOrderDrawer}
+                            onOpenWorkOrder={(id) => void handleOpenWorkOrder(id, "open")}
+                            onAssignFromMap={handleAssignFromMap}
+                            onPatchFilters={patchFilterState}
+                          />
+                        </div>
+                      </div>
+                    </aside>
+                  </>
+                ) : null}
               </div>
               <DragOverlay
                 modifiers={[snapCenterToCursor]}
@@ -1479,82 +1736,11 @@ export function DispatchView({
                 }`}
               >
                 <div className="flex h-full min-h-0 flex-col">
-                  {filterState.viewMode === "day" ? (
-                    <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-[var(--card-border)] bg-[var(--card)]/80 px-2 py-0.5">
-                      <span className="text-[10px] font-medium text-[var(--muted)]">View:</span>
-                      <div className="flex rounded border border-[var(--card-border)] bg-[var(--background)] p-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setDispatchBoardMode("technicians")}
-                          className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                            dispatchBoardMode === "technicians"
-                              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                              : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                          }`}
-                        >
-                          Technicians
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDispatchBoardMode("crews")}
-                          className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-                            dispatchBoardMode === "crews"
-                              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                              : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                          }`}
-                        >
-                          Crews
-                        </button>
-                      </div>
-                      {dispatchBoardMode === "technicians" &&
-                        initialData.workforce.technicians.length > TECHNICIAN_PAGE_SIZE && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setTechnicianPage((p) => Math.max(0, p - 1))}
-                              disabled={technicianPage === 0}
-                              className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
-                              aria-label="Previous page"
-                            >
-                              ←
-                            </button>
-                            <span className="text-[10px] text-[var(--muted)]">
-                              {technicianPage * TECHNICIAN_PAGE_SIZE + 1}–
-                              {Math.min(
-                                (technicianPage + 1) * TECHNICIAN_PAGE_SIZE,
-                                initialData.workforce.technicians.length
-                              )}{" "}
-                              of {initialData.workforce.technicians.length}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTechnicianPage((p) =>
-                                  Math.min(
-                                    p + 1,
-                                    Math.ceil(
-                                      initialData.workforce.technicians.length /
-                                        TECHNICIAN_PAGE_SIZE
-                                    ) - 1
-                                  )
-                                )
-                              }
-                              disabled={
-                                technicianPage >=
-                                Math.ceil(
-                                  initialData.workforce.technicians.length /
-                                    TECHNICIAN_PAGE_SIZE
-                                ) - 1
-                              }
-                              className="rounded border border-[var(--card-border)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground)] disabled:opacity-50"
-                              aria-label="Next page"
-                            >
-                              →
-                            </button>
-                          </div>
-                        )}
-                    </div>
-                  ) : null}
+                  {["day", "week", "month"].includes(filterState.viewMode)
+                    ? renderBoardToolbar({
+                        showAvailabilityFilters: filterState.viewMode === "day",
+                      })
+                    : null}
                   {filterState.viewMode === "day" &&
                   dispatchBoardMode === "technicians" &&
                   initialData.workforce.technicians.length === 0 ? (
@@ -1659,6 +1845,19 @@ export function DispatchView({
           Work order created → appears in the Dispatch queue → dispatcher drags it onto a technician or crew lane →
           technician completes the work → status updates flow back into Work Orders.
         </p>
+        <h3 className="mb-1 text-sm font-semibold">View modes</h3>
+        <ul className="mb-3 list-disc space-y-1 pl-5">
+          <li>
+            <strong>Day</strong> — queue and schedule grid only (fastest). No map.
+          </li>
+          <li>
+            <strong>Map</strong> — full-width map for routing; filters stay at the top.
+          </li>
+          <li>
+            <strong>Map+</strong> — queue, board, and map side-by-side on large screens; on small screens use the{" "}
+            <strong>Map</strong> button to open the map in a panel.
+          </li>
+        </ul>
         <h3 className="mb-1 text-sm font-semibold">Tips</h3>
         <ul className="mb-2 list-disc space-y-1 pl-5">
           <li>Watch lane load to avoid overbooking any one technician.</li>

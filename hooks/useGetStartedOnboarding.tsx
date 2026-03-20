@@ -81,7 +81,12 @@ export function GetStartedOnboardingProvider({
   const pathname = usePathname();
   const [progress, setProgress] = useState<GetStartedProgress | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stored, setStored] = useState<StoredState>(() => readStored());
+  // Keep initial server/client render deterministic; hydrate localStorage state after mount.
+  const [stored, setStored] = useState<StoredState>({});
+
+  useEffect(() => {
+    setStored(readStored());
+  }, []);
 
   const fetchProgress = useCallback(async () => {
     try {

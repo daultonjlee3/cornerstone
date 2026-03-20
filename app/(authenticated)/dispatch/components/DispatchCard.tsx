@@ -28,16 +28,16 @@ export function DispatchCard({
     <article
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`group relative overflow-hidden rounded-[var(--radius-control)] border bg-white/94 pl-3 shadow-[var(--shadow-soft)] transition-all duration-200 ${
+      className={`group relative overflow-hidden rounded-md border bg-white/95 pl-2 shadow-[0_1px_3px_rgba(16,35,63,0.08)] transition-all duration-150 ${
         isOverdue
-          ? "border-red-200/90 bg-red-50/50 ring-1 ring-red-100"
+          ? "border-red-200/90 bg-red-50/55 ring-1 ring-red-100"
           : isSlaBreached
             ? "border-red-200/90 bg-red-50/35 ring-1 ring-red-100"
-          : "border-[var(--card-border)] hover:-translate-y-[1px] hover:shadow-[var(--shadow-card)]"
-      } ${isDragging ? "opacity-90 shadow-[var(--shadow-card)]" : ""} ${className}`}
+          : "border-[var(--card-border)] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(16,35,63,0.12)]"
+      } ${isDragging ? "opacity-90 shadow-[0_8px_20px_rgba(16,35,63,0.16)]" : ""} ${className}`}
     >
       <PriorityStripe priority={priority} />
-      <div className={`p-2.5 ${contentClassName ?? ""}`}>{children}</div>
+      <div className={`p-2 ${contentClassName ?? ""}`}>{children}</div>
     </article>
   );
 }

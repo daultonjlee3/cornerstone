@@ -103,6 +103,12 @@ export function TopBar({
       };
       setUnreadCount(data.unreadCount ?? 0);
       setItems(data.items ?? []);
+    } catch (err) {
+      // Network error, dev server restart, offline, etc. — don't crash the shell.
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.debug("[top-bar] notifications fetch failed", err);
+      }
     } finally {
       setLoading(false);
     }
@@ -124,18 +130,22 @@ export function TopBar({
   }, []);
 
   const markAllRead = useCallback(async () => {
-    const response = await fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markAll: true }),
-    });
-    if (!response.ok) return;
-    const data = (await response.json()) as {
-      unreadCount?: number;
-      items?: NotificationItem[];
-    };
-    setUnreadCount(data.unreadCount ?? 0);
-    setItems(data.items ?? []);
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAll: true }),
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        unreadCount?: number;
+        items?: NotificationItem[];
+      };
+      setUnreadCount(data.unreadCount ?? 0);
+      setItems(data.items ?? []);
+    } catch {
+      // ignore network failures
+    }
   }, []);
 
   useEffect(() => {

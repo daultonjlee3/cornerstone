@@ -12,7 +12,6 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import introJs from "intro.js";
 import { markTourComplete } from "@/app/(authenticated)/tours/actions";
 import { getGuidanceTourById, getLiveDemoTour, getProductTourForPath } from "@/src/lib/guidance/registry";
 import { resolveAvailableSteps } from "@/src/lib/guidance/utils";
@@ -28,6 +27,13 @@ type GuidanceContextValue = {
 };
 
 const GuidanceContext = createContext<GuidanceContextValue | null>(null);
+type IntroInstance = {
+  exit: (force?: boolean) => void;
+  setOptions: (options: Record<string, unknown>) => void;
+  onexit: (cb: () => void) => void;
+  oncomplete: (cb: () => void) => void;
+  start: () => void;
+};
 
 function isVisibleElement(el: Element | null): el is HTMLElement {
   if (!el || !(el instanceof HTMLElement)) return false;
@@ -65,7 +71,7 @@ export function GuidanceProvider({
   const query = useSearchParams();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const router = useRouter();
-  const introRef = useRef<ReturnType<typeof introJs> | null>(null);
+  const introRef = useRef<IntroInstance | null>(null);
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
   const isLiveDemoMode =
     isDemoGuest ||
@@ -100,7 +106,9 @@ export function GuidanceProvider({
       const introSteps = routedSteps.map(toIntroStep);
       if (introSteps.length === 0) return;
 
-      const intro = introJs();
+      if (typeof window === "undefined") return;
+      const { default: introJs } = await import("intro.js");
+      const intro = introJs() as IntroInstance;
       introRef.current = intro;
       setActiveTourId(tourId);
       intro.setOptions({

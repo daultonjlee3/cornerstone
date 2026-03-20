@@ -29,5 +29,5 @@ type PriorityStripeProps = {
 
 export function PriorityStripe({ priority, className = "" }: PriorityStripeProps) {
   const tone = getPriorityTone(priority);
-  return <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${getStripeClass(tone)} ${className}`} />;
+  return <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${getStripeClass(tone)} ${className}`} />;
 }

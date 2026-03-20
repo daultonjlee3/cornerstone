@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Button } from "@/src/components/ui/button";
 import type { DispatchWorkOrder } from "../types";
 import type { DispatchTechnicianWorkload } from "../dispatch-data";
+import { toDateOnlyString } from "@/src/lib/date-utils";
 import { haversineMiles, estimateTravelMinutes, hasCoordinate } from "../dispatch-map-utils";
 
 const MAX_SUGGESTIONS = 5;
@@ -23,7 +24,9 @@ function getNextOpening(
 ): string | null {
   const dayStart = new Date(`${selectedDate}T08:00:00`).getTime();
   const techJobs = workOrders.filter(
-    (wo) => wo.assigned_technician_id === technicianId && wo.scheduled_date === selectedDate
+    (wo) =>
+      wo.assigned_technician_id === technicianId &&
+      toDateOnlyString(wo.scheduled_date) === selectedDate
   );
   if (techJobs.length === 0) return formatTimeAM(`${selectedDate}T08:00:00`);
   const sorted = [...techJobs].sort(
