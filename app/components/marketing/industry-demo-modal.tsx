@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { INDUSTRY_DEMO_OPTIONS, DEMO_ROUTES, ROUTES } from "@/lib/marketing-site";
 import { enterDemoAction } from "@/app/demo/actions";
 import { ArrowRight, Building2, ChevronLeft, Factory, FileSearch, Heart, LayoutGrid, Mail, Play, Rocket, School, X } from "lucide-react";
@@ -23,6 +24,19 @@ const INDUSTRY_ICONS: Record<(typeof INDUSTRY_DEMO_OPTIONS)[number]["id"], React
 };
 
 const DEMO_INDUSTRY_IDS = ["facility-maintenance", "industrial", "school-district", "healthcare"] as const;
+
+function EnterDemoSubmitButton({ disabled }: { disabled?: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending || !!disabled}
+      className="w-full rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      {pending ? "Starting demo…" : "Enter Demo"}
+    </button>
+  );
+}
 
 type IndustryDemoModalContextValue = {
   openModal: () => void;
@@ -74,12 +88,6 @@ function IndustryDemoModalContent({
       document.body.style.overflow = prev;
     };
   }, []);
-
-  useEffect(() => {
-    if (state?.redirectUrl) {
-      window.location.href = state.redirectUrl;
-    }
-  }, [state?.redirectUrl]);
 
   // Only industry options from INDUSTRY_DEMO_OPTIONS are passed here. The "Just show me the platform"
   // general option is a separate button that calls onSelectGeneral directly (no route comparison).
@@ -233,12 +241,7 @@ function IndustryDemoModalContent({
                     className="mt-1.5 w-full rounded-xl border border-[var(--card-border)] bg-[var(--background)] py-3 px-4 text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                >
-                  Enter Demo
-                </button>
+                <EnterDemoSubmitButton disabled={!selectedIndustry?.slug} />
               </form>
               <p className="mt-4 text-sm text-[var(--muted)]">
                 No scheduling required. Explore a live environment with realistic seeded data.

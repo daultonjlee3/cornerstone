@@ -25,11 +25,26 @@ import {
   isSupportedStatus,
 } from "@/src/lib/work-orders/status";
 
+/** Returned from updateWorkOrderAssignment so dispatch can merge DB truth without waiting on RSC. */
+export type WorkOrderAssignmentSnapshot = {
+  id: string;
+  assigned_technician_id: string | null;
+  assigned_crew_id: string | null;
+  vendor_id: string | null;
+  scheduled_date: string | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  status: string | null;
+  updated_at: string | null;
+};
+
 export type WorkOrderFormState = {
   error?: string;
   success?: boolean;
   workOrderId?: string;
   workOrderNumber?: string;
+  /** Authoritative row fields after a successful assignment update (non-demo). */
+  assignmentSnapshot?: WorkOrderAssignmentSnapshot;
 };
 
 async function getActorId(
@@ -1263,6 +1278,16 @@ export async function updateWorkOrderAssignment(
   if (error) return { error: error.message };
 
   const afterState = (updated as Record<string, unknown>) ?? {};
+  if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line no-console
+    console.log("[dispatch-drop] server DB row after update", {
+      id,
+      scheduled_date: afterState.scheduled_date,
+      assigned_technician_id: afterState.assigned_technician_id,
+      assigned_crew_id: afterState.assigned_crew_id,
+      status: afterState.status,
+    });
+  }
   const beforeHadAssignment = Boolean(
     beforeState.assigned_technician_id ||
       beforeState.assigned_crew_id ||
@@ -1442,7 +1467,20 @@ export async function updateWorkOrderAssignment(
   revalidatePath(`/technician/jobs/${id}`);
   revalidatePath("/portal/work-orders");
   revalidatePath(`/portal/work-orders/${id}`);
-  return { success: true };
+  return {
+    success: true,
+    assignmentSnapshot: {
+      id,
+      assigned_technician_id: (afterState.assigned_technician_id as string | null) ?? null,
+      assigned_crew_id: (afterState.assigned_crew_id as string | null) ?? null,
+      vendor_id: (afterState.vendor_id as string | null) ?? null,
+      scheduled_date: (afterState.scheduled_date as string | null) ?? null,
+      scheduled_start: (afterState.scheduled_start as string | null) ?? null,
+      scheduled_end: (afterState.scheduled_end as string | null) ?? null,
+      status: (afterState.status as string | null) ?? null,
+      updated_at: (afterState.updated_at as string | null) ?? null,
+    } satisfies WorkOrderAssignmentSnapshot,
+  };
 }
 
 export type WorkOrderCompletionPayload = {

@@ -15,7 +15,12 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import { updateWorkOrderAssignment, saveWorkOrder, logDispatchRebalance } from "@/app/(authenticated)/work-orders/actions";
+import {
+  updateWorkOrderAssignment,
+  saveWorkOrder,
+  logDispatchRebalance,
+  type WorkOrderAssignmentSnapshot,
+} from "@/app/(authenticated)/work-orders/actions";
 import { parseSlotId } from "./dispatch-board-utils";
 import { DispatchTopBar } from "./DispatchTopBar";
 import { DispatchSidebarQueue } from "./DispatchSidebarQueue";
@@ -91,24 +96,96 @@ function parseScheduledHours(workOrder: DispatchWorkOrder): number {
   return workOrder.estimated_hours ?? 1;
 }
 
-/**
- * After router.refresh(), server rows win. Rows only present on the client are appended so a
- * just-scheduled job is not lost if the server payload is briefly stale or missing an id.
- */
-function mergeWorkOrdersFromServer(
-  prev: DispatchWorkOrder[],
-  server: DispatchWorkOrder[]
-): DispatchWorkOrder[] {
-  const serverIds = new Set(server.map((w) => w.id));
-  const out = server.map((w) => ({
+function parseUpdatedAtMs(value: unknown): number {
+  if (value == null || value === "") return 0;
+  const t = new Date(String(value)).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function normalizeDispatchWorkOrderDates(w: DispatchWorkOrder): DispatchWorkOrder {
+  return {
     ...w,
     scheduled_date: toDateOnlyString(w.scheduled_date) ?? w.scheduled_date ?? null,
     due_date: toDateOnlyString(w.due_date as string | null | undefined) ?? w.due_date ?? null,
-  }));
+  };
+}
+
+/**
+ * Merge RSC payload with client rows. If the refreshed snapshot is older than the client row
+ * (stale `updated_at` right after a mutation), keep dispatch fields from the client.
+ * Client-only ids are appended so jobs not yet in the server list are not dropped.
+ */
+function mergeWorkOrdersFromServer(prev: DispatchWorkOrder[], server: DispatchWorkOrder[]): DispatchWorkOrder[] {
+  const prevById = new Map(prev.map((row) => [row.id, row]));
+  const serverIds = new Set(server.map((w) => w.id));
+
+  const mergedFromServer = server.map((w) => {
+    const normalized = normalizeDispatchWorkOrderDates(w);
+    const p = prevById.get(w.id);
+    if (!p) return normalized;
+
+    const serverMs = parseUpdatedAtMs(w.updated_at);
+    const prevMs = parseUpdatedAtMs(p.updated_at);
+
+    if (prevMs > serverMs) {
+      return {
+        ...normalized,
+        assigned_technician_id: p.assigned_technician_id ?? normalized.assigned_technician_id,
+        assigned_crew_id: p.assigned_crew_id ?? normalized.assigned_crew_id,
+        vendor_id: p.vendor_id ?? normalized.vendor_id,
+        scheduled_date: p.scheduled_date ?? normalized.scheduled_date,
+        scheduled_start: p.scheduled_start ?? normalized.scheduled_start,
+        scheduled_end: p.scheduled_end ?? normalized.scheduled_end,
+        status: p.status ?? normalized.status,
+        assignment_type: p.assignment_type ?? normalized.assignment_type,
+        assigned_technician_name: p.assigned_technician_name ?? normalized.assigned_technician_name,
+        assigned_crew_name: p.assigned_crew_name ?? normalized.assigned_crew_name,
+        vendor_name: p.vendor_name ?? normalized.vendor_name,
+        updated_at: p.updated_at ?? normalized.updated_at,
+      };
+    }
+    return normalized;
+  });
+
+  const out = [...mergedFromServer];
   for (const w of prev) {
     if (!serverIds.has(w.id)) out.push(w);
   }
   return out;
+}
+
+function applyAssignmentSnapshotToRow(
+  base: DispatchWorkOrder,
+  snap: WorkOrderAssignmentSnapshot,
+  technicians: { id: string; name?: string | null }[],
+  crews: { id: string; name?: string | null }[]
+): DispatchWorkOrder {
+  const techId = snap.assigned_technician_id;
+  const crewId = snap.assigned_crew_id;
+  const techName = techId ? technicians.find((t) => t.id === techId)?.name ?? null : null;
+  const crewName = crewId ? crews.find((c) => c.id === crewId)?.name ?? null : null;
+  const scheduledDate = toDateOnlyString(snap.scheduled_date) ?? snap.scheduled_date ?? null;
+  const assignment_type: DispatchWorkOrder["assignment_type"] = techId
+    ? "technician"
+    : crewId
+      ? "crew"
+      : snap.vendor_id
+        ? "vendor"
+        : "unassigned";
+  return {
+    ...base,
+    assigned_technician_id: snap.assigned_technician_id,
+    assigned_crew_id: snap.assigned_crew_id,
+    vendor_id: snap.vendor_id,
+    assigned_technician_name: techName ?? undefined,
+    assigned_crew_name: crewName ?? undefined,
+    scheduled_date: scheduledDate,
+    scheduled_start: snap.scheduled_start,
+    scheduled_end: snap.scheduled_end,
+    status: snap.status ?? base.status,
+    updated_at: snap.updated_at ?? base.updated_at,
+    assignment_type,
+  };
 }
 
 /**
@@ -703,7 +780,11 @@ export function DispatchView({
       const previous = optimisticWorkOrders;
       setOptimisticWorkOrders((current) => {
         const idx = current.findIndex((row) => row.id === workOrder.id);
-        const merged = { ...workOrder, ...patch } as DispatchWorkOrder;
+        const merged = {
+          ...workOrder,
+          ...patch,
+          updated_at: new Date().toISOString(),
+        } as DispatchWorkOrder;
         if (merged.scheduled_date != null && merged.scheduled_date !== "") {
           merged.scheduled_date = toDateOnlyString(merged.scheduled_date as string) ?? merged.scheduled_date;
         }
@@ -715,14 +796,6 @@ export function DispatchView({
         }
         return current.map((row) => (row.id === workOrder.id ? merged : row));
       });
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.debug("[dispatch] updateWorkOrderAssignment request", {
-          workOrderId: workOrder.id,
-          payload,
-          patchKeys: Object.keys(patch),
-        });
-      }
       let result: Awaited<ReturnType<typeof updateWorkOrderAssignment>>;
       try {
         result = await updateWorkOrderAssignment(workOrder.id, payload);
@@ -735,13 +808,6 @@ export function DispatchView({
         console.error("[dispatch] updateWorkOrderAssignment threw", err);
         return;
       }
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.debug("[dispatch] updateWorkOrderAssignment response", {
-          workOrderId: workOrder.id,
-          result,
-        });
-      }
       if (result?.error) {
         setOptimisticWorkOrders(previous);
         setDropError(result.error);
@@ -749,12 +815,31 @@ export function DispatchView({
         console.warn("[dispatch] assignment rejected by server", { workOrderId: workOrder.id, error: result.error });
         return;
       }
+
+      if (result.success && result.assignmentSnapshot) {
+        const snap = result.assignmentSnapshot;
+        setOptimisticWorkOrders((current) => {
+          const idx = current.findIndex((r) => r.id === snap.id);
+          const base = idx >= 0 ? current[idx] : workOrder;
+          const next = applyAssignmentSnapshotToRow(
+            base,
+            snap,
+            initialData.workforce.technicians,
+            initialData.crews
+          );
+          if (idx === -1) return [...current, next];
+          return current.map((row) => (row.id === snap.id ? next : row));
+        });
+      }
+
       if (!isDemoMode) {
-        router.refresh();
-        window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+        queueMicrotask(() => {
+          router.refresh();
+          window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+        });
       }
     },
-    [isDemoMode, optimisticWorkOrders, router]
+    [isDemoMode, optimisticWorkOrders, router, initialData.workforce.technicians, initialData.crews]
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -884,18 +969,6 @@ export function DispatchView({
       const startISO = toSlotISO(dropDate, defaultHour);
       const hours = workOrder.estimated_hours ?? 1;
       const endISO = addHours(startISO, hours);
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.debug("[dispatch] drop on board", {
-          overId,
-          crewId,
-          dropDate,
-          slotHour: defaultHour,
-          startISO,
-          endISO,
-          durationHours: hours,
-        });
-      }
       const isTechnicianDrop = crewId.startsWith("tech-");
       const assignedTechnicianId = isTechnicianDrop ? crewId.slice(5) : null;
       const assignedCrewId = crewId === "__unassigned__" || isTechnicianDrop ? null : crewId;

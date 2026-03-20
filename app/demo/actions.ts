@@ -1,10 +1,11 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/src/lib/supabase/admin";
 import { DEMO_LOGIN_CONFIG, SITE_URL } from "@/lib/marketing-site";
 import crypto from "crypto";
 
-export type EnterDemoState = { error?: string; redirectUrl?: string };
+export type EnterDemoState = { error?: string };
 
 const DEMO_SLUGS = [
   "facility-maintenance",
@@ -23,8 +24,8 @@ function demoSessionId(): string {
 
 /**
  * Create a temporary demo guest session: auth user + tenant_membership (demo_guest) + lead row,
- * then return a magic link URL so the client can redirect without showing login.
- * Caller must only use redirectUrl over HTTPS in production.
+ * then redirect to Supabase's one-time magic link URL so the browser navigates immediately.
+ * (Client-side window.location after async server actions is unreliable on mobile Safari.)
  */
 export async function enterDemoAction(
   _prev: EnterDemoState,
@@ -142,5 +143,5 @@ export async function enterDemoAction(
     };
   }
 
-  return { redirectUrl: linkData.properties.action_link };
+  redirect(linkData.properties.action_link);
 }

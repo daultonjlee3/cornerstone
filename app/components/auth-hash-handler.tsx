@@ -40,8 +40,15 @@ export function AuthHashHandler() {
           handled.current = false;
           return;
         }
-        // Clear hash and go to the operations landing route.
-        const next = "/operations";
+        // Prefer ?next= (e.g. demo deep link) when Supabase lands on site root with hash tokens.
+        let next = "/operations";
+        try {
+          const url = new URL(window.location.href);
+          const q = url.searchParams.get("next");
+          if (q && q.startsWith("/")) next = q;
+        } catch {
+          /* keep default */
+        }
         window.history.replaceState(null, "", next);
         router.replace(next);
       })
