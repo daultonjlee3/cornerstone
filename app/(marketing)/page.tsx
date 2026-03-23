@@ -446,19 +446,19 @@ export default function HomePage() {
       <section className="min-w-0 px-4 py-16 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center mk-section-headline">
-            Only technicians are billed
+            Simple pricing for operations teams
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center mk-body-lg">
-            Managers, supervisors, dispatchers, and office staff are included at
-            no cost. Unlimited office users.
+            Founding Pricing is designed to be straightforward: one monthly rate,
+            up to 20 technicians included, and every core module in one plan.
           </p>
           <ul className="mt-10 space-y-4">
             {[
-              "Technicians — billed per seat",
-              "Managers & supervisors — included",
-              "Dispatchers — included",
-              "Office staff — included",
-              "Unlimited office users",
+              "$850/month",
+              "Up to 20 technicians included",
+              "Everything included. No per-module pricing.",
+              "Pay annually: $8,500/year",
+              "Get 2 months free",
             ].map((item) => (
               <li key={item} className="flex items-center gap-3 text-[var(--foreground)]">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)]" aria-hidden />
@@ -466,10 +466,6 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
-          <p className="mt-8 text-center mk-caption">
-            Unlike MaintainX, UpKeep, and Limble—which charge per user—{SITE_NAME}{" "}
-            only bills for technicians in the field.
-          </p>
         </div>
       </section>
 
@@ -586,7 +582,7 @@ export default function HomePage() {
           </p>
           <ul className="mt-10 space-y-3 text-left sm:mx-auto sm:max-w-md">
             {[
-              "Lifetime locked pricing",
+              "Lock in your pricing as an early customer",
               "Direct roadmap influence",
               "Priority feature requests",
               "Early access to new features",

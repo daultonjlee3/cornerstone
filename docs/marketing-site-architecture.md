@@ -147,8 +147,8 @@ World-class B2B SaaS marketing website that:
 ## 7. Conversion & Content Requirements (Reference)
 
 - **Operational Workflow Visual:** Request → Work Order → Dispatch → Technician → Asset History → Reporting (on homepage).
-- **Technician Pricing Advantage:** Only technicians billed; managers, supervisors, dispatchers, office staff included. Comparison vs MaintainX, UpKeep, Limble (per user).
+- **Pricing Model:** Founding Pricing at $850/month with up to 20 technicians included; everything included with no per-module pricing. Annual option: $8,500/year with 2 months free.
 - **Self-Guided Tour:** Primary CTAs — Start Free Trial, See How It Works, Explore Product Tour. Demo booking secondary.
-- **Founding Customer:** First 25 customers — lifetime locked pricing, roadmap influence, priority requests, early access, concierge onboarding.
+- **Founding Customer:** First 25 customers — lock in your pricing as an early customer, roadmap influence, priority requests, early access, concierge onboarding.
 
 This document defines the site architecture and page structure for Phases 2–6.

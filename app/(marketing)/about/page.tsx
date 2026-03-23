@@ -29,7 +29,7 @@ const PRINCIPLES = [
   },
   {
     title: "Pricing that makes sense",
-    body: "Only technicians are billed. Managers, supervisors, dispatchers, and office staff are included at no cost—because modern maintenance teams shouldn't pay per seat for every person in the office.",
+    body: "Straightforward pricing with everything included in one plan, so teams can focus on operations instead of navigating add-ons and seat-based billing complexity.",
   },
   {
     title: "Built to last",

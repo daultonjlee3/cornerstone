@@ -12,26 +12,11 @@ export const metadata: Metadata = buildMarketingMetadata(
 );
 
 const BENEFITS = [
-  {
-    title: "Lifetime locked pricing",
-    description: "Lock in $75 per technician per month for as long as you use Cornerstone OS. No surprise increases.",
-  },
-  {
-    title: "Direct roadmap influence",
-    description: "Your feedback shapes what we build next. Founding customers have a direct line to product decisions.",
-  },
-  {
-    title: "Priority feature requests",
-    description: "Need something specific for your operations? Founding customers get priority consideration for new features.",
-  },
-  {
-    title: "Early access to new features",
-    description: "Be the first to use new capabilities before they’re available to everyone.",
-  },
-  {
-    title: "Concierge onboarding",
-    description: "Dedicated support to get your team, assets, and workflows set up so you’re productive from day one.",
-  },
+  "Lock in your pricing as an early customer",
+  "Direct roadmap influence",
+  "Priority feature requests",
+  "Early access to new features",
+  "Concierge onboarding",
 ] as const;
 
 export default function FoundingCustomerPage() {
@@ -49,21 +34,18 @@ export default function FoundingCustomerPage() {
       </header>
 
       {/* Benefits */}
-      <section className="mt-14 space-y-6">
-        {BENEFITS.map((benefit) => (
-          <div
-            key={benefit.title}
-            className="flex gap-6 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6"
-          >
-            <CheckCircle2 className="h-8 w-8 shrink-0 text-[var(--accent)]" aria-hidden />
-            <div>
-              <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
-                {benefit.title}
-              </h2>
-              <p className="mt-2 text-[var(--muted)]">{benefit.description}</p>
-            </div>
-          </div>
-        ))}
+      <section className="mt-14 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8">
+        <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
+          Founding customer benefits
+        </h2>
+        <ul className="mt-6 space-y-3">
+          {BENEFITS.map((benefit) => (
+            <li key={benefit} className="flex items-start gap-3 text-[var(--foreground)]">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" aria-hidden />
+              <span>{benefit}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Pricing reminder */}
@@ -72,11 +54,16 @@ export default function FoundingCustomerPage() {
           Founding customer pricing
         </h2>
         <p className="mt-2 text-3xl font-bold text-[var(--foreground)]">
-          $75 <span className="text-lg font-normal text-[var(--muted)]">/ technician / month</span>
+          $850/month
         </p>
-        <p className="mt-1 text-[var(--muted)]">$750 monthly minimum · locked for life</p>
+        <p className="mt-1 text-[var(--muted)]">Up to 20 technicians included</p>
+        <p className="mt-1 text-[var(--muted)]">Everything included. No per-module pricing.</p>
+        <div className="mx-auto mt-5 max-w-md rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/8 px-4 py-3">
+          <p className="text-sm font-semibold text-[var(--accent)]">Pay annually: $8,500/year</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">Get 2 months free</p>
+        </div>
         <p className="mt-4 text-sm text-[var(--muted)]">
-          Only technicians are billed. Managers, dispatchers, and office staff are included at no cost.
+          Founding pricing is available for a limited number of early customers.
         </p>
         <Link
           href={ROUTES.pricing}

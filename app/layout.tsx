@@ -62,13 +62,13 @@ const softwareSchema = {
   description: defaultDescription,
   offers: {
     "@type": "Offer",
-    price: "75",
+    price: "850",
     priceCurrency: "USD",
     priceSpecification: {
       "@type": "UnitPriceSpecification",
-      price: "75",
+      price: "850",
       priceCurrency: "USD",
-      unitText: "per technician per month",
+      unitText: "per month",
     },
   },
 };

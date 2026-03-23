@@ -234,14 +234,14 @@ export const SEO: Record<string, { title: string; description: string }> = {
       "Inventory management software and maintenance procurement software for CMMS teams. Cornerstone OS connects inventory tracking, vendor management, products, and purchase order software directly to maintenance operations.",
   },
   [ROUTES.pricing]: {
-    title: "Pricing | Work Order Management Software That Bills Per Technician",
+    title: "Pricing | Flat Monthly CMMS Pricing",
     description:
-      "CMMS pricing that bills only technicians. Managers, supervisors, dispatchers, and office staff included. $75/technician/month. Founding customer pricing for the first 25 customers.",
+      "Founding Pricing is $850/month with up to 20 technicians included. Everything included with no per-module pricing. Annual billing is $8,500/year with 2 months free.",
   },
   [ROUTES.foundingCustomer]: {
     title: "Founding Customer Program | CMMS Early Access",
     description:
-      "Join the first 25 founding customers. Lifetime locked pricing, roadmap influence, priority feature requests, early access, and concierge onboarding for our maintenance management software.",
+      "Join the first 25 founding customers. Lock in your pricing as an early customer, get direct roadmap influence, priority feature requests, early access to new features, and concierge onboarding.",
   },
   [ROUTES.howItWorks]: {
     title: "How It Works | Get Started with Our CMMS",
