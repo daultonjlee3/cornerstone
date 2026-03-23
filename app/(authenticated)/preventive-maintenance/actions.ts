@@ -96,6 +96,7 @@ export async function savePMProgramPlan(
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string | null)?.trim() || null;
+  const pmPlanId = (formData.get("pm_plan_id") as string | null)?.trim() || null;
   const companyId = (formData.get("company_id") as string | null)?.trim();
   const name = (formData.get("name") as string | null)?.trim();
   const description = (formData.get("description") as string | null)?.trim() || null;
@@ -546,6 +547,7 @@ export async function savePreventiveMaintenancePlan(
   if (!tenantId) return { error: "Unauthorized." };
 
   const id = (formData.get("id") as string | null)?.trim() || null;
+  const pmPlanId = (formData.get("pm_plan_id") as string | null)?.trim() || null;
   const companyId = (formData.get("company_id") as string | null)?.trim();
   const name = (formData.get("name") as string | null)?.trim();
   const frequencyType = parseFrequencyType(
@@ -614,7 +616,6 @@ export async function savePreventiveMaintenancePlan(
   const generateChildWorkOrders =
     formData.get("generate_child_work_orders") !== null &&
     formData.get("generate_child_work_orders") !== "off";
-  const pmPlanId = (formData.get("pm_plan_id") as string | null)?.trim() || null;
   const intervalValueRaw = (formData.get("interval_value") as string | null)?.trim();
   const intervalValue =
     intervalValueRaw && Number.isFinite(parseInt(intervalValueRaw, 10))
@@ -936,6 +937,18 @@ export async function savePreventiveMaintenanceTemplate(
     })(),
     instructions: (formData.get("instructions") as string | null)?.trim() || null,
   };
+  const taskTitles = formData.getAll("task_title").map((value) => String(value ?? "").trim());
+  const taskDescriptions = formData
+    .getAll("task_description")
+    .map((value) => String(value ?? "").trim());
+  const taskAssetIds = formData.getAll("task_asset_id").map((value) => String(value ?? "").trim());
+  const taskAssetGroups = formData
+    .getAll("task_asset_group")
+    .map((value) => String(value ?? "").trim());
+  const taskSortOrders = formData
+    .getAll("task_sort_order")
+    .map((value) => parseInt(String(value ?? "").trim(), 10));
+  const taskIds = formData.getAll("task_id").map((value) => String(value ?? "").trim());
 
   if (id) {
     const { data: existing } = await supabase
