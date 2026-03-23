@@ -37,4 +37,5 @@ export interface WorkOrder extends BaseEntity {
   scheduledAt?: string | null;
   completedAt?: string | null;
   dueDate?: string | null;
+  parentWorkOrderId?: string | null;
 }

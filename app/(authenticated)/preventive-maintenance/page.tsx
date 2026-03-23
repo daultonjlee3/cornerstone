@@ -35,6 +35,11 @@ export default async function PreventiveMaintenancePage({
   const frequency = getStringParam(params ?? {}, "frequency");
   const status = getStringParam(params ?? {}, "status");
   const technicianId = getStringParam(params ?? {}, "technician_id");
+  const pmPlanId = getStringParam(params ?? {}, "pm_plan_id");
+  const assetFilterId = getStringParam(params ?? {}, "asset_id");
+  const overdueOnly = ["1", "true"].includes(
+    (getStringParam(params ?? {}, "overdue") ?? "").toLowerCase()
+  );
   const shouldOpenNew = ["1", "true"].includes(
     (getStringParam(params ?? {}, "new") ?? "").toLowerCase()
   );
@@ -56,6 +61,21 @@ export default async function PreventiveMaintenancePage({
     name: (company as { name: string }).name,
   }));
   const companyIds = companyOptions.map((company) => company.id);
+  const { data: pmPlansRaw } = companyIds.length
+    ? await supabase
+        .from("pm_plans")
+        .select("id, company_id, name, description, category, active")
+        .in("company_id", companyIds)
+        .order("name")
+    : { data: [] as unknown[] };
+  const pmPlans = (pmPlansRaw ?? []).map((row) => ({
+    id: (row as { id: string }).id,
+    company_id: (row as { company_id: string }).company_id,
+    name: (row as { name: string }).name,
+    description: (row as { description?: string | null }).description ?? null,
+    category: (row as { category?: string | null }).category ?? null,
+    active: (row as { active?: boolean }).active ?? true,
+  }));
 
   if (companyIds.length === 0) {
     return (
@@ -222,13 +242,16 @@ export default async function PreventiveMaintenancePage({
   let plansQuery = supabase
     .from("preventive_maintenance_plans")
     .select(
-      "id, company_id, asset_id, property_id, building_id, unit_id, name, description, frequency_type, frequency_interval, start_date, next_run_date, last_run_date, auto_create_work_order, priority, estimated_duration_minutes, assigned_technician_id, instructions, status, assets(asset_name, name), technicians!assigned_technician_id(technician_name, name)"
+      "id, company_id, pm_plan_id, generate_parent_work_order, generate_child_work_orders, asset_id, property_id, building_id, unit_id, name, description, frequency_type, frequency_interval, interval_value, start_date, next_run_date, last_run_date, auto_create_work_order, priority, estimated_duration_minutes, assigned_technician_id, instructions, status, assets(asset_name, name), technicians!assigned_technician_id(technician_name, name), pm_plans(name, category), preventive_maintenance_schedule_tasks(id, title, description, asset_id, sort_order, active)"
     )
     .in("company_id", companyIds);
 
   if (frequency) plansQuery = plansQuery.eq("frequency_type", frequency);
   if (status) plansQuery = plansQuery.eq("status", status);
   if (technicianId) plansQuery = plansQuery.eq("assigned_technician_id", technicianId);
+  if (pmPlanId) plansQuery = plansQuery.eq("pm_plan_id", pmPlanId);
+  if (assetFilterId) plansQuery = plansQuery.eq("asset_id", assetFilterId);
+  if (overdueOnly) plansQuery = plansQuery.lt("next_run_date", new Date().toISOString().slice(0, 10));
   if (q) {
     const term = q.replace(/%/g, "\\%").replace(/_/g, "\\_");
     plansQuery = plansQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
@@ -243,9 +266,22 @@ export default async function PreventiveMaintenancePage({
     const technician = Array.isArray(row.technicians)
       ? row.technicians[0]
       : row.technicians;
+    const pmPlan = Array.isArray(row.pm_plans) ? row.pm_plans[0] : row.pm_plans;
+    const scheduleTasks = ((row.preventive_maintenance_schedule_tasks as unknown[]) ?? [])
+      .map((task) => task as Record<string, unknown>)
+      .filter((task) => (task.active as boolean | null) !== false)
+      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+      .map((task) => ({
+        id: (task.id as string) ?? "",
+        title: (task.title as string) ?? "",
+        description: (task.description as string | null) ?? null,
+        asset_id: (task.asset_id as string | null) ?? null,
+        sort_order: Number(task.sort_order ?? 0),
+      }));
     return {
       id: row.id as string,
       company_id: row.company_id as string,
+      pm_plan_id: (row.pm_plan_id as string | null) ?? null,
       asset_id: (row.asset_id as string | null) ?? null,
       property_id: (row.property_id as string | null) ?? null,
       building_id: (row.building_id as string | null) ?? null,
@@ -258,6 +294,10 @@ export default async function PreventiveMaintenancePage({
       next_run_date: row.next_run_date as string,
       last_run_date: (row.last_run_date as string | null) ?? null,
       auto_create_work_order: Boolean(row.auto_create_work_order),
+      generate_parent_work_order:
+        (row.generate_parent_work_order as boolean | null) ?? true,
+      generate_child_work_orders:
+        (row.generate_child_work_orders as boolean | null) ?? false,
       priority: (row.priority as string | null) ?? "medium",
       estimated_duration_minutes:
         (row.estimated_duration_minutes as number | null) ?? null,
@@ -277,13 +317,22 @@ export default async function PreventiveMaintenancePage({
             (technician as { name?: string }).name ??
             null)
           : null,
+      pm_plan_name:
+        pmPlan && typeof pmPlan === "object"
+          ? ((pmPlan as { name?: string }).name ?? null)
+          : null,
+      pm_plan_category:
+        pmPlan && typeof pmPlan === "object"
+          ? ((pmPlan as { category?: string }).category ?? null)
+          : null,
+      tasks: scheduleTasks,
     };
   });
 
   const { data: templatesRaw } = await supabase
     .from("preventive_maintenance_templates")
     .select(
-      "id, company_id, name, description, frequency_type, frequency_interval, priority, estimated_duration_minutes, instructions"
+      "id, company_id, name, description, frequency_type, frequency_interval, priority, estimated_duration_minutes, instructions, preventive_maintenance_template_tasks(id, title, description, asset_id, asset_group, sort_order)"
     )
     .in("company_id", companyIds)
     .order("name");
@@ -300,6 +349,19 @@ export default async function PreventiveMaintenancePage({
       (template as { estimated_duration_minutes?: number | null })
         .estimated_duration_minutes ?? null,
     instructions: (template as { instructions?: string | null }).instructions ?? null,
+    tasks: (
+      ((template as { preventive_maintenance_template_tasks?: unknown[] })
+        .preventive_maintenance_template_tasks ?? []) as Array<Record<string, unknown>>
+    )
+      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+      .map((task) => ({
+        id: (task.id as string) ?? "",
+        title: (task.title as string) ?? "",
+        description: (task.description as string | null) ?? null,
+        asset_id: (task.asset_id as string | null) ?? null,
+        asset_group: (task.asset_group as string | null) ?? null,
+        sort_order: Number(task.sort_order ?? 0),
+      })),
   }));
 
   return (
@@ -312,6 +374,7 @@ export default async function PreventiveMaintenancePage({
       />
       <PreventiveMaintenancePlansList
         plans={plans}
+        pmPlans={pmPlans}
         templates={templates}
         companies={companyOptions}
         assets={assets}
@@ -321,6 +384,9 @@ export default async function PreventiveMaintenancePage({
           frequency: frequency ?? "",
           status: status ?? "",
           technician_id: technicianId ?? "",
+          pm_plan_id: pmPlanId ?? "",
+          asset_id: assetFilterId ?? "",
+          overdue: overdueOnly ? "1" : "",
         }}
         initialPrefill={prefill}
         autoOpenNew={shouldOpenNew}

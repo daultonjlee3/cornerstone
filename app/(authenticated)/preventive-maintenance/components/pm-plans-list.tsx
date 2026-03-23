@@ -12,6 +12,7 @@ import {
   generatePreventiveMaintenanceNow,
   savePreventiveMaintenancePlan,
   savePreventiveMaintenanceTemplate,
+  updatePMProgramPlanActive,
   updatePreventiveMaintenancePlanStatus,
 } from "../actions";
 import {
@@ -49,6 +50,7 @@ type AssetOption = {
 type PMListRow = PreventiveMaintenancePlan & {
   asset_name?: string | null;
   technician_name?: string | null;
+  pm_plan_name?: string | null;
 };
 
 type FilterParams = {
@@ -56,10 +58,20 @@ type FilterParams = {
   frequency: string;
   status: string;
   technician_id: string;
+  pm_plan_id?: string;
+  asset_id?: string;
+  overdue?: string;
 };
 
 type Props = {
   plans: PMListRow[];
+  pmPlans: {
+    id: string;
+    company_id: string;
+    name: string;
+    category?: string | null;
+    active: boolean;
+  }[];
   templates: PreventiveMaintenanceTemplate[];
   companies: CompanyOption[];
   assets: AssetOption[];
@@ -90,6 +102,7 @@ function frequencyDisplay(plan: PMListRow): string {
 
 export function PreventiveMaintenancePlansList({
   plans,
+  pmPlans,
   templates,
   companies,
   assets,
@@ -232,6 +245,19 @@ export function PreventiveMaintenancePlansList({
       }
     });
   };
+  const handleTogglePmPlan = (pmPlanId: string, active: boolean) => {
+    startTransition(async () => {
+      const result = await updatePMProgramPlanActive(pmPlanId, active);
+      if (result.error) setMessage({ type: "error", text: result.error });
+      else {
+        setMessage({
+          type: "success",
+          text: `PM Plan ${active ? "activated" : "deactivated"}.`,
+        });
+        router.refresh();
+      }
+    });
+  };
 
   if (initialError) {
     return (
@@ -255,6 +281,42 @@ export function PreventiveMaintenancePlansList({
           {message.text}
         </div>
       )}
+
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">PM Program Plans</h3>
+          <Link href="/preventive-maintenance/plans" className="text-sm text-[var(--accent)] hover:underline">
+            Open full PM Plan view
+          </Link>
+        </div>
+        {pmPlans.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No PM plans yet.</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {pmPlans.map((pmPlan) => (
+              <div key={pmPlan.id} className="rounded border border-[var(--card-border)] px-3 py-2">
+                <p className="text-sm font-medium text-[var(--foreground)]">{pmPlan.name}</p>
+                <p className="text-xs text-[var(--muted)]">{pmPlan.category ?? "Uncategorized"}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <Link
+                    href={`/preventive-maintenance/plans/${pmPlan.id}`}
+                    className="text-xs text-[var(--accent)] hover:underline"
+                  >
+                    View schedules
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePmPlan(pmPlan.id, !pmPlan.active)}
+                    className="rounded border border-[var(--card-border)] px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--background)]"
+                  >
+                    {pmPlan.active ? "Deactivate" : "Activate"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3" data-tour="preventive-maintenance:generated-wo">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Preventive Maintenance</h2>
@@ -318,6 +380,53 @@ export function PreventiveMaintenancePlansList({
           </div>
           <div className="w-40">
             <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Asset
+            </label>
+            <select
+              value={filterParams.asset_id ?? ""}
+              onChange={(event) => applyFilters({ asset_id: event.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+            >
+              <option value="">All</option>
+              {assets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-32">
+            <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Due state
+            </label>
+            <select
+              value={filterParams.overdue ?? ""}
+              onChange={(event) => applyFilters({ overdue: event.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+            >
+              <option value="">All</option>
+              <option value="1">Overdue</option>
+            </select>
+          </div>
+          <div className="w-40">
+            <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              PM Plan
+            </label>
+            <select
+              value={filterParams.pm_plan_id ?? ""}
+              onChange={(event) => applyFilters({ pm_plan_id: event.target.value })}
+              className="w-full rounded-md border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+            >
+              <option value="">All</option>
+              {pmPlans.map((pmPlan) => (
+                <option key={pmPlan.id} value={pmPlan.id}>
+                  {pmPlan.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-40">
+            <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
               Technician
             </label>
             <select
@@ -374,7 +483,10 @@ export function PreventiveMaintenancePlansList({
           {(filterParams.q ||
             filterParams.frequency ||
             filterParams.status ||
-            filterParams.technician_id) && (
+            filterParams.technician_id ||
+            filterParams.pm_plan_id ||
+            filterParams.asset_id ||
+            filterParams.overdue) && (
             <button
               type="button"
               onClick={() =>
@@ -383,6 +495,9 @@ export function PreventiveMaintenancePlansList({
                   frequency: "",
                   status: "",
                   technician_id: "",
+                  pm_plan_id: "",
+                  asset_id: "",
+                  overdue: "",
                 })
               }
               className="rounded-lg border border-[var(--card-border)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--background)]"
@@ -423,6 +538,7 @@ export function PreventiveMaintenancePlansList({
               <thead>
                 <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/70 text-xs uppercase tracking-wide text-[var(--muted)]">
                   <th className="px-4 py-3 font-semibold">Name</th>
+                  <th className="px-4 py-3 font-semibold">PM Plan</th>
                   <th className="px-4 py-3 font-semibold">Asset</th>
                   <th className="px-4 py-3 font-semibold">Frequency</th>
                   <th className="px-4 py-3 font-semibold">Next Run</th>
@@ -444,6 +560,9 @@ export function PreventiveMaintenancePlansList({
                       >
                         {plan.name}
                       </Link>
+                    </td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
+                      {(plan as PMListRow & { pm_plan_name?: string | null }).pm_plan_name ?? "—"}
                     </td>
                     <td className="px-4 py-3.5 text-[var(--muted)]">
                       {plan.asset_name ?? "—"}
@@ -550,6 +669,7 @@ export function PreventiveMaintenancePlansList({
           assets={assets}
           technicians={technicians}
           templates={templates}
+          pmPlans={pmPlans}
           saveAction={savePreventiveMaintenancePlan}
         />
       )}
@@ -564,6 +684,11 @@ export function PreventiveMaintenancePlansList({
           }}
           template={editingTemplate}
           companies={companies}
+          assets={assets.map((asset) => ({
+            id: asset.id,
+            name: asset.name,
+            company_id: asset.company_id,
+          }))}
           saveAction={savePreventiveMaintenanceTemplate}
         />
       )}

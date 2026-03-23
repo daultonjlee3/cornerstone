@@ -296,19 +296,31 @@ export default function ProductPage() {
       {/* Section 10: Pricing simplicity */}
       <Section>
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="mk-section-headline">Simple technician-based pricing</h2>
+          <h2 className="mk-section-headline">Simple pricing for early customers</h2>
           <p className="mt-6 mk-body-lg">
-            {SITE_NAME} only charges for technicians. Managers, supervisors, dispatchers, and office
-            staff are included at no extra cost—so you can run your full team in one platform
-            without per-seat surprises.
+            Cornerstone OS gives your full maintenance team one modern platform for work
+            orders, preventive maintenance, assets, and dispatch. Managers, supervisors,
+            dispatchers, and office staff are included at no extra cost.
           </p>
           <div className="mt-10 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8 shadow-[var(--shadow-soft)]">
             <p className="text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
-              $75 per technician <span className="text-[var(--muted)] font-normal">/ month</span>
+              $850/month
             </p>
-            <p className="mt-2 text-[var(--muted)]">$750 monthly platform minimum</p>
+            <p className="mt-2 text-[var(--muted)]">Up to 20 technicians included</p>
+            <p className="mt-2 text-sm font-medium text-[var(--foreground)]/80">
+              Everything included. No per-module pricing.
+            </p>
+            <div className="mx-auto mt-6 max-w-md rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-4 py-3 text-left shadow-[var(--shadow-soft)]">
+              <p className="text-sm font-semibold text-[var(--accent)]">
+                Get 2 months free with annual billing
+              </p>
+              <p className="mt-1 text-base font-semibold text-[var(--foreground)]">
+                Pay annually: $8,500/year
+              </p>
+              <p className="mt-1 text-sm text-[var(--muted)]">Save $1,700 per year</p>
+            </div>
             <p className="mt-6 text-sm text-[var(--muted)]">
-              The first 25 teams can lock in founding customer pricing and benefits.
+              Founding pricing available for a limited number of early customers.
             </p>
             <Link
               href={ROUTES.pricing}

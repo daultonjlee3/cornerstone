@@ -451,6 +451,9 @@ export async function saveWorkOrder(
   const buildingId = (formData.get("building_id") as string)?.trim() || null;
   const unitId = (formData.get("unit_id") as string)?.trim() || null;
   const assetId = (formData.get("asset_id") as string)?.trim() || null;
+  let resolvedAssetId = assetId;
+  const parentWorkOrderId =
+    (formData.get("parent_work_order_id") as string | null)?.trim() || null;
   const hasRequestIdField = formData.has("request_id");
   const requestId = hasRequestIdField
     ? (formData.get("request_id") as string | null)?.trim() || null
@@ -595,6 +598,49 @@ export async function saveWorkOrder(
   });
   if (assignmentValidationError) return { error: assignmentValidationError };
 
+  if (parentWorkOrderId) {
+    if (id && parentWorkOrderId === id) {
+      return { error: "Work order cannot be its own parent." };
+    }
+    const { data: parentRow } = await supabase
+      .from("work_orders")
+      .select(
+        "id, company_id, property_id, building_id, unit_id, asset_id, parent_work_order_id"
+      )
+      .eq("id", parentWorkOrderId)
+      .maybeSingle();
+    if (!parentRow) return { error: "Parent work order not found." };
+    const parent = parentRow as {
+      id: string;
+      company_id: string;
+      property_id: string | null;
+      building_id: string | null;
+      unit_id: string | null;
+      asset_id: string | null;
+      parent_work_order_id?: string | null;
+    };
+    if (parent.company_id !== companyId) {
+      return { error: "Parent work order must belong to the same company." };
+    }
+    if (parent.parent_work_order_id) {
+      return { error: "Only one level of nesting is supported." };
+    }
+    if (!resolvedPropertyId) resolvedPropertyId = parent.property_id;
+    if (!resolvedBuildingId) resolvedBuildingId = parent.building_id;
+    if (!resolvedUnitId) resolvedUnitId = parent.unit_id;
+    if (!resolvedAssetId && parent.asset_id) resolvedAssetId = parent.asset_id;
+    if (id) {
+      const { data: childRows } = await supabase
+        .from("work_orders")
+        .select("id")
+        .eq("parent_work_order_id", id)
+        .limit(1);
+      if ((childRows ?? []).length > 0) {
+        return { error: "Cannot set a parent for a work order that already has children." };
+      }
+    }
+  }
+
   const payload: Record<string, unknown> = {
     tenant_id: tenantId,
     company_id: companyId,
@@ -602,7 +648,8 @@ export async function saveWorkOrder(
     property_id: resolvedPropertyId || null,
     building_id: resolvedBuildingId || null,
     unit_id: resolvedUnitId || null,
-    asset_id: assetId || null,
+    asset_id: resolvedAssetId || null,
+    parent_work_order_id: parentWorkOrderId,
     title,
     description: (formData.get("description") as string)?.trim() || null,
     safety_notes: (formData.get("safety_notes") as string)?.trim() || null,

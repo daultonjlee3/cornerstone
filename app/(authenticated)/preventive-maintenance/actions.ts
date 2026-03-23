@@ -31,6 +31,7 @@ export type PreventiveMaintenanceGenerationState = {
   skipped?: number;
   failed?: number;
 };
+export type PMProgramPlanFormState = { error?: string; success?: boolean };
 
 type PlanRow = {
   id: string;
@@ -53,6 +54,28 @@ type PlanRow = {
   assigned_technician_id: string | null;
   instructions: string | null;
   status: "active" | "paused" | "archived";
+  template_id?: string | null;
+  pm_plan_id?: string | null;
+  generate_parent_work_order?: boolean;
+  generate_child_work_orders?: boolean;
+};
+type PMTemplateTaskRow = {
+  id: string;
+  pm_template_id: string;
+  title: string;
+  description: string | null;
+  asset_id: string | null;
+  asset_group: string | null;
+  sort_order: number;
+};
+
+type PMScheduleTaskRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  asset_id: string | null;
+  sort_order: number;
+  active: boolean;
 };
 
 async function getActorId(
@@ -62,6 +85,70 @@ async function getActorId(
     data: { user },
   } = await supabase.auth.getUser();
   return user?.id ?? null;
+}
+
+export async function savePMProgramPlan(
+  _prev: PMProgramPlanFormState,
+  formData: FormData
+): Promise<PMProgramPlanFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+
+  const id = (formData.get("id") as string | null)?.trim() || null;
+  const companyId = (formData.get("company_id") as string | null)?.trim();
+  const name = (formData.get("name") as string | null)?.trim();
+  const description = (formData.get("description") as string | null)?.trim() || null;
+  const category = (formData.get("category") as string | null)?.trim() || null;
+  const active =
+    formData.get("active") !== null && formData.get("active") !== "off";
+
+  if (!companyId) return { error: "Company is required." };
+  if (!name) return { error: "Plan name is required." };
+  const allowed = await companyBelongsToTenant(companyId, tenantId);
+  if (!allowed) return { error: "Invalid company." };
+
+  const payload = {
+    tenant_id: tenantId,
+    company_id: companyId,
+    name,
+    description,
+    category,
+    active,
+  };
+
+  if (id) {
+    const { error } = await supabase.from("pm_plans").update(payload).eq("id", id);
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.from("pm_plans").insert(payload);
+    if (error) return { error: error.message };
+  }
+  revalidatePath("/preventive-maintenance");
+  revalidatePath("/preventive-maintenance/plans");
+  return { success: true };
+}
+
+export async function updatePMProgramPlanActive(
+  id: string,
+  active: boolean
+): Promise<PMProgramPlanFormState> {
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  const { data: row } = await supabase
+    .from("pm_plans")
+    .select("id, company_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row) return { error: "PM Plan not found." };
+  const allowed = await companyBelongsToTenant((row as { company_id: string }).company_id, tenantId);
+  if (!allowed) return { error: "Unauthorized." };
+  const { error } = await supabase.from("pm_plans").update({ active }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/preventive-maintenance");
+  revalidatePath("/preventive-maintenance/plans");
+  return { success: true };
 }
 
 async function loadAssetContext(assetId: string): Promise<{
@@ -155,21 +242,58 @@ function toPlanRow(data: Record<string, unknown>): PlanRow {
     assigned_technician_id: (data.assigned_technician_id as string | null) ?? null,
     instructions: (data.instructions as string | null) ?? null,
     status: (data.status as "active" | "paused" | "archived") ?? "active",
+    template_id: (data.template_id as string | null) ?? null,
+    pm_plan_id: (data.pm_plan_id as string | null) ?? null,
+    generate_parent_work_order:
+      (data.generate_parent_work_order as boolean | null) ?? true,
+    generate_child_work_orders:
+      (data.generate_child_work_orders as boolean | null) ?? false,
   };
 }
 
-async function createWorkOrderFromPlan(
+async function loadPlanTemplateTasks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  plan: PlanRow
+): Promise<PMTemplateTaskRow[]> {
+  if (!plan.template_id) return [];
+  const { data } = await supabase
+    .from("preventive_maintenance_template_tasks")
+    .select("id, pm_template_id, title, description, asset_id, asset_group, sort_order")
+    .eq("pm_template_id", plan.template_id)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  return (data ?? []) as PMTemplateTaskRow[];
+}
+
+async function loadScheduleTasks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  scheduleId: string
+): Promise<PMScheduleTaskRow[]> {
+  const { data } = await supabase
+    .from("preventive_maintenance_schedule_tasks")
+    .select("id, title, description, asset_id, sort_order, active")
+    .eq("pm_schedule_id", scheduleId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  return (data ?? []) as PMScheduleTaskRow[];
+}
+
+async function createWorkOrderFromPlanTask(
   supabase: Awaited<ReturnType<typeof createClient>>,
   plan: PlanRow,
   runId: string,
-  scheduledDate: string
+  scheduledDate: string,
+  task: PMTemplateTaskRow | null,
+  parentWorkOrderId: string | null
 ): Promise<string> {
+  const taskAssetId = task?.asset_id ?? null;
+  const effectiveAssetId = taskAssetId ?? plan.asset_id;
   let resolvedAssetName: string | null = null;
-  if (!resolvedAssetName && plan.asset_id) {
+  if (!resolvedAssetName && effectiveAssetId) {
     const { data: asset } = await supabase
       .from("assets")
       .select("asset_name, name")
-      .eq("id", plan.asset_id)
+      .eq("id", effectiveAssetId)
       .maybeSingle();
     resolvedAssetName =
       ((asset as { asset_name?: string }).asset_name ??
@@ -177,8 +301,10 @@ async function createWorkOrderFromPlan(
         null);
   }
 
-  const title = `Preventive Maintenance - ${resolvedAssetName ?? plan.name}`;
-  const descriptionParts = [plan.description, plan.instructions].filter(Boolean);
+  const title = parentWorkOrderId
+    ? task?.title ?? `Preventive Maintenance Task - ${resolvedAssetName ?? plan.name}`
+    : `Preventive Maintenance - ${plan.name}`;
+  const descriptionParts = [task?.description, plan.description, plan.instructions].filter(Boolean);
   const workOrderNumber = await generateWorkOrderNumber(supabase, plan.company_id);
 
   const payload = {
@@ -187,7 +313,8 @@ async function createWorkOrderFromPlan(
     property_id: plan.property_id,
     building_id: plan.building_id,
     unit_id: plan.unit_id,
-    asset_id: plan.asset_id,
+    asset_id: effectiveAssetId,
+    parent_work_order_id: parentWorkOrderId,
     work_order_number: workOrderNumber,
     title,
     description: descriptionParts.length ? descriptionParts.join("\n\n") : null,
@@ -226,7 +353,7 @@ async function processPlanRun(
   forceCreateWorkOrder: boolean,
   tenantId: string,
   actorId: string | null
-): Promise<{ status: "generated" | "skipped" | "failed"; workOrderGenerated: boolean; error?: string }> {
+): Promise<{ status: "generated" | "skipped" | "failed"; workOrdersGenerated: number; error?: string }> {
   const scheduled = formatDateOnly(scheduledDate);
 
   // Idempotency: unique constraint on (plan_id, scheduled_date) prevents duplicate runs; 23505 = unique violation.
@@ -234,6 +361,9 @@ async function processPlanRun(
     .from("preventive_maintenance_runs")
     .insert({
       preventive_maintenance_plan_id: plan.id,
+      pm_schedule_id: plan.id,
+      pm_plan_id: plan.pm_plan_id ?? null,
+      company_id: plan.company_id,
       scheduled_date: scheduled,
       status: "pending",
       notes: forceCreateWorkOrder ? "Manual run generation" : null,
@@ -243,27 +373,79 @@ async function processPlanRun(
 
   if (runInsertError) {
     if ((runInsertError as { code?: string }).code === "23505") {
-      return { status: "skipped", workOrderGenerated: false };
+      return { status: "skipped", workOrdersGenerated: 0 };
     }
-    return { status: "failed", workOrderGenerated: false, error: runInsertError.message };
+    return { status: "failed", workOrdersGenerated: 0, error: runInsertError.message };
   }
 
   const runId = (runRow as { id: string }).id;
-  let generatedWorkOrderId: string | null = null;
+  const generatedWorkOrderIds: string[] = [];
   const shouldCreateWorkOrder = forceCreateWorkOrder || plan.auto_create_work_order;
   let runStatus: "generated" | "skipped" | "failed" = "generated";
   let runNotes: string | null = forceCreateWorkOrder ? "Manual run generation" : null;
 
   if (shouldCreateWorkOrder) {
     try {
-      generatedWorkOrderId = await createWorkOrderFromPlan(supabase, plan, runId, scheduled);
+      const scheduleTasks = (await loadScheduleTasks(supabase, plan.id)).filter((task) => task.active);
+      const templateTasks = await loadPlanTemplateTasks(supabase, plan);
+      const executionTasks = scheduleTasks.length
+        ? scheduleTasks.map((task) => ({
+            id: task.id,
+            pm_template_id: "",
+            title: task.title,
+            description: task.description,
+            asset_id: task.asset_id,
+            asset_group: null,
+            sort_order: task.sort_order,
+          }))
+        : templateTasks;
+      const shouldGenerateChildren =
+        (plan.generate_child_work_orders ?? false) && executionTasks.length > 0;
+      const shouldGenerateParent =
+        (plan.generate_parent_work_order ?? true) || !shouldGenerateChildren;
+
+      if (!shouldGenerateChildren) {
+        const workOrderId = await createWorkOrderFromPlanTask(
+          supabase,
+          plan,
+          runId,
+          scheduled,
+          null,
+          null
+        );
+        generatedWorkOrderIds.push(workOrderId);
+      } else {
+        let parentWorkOrderId: string | null = null;
+        if (shouldGenerateParent) {
+          parentWorkOrderId = await createWorkOrderFromPlanTask(
+            supabase,
+            plan,
+            runId,
+            scheduled,
+            null,
+            null
+          );
+          generatedWorkOrderIds.push(parentWorkOrderId);
+        }
+        for (const task of executionTasks) {
+          const childWorkOrderId = await createWorkOrderFromPlanTask(
+            supabase,
+            plan,
+            runId,
+            scheduled,
+            task,
+            parentWorkOrderId
+          );
+          generatedWorkOrderIds.push(childWorkOrderId);
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await supabase
         .from("preventive_maintenance_runs")
         .update({ status: "failed", notes: message })
         .eq("id", runId);
-      return { status: "failed", workOrderGenerated: false, error: message };
+      return { status: "failed", workOrdersGenerated: 0, error: message };
     }
   } else {
     runStatus = "skipped";
@@ -273,13 +455,23 @@ async function processPlanRun(
   const { error: runUpdateError } = await supabase
     .from("preventive_maintenance_runs")
     .update({
-      generated_work_order_id: generatedWorkOrderId,
+      generated_work_order_id: generatedWorkOrderIds[0] ?? null,
+      parent_work_order_id: generatedWorkOrderIds[0] ?? null,
+      generated_at: new Date().toISOString(),
       status: runStatus,
       notes: runNotes,
     })
     .eq("id", runId);
   if (runUpdateError) {
-    return { status: "failed", workOrderGenerated: false, error: runUpdateError.message };
+    return { status: "failed", workOrdersGenerated: generatedWorkOrderIds.length, error: runUpdateError.message };
+  }
+  if (generatedWorkOrderIds.length > 0) {
+    await supabase.from("preventive_maintenance_run_work_orders").insert(
+      generatedWorkOrderIds.map((workOrderId) => ({
+        preventive_maintenance_run_id: runId,
+        work_order_id: workOrderId,
+      }))
+    );
   }
 
   const nextRun = calculateNextRunDateAfterExecution({
@@ -298,7 +490,7 @@ async function processPlanRun(
     .eq("id", plan.id);
 
   if (updatePlanError) {
-    return { status: "failed", workOrderGenerated: !!generatedWorkOrderId, error: updatePlanError.message };
+    return { status: "failed", workOrdersGenerated: generatedWorkOrderIds.length, error: updatePlanError.message };
   }
 
   await insertActivityLog(supabase, {
@@ -310,18 +502,18 @@ async function processPlanRun(
     performedBy: actorId,
     metadata: {
       preventive_maintenance_plan_id: plan.id,
-      generated_work_order_id: generatedWorkOrderId,
+        generated_work_order_ids: generatedWorkOrderIds,
       auto_create_work_order: plan.auto_create_work_order,
       force_create_work_order: forceCreateWorkOrder,
     },
     afterState: {
       status: runStatus,
       scheduled_date: scheduled,
-      generated_work_order_id: generatedWorkOrderId,
+        generated_work_order_id: generatedWorkOrderIds[0] ?? null,
     },
   });
 
-  if (generatedWorkOrderId) {
+  for (const generatedWorkOrderId of generatedWorkOrderIds) {
     await insertActivityLog(supabase, {
       tenantId,
       companyId: plan.company_id,
@@ -342,7 +534,7 @@ async function processPlanRun(
     });
   }
 
-  return { status: "generated", workOrderGenerated: !!generatedWorkOrderId };
+  return { status: "generated", workOrdersGenerated: generatedWorkOrderIds.length };
 }
 
 export async function savePreventiveMaintenancePlan(
@@ -373,6 +565,17 @@ export async function savePreventiveMaintenancePlan(
 
   const allowed = await companyBelongsToTenant(companyId, tenantId);
   if (!allowed) return { error: "Invalid company." };
+  if (pmPlanId) {
+    const { data: pmPlanRow } = await supabase
+      .from("pm_plans")
+      .select("id, company_id")
+      .eq("id", pmPlanId)
+      .maybeSingle();
+    if (!pmPlanRow) return { error: "PM Plan not found." };
+    if ((pmPlanRow as { company_id: string }).company_id !== companyId) {
+      return { error: "PM Plan must belong to the selected company." };
+    }
+  }
 
   const assetId = (formData.get("asset_id") as string | null)?.trim() || null;
   const propertyIdInput = (formData.get("property_id") as string | null)?.trim() || null;
@@ -405,6 +608,18 @@ export async function savePreventiveMaintenancePlan(
   const autoCreateWorkOrder =
     formData.get("auto_create_work_order") !== null &&
     formData.get("auto_create_work_order") !== "off";
+  const generateParentWorkOrder =
+    formData.get("generate_parent_work_order") !== null &&
+    formData.get("generate_parent_work_order") !== "off";
+  const generateChildWorkOrders =
+    formData.get("generate_child_work_orders") !== null &&
+    formData.get("generate_child_work_orders") !== "off";
+  const pmPlanId = (formData.get("pm_plan_id") as string | null)?.trim() || null;
+  const intervalValueRaw = (formData.get("interval_value") as string | null)?.trim();
+  const intervalValue =
+    intervalValueRaw && Number.isFinite(parseInt(intervalValueRaw, 10))
+      ? Math.max(parseInt(intervalValueRaw, 10), 1)
+      : null;
 
   const actorId = await getActorId(supabase);
   let beforeState: Record<string, unknown> | null = null;
@@ -447,12 +662,25 @@ export async function savePreventiveMaintenancePlan(
     start_date: startDate,
     next_run_date: nextRunDate,
     auto_create_work_order: autoCreateWorkOrder,
+    generate_parent_work_order: generateParentWorkOrder,
+    generate_child_work_orders: generateChildWorkOrders,
+    pm_plan_id: pmPlanId,
+    interval_value: intervalValue,
     priority,
     estimated_duration_minutes: estimatedDurationMinutes,
     assigned_technician_id: assignedTechnicianId,
     instructions: (formData.get("instructions") as string | null)?.trim() || null,
     status,
   };
+  const taskTitles = formData.getAll("task_title").map((value) => String(value ?? "").trim());
+  const taskDescriptions = formData
+    .getAll("task_description")
+    .map((value) => String(value ?? "").trim());
+  const taskAssetIds = formData.getAll("task_asset_id").map((value) => String(value ?? "").trim());
+  const taskSortOrders = formData
+    .getAll("task_sort_order")
+    .map((value) => parseInt(String(value ?? "").trim(), 10));
+  const taskIds = formData.getAll("task_id").map((value) => String(value ?? "").trim());
 
   if (id) {
     const { data: updated, error } = await supabase
@@ -472,6 +700,26 @@ export async function savePreventiveMaintenancePlan(
       beforeState,
       afterState: updated as Record<string, unknown>,
     });
+    await supabase
+      .from("preventive_maintenance_schedule_tasks")
+      .delete()
+      .eq("pm_schedule_id", id);
+    const scheduleTasksToInsert = taskTitles
+      .map((title, index) => ({
+        id: taskIds[index] || undefined,
+        pm_schedule_id: id,
+        title,
+        description: taskDescriptions[index] || null,
+        asset_id: taskAssetIds[index] || null,
+        sort_order: Number.isFinite(taskSortOrders[index]) ? taskSortOrders[index] : index,
+      }))
+      .filter((task) => task.title);
+    if (scheduleTasksToInsert.length > 0) {
+      const { error: scheduleTaskError } = await supabase
+        .from("preventive_maintenance_schedule_tasks")
+        .insert(scheduleTasksToInsert);
+      if (scheduleTaskError) return { error: scheduleTaskError.message };
+    }
     revalidatePath(`/preventive-maintenance/${id}`);
   } else {
     const { data: inserted, error } = await supabase
@@ -489,6 +737,22 @@ export async function savePreventiveMaintenancePlan(
       performedBy: actorId,
       afterState: inserted as Record<string, unknown>,
     });
+    const insertedId = (inserted as { id: string }).id;
+    const scheduleTasksToInsert = taskTitles
+      .map((title, index) => ({
+        pm_schedule_id: insertedId,
+        title,
+        description: taskDescriptions[index] || null,
+        asset_id: taskAssetIds[index] || null,
+        sort_order: Number.isFinite(taskSortOrders[index]) ? taskSortOrders[index] : index,
+      }))
+      .filter((task) => task.title);
+    if (scheduleTasksToInsert.length > 0) {
+      const { error: scheduleTaskError } = await supabase
+        .from("preventive_maintenance_schedule_tasks")
+        .insert(scheduleTasksToInsert);
+      if (scheduleTaskError) return { error: scheduleTaskError.message };
+    }
   }
 
   revalidatePath("/preventive-maintenance");
@@ -691,11 +955,53 @@ export async function savePreventiveMaintenanceTemplate(
       .update(payload)
       .eq("id", id);
     if (error) return { error: error.message };
+    await supabase
+      .from("preventive_maintenance_template_tasks")
+      .delete()
+      .eq("pm_template_id", id);
+    const tasksToInsert = taskTitles
+      .map((title, index) => ({
+        id: taskIds[index] || undefined,
+        pm_template_id: id,
+        title,
+        description: taskDescriptions[index] || null,
+        asset_id: taskAssetIds[index] || null,
+        asset_group: taskAssetGroups[index] || null,
+        sort_order: Number.isFinite(taskSortOrders[index]) ? taskSortOrders[index] : index,
+      }))
+      .filter((task) => task.title);
+    if (tasksToInsert.length > 0) {
+      const { error: taskError } = await supabase
+        .from("preventive_maintenance_template_tasks")
+        .insert(tasksToInsert);
+      if (taskError) return { error: taskError.message };
+    }
   } else {
-    const { error } = await supabase
+    const { data: insertedTemplate, error } = await supabase
       .from("preventive_maintenance_templates")
-      .insert(payload);
+      .insert(payload)
+      .select("id")
+      .single();
     if (error) return { error: error.message };
+    const templateId = (insertedTemplate as { id?: string } | null)?.id ?? null;
+    if (templateId) {
+      const tasksToInsert = taskTitles
+        .map((title, index) => ({
+          pm_template_id: templateId,
+          title,
+          description: taskDescriptions[index] || null,
+          asset_id: taskAssetIds[index] || null,
+          asset_group: taskAssetGroups[index] || null,
+          sort_order: Number.isFinite(taskSortOrders[index]) ? taskSortOrders[index] : index,
+        }))
+        .filter((task) => task.title);
+      if (tasksToInsert.length > 0) {
+        const { error: taskError } = await supabase
+          .from("preventive_maintenance_template_tasks")
+          .insert(tasksToInsert);
+        if (taskError) return { error: taskError.message };
+      }
+    }
   }
 
   revalidatePath("/preventive-maintenance");
@@ -863,7 +1169,7 @@ export async function generatePreventiveMaintenanceNow(
   return {
     success: true,
     generatedRuns: 1,
-    generatedWorkOrders: result.workOrderGenerated ? 1 : 0,
+    generatedWorkOrders: result.workOrdersGenerated,
   };
 }
 
@@ -909,7 +1215,7 @@ export async function generateDuePreventiveMaintenanceRuns(
     );
     if (result.status === "generated") {
       generatedRuns += 1;
-      if (result.workOrderGenerated) generatedWorkOrders += 1;
+      generatedWorkOrders += result.workOrdersGenerated;
     } else if (result.status === "skipped") {
       skipped += 1;
     } else {

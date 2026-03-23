@@ -366,6 +366,10 @@ export default async function WorkOrdersPage({
         building_id: typeof resolvedSearchParams?.building_id === "string" ? resolvedSearchParams.building_id : undefined,
         unit_id: typeof resolvedSearchParams?.unit_id === "string" ? resolvedSearchParams.unit_id : undefined,
         asset_id: typeof resolvedSearchParams?.asset_id === "string" ? resolvedSearchParams.asset_id : undefined,
+        parent_work_order_id:
+          typeof resolvedSearchParams?.parent_work_order_id === "string"
+            ? resolvedSearchParams.parent_work_order_id
+            : undefined,
         title: typeof resolvedSearchParams?.title === "string" ? decodeURIComponent(resolvedSearchParams.title) : undefined,
         description:
           typeof resolvedSearchParams?.description === "string"
@@ -373,7 +377,16 @@ export default async function WorkOrdersPage({
             : undefined,
       }
     : null;
-  const autoOpenNew = wantNew && (prefill?.company_id ?? prefill?.property_id ?? prefill?.building_id ?? prefill?.unit_id ?? prefill?.asset_id ?? prefill?.title ?? prefill?.description);
+  const autoOpenNew =
+    wantNew &&
+    (prefill?.company_id ??
+      prefill?.property_id ??
+      prefill?.building_id ??
+      prefill?.unit_id ??
+      prefill?.asset_id ??
+      prefill?.parent_work_order_id ??
+      prefill?.title ??
+      prefill?.description);
   const editId = typeof resolvedSearchParams?.edit === "string" ? resolvedSearchParams.edit : null;
   const technicianOptions = (techniciansData ?? []).map((t) => ({
     id: t.id,
@@ -474,6 +487,7 @@ export default async function WorkOrdersPage({
       estimated_hours, estimated_technicians, actual_hours,
       billable, nte_amount, updated_at,
       source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
+      parent_work_order_id,
       completed_at, completion_status,
       companies(name),
       customers(name),

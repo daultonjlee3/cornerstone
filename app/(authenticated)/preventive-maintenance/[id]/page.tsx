@@ -28,7 +28,7 @@ export default async function PreventiveMaintenanceDetailPage({
   const { data: planRaw, error } = await supabase
     .from("preventive_maintenance_plans")
     .select(
-      "id, tenant_id, company_id, asset_id, property_id, building_id, unit_id, name, description, frequency_type, frequency_interval, start_date, next_run_date, last_run_date, auto_create_work_order, priority, estimated_duration_minutes, assigned_technician_id, instructions, status, companies(name), assets(asset_name, name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number), technicians!assigned_technician_id(technician_name, name)"
+      "id, tenant_id, company_id, pm_plan_id, generate_parent_work_order, generate_child_work_orders, asset_id, property_id, building_id, unit_id, name, description, frequency_type, frequency_interval, start_date, next_run_date, last_run_date, auto_create_work_order, priority, estimated_duration_minutes, assigned_technician_id, instructions, status, companies(name), pm_plans(name, category), assets(asset_name, name), properties(property_name, name), buildings(building_name, name), units(unit_name, name_or_number), technicians!assigned_technician_id(technician_name, name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -43,6 +43,7 @@ export default async function PreventiveMaintenanceDetailPage({
   const building = Array.isArray(row.buildings) ? row.buildings[0] : row.buildings;
   const unit = Array.isArray(row.units) ? row.units[0] : row.units;
   const technician = Array.isArray(row.technicians) ? row.technicians[0] : row.technicians;
+  const pmPlan = Array.isArray(row.pm_plans) ? row.pm_plans[0] : row.pm_plans;
 
   const plan = {
     id: row.id as string,
@@ -59,6 +60,19 @@ export default async function PreventiveMaintenanceDetailPage({
       (row.estimated_duration_minutes as number | null) ?? null,
     instructions: (row.instructions as string | null) ?? null,
     status: row.status as "active" | "paused" | "archived",
+    pm_plan_id: (row.pm_plan_id as string | null) ?? null,
+    pm_plan_name:
+      pmPlan && typeof pmPlan === "object"
+        ? ((pmPlan as { name?: string }).name ?? null)
+        : null,
+    pm_plan_category:
+      pmPlan && typeof pmPlan === "object"
+        ? ((pmPlan as { category?: string }).category ?? null)
+        : null,
+    generate_parent_work_order:
+      (row.generate_parent_work_order as boolean | null) ?? true,
+    generate_child_work_orders:
+      (row.generate_child_work_orders as boolean | null) ?? false,
     company_name:
       company && typeof company === "object"
         ? ((company as { name?: string }).name ?? null)
@@ -105,11 +119,33 @@ export default async function PreventiveMaintenanceDetailPage({
   const generatedWorkOrderIds = (runsRaw ?? [])
     .map((run) => (run as { generated_work_order_id?: string | null }).generated_work_order_id)
     .filter(Boolean) as string[];
-  const { data: workOrdersRaw } = generatedWorkOrderIds.length
+  const runIds = (runsRaw ?? []).map((run) => (run as { id: string }).id);
+  const { data: runWorkOrdersRaw } = runIds.length
+    ? await supabase
+        .from("preventive_maintenance_run_work_orders")
+        .select("preventive_maintenance_run_id, work_order_id")
+        .in("preventive_maintenance_run_id", runIds)
+    : { data: [] as unknown[] };
+  const runWorkOrdersByRunId = new Map<string, string[]>();
+  for (const row of (runWorkOrdersRaw ?? []) as Array<{
+    preventive_maintenance_run_id: string;
+    work_order_id: string;
+  }>) {
+    const existing = runWorkOrdersByRunId.get(row.preventive_maintenance_run_id) ?? [];
+    existing.push(row.work_order_id);
+    runWorkOrdersByRunId.set(row.preventive_maintenance_run_id, existing);
+  }
+  const generatedWorkOrderIdsFromLinks = (runWorkOrdersRaw ?? []).map(
+    (row) => (row as { work_order_id: string }).work_order_id
+  );
+  const allGeneratedWorkOrderIds = Array.from(
+    new Set([...generatedWorkOrderIds, ...generatedWorkOrderIdsFromLinks])
+  );
+  const { data: workOrdersRaw } = allGeneratedWorkOrderIds.length
     ? await supabase
         .from("work_orders")
         .select("id, work_order_number, title, status")
-        .in("id", generatedWorkOrderIds)
+        .in("id", allGeneratedWorkOrderIds)
     : { data: [] as unknown[] };
   const workOrderById = new Map(
     (workOrdersRaw ?? []).map((workOrder) => [
@@ -130,6 +166,15 @@ export default async function PreventiveMaintenanceDetailPage({
     const workOrder = generatedWorkOrderId
       ? workOrderById.get(generatedWorkOrderId)
       : null;
+    const linkedWorkOrderIds = runWorkOrdersByRunId.get(runRow.id as string) ?? [];
+    const linkedWorkOrders = linkedWorkOrderIds
+      .map((workOrderId) => workOrderById.get(workOrderId))
+      .filter(Boolean);
+    const parentWorkOrderId = linkedWorkOrderIds[0] ?? generatedWorkOrderId;
+    const childCount = Math.max(
+      0,
+      linkedWorkOrders.filter((workOrder) => workOrder?.id !== parentWorkOrderId).length
+    );
     return {
       id: runRow.id as string,
       scheduled_date: runRow.scheduled_date as string,
@@ -139,6 +184,8 @@ export default async function PreventiveMaintenanceDetailPage({
       work_order_number: workOrder?.work_order_number ?? null,
       work_order_title: workOrder?.title ?? null,
       work_order_status: workOrder?.status ?? null,
+      linked_work_orders: linkedWorkOrders,
+      child_work_order_count: childCount,
     };
   });
 
@@ -216,6 +263,18 @@ export default async function PreventiveMaintenanceDetailPage({
           <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">Schedule</h2>
           <dl className="space-y-2 text-sm">
             <div>
+              <dt className="text-xs text-[var(--muted)]">PM Plan</dt>
+              <dd className="text-[var(--foreground)]">
+                {plan.pm_plan_id ? (
+                  <Link href={`/preventive-maintenance/plans/${plan.pm_plan_id}`} className="text-[var(--accent)] hover:underline">
+                    {plan.pm_plan_name ?? "View PM plan"}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </dd>
+            </div>
+            <div>
               <dt className="text-xs text-[var(--muted)]">Frequency</dt>
               <dd className="text-[var(--foreground)]">
                 Every {plan.frequency_interval} {plan.frequency_type}
@@ -243,6 +302,12 @@ export default async function PreventiveMaintenanceDetailPage({
                 {plan.estimated_duration_minutes != null
                   ? `${plan.estimated_duration_minutes} min`
                   : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[var(--muted)]">Hierarchy generation</dt>
+              <dd className="text-[var(--foreground)]">
+                Parent: {plan.generate_parent_work_order ? "Yes" : "No"} · Children: {plan.generate_child_work_orders ? "Yes" : "No"}
               </dd>
             </div>
             <div>
@@ -275,7 +340,8 @@ export default async function PreventiveMaintenanceDetailPage({
                 <tr className="border-b border-[var(--card-border)]">
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Scheduled Date</th>
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Status</th>
-                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Generated Work Order</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Generated Work Orders</th>
+                  <th className="px-2 py-2 font-medium text-[var(--foreground)]">Child WOs</th>
                   <th className="px-2 py-2 font-medium text-[var(--foreground)]">Notes</th>
                 </tr>
               </thead>
@@ -287,17 +353,29 @@ export default async function PreventiveMaintenanceDetailPage({
                     </td>
                     <td className="px-2 py-2 text-[var(--muted)]">{run.status}</td>
                     <td className="px-2 py-2 text-[var(--muted)]">
-                      {run.generated_work_order_id ? (
+                      {run.linked_work_orders?.length ? (
+                        <div className="space-y-1">
+                          {run.linked_work_orders.map((wo) => (
+                            <div key={wo?.id}>
+                              <Link
+                                href={`/work-orders/${wo?.id}`}
+                                className="text-[var(--accent)] hover:underline"
+                              >
+                                {wo?.work_order_number ?? wo?.title ?? "View work order"}
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                      ) : run.generated_work_order_id ? (
                         <Link
                           href={`/work-orders/${run.generated_work_order_id}`}
                           className="text-[var(--accent)] hover:underline"
                         >
                           {run.work_order_number ?? run.work_order_title ?? "View work order"}
                         </Link>
-                      ) : (
-                        "—"
-                      )}
+                      ) : "—"}
                     </td>
+                    <td className="px-2 py-2 text-[var(--muted)]">{run.child_work_order_count ?? 0}</td>
                     <td className="px-2 py-2 text-[var(--muted)]">{run.notes ?? "—"}</td>
                   </tr>
                 ))}

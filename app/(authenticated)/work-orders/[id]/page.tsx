@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { getWorkOrderMaterialLinesWithAvailability } from "../actions";
 import { WorkOrderDetailView, type PartUsageForDetail } from "../components/work-order-detail-view";
+import { getParentWorkOrder, getWorkOrderWithChildren } from "@/src/lib/work-orders/hierarchy";
 import {
   calculateWorkOrderSlaSnapshot,
   groupSlaPoliciesByCompany,
@@ -36,6 +37,7 @@ export default async function WorkOrderDetailPage({
       `
       id, work_order_number, title, description, category, priority, status,
       company_id, customer_id, property_id, building_id, unit_id, asset_id, vendor_id,
+      parent_work_order_id,
       source_type, preventive_maintenance_plan_id, preventive_maintenance_run_id,
       requested_at, scheduled_date, scheduled_start, scheduled_end, due_date, completed_at,
       first_response_at, response_time_minutes, resolution_time_minutes,
@@ -166,6 +168,8 @@ export default async function WorkOrderDetailPage({
     completedByTechnicianName,
     crewLeadName,
     crewMemberNames,
+    hierarchy,
+    parentWorkOrder,
   ] = await Promise.all([
     supabase
       .from("work_order_notes")
@@ -232,6 +236,8 @@ export default async function WorkOrderDetailPage({
     completedByTechnicianNamePromise,
     crewLeadNamePromise,
     crewMemberNamesPromise,
+    getWorkOrderWithChildren(id),
+    getParentWorkOrder(id),
   ]);
 
   const workOrder = {
@@ -342,6 +348,25 @@ export default async function WorkOrderDetailPage({
     }
     return sum;
   }, 0);
+  const childRows = hierarchy.children;
+  const completedChildCount = childRows.filter((row) => row.status === "completed").length;
+  const activeChildCount = childRows.filter((row) =>
+    ["in_progress", "scheduled", "ready_to_schedule", "new"].includes(row.status)
+  ).length;
+  const overdueChildCount = childRows.filter((row) => {
+    if (!row.due_date) return false;
+    return row.due_date < new Date().toISOString().slice(0, 10) && row.status !== "completed";
+  }).length;
+  const aggregateStatus =
+    childRows.length === 0
+      ? null
+      : overdueChildCount > 0
+        ? "overdue"
+        : completedChildCount === childRows.length
+          ? "complete"
+          : activeChildCount > 0
+            ? "in_progress"
+            : "open";
 
   return (
     <div className="space-y-6">
@@ -389,6 +414,14 @@ export default async function WorkOrderDetailPage({
         vendors={vendorOptions}
         sla={sla}
         laborMinutes={laborMinutes}
+        parentWorkOrder={parentWorkOrder}
+        childWorkOrders={childRows}
+        childSummary={{
+          total: childRows.length,
+          completed: completedChildCount,
+          aggregateStatus,
+          overdue: overdueChildCount,
+        }}
         materialLines={materialLines ?? []}
         productsForMaterials={(productsForMaterials ?? []).map((p) => ({
           id: (p as { id: string }).id,

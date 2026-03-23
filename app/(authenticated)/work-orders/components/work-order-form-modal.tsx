@@ -37,6 +37,7 @@ export type WorkOrder = {
   source_type?: string | null;
   preventive_maintenance_plan_id?: string | null;
   preventive_maintenance_run_id?: string | null;
+  parent_work_order_id?: string | null;
   updated_at?: string | null;
   completed_at?: string | null;
 };
@@ -69,6 +70,8 @@ export type WorkOrderPrefill = {
   title?: string;
   /** Prefill description when creating from asset (e.g. asset details). */
   description?: string;
+  /** Optional parent work order id for sub-work-order creation. */
+  parent_work_order_id?: string;
 };
 
 type WorkOrderFormModalProps = {
@@ -181,6 +184,7 @@ const emptyWorkOrder: WorkOrder = {
   actual_hours: null,
   billable: true,
   nte_amount: null,
+  parent_work_order_id: null,
 };
 
 const PRIORITIES = ["low", "medium", "high", "urgent", "emergency"] as const;
@@ -382,6 +386,9 @@ export function WorkOrderFormModal({
   const wo = workOrder ?? emptyWorkOrder;
   const titleDefault = isEdit ? wo.title : (prefill?.title ?? wo.title);
   const descriptionDefault = isEdit ? (wo.description ?? "") : (prefill?.description ?? wo.description ?? "");
+  const parentWorkOrderIdDefault = isEdit
+    ? (wo.parent_work_order_id ?? "")
+    : (prefill?.parent_work_order_id ?? "");
   const inputClass = "ui-input";
   const labelClass = "ui-label";
   const sectionTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)] border-b border-[var(--card-border)] pb-2";
@@ -427,6 +434,20 @@ export function WorkOrderFormModal({
               <div>
                 <label htmlFor="description" className={labelClass}>Description</label>
                 <textarea id="description" name="description" rows={2} defaultValue={descriptionDefault} className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="parent_work_order_id" className={labelClass}>Parent Work Order ID (optional)</label>
+                <input
+                  id="parent_work_order_id"
+                  name="parent_work_order_id"
+                  type="text"
+                  defaultValue={parentWorkOrderIdDefault}
+                  placeholder="UUID of parent work order"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Use this field to create a sub work order. Leave blank for top-level.
+                </p>
               </div>
               <div>
                 <label htmlFor="safety_notes" className={labelClass}>Safety Notes</label>

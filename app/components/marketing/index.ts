@@ -7,6 +7,7 @@ export { IndustryCard } from "./industry-card";
 export { HowItWorksDemoCard, IndustryDemoModalProvider, SeeHowItWorksButton, useIndustryDemoModal } from "./industry-demo-modal";
 export { MarketingFooter } from "./marketing-footer";
 export { MarketingHeader } from "./marketing-header";
+export { FoundingPricingCard } from "./founding-pricing-card";
 export { PricingCard } from "./pricing-card";
 export { ScreenshotContainer, ScreenshotPlaceholder } from "./screenshot-container";
 export { Section } from "./section";

@@ -10,6 +10,7 @@ import {
 export type PreventiveMaintenancePlan = {
   id: string;
   company_id: string;
+  pm_plan_id?: string | null;
   asset_id: string | null;
   property_id: string | null;
   building_id: string | null;
@@ -22,14 +23,31 @@ export type PreventiveMaintenancePlan = {
   next_run_date: string;
   last_run_date: string | null;
   auto_create_work_order: boolean;
+  generate_parent_work_order?: boolean;
+  generate_child_work_orders?: boolean;
+  interval_value?: number | null;
   priority: string;
   estimated_duration_minutes: number | null;
   assigned_technician_id: string | null;
   instructions: string | null;
   status: "active" | "paused" | "archived";
+  tasks?: {
+    id?: string;
+    title: string;
+    description?: string | null;
+    asset_id?: string | null;
+    sort_order?: number;
+  }[];
 };
 
 type CompanyOption = { id: string; name: string };
+type PMProgramPlanOption = {
+  id: string;
+  company_id: string;
+  name: string;
+  category?: string | null;
+  active?: boolean;
+};
 type AssetOption = {
   id: string;
   name: string;
@@ -71,6 +89,7 @@ type Props = {
   prefill?: Prefill;
   /** Optional templates to apply when creating a new plan. Filtered by company in UI. */
   templates?: PMPlanTemplateOption[] | null;
+  pmPlans?: PMProgramPlanOption[] | null;
   saveAction: (
     prev: { error?: string; success?: boolean },
     formData: FormData
@@ -100,6 +119,7 @@ export function PreventiveMaintenancePlanFormModal({
   technicians,
   prefill = null,
   templates = null,
+  pmPlans = null,
   saveAction,
 }: Props) {
   const isEdit = !!plan?.id;
@@ -124,6 +144,19 @@ export function PreventiveMaintenancePlanFormModal({
   );
   const [instructions, setInstructions] = useState(plan?.instructions ?? "");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [pmPlanId, setPmPlanId] = useState(plan?.pm_plan_id ?? "");
+  const [scheduleTasks, setScheduleTasks] = useState<
+    { title: string; description: string; asset_id: string; sort_order: number }[]
+  >(
+    plan?.tasks?.length
+      ? plan.tasks.map((task, index) => ({
+          title: task.title,
+          description: task.description ?? "",
+          asset_id: task.asset_id ?? "",
+          sort_order: task.sort_order ?? index,
+        }))
+      : [{ title: "", description: "", asset_id: "", sort_order: 0 }]
+  );
 
   useEffect(() => {
     if (state?.success) onClose();
@@ -137,6 +170,21 @@ export function PreventiveMaintenancePlanFormModal({
       setPriority("medium");
       setEstimatedDurationMinutes("");
       setInstructions("");
+      setPmPlanId("");
+      setScheduleTasks([{ title: "", description: "", asset_id: "", sort_order: 0 }]);
+    }
+    if (open && plan) {
+      setPmPlanId(plan.pm_plan_id ?? "");
+      setScheduleTasks(
+        plan.tasks?.length
+          ? plan.tasks.map((task, index) => ({
+              title: task.title,
+              description: task.description ?? "",
+              asset_id: task.asset_id ?? "",
+              sort_order: task.sort_order ?? index,
+            }))
+          : [{ title: "", description: "", asset_id: "", sort_order: 0 }]
+      );
     }
   }, [open, plan]);
 
@@ -146,6 +194,13 @@ export function PreventiveMaintenancePlanFormModal({
         ? templates.filter((t) => t.company_id === companyId)
         : templates ?? [],
     [templates, companyId]
+  );
+  const pmPlansForCompany = useMemo(
+    () =>
+      companyId && pmPlans?.length
+        ? pmPlans.filter((row) => row.company_id === companyId)
+        : pmPlans ?? [],
+    [pmPlans, companyId]
   );
 
   const applyTemplate = (template: PMPlanTemplateOption) => {
@@ -240,6 +295,24 @@ export function PreventiveMaintenancePlanFormModal({
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
                     {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                PM Plan
+              </label>
+              <select
+                name="pm_plan_id"
+                value={pmPlanId}
+                onChange={(event) => setPmPlanId(event.target.value)}
+                className={inputClass}
+              >
+                <option value="">Unassigned</option>
+                {pmPlansForCompany.map((pmPlan) => (
+                  <option key={pmPlan.id} value={pmPlan.id}>
+                    {pmPlan.name}
                   </option>
                 ))}
               </select>
@@ -380,6 +453,18 @@ export function PreventiveMaintenancePlanFormModal({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                Interval value
+              </label>
+              <input
+                name="interval_value"
+                type="number"
+                min={1}
+                defaultValue={plan?.interval_value ?? ""}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
                 Start date *
               </label>
               <input
@@ -456,6 +541,24 @@ export function PreventiveMaintenancePlanFormModal({
             />
             Automatically create work order when due
           </label>
+          <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+            <input
+              type="checkbox"
+              name="generate_parent_work_order"
+              defaultChecked={plan?.generate_parent_work_order ?? true}
+              className="rounded border-[var(--card-border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+            />
+            Generate parent work order
+          </label>
+          <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+            <input
+              type="checkbox"
+              name="generate_child_work_orders"
+              defaultChecked={plan?.generate_child_work_orders ?? false}
+              className="rounded border-[var(--card-border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+            />
+            Generate child work orders from schedule tasks
+          </label>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
@@ -468,6 +571,92 @@ export function PreventiveMaintenancePlanFormModal({
               onChange={(e) => setInstructions(e.target.value)}
               className={inputClass}
             />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-[var(--card-border)] p-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">Schedule Tasks</h3>
+              <button
+                type="button"
+                onClick={() =>
+                  setScheduleTasks((prev) => [
+                    ...prev,
+                    { title: "", description: "", asset_id: "", sort_order: prev.length },
+                  ])
+                }
+                className="rounded border border-[var(--card-border)] px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--background)]"
+              >
+                Add Task
+              </button>
+            </div>
+            {scheduleTasks.map((task, index) => (
+              <div key={`schedule-task-${index}`} className="rounded-lg border border-[var(--card-border)] p-3">
+                <input type="hidden" name="task_sort_order" value={String(index)} />
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                      Task title
+                    </label>
+                    <input
+                      name="task_title"
+                      value={task.title}
+                      onChange={(event) =>
+                        setScheduleTasks((prev) =>
+                          prev.map((row, rowIndex) =>
+                            rowIndex === index ? { ...row, title: event.target.value } : row
+                          )
+                        )
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                      Description
+                    </label>
+                    <textarea
+                      name="task_description"
+                      rows={2}
+                      value={task.description}
+                      onChange={(event) =>
+                        setScheduleTasks((prev) =>
+                          prev.map((row, rowIndex) =>
+                            rowIndex === index
+                              ? { ...row, description: event.target.value }
+                              : row
+                          )
+                        )
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                      Asset (optional)
+                    </label>
+                    <select
+                      name="task_asset_id"
+                      value={task.asset_id}
+                      onChange={(event) =>
+                        setScheduleTasks((prev) =>
+                          prev.map((row, rowIndex) =>
+                            rowIndex === index ? { ...row, asset_id: event.target.value } : row
+                          )
+                        )
+                      }
+                      className={inputClass}
+                    >
+                      <option value="">None</option>
+                      {assetsForCompany.map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div>

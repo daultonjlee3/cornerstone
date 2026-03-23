@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import {
@@ -84,6 +85,27 @@ type WorkOrderDetailViewProps = {
   productsForMaterials: { id: string; name: string; sku: string | null; default_cost: number | null }[];
   stockLocationsForMaterials: { id: string; name: string }[];
   laborMinutes?: number | null;
+  parentWorkOrder?: {
+    id: string;
+    work_order_number: string | null;
+    title: string;
+    status: string;
+  } | null;
+  childWorkOrders?: {
+    id: string;
+    work_order_number: string | null;
+    title: string;
+    status: string;
+    technician_name?: string | null;
+    crew_name?: string | null;
+    due_date: string | null;
+  }[];
+  childSummary?: {
+    total: number;
+    completed: number;
+    aggregateStatus: string | null;
+    overdue: number;
+  } | null;
 };
 
 export type PartUsageForDetail = {
@@ -121,6 +143,9 @@ export function WorkOrderDetailView({
   productsForMaterials,
   stockLocationsForMaterials,
   laborMinutes = null,
+  parentWorkOrder = null,
+  childWorkOrders = [],
+  childSummary = null,
 }: WorkOrderDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -196,6 +221,16 @@ export function WorkOrderDetailView({
     !isCompleted &&
     !(workOrder.assigned_technician_id as string | null) &&
     !(workOrder.assigned_crew_id as string | null);
+  const subWorkOrderParams = new URLSearchParams({
+    new: "1",
+    parent_work_order_id: id,
+    company_id: (workOrder.company_id as string | null) ?? "",
+    property_id: (workOrder.property_id as string | null) ?? "",
+    building_id: (workOrder.building_id as string | null) ?? "",
+    unit_id: (workOrder.unit_id as string | null) ?? "",
+    asset_id: (workOrder.asset_id as string | null) ?? "",
+  });
+  const subWorkOrderCreateHref = `/work-orders?${subWorkOrderParams.toString()}`;
 
   const formatDuration = (minutes: number | null) => {
     if (minutes == null) return "—";
@@ -280,6 +315,91 @@ export function WorkOrderDetailView({
           onSummarize={() => setAiPanelOpen(true)}
           isPending={isPending}
         />
+        {parentWorkOrder ? (
+          <div className={cardClass}>
+            <h2 className={cardTitleClass}>Parent Work Order</h2>
+            <Link
+              href={`/work-orders/${parentWorkOrder.id}`}
+              className="text-sm font-medium text-[var(--accent)] hover:underline"
+            >
+              {parentWorkOrder.work_order_number ?? "Work Order"} - {parentWorkOrder.title}
+            </Link>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Status: {parentWorkOrder.status.replace(/_/g, " ")}
+            </p>
+          </div>
+        ) : null}
+
+        {childSummary && childSummary.total > 0 ? (
+          <div className={cardClass}>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className={cardTitleClass}>Sub Work Orders</h2>
+              <Link
+                href={subWorkOrderCreateHref}
+                className="rounded-lg border border-[var(--card-border)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              >
+                + Add Sub Work Order
+              </Link>
+            </div>
+            <p className="mb-3 text-sm text-[var(--muted)]">
+              {childSummary.completed}/{childSummary.total} complete · Aggregate status:{" "}
+              {(childSummary.aggregateStatus ?? "open").replace(/_/g, " ")}
+              {childSummary.overdue > 0 ? ` · ${childSummary.overdue} overdue` : ""}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--card-border)]">
+                    <th className="px-2 py-2">Title</th>
+                    <th className="px-2 py-2">Status</th>
+                    <th className="px-2 py-2">Assignee</th>
+                    <th className="px-2 py-2">Due Date</th>
+                    <th className="px-2 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {childWorkOrders.map((child) => (
+                    <tr key={child.id} className="border-b border-[var(--card-border)] last:border-0">
+                      <td className="px-2 py-2">
+                        {child.work_order_number ? `${child.work_order_number} · ` : ""}
+                        {child.title}
+                      </td>
+                      <td className="px-2 py-2">{child.status.replace(/_/g, " ")}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">
+                        {child.technician_name ?? child.crew_name ?? "—"}
+                      </td>
+                      <td className="px-2 py-2 text-[var(--muted)]">
+                        {child.due_date ? new Date(child.due_date).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-2 py-2">
+                        <Link href={`/work-orders/${child.id}`} className="text-[var(--accent)] hover:underline">
+                          Open
+                        </Link>
+                        {" · "}
+                        <Link href={`/work-orders?edit=${child.id}`} className="text-[var(--accent)] hover:underline">
+                          Edit
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className={cardClass}>
+            <h2 className={cardTitleClass}>Sub Work Orders</h2>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-[var(--muted)]">No sub work orders yet.</p>
+              <Link
+                href={subWorkOrderCreateHref}
+                className="rounded-lg border border-[var(--card-border)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+              >
+                + Add Sub Work Order
+              </Link>
+            </div>
+          </div>
+        )}
         <CornerstoneAiPanel
           open={aiPanelOpen}
           onClose={() => setAiPanelOpen(false)}

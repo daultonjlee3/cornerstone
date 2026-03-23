@@ -11,9 +11,9 @@ import {
 } from "@/lib/marketing-site";
 import {
   CTASection,
+  FoundingPricingCard,
   HeroSection,
   IndustryCard,
-  PricingCard,
   ScreenshotContainer,
   SeeHowItWorksButton,
   WorkflowSection,
@@ -609,21 +609,13 @@ export default function HomePage() {
 
       <section className="mk-section-alt min-w-0 border-t border-[var(--card-border)] px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="mx-auto w-full min-w-0 max-w-2xl text-center">
-          <h2 className="mk-section-headline">Simple, transparent pricing</h2>
-          <PricingCard
-            price="$75"
-            period="per technician / month"
-            minimum="$750 monthly minimum"
-            description="Only technicians are billed. Office staff and managers are included. Pricing is limited to the first 25 founding customers."
-            primaryAction={
-              <Link
-                href={ROUTES.pricing}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
-              >
-                View full pricing
-              </Link>
-            }
-          />
+          <FoundingPricingCard />
+          <Link
+            href={ROUTES.pricing}
+            className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-3 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            View full pricing details
+          </Link>
         </div>
       </section>
 
