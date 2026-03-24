@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { createClient } from "@/src/lib/supabase/server";
-import { SITE_URL } from "@/lib/marketing-site";
+import { buildEmailRedirectTo, resolveAuthRedirectOrigin } from "@/lib/auth/auth-redirect-origin";
 import {
   buildRateLimitKey,
   consumeRateLimitSafe,
@@ -35,8 +35,11 @@ export async function resendVerificationEmailAction(
 ): Promise<ResendVerificationState> {
   const email = ((formData.get("email") as string | null) ?? "").trim().toLowerCase();
   const nextPath = sanitizeAuthNextPath(formData.get("next") as string | null);
+  const authOriginField = (formData.get("auth_origin") as string | null)?.trim() || null;
   const headerStore = await headers();
   const ip = getRequestIp(headerStore);
+  const redirectOrigin = resolveAuthRedirectOrigin(headerStore, authOriginField);
+  const emailRedirectTo = buildEmailRedirectTo(redirectOrigin, nextPath);
 
   const limit = consumeRateLimitSafe({
     key: buildRateLimitKey("resend-verification", ip),
@@ -53,20 +56,35 @@ export async function resendVerificationEmailAction(
   }
 
   try {
+    console.info("[auth] resend verification request", {
+      emailDomain: email.split("@")[1] ?? "unknown",
+      redirectOrigin,
+      emailRedirectTo,
+    });
+
     const supabase = await createClient();
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
       options: {
-        emailRedirectTo: `${SITE_URL.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        emailRedirectTo,
       },
     });
+
     if (error) {
-      // Log for ops; same user-facing message to reduce enumeration signals.
-      console.warn("[auth] resend verification returned error:", error.message);
+      console.warn("[auth] resend verification error (full)", {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+        status: (error as { status?: number }).status,
+      });
+      // Same user-facing message to reduce enumeration signals.
       return { success: RESEND_VERIFICATION_GENERIC_SUCCESS };
     }
-    console.info("[auth] Resend verification email requested.", { emailDomain: email.split("@")[1] ?? "unknown" });
+
+    console.info("[auth] resend verification OK", {
+      emailDomain: email.split("@")[1] ?? "unknown",
+    });
   } catch (err) {
     console.warn("[auth] resend verification exception:", err instanceof Error ? err.message : err);
     return { error: RESEND_VERIFICATION_GENERIC_FAILURE };

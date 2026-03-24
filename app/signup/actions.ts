@@ -12,7 +12,7 @@ import {
 import { getRequestIp } from "@/lib/security/getRequestIp";
 import { TURNSTILE_VERIFY_FAILED, verifyTurnstileToken } from "@/lib/security/verifyTurnstile";
 import { redirect } from "next/navigation";
-import { SITE_URL } from "@/lib/marketing-site";
+import { buildEmailRedirectTo, resolveAuthRedirectOrigin } from "@/lib/auth/auth-redirect-origin";
 
 export type SignupState = {
   error?: string;
@@ -20,6 +20,8 @@ export type SignupState = {
   /** True when Supabase created the user but no session (email confirmation required). */
   verificationPending?: boolean;
   pendingEmail?: string;
+  /** Dev-only: raw Supabase error for debugging email / redirect issues. */
+  debugDetails?: string;
 };
 
 /** Same copy whether user is real or honeypot — avoids tipping off bots. */
@@ -36,6 +38,7 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
 
   const headerStore = await headers();
   const ip = getRequestIp(headerStore);
+  const authOriginField = (formData.get("auth_origin") as string | null)?.trim() || null;
 
   // Honeypot: silent success (no account creation, no enumeration signal).
   if (honey) {
@@ -63,26 +66,64 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
     return { error: "Email and password are required." };
   }
 
-  const emailRedirectTo = `${SITE_URL.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent("/onboarding")}`;
+  const redirectOrigin = resolveAuthRedirectOrigin(headerStore, authOriginField);
+  const emailRedirectTo = buildEmailRedirectTo(redirectOrigin, "/onboarding");
 
   try {
     const supabase = await createClient();
+    const trimmedEmail = email.trim();
+
+    console.info("[signup] signUp request", {
+      emailDomain: trimmedEmail.split("@")[1] ?? "unknown",
+      redirectOrigin,
+      emailRedirectTo,
+    });
+
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: trimmedEmail,
       password,
       options: {
         data: { organization_name: organizationName },
         emailRedirectTo,
       },
     });
+
     if (error) {
-      console.warn("[signup] Supabase signUp error (generic client message):", error.message);
-      return { error: "Something went wrong. Please try again." };
+      console.warn("[signup] signUp error (full)", {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+        status: (error as { status?: number }).status,
+      });
+      const devMsg =
+        process.env.NODE_ENV === "development"
+          ? `${error.message}${error.code ? ` [${error.code}]` : ""}`
+          : undefined;
+      return {
+        error:
+          process.env.NODE_ENV === "development"
+            ? `Sign up failed: ${error.message}`
+            : "Something went wrong. Please try again.",
+        debugDetails: devMsg,
+      };
+    }
+
+    console.info("[signup] signUp result", {
+      hasSession: !!data.session,
+      userId: data.user?.id,
+      identityCount: data.user?.identities?.length ?? 0,
+      emailConfirmedAt: data.user?.email_confirmed_at ?? null,
+    });
+
+    if (!data.session && (data.user?.identities?.length ?? 0) === 0) {
+      console.warn(
+        "[signup] No session and no identities — often duplicate signup or provider issue; Supabase may not send another confirmation email."
+      );
     }
 
     // When email confirmation is enabled in Supabase, session is null until verify.
     if (!data.session) {
-      return { verificationPending: true, pendingEmail: email.trim() };
+      return { verificationPending: true, pendingEmail: trimmedEmail };
     }
 
     if (process.env.NODE_ENV !== "test") {
@@ -100,7 +141,7 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
             (metadata.full_name as string | undefined) ??
             (metadata.name as string | undefined) ??
             null,
-          email: data.user?.email ?? email.trim(),
+          email: data.user?.email ?? trimmedEmail,
           companyName:
             organizationName ??
             (metadata.organization_name as string | undefined) ??

@@ -24,9 +24,14 @@ export function ResendVerificationSection({
   redirectNext = "/onboarding",
   onResendSuccess,
 }: ResendVerificationSectionProps) {
+  const [authOrigin, setAuthOrigin] = useState("");
   const [state, formAction, isPending] = useActionState(resendVerificationEmailAction, INITIAL_RESEND);
   const [cooldown, setCooldown] = useState(0);
   const lastHandledSuccessRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    setAuthOrigin(typeof window !== "undefined" ? window.location.origin : "");
+  }, []);
 
   useEffect(() => {
     if (isPending) lastHandledSuccessRef.current = undefined;
@@ -57,6 +62,7 @@ export function ResendVerificationSection({
       <form action={formAction} className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
         <input type="hidden" name="email" value={email} readOnly />
         <input type="hidden" name="next" value={redirectNext} readOnly />
+        <input type="hidden" name="auth_origin" value={authOrigin} readOnly />
         <button
           type="submit"
           disabled={disabled}

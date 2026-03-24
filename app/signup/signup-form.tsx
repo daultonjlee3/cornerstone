@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { Building2, Mail, Lock } from "lucide-react";
 import { signupAction, type SignupState } from "./actions";
 import { TurnstileField } from "@/app/components/security/turnstile-field";
@@ -17,12 +17,17 @@ type SignupFormProps = {
 
 export function SignupForm({ source = "" }: SignupFormProps) {
   const [state, formAction, isPending] = useActionState(signupAction, {} as SignupState);
+  const [authOrigin, setAuthOrigin] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileEnabled = useMemo(
     () => Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim()),
     []
   );
   const canSubmit = !turnstileEnabled || turnstileToken.length > 0;
+
+  useEffect(() => {
+    setAuthOrigin(typeof window !== "undefined" ? window.location.origin : "");
+  }, []);
 
   const verificationPending = Boolean(state?.verificationPending && state?.pendingEmail);
 
@@ -72,12 +77,18 @@ export function SignupForm({ source = "" }: SignupFormProps) {
       ) : (
         <form action={formAction} className="space-y-6 sm:space-y-6">
           <input type="hidden" name="source" value={source} />
+          <input type="hidden" name="auth_origin" value={authOrigin} readOnly />
           {state?.error && (
             <div
               className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
               role="alert"
             >
               {state.error}
+              {process.env.NODE_ENV === "development" && state.debugDetails ? (
+                <span className="mt-2 block font-mono text-xs text-red-600/90 dark:text-red-400/90">
+                  {state.debugDetails}
+                </span>
+              ) : null}
             </div>
           )}
           {state?.success && (
