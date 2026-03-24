@@ -22,6 +22,22 @@ function pathnameMatchesStep(pathname: string, step: TourStep): boolean {
   return norm === path || (path !== "/" && norm.startsWith(path + "/"));
 }
 
+const DEMO_90_WO_COMPLETED = "cornerstone:demo-90:wo-completed";
+
+function isWorkOrdersListPath(pathname: string): boolean {
+  const n = pathname.replace(/\/$/, "") || "/";
+  return n === "/work-orders" || n.startsWith("/work-orders?");
+}
+
+function isWorkOrderDetailPath(pathname: string): boolean {
+  const n = pathname.replace(/\/$/, "") || "/";
+  const m = n.match(/^\/work-orders\/([^/]+)$/);
+  if (!m) return false;
+  const seg = m[1];
+  if (seg === "new") return false;
+  return true;
+}
+
 type TourContextValue = {
   /** Currently running tour or null. */
   activeTour: TourConfig | null;
@@ -31,6 +47,8 @@ type TourContextValue = {
   stepCount: number;
   /** Current step's target element (if any). */
   targetRect: DOMRect | null;
+  /** True when the live demo / demo guest workspace is active (suppresses generic path tours). */
+  isDemoGuest: boolean;
   /** Go to next step or finish. */
   next: () => void;
   /** Go to previous step. */
@@ -56,13 +74,16 @@ export function useTour() {
 }
 
 const SPOTLIGHT_PADDING = 8;
+const DEMO_SPOTLIGHT_PADDING = 10;
 
 export function TourProvider({
   children,
   completedTourIds: initialCompleted = [],
+  isDemoGuest = false,
 }: {
   children: ReactNode;
   completedTourIds?: string[];
+  isDemoGuest?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -75,6 +96,7 @@ export function TourProvider({
     () => new Set(initialCompleted)
   );
   const hasAutoStarted = useRef<string | null>(null);
+  const tourStepRef = useRef({ activeTour: null as TourConfig | null, stepIndex: 0 });
 
   const refreshCompleted = useCallback(async () => {
     const ids = await getCompletedTourIds();
@@ -130,16 +152,21 @@ export function TourProvider({
       setTargetRect(null);
       return;
     }
+    if (step.variant === "cta") {
+      setTargetRect(null);
+      return;
+    }
     const sel = tourStepSelector(config.id, step.id);
     const el = document.querySelector<HTMLElement>(sel);
     if (el) {
+      const pad = config.id === "demo-guided" ? DEMO_SPOTLIGHT_PADDING : SPOTLIGHT_PADDING;
       const rect = el.getBoundingClientRect();
       setTargetRect(
         new DOMRect(
-          rect.left - SPOTLIGHT_PADDING,
-          rect.top - SPOTLIGHT_PADDING,
-          rect.width + SPOTLIGHT_PADDING * 2,
-          rect.height + SPOTLIGHT_PADDING * 2
+          rect.left - pad,
+          rect.top - pad,
+          rect.width + pad * 2,
+          rect.height + pad * 2
         )
       );
     } else {
@@ -150,7 +177,7 @@ export function TourProvider({
   const scrollToStep = useCallback(
     (config: TourConfig, index: number) => {
       const step = config.steps[index];
-      if (!step) return;
+      if (!step || step.variant === "cta") return;
       const sel = tourStepSelector(config.id, step.id);
       const el = document.querySelector<HTMLElement>(sel);
       if (el) {
@@ -221,15 +248,60 @@ export function TourProvider({
     return () => clearTimeout(t);
   }, [activeTour, stepIndex, updateTargetRect]);
 
+  useEffect(() => {
+    tourStepRef.current = { activeTour, stepIndex };
+  }, [activeTour, stepIndex]);
+
+  // 90s demo: advance when the user navigates (not via Next).
+  useEffect(() => {
+    if (!activeTour || activeTour.id !== "demo-guided") return;
+    const step = activeTour.steps[stepIndex];
+    if (!step) return;
+    if (step.id === "priority-plan" && isWorkOrdersListPath(pathname)) {
+      setStepIndex(1);
+      setPendingStepIndex(null);
+      const t = setTimeout(() => {
+        updateTargetRect(activeTour, 1);
+        scrollToStep(activeTour, 1);
+      }, 120);
+      return () => clearTimeout(t);
+    }
+    if (step.id === "urgent-wo-row" && isWorkOrderDetailPath(pathname)) {
+      setStepIndex(2);
+      setPendingStepIndex(null);
+      const t = setTimeout(() => {
+        updateTargetRect(activeTour, 2);
+        scrollToStep(activeTour, 2);
+      }, 120);
+      return () => clearTimeout(t);
+    }
+  }, [pathname, activeTour, stepIndex, updateTargetRect, scrollToStep]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => {
+      const { activeTour: t, stepIndex: si } = tourStepRef.current;
+      if (!t || t.id !== "demo-guided") return;
+      const s = t.steps[si];
+      if (s?.id !== "complete-work") return;
+      setStepIndex(3);
+      setPendingStepIndex(null);
+      router.push("/operations");
+    };
+    window.addEventListener(DEMO_90_WO_COMPLETED, handler);
+    return () => window.removeEventListener(DEMO_90_WO_COMPLETED, handler);
+  }, [router]);
+
   // Auto-start tour when pathname matches and tour not completed.
   useEffect(() => {
+    if (isDemoGuest) return;
     const config = getTourForPath(pathname);
     if (!config || completedTourIds.has(config.id)) return;
     if (hasAutoStarted.current === config.id) return;
     hasAutoStarted.current = config.id;
     const timer = setTimeout(() => runTour(config), 400);
     return () => clearTimeout(timer);
-  }, [pathname, completedTourIds, runTour]);
+  }, [pathname, completedTourIds, runTour, isDemoGuest]);
 
   // Reset auto-start when leaving the path so revisiting can trigger again if not completed.
   useEffect(() => {
@@ -274,6 +346,7 @@ export function TourProvider({
     stepIndex,
     stepCount: activeTour?.steps.length ?? 0,
     targetRect,
+    isDemoGuest,
     next,
     back,
     skip,

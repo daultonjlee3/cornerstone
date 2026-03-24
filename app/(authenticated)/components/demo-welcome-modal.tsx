@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Compass, Sparkles } from "lucide-react";
 import { useTour } from "@/src/components/ui/tour";
 
-const DEMO_WELCOME_SHOWN_KEY = "demo_welcome_shown";
+const DEMO_WELCOME_SHOWN_KEY = "demo_welcome_modal_v2";
 
 type Props = {
   isDemoGuest: boolean;
-  /** Called when user clicks Start Guided Tour (e.g. expand sidebar so step targets are visible). */
+  /** Called when user starts the 90s demo (e.g. expand sidebar so targets are visible). */
   onStartGuidedTour?: () => void;
 };
 
@@ -48,23 +48,23 @@ export function DemoWelcomeModal({ isDemoGuest, onStartGuidedTour }: Props) {
     >
       <div className="relative w-full max-w-md rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-8 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.25)]">
         <h2 id="demo-welcome-title" className="text-xl font-bold tracking-tight text-[var(--foreground)] sm:text-2xl">
-          Cornerstone OS
+          Welcome to the demo workspace
         </h2>
         <p className="mt-2 text-[var(--muted)]">
-          See how maintenance runs—with a short tour or on your own.
+          Four steps, real clicks—open a priority job, complete it, see the board move. About two minutes.
         </p>
 
         <div className="mt-5 space-y-3 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 p-4">
           <div>
-            <p className="font-medium text-[var(--foreground)]">Guided Tour</p>
+            <p className="font-medium text-[var(--foreground)]">Guided workflow demo</p>
             <p className="mt-0.5 text-sm text-[var(--muted)]">
-              2 min: request → work order → dispatch → execution → reporting.
+              Priority plan → work order → mark complete → back to Operations. No slide-through Next buttons.
             </p>
           </div>
           <div>
-            <p className="font-medium text-[var(--foreground)]">Explore</p>
+            <p className="font-medium text-[var(--foreground)]">Explore on your own</p>
             <p className="mt-0.5 text-sm text-[var(--muted)]">
-              Sample data, no guidance. Explore at your pace.
+              Sample data, no script—browse at your pace.
             </p>
           </div>
         </div>
@@ -76,7 +76,7 @@ export function DemoWelcomeModal({ isDemoGuest, onStartGuidedTour }: Props) {
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3.5 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           >
             <Sparkles className="h-5 w-5 shrink-0" aria-hidden />
-            Start Tour
+            Start 90-Second Demo
           </button>
           <button
             type="button"

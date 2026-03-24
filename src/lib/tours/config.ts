@@ -1,54 +1,46 @@
 import type { TourConfig } from "./types";
 
 /**
- * 5-step product-led walkthrough: Operations → Work Orders → Dispatch → Work Queue → Asset Intelligence.
- * ~2 min. Outcome-focused copy; skip anytime.
+ * Four-step action-only demo: real navigation and completion—no passive Next/Back.
+ * Advances on route changes + work-order completion event.
  */
 export const demoGuidedTourConfig: TourConfig = {
   id: "demo-guided",
-  name: "How maintenance runs here",
+  name: "Guided workflow demo",
   path: "/operations",
   autoStart: false,
   steps: [
     {
-      id: "command-center",
+      id: "priority-plan",
       path: "/operations",
-      title: "Operations Center",
-      content:
-        "Open, overdue, and scheduled work in one place. Start the day knowing what needs attention.",
-      cta: "Next",
+      title: "Run Today's Maintenance Plan",
+      content: "",
+      actionCta: "Open Priority Work Order",
+      hideNext: true,
     },
     {
-      id: "work-orders",
+      id: "urgent-wo-row",
       path: "/work-orders",
-      title: "Work Orders",
-      content:
-        "Every request becomes a work order—linked to assets and locations. Track from creation to completion.",
-      cta: "Next",
+      title: "This is what your tech sees",
+      content: "",
+      actionCta: "Open Work Order",
+      hideNext: true,
     },
     {
-      id: "dispatch",
-      path: "/dispatch",
-      title: "Dispatch",
-      content:
-        "Dispatch by technician, availability, or workload. Schedule the day; the map drives routes.",
-      cta: "Next",
+      id: "complete-work",
+      path: "/work-orders",
+      title: "Complete the job",
+      content: "",
+      actionCta: "Mark Complete",
+      hideNext: true,
     },
     {
-      id: "technician-execution",
-      path: "/technicians/work-queue",
-      title: "Work Queue",
-      content:
-        "Technicians run their queue from the field—status, notes, photos, close. Execution feeds back in real time.",
-      cta: "Next",
-    },
-    {
-      id: "asset-intelligence",
-      path: "/assets/intelligence",
-      title: "Asset Intelligence",
-      content:
-        "Completed work builds asset history. Labor, backlog, and performance in one place—act on data, not guesswork.",
-      cta: "Finish",
+      id: "trial-cta",
+      path: "/operations",
+      title: "Your operations just updated",
+      content: "",
+      actionCta: "Start Free Trial",
+      variant: "cta",
     },
   ],
 };
@@ -58,6 +50,7 @@ export const tourConfigs: TourConfig[] = [
     id: "dashboard",
     name: "Operations Center",
     path: "/operations",
+    autoStart: false,
     steps: [
       {
         id: "overview",

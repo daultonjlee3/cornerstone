@@ -80,6 +80,7 @@ export function GuidanceProvider({
 
   const launchTour = useCallback(
     async (tourId: string, options: GuidanceStartOptions = {}) => {
+      if (isDemoGuest) return;
       const tour = getGuidanceTourById(tourId);
       if (!tour) return;
 
@@ -138,7 +139,7 @@ export function GuidanceProvider({
       });
       intro.start();
     },
-    [pathname, router]
+    [pathname, router, isDemoGuest]
   );
 
   const startTour = useCallback(
@@ -149,7 +150,7 @@ export function GuidanceProvider({
   );
 
   const productTour = useMemo(() => getProductTourForPath(pathname), [pathname]);
-  const hasProductTourForCurrentPage = productTour != null;
+  const hasProductTourForCurrentPage = !isDemoGuest && productTour != null;
 
   const startProductTourForCurrentPage = useCallback(async () => {
     if (!productTour) return;
@@ -182,6 +183,7 @@ export function GuidanceProvider({
   );
 
   useEffect(() => {
+    if (isDemoGuest) return;
     const requestedTour = query.get("startTour");
     if (!requestedTour) return;
     void launchTour(requestedTour, { force: true });
@@ -189,7 +191,7 @@ export function GuidanceProvider({
     next.delete("startTour");
     const nextQuery = next.toString();
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-  }, [launchTour, pathname, query, router]);
+  }, [launchTour, pathname, query, router, isDemoGuest]);
 
   return <GuidanceContext.Provider value={value}>{children}</GuidanceContext.Provider>;
 }

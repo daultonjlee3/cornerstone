@@ -99,6 +99,7 @@ export function WorkOrderHeader({
                   onClick={onCompleteClick}
                   disabled={isPending}
                   className={btnPrimary}
+                  data-tour="demo-guided:complete-work"
                 >
                   Complete Work Order
                 </button>

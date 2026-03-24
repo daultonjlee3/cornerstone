@@ -224,7 +224,7 @@ export default async function OperationsCenterPage() {
 
   return (
     <div className="space-y-8" data-tour="dashboard:overview" data-testid="operations-center-page">
-      <div data-tour="demo-guided:command-center" className="space-y-8">
+      <div className="space-y-8">
         <PageHeader
           icon={<LayoutGrid className="size-5" />}
           title="Operations Command Center"
@@ -238,7 +238,21 @@ export default async function OperationsCenterPage() {
           }
         />
 
-        <OperationOptimizationWidget maxVisible={3} />
+        <div className="space-y-3" data-tour="demo-guided:priority-plan">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">Daily Priority Plan</h2>
+            <p className="text-sm text-[var(--muted)]">
+              What needs your attention before you dispatch—live from your backlog.
+            </p>
+            <Link
+              href="/work-orders"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)] hover:underline"
+            >
+              Open priority work orders →
+            </Link>
+          </div>
+          <OperationOptimizationWidget maxVisible={3} />
+        </div>
 
       <DashboardHelperTips overdueWorkOrders={operations.kpis.overdueWorkOrders} />
 
@@ -246,7 +260,8 @@ export default async function OperationsCenterPage() {
         <DashboardSetupGuidance noCompanies={noCompanies} emptyButConfigured={hasNoVisibleActivity} />
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-tour="dashboard:metrics">
+      <section data-tour="dashboard:metrics">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           title="Open Work Orders"
           value={operations.kpis.openWorkOrders}
@@ -294,6 +309,7 @@ export default async function OperationsCenterPage() {
           icon={UserMinus}
           trend={operations.kpis.unassignedWorkOrders > 0 ? { label: "Assign to schedule", tone: "neutral" } : undefined}
         />
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3" data-tour="dashboard:technicians">

@@ -80,6 +80,7 @@ export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProv
     lastResetTokenRef.current = resetToken;
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(INTRO_SHOWN_KEY);
+      sessionStorage.removeItem("demo_welcome_modal_v2");
       sessionStorage.removeItem("cornerstone_demo_scenario_step");
       sessionStorage.removeItem("cornerstone_demo_scenario_ctx");
       localStorage.removeItem(GET_STARTED_STORAGE_KEY);
@@ -90,21 +91,10 @@ export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProv
     setScenarioCtx(null);
     setStepError(null);
     setIsStarting(false);
-    setExploreMode(false);
+    setExploreMode(isDemoGuest ? true : false);
     setStepIndex(0);
-    setIsIntroOpen(true);
+    setIsIntroOpen(false);
   }, [isDemoEntry, isDemoGuest, pathname, searchParams]);
-
-  useEffect(() => {
-    if (!isDemoGuest) return;
-    if (typeof window === "undefined") return;
-    const shown = sessionStorage.getItem(INTRO_SHOWN_KEY) === "1";
-    if (!shown) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsIntroOpen(true);
-      setStepIndex(0);
-    }
-  }, [isDemoGuest]);
 
   const navigateToStep = useCallback(
     (index: number, ctx: DemoScenarioContext) => {

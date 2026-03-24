@@ -118,6 +118,8 @@ type WorkOrderRowProps = {
   onOpenDetail: (wo: WorkOrderListRow) => void;
   onChangeStatus: (wo: WorkOrderListRow, status: (typeof STATUS_OPTIONS_QUICK)[number]) => void;
   onAssign: (wo: WorkOrderListRow) => void;
+  /** Highlights the WO number link for the 90s product demo spotlight. */
+  demoTourHighlight?: boolean;
 };
 
 const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
@@ -129,6 +131,7 @@ const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
   onOpenDetail,
   onChangeStatus,
   onAssign,
+  demoTourHighlight = false,
 }: WorkOrderRowProps) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -177,6 +180,7 @@ const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
           <div className="flex items-baseline gap-2">
             <Link
               href={`/work-orders/${wo.id}`}
+              data-tour={demoTourHighlight ? "demo-guided:urgent-wo-row" : undefined}
               className="shrink-0 text-[13px] font-medium text-[var(--accent)] transition-colors hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -278,6 +282,19 @@ export function WorkOrdersList({
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
+
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const firstDemoUrgentIndex = useMemo(() => {
+    const urgentOrOverdue = initialList.findIndex((wo) => {
+      if (wo.status === "completed" || wo.status === "cancelled") return false;
+      const urgent = wo.priority === "emergency" || wo.priority === "urgent";
+      const due = (wo as { due_date?: string | null }).due_date;
+      const overdue = Boolean(due && due < today);
+      return urgent || overdue;
+    });
+    if (urgentOrOverdue >= 0) return urgentOrOverdue;
+    return initialList.findIndex((wo) => wo.status !== "completed" && wo.status !== "cancelled");
+  }, [initialList, today]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -715,7 +732,7 @@ export function WorkOrdersList({
                       </tr>
                     </thead>
                     <tbody data-tour="work-orders:completion">
-                      {initialList.map((wo) => (
+                      {initialList.map((wo, rowIndex) => (
                         <WorkOrderTableRow
                           key={wo.id}
                           wo={wo}
@@ -726,6 +743,9 @@ export function WorkOrdersList({
                           onOpenDetail={setDetailDrawerRow}
                           onChangeStatus={setStatusForRow}
                           onAssign={setAssigningWorkOrder}
+                          demoTourHighlight={
+                            firstDemoUrgentIndex >= 0 && rowIndex === firstDemoUrgentIndex
+                          }
                         />
                       ))}
                     </tbody>

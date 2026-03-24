@@ -276,6 +276,7 @@ export function WorkOrderDetailView({
           onSuccess={() => {
             router.refresh();
             window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+            window.dispatchEvent(new CustomEvent("cornerstone:demo-90:wo-completed"));
           }}
         />
       )}

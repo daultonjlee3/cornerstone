@@ -16,6 +16,8 @@ import { GetStartedOverlay } from "./get-started/GetStartedOverlay";
 import { OperationOptimizationProvider } from "@/src/components/operation-optimization/OperationOptimizationProvider";
 import { GuidanceProvider } from "@/src/components/guidance/GuidanceProvider";
 import { DemoWelcomePanel } from "@/src/components/guidance/DemoWelcomePanel";
+import { TourProvider, TourOverlay } from "@/src/components/ui/tour";
+import { DemoWelcomeModal } from "./demo-welcome-modal";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -70,17 +72,24 @@ export function Shell({
   };
 
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
-  void completedTourIds;
 
   return (
     <TooltipProvider>
       <DemoScenarioProvider isDemoGuest={isDemoGuest && !isScreenshotMode}>
         <GuidanceProvider isDemoGuest={isDemoGuest && !isScreenshotMode}>
-          <GetStartedOnboardingProvider disabled={isDemoGuest || isScreenshotMode}>
-            <OperationOptimizationProvider>
-              <GetStartedOverlay />
-              <GetStartedChecklist />
-              <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
+          <TourProvider
+            completedTourIds={completedTourIds}
+            isDemoGuest={isDemoGuest && !isScreenshotMode}
+          >
+            <GetStartedOnboardingProvider disabled={isDemoGuest || isScreenshotMode}>
+              <OperationOptimizationProvider>
+                {!isScreenshotMode && isDemoGuest ? (
+                  <DemoWelcomeModal isDemoGuest={isDemoGuest} />
+                ) : null}
+                {!isScreenshotMode ? <TourOverlay /> : null}
+                <GetStartedOverlay />
+                <GetStartedChecklist />
+                <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
                   {!isDispatchFullscreen ? (
                     <Sidebar
                       open={sidebarOpen}
@@ -136,28 +145,29 @@ export function Shell({
                     </div>
                   </div>
                 </div>
-              {!isDispatchFullscreen && !isScreenshotMode ? (
-                <>
-                  <div className="fixed bottom-5 right-5 z-40">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setAiPanelOpen(true)}
-                          className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[var(--shadow-glow)] transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
-                          aria-label="Ask Cornerstone"
-                        >
-                          <Sparkles className="size-5" aria-hidden />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">Ask Cornerstone</TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <CornerstoneAiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
-                </>
-              ) : null}
-            </OperationOptimizationProvider>
-          </GetStartedOnboardingProvider>
+                {!isDispatchFullscreen && !isScreenshotMode ? (
+                  <>
+                    <div className="fixed bottom-5 right-5 z-40">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setAiPanelOpen(true)}
+                            className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[var(--shadow-glow)] transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+                            aria-label="Ask Cornerstone"
+                          >
+                            <Sparkles className="size-5" aria-hidden />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">Ask Cornerstone</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <CornerstoneAiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+                  </>
+                ) : null}
+              </OperationOptimizationProvider>
+            </GetStartedOnboardingProvider>
+          </TourProvider>
         </GuidanceProvider>
       </DemoScenarioProvider>
     </TooltipProvider>
