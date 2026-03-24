@@ -7,12 +7,17 @@ export const metadata = {
   description: "Create your account — Cornerstone OS, The Operations System for Maintenance Teams",
 };
 
-export default function SignupPage({
+export default async function SignupPage({
   searchParams,
 }: {
-  searchParams?: { source?: string };
+  searchParams: Promise<{ source?: string }>;
 }) {
-  const source = searchParams?.source === "demo" ? "demo" : "";
+  const params = await searchParams;
+  const source = params?.source === "demo" ? "demo" : "";
+  if (process.env.NODE_ENV === "development") {
+    console.log("searchParams:", source);
+  }
+
   return (
     <div className="flex min-h-screen min-h-[100dvh] flex-col lg:flex-row lg:items-start">
       {/* Left panel: brand + value prop — matches login */}

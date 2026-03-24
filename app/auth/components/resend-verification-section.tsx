@@ -1,41 +1,37 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { resendVerificationEmailAction } from "@/app/auth/verification-actions";
-import type { ResendVerificationState } from "@/app/auth/verification-types";
-
-const INITIAL_RESEND: ResendVerificationState = {};
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/src/lib/supabase/client";
 
 const COOLDOWN_SECONDS = 60;
 
+/** Generic copy when resend succeeds (does not confirm whether the address exists). */
+const RESEND_SUCCESS_GENERIC =
+  "If an account exists for this email, a new verification link has been sent.";
+
 type ResendVerificationSectionProps = {
   email: string;
-  /** Post-verify redirect (must be a relative path). Defaults to onboarding after signup. */
+  /** Post-verify path appended as `?next=` (must be a relative path). */
   redirectNext?: string;
-  /** Called after a successful resend so parent can start cooldown if needed */
   onResendSuccess?: () => void;
 };
 
 /**
- * Resend signup confirmation email with 60s client cooldown and server rate limits.
+ * Client-side resend using the browser Supabase SDK (visible as `/auth/v1/resend` in Network).
+ * Uses `type="button"` + onClick so this works when nested inside another `<form>` (e.g. login page),
+ * where an inner `<form>` is invalid HTML and submit may not fire.
  */
 export function ResendVerificationSection({
   email,
   redirectNext = "/onboarding",
   onResendSuccess,
 }: ResendVerificationSectionProps) {
-  const [authOrigin, setAuthOrigin] = useState("");
-  const [state, formAction, isPending] = useActionState(resendVerificationEmailAction, INITIAL_RESEND);
   const [cooldown, setCooldown] = useState(0);
-  const lastHandledSuccessRef = useRef<string | undefined>(undefined);
+  const [isSending, setIsSending] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    setAuthOrigin(typeof window !== "undefined" ? window.location.origin : "");
-  }, []);
-
-  useEffect(() => {
-    if (isPending) lastHandledSuccessRef.current = undefined;
-  }, [isPending]);
+  const normalizedEmail = email.trim().toLowerCase();
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -45,43 +41,78 @@ export function ResendVerificationSection({
     return () => window.clearInterval(id);
   }, [cooldown]);
 
-  useEffect(() => {
-    if (!state?.success || state.success === lastHandledSuccessRef.current) return;
-    lastHandledSuccessRef.current = state.success;
-    setCooldown(COOLDOWN_SECONDS);
-    onResendSuccess?.();
-  }, [state?.success, onResendSuccess]);
+  const handleResend = useCallback(async () => {
+    console.log("[auth] Resend clicked:", email);
 
-  const disabled = isPending || cooldown > 0 || !email.trim().includes("@");
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    if (!normalizedEmail || !normalizedEmail.includes("@")) {
+      console.error("[auth] Resend verification: missing or invalid email", { email });
+      setErrorMessage("Email is missing. Go back and use the email you signed up with.");
+      return;
+    }
+
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+      redirectNext.startsWith("/") ? redirectNext : `/${redirectNext}`
+    )}`;
+    console.log("[auth] Resend emailRedirectTo:", emailRedirectTo);
+
+    setIsSending(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.resend({
+        type: "signup",
+        email: normalizedEmail,
+        options: {
+          emailRedirectTo,
+        },
+      });
+
+      console.log("[auth] Resend response:", data);
+      if (error) {
+        console.error("[auth] Resend error:", error);
+        setErrorMessage(error.message || "Unable to send verification email. Please try again.");
+        return;
+      }
+
+      console.log("[auth] Resend completed without error");
+      setSuccessMessage(RESEND_SUCCESS_GENERIC);
+      setCooldown(COOLDOWN_SECONDS);
+      onResendSuccess?.();
+    } catch (err) {
+      console.error("[auth] Resend exception:", err);
+      setErrorMessage("Something went wrong. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  }, [email, normalizedEmail, redirectNext, onResendSuccess]);
+
+  const disabled = isSending || cooldown > 0 || !normalizedEmail.includes("@");
   let buttonLabel = "Resend verification email";
-  if (isPending) buttonLabel = "Sending…";
+  if (isSending) buttonLabel = "Sending…";
   else if (cooldown > 0) buttonLabel = `Resend in ${cooldown}s`;
 
   return (
     <div className="space-y-3">
-      <form action={formAction} className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-        <input type="hidden" name="email" value={email} readOnly />
-        <input type="hidden" name="next" value={redirectNext} readOnly />
-        <input type="hidden" name="auth_origin" value={authOrigin} readOnly />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
         <button
-          type="submit"
+          type="button"
+          onClick={() => void handleResend()}
           disabled={disabled}
           className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-4 py-3 text-sm font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[200px]"
         >
           {buttonLabel}
         </button>
-      </form>
-      {state?.error ? (
+      </div>
+      {errorMessage ? (
         <div className="space-y-1" role="alert">
-          <p className="text-sm text-red-700 dark:text-red-300">{state.error}</p>
-          {process.env.NODE_ENV === "development" && state.debugDetails ? (
-            <p className="font-mono text-xs text-red-600/90 dark:text-red-400/90">{state.debugDetails}</p>
-          ) : null}
+          <p className="text-sm text-red-700 dark:text-red-300">{errorMessage}</p>
         </div>
       ) : null}
-      {state?.success ? (
+      {successMessage ? (
         <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
-          {state.success}
+          {successMessage}
         </p>
       ) : null}
       <p className="text-xs text-slate-500 dark:text-slate-400">

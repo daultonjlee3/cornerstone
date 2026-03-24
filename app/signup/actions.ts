@@ -20,6 +20,11 @@ export type SignupState = {
   /** True when Supabase created the user but no session (email confirmation required). */
   verificationPending?: boolean;
   pendingEmail?: string;
+  /**
+   * When true, signUp returned no identities — often "email already registered". Supabase may not
+   * send another confirmation email; user should sign in or reset password instead.
+   */
+  likelyDuplicateSignup?: boolean;
   /** Dev-only: raw Supabase error for debugging email / redirect issues. */
   debugDetails?: string;
 };
@@ -115,15 +120,22 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
       emailConfirmedAt: data.user?.email_confirmed_at ?? null,
     });
 
-    if (!data.session && (data.user?.identities?.length ?? 0) === 0) {
+    const identityCount = data.user?.identities?.length ?? 0;
+    const likelyDuplicateSignup = !data.session && identityCount === 0;
+
+    if (likelyDuplicateSignup) {
       console.warn(
-        "[signup] No session and no identities — often duplicate signup or provider issue; Supabase may not send another confirmation email."
+        "[signup] No session and no identities — often duplicate signup; Supabase usually will not send another confirmation email for this address."
       );
     }
 
     // When email confirmation is enabled in Supabase, session is null until verify.
     if (!data.session) {
-      return { verificationPending: true, pendingEmail: trimmedEmail };
+      return {
+        verificationPending: true,
+        pendingEmail: trimmedEmail,
+        likelyDuplicateSignup,
+      };
     }
 
     if (process.env.NODE_ENV !== "test") {

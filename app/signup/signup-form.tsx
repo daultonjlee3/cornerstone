@@ -63,7 +63,10 @@ export function SignupForm({ source = "" }: SignupFormProps) {
 
       {verificationPending && state.pendingEmail ? (
         <div className="space-y-6">
-          <VerificationPendingContent email={state.pendingEmail} />
+          <VerificationPendingContent
+            email={state.pendingEmail}
+            likelyDuplicateSignup={state.likelyDuplicateSignup}
+          />
           <p className="text-center text-[15px] text-slate-600 dark:text-slate-300">
             Already verified?{" "}
             <Link
