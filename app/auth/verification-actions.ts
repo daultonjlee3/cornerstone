@@ -16,6 +16,9 @@ import type { ResendVerificationState } from "@/app/auth/verification-types";
 const RESEND_VERIFICATION_GENERIC_SUCCESS =
   "If an account exists for this email, a new verification link has been sent.";
 
+const RESEND_VERIFICATION_SEND_FAILED =
+  "We couldn't send the verification email. Please try again in a moment.";
+
 const RESEND_VERIFICATION_GENERIC_FAILURE =
   "Something went wrong. Please try again in a moment.";
 
@@ -72,14 +75,22 @@ export async function resendVerificationEmailAction(
     });
 
     if (error) {
-      console.warn("[auth] resend verification error (full)", {
+      // Do NOT return fake success here — that hid SMTP/redirect failures and looked like email was sent.
+      console.error("[auth] resend verification failed (Supabase error)", {
         message: error.message,
         code: error.code,
         name: error.name,
         status: (error as { status?: number }).status,
+        emailRedirectTo,
       });
-      // Same user-facing message to reduce enumeration signals.
-      return { success: RESEND_VERIFICATION_GENERIC_SUCCESS };
+      const devDetails =
+        process.env.NODE_ENV === "development"
+          ? `${error.message}${error.code ? ` [${error.code}]` : ""}`
+          : undefined;
+      return {
+        error: RESEND_VERIFICATION_SEND_FAILED,
+        debugDetails: devDetails,
+      };
     }
 
     console.info("[auth] resend verification OK", {

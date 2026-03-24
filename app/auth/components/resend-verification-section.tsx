@@ -72,9 +72,12 @@ export function ResendVerificationSection({
         </button>
       </form>
       {state?.error ? (
-        <p className="text-sm text-red-700 dark:text-red-300" role="alert">
-          {state.error}
-        </p>
+        <div className="space-y-1" role="alert">
+          <p className="text-sm text-red-700 dark:text-red-300">{state.error}</p>
+          {process.env.NODE_ENV === "development" && state.debugDetails ? (
+            <p className="font-mono text-xs text-red-600/90 dark:text-red-400/90">{state.debugDetails}</p>
+          ) : null}
+        </div>
       ) : null}
       {state?.success ? (
         <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
