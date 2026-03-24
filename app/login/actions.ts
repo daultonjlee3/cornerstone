@@ -1,60 +1,75 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createClient } from "@/src/lib/supabase/server";
+import {
+  buildRateLimitKey,
+  consumeRateLimitSafe,
+  RATE_LIMITS,
+  RATE_LIMIT_TOO_MANY,
+} from "@/lib/security/rateLimit";
+import { getRequestIp } from "@/lib/security/getRequestIp";
 import { redirect } from "next/navigation";
 
-export type LoginState = { error?: string };
+export type LoginState = { error?: string; needsVerification?: boolean };
 
-function isLocalSupabaseUrl(url: string | undefined): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
-  } catch {
-    return false;
-  }
+function isUnverifiedEmailAuthError(error: { message?: string; code?: string }): boolean {
+  const code = (error as { code?: string }).code ?? "";
+  const msg = (error.message ?? "").toLowerCase();
+  return (
+    code === "email_not_confirmed" ||
+    msg.includes("email not confirmed") ||
+    msg.includes("user not confirmed") ||
+    msg.includes("confirm your email")
+  );
 }
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = formData.get("email") as string | null;
   const password = formData.get("password") as string | null;
+  const headerStore = await headers();
+  const ip = getRequestIp(headerStore);
+
+  const loginKey = buildRateLimitKey("login", ip);
+  const loginLimit = consumeRateLimitSafe({
+    key: loginKey,
+    limit: RATE_LIMITS.login.limit,
+    windowMs: RATE_LIMITS.login.windowMs,
+  });
+  if (!loginLimit.allowed) {
+    console.warn(
+      `[security] Rate limit hit for login. ip=${ip} retry_after=${loginLimit.retryAfterSeconds}s`
+    );
+    return { error: RATE_LIMIT_TOO_MANY };
+  }
+
   if (!email?.trim() || !password) {
-    return { error: "Email and password are required." };
+    return { error: "Invalid email or password" };
   }
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
     if (error) {
-      if (error.message === "Invalid login credentials") {
-        const runtimeUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-        const envHint = isLocalSupabaseUrl(runtimeUrl)
-          ? ""
-          : ` Frontend auth is currently using ${
-              runtimeUrl || "an unset Supabase URL"
-            }. Verify NEXT_PUBLIC_SUPABASE_URL points to local Supabase and restart the Next.js dev server after env changes.`;
-        return { error: `Invalid email or password.${envHint}` };
+      if (isUnverifiedEmailAuthError(error)) {
+        console.warn("[auth] Login blocked: email not verified (client gets verification prompt).", {
+          code: (error as { code?: string }).code,
+        });
+        return { needsVerification: true };
       }
-      return { error: error.message };
+      console.warn("[security] Login failed (generic response to client).");
+      return { error: "Invalid email or password" };
     }
     if (!data.session) {
-      return { error: "Login succeeded but no session was created. Please try again." };
+      return { error: "Invalid email or password" };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "fetch failed" || message.includes("fetch")) {
-      return {
-        error:
-          "Could not reach the authentication server. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local, then restart the Next.js dev server.",
-      };
-    }
-    if (message.includes("Missing Supabase env")) {
-      return {
-        error:
-          "Server is missing Supabase configuration. Add env vars to .env.local and restart the Next.js dev server.",
-      };
-    }
-    return { error: message };
+    console.warn("[security] Login exception (generic response):", message);
+    return { error: "Invalid email or password" };
   }
 
   const next = formData.get("next") as string | null;

@@ -1,9 +1,17 @@
 "use server";
 
 import { Buffer } from "node:buffer";
+import { headers } from "next/headers";
 import { createClient } from "@/src/lib/supabase/server";
 import { saveWorkOrder } from "@/app/(authenticated)/work-orders/actions";
 import { t, type RequestPortalLocaleCode } from "@/src/lib/i18n/request-portal";
+import {
+  buildRateLimitKey,
+  consumeRateLimitSafe,
+  RATE_LIMITS,
+  RATE_LIMIT_TOO_MANY,
+} from "@/lib/security/rateLimit";
+import { getRequestIp } from "@/lib/security/getRequestIp";
 
 export type PortalSubmissionState = {
   error?: string;
@@ -47,6 +55,23 @@ export async function submitMaintenanceRequestPortal(
   formData: FormData
 ): Promise<PortalSubmissionState> {
   const locale = getLocale(formData);
+  const headerStore = await headers();
+  const ip = getRequestIp(headerStore);
+  const honey = ((formData.get("website") as string | null) ?? "").trim();
+  if (honey) {
+    console.warn(`[security] Honeypot hit on request portal submit. ip=${ip}`);
+    return { success: true, workOrderNumber: undefined };
+  }
+  const requestLimit = consumeRateLimitSafe({
+    key: buildRateLimitKey("request-portal-submit", ip),
+    limit: RATE_LIMITS.requestPortal.limit,
+    windowMs: RATE_LIMITS.requestPortal.windowMs,
+  });
+  if (!requestLimit.allowed) {
+    console.warn(`[security] Rate limit hit for request portal submit. ip=${ip}`);
+    return { error: RATE_LIMIT_TOO_MANY };
+  }
+
   const tenantId = ((formData.get("tenant_id") as string | null) ?? "").trim();
   const companyId = ((formData.get("company_id") as string | null) ?? "").trim();
   if (!tenantId || !companyId) {

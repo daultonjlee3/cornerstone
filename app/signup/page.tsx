@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { CalendarCheck, LayoutGrid, Users } from "lucide-react";
 import { SignupForm } from "./signup-form";
 
@@ -97,31 +96,6 @@ export default function SignupPage({
       <div className="flex min-h-0 flex-1 shrink-0 items-center justify-center bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-12 md:py-14 lg:items-start lg:justify-start lg:px-14 lg:pt-16 lg:pb-16 xl:px-20 xl:pt-20 xl:pb-20">
         <div className="w-full max-w-[420px] pb-[env(safe-area-inset-bottom)] lg:pb-0">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_40px_80px_-16px_rgba(15,23,42,0.25),0_0_0_1px_rgba(15,23,42,0.06)] transition-shadow duration-200 dark:border-slate-600 dark:bg-slate-800/95 dark:shadow-[0_40px_80px_-16px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.06)] sm:p-10 lg:p-12">
-            <div className="mb-8 flex flex-col items-center text-center sm:mb-10">
-              <Link
-                href="/"
-                className="group inline-flex items-center gap-3 transition-opacity hover:opacity-90"
-              >
-                <Image
-                  src="/logo.png"
-                  alt=""
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 shrink-0 rounded-lg object-contain sm:h-11 sm:w-11"
-                />
-                <span className="text-sm font-semibold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-[var(--accent)] dark:text-slate-300 dark:group-hover:text-slate-100">
-                  Cornerstone OS
-                </span>
-              </Link>
-              <h2 className="mt-5 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:mt-6 sm:text-2xl">
-                Create your account
-              </h2>
-              <p className="mt-1.5 text-[15px] text-slate-600 dark:text-slate-300 sm:mt-2">
-                {source === "demo"
-                  ? "Let's set up your workspace in under 2 minutes"
-                  : "Enter your details to get started with Cornerstone OS"}
-              </p>
-            </div>
             <SignupForm source={source} />
           </div>
           <p className="mt-6 text-center text-xs leading-relaxed text-[var(--muted)] sm:mt-8">

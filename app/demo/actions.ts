@@ -1,11 +1,20 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/src/lib/supabase/admin";
 import { DEMO_LOGIN_CONFIG, SITE_URL } from "@/lib/marketing-site";
+import {
+  buildRateLimitKey,
+  consumeRateLimitSafe,
+  RATE_LIMITS,
+  RATE_LIMIT_TOO_MANY,
+} from "@/lib/security/rateLimit";
+import { getRequestIp } from "@/lib/security/getRequestIp";
+import { TURNSTILE_VERIFY_FAILED, verifyTurnstileToken } from "@/lib/security/verifyTurnstile";
 import crypto from "crypto";
 
-export type EnterDemoState = { error?: string };
+export type EnterDemoState = { error?: string; success?: boolean };
 
 const DEMO_SLUGS = [
   "facility-maintenance",
@@ -31,6 +40,33 @@ export async function enterDemoAction(
   _prev: EnterDemoState,
   formData: FormData
 ): Promise<EnterDemoState> {
+  const headerStore = await headers();
+  const ip = getRequestIp(headerStore);
+  const honey = ((formData.get("website") as string | null) ?? "").trim();
+  const captchaToken = (formData.get("turnstile_token") as string | null)?.trim() || null;
+
+  // Honeypot: silent success — no side effects, generic UX.
+  if (honey) {
+    console.warn(`[security] Honeypot triggered on demo form. ip=${ip}`);
+    return { success: true };
+  }
+
+  const demoLimit = consumeRateLimitSafe({
+    key: buildRateLimitKey("demo-enter", ip),
+    limit: RATE_LIMITS.demo.limit,
+    windowMs: RATE_LIMITS.demo.windowMs,
+  });
+  if (!demoLimit.allowed) {
+    console.warn(`[security] Rate limit hit for demo entry. ip=${ip}`);
+    return { error: RATE_LIMIT_TOO_MANY };
+  }
+
+  const turnstileOk = await verifyTurnstileToken({ token: captchaToken, remoteIp: ip });
+  if (!turnstileOk) {
+    console.warn(`[security] Turnstile verification failed for demo form. ip=${ip}`);
+    return { error: TURNSTILE_VERIFY_FAILED };
+  }
+
   const email = (formData.get("email") as string)?.trim()?.toLowerCase();
   const companyName = (formData.get("company_name") as string)?.trim() || null;
   const industrySlug = (formData.get("industry_slug") as string)?.trim();
@@ -95,8 +131,6 @@ export async function enterDemoAction(
   );
   if (memError) return { error: memError.message || "Could not link demo environment." };
 
-  // Ensure demo guest has only this tenant: remove any other demo_guest memberships so refresh
-  // always resolves to the selected environment (layout uses limit(1) with no order).
   await supabase
     .from("tenant_memberships")
     .delete()
@@ -117,10 +151,6 @@ export async function enterDemoAction(
   const defaultProdUrl = "https://cornerstonecmms.com";
   const defaultDevUrl = "http://localhost:3000";
 
-  // In production, never allow localhost; prefer NEXT_PUBLIC_SITE_URL when it is
-  // set to a non-localhost value, otherwise fall back to the canonical domain.
-  // In development, prefer NEXT_PUBLIC_SITE_URL (often http://localhost:3000),
-  // with a final fallback to the local default.
   const baseUrl = isProd
     ? rawEnvUrl && !rawEnvUrl.includes("localhost")
       ? rawEnvUrl

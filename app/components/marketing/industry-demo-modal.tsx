@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { INDUSTRY_DEMO_OPTIONS, DEMO_ROUTES, ROUTES } from "@/lib/marketing-site";
 import { enterDemoAction } from "@/app/demo/actions";
+import { TurnstileField } from "@/app/components/security/turnstile-field";
 import { ArrowRight, Building2, ChevronLeft, Factory, FileSearch, Heart, LayoutGrid, Mail, Play, Rocket, School, X } from "lucide-react";
 
 const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -62,6 +63,12 @@ function IndustryDemoModalContent({
   const [step, setStep] = useState<"industry" | "email">("industry");
   const [selectedIndustry, setSelectedIndustry] = useState<{ slug: string; name: string } | null>(null);
   const [state, formAction] = useActionState(enterDemoAction, {});
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileEnabled = useMemo(
+    () => Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim()),
+    []
+  );
+  const canSubmitDemo = !turnstileEnabled || turnstileToken.length > 0;
 
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent) => {
@@ -180,6 +187,18 @@ function IndustryDemoModalContent({
                 </button>
               </div>
             </>
+          ) : state?.success ? (
+            <>
+              <h2
+                id="industry-demo-modal-title"
+                className="text-xl font-bold tracking-tight text-[var(--foreground)] sm:text-2xl"
+              >
+                You&apos;re all set
+              </h2>
+              <p id="industry-demo-modal-desc" className="mt-2 text-[var(--muted)] sm:text-base">
+                If your email is valid, you&apos;ll receive next steps shortly.
+              </p>
+            </>
           ) : (
             <>
               <button
@@ -211,6 +230,14 @@ function IndustryDemoModalContent({
 
               <form action={formAction} className="mt-6 space-y-4">
                 <input type="hidden" name="industry_slug" value={selectedIndustry?.slug ?? ""} />
+                <input
+                  name="website"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  className="hidden"
+                  aria-hidden="true"
+                />
                 <div>
                   <label htmlFor="demo-email" className="block text-sm font-semibold text-[var(--foreground)]">
                     Work email <span className="text-red-500">*</span>
@@ -241,7 +268,12 @@ function IndustryDemoModalContent({
                     className="mt-1.5 w-full rounded-xl border border-[var(--card-border)] bg-[var(--background)] py-3 px-4 text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
-                <EnterDemoSubmitButton disabled={!selectedIndustry?.slug} />
+                <TurnstileField
+                  resetKey={state?.error ?? "ok"}
+                  onTokenChange={setTurnstileToken}
+                  className="rounded-xl border border-[var(--card-border)] bg-[var(--background)] p-3"
+                />
+                <EnterDemoSubmitButton disabled={!selectedIndustry?.slug || !canSubmitDemo} />
               </form>
               <p className="mt-4 text-sm text-[var(--muted)]">
                 No scheduling required. Explore a live environment with realistic seeded data.

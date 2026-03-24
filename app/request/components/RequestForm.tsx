@@ -122,6 +122,14 @@ export function RequestForm({ properties, assets, tenantId, companyId }: Request
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="tenant_id" value={tenantId} />
       <input type="hidden" name="company_id" value={companyId} />
+      <input
+        type="text"
+        name="website"
+        tabIndex={-1}
+        autoComplete="off"
+        className="hidden"
+        aria-hidden="true"
+      />
       {state.error ? (
         <div className="rounded-xl bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
           {state.error}

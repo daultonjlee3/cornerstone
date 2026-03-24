@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Mail, Lock } from "lucide-react";
-import { loginAction } from "./actions";
+import { loginAction, type LoginState } from "./actions";
+import { LoginVerificationNotice } from "@/app/auth/components/login-verification-notice";
 
 type LoginFormProps = {
+  /** Post-login redirect; also used for verification email callback. */
   next?: string;
   demoEmail?: string;
   demoLabel?: string;
@@ -17,8 +19,15 @@ const inputBase =
   "w-full min-h-[52px] rounded-xl border bg-white py-3.5 pl-11 pr-4 text-base text-slate-900 placeholder:text-slate-500 transition-[border-color,box-shadow] duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 focus:border-[var(--accent)] dark:bg-slate-700/80 dark:text-slate-100 dark:placeholder:text-slate-400 dark:border-slate-600 dark:hover:border-slate-500 sm:min-h-0 sm:text-[15px]";
 
 export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFormProps) {
-  const [state, formAction] = useActionState(loginAction, {});
+  const [state, formAction, isPending] = useActionState(loginAction, {} as LoginState);
+  const [email, setEmail] = useState(demoEmail ?? "");
   const isDemo = Boolean(demoEmail && demoLabel);
+  const verificationRedirectNext =
+    next && next.startsWith("/") && !next.startsWith("//") ? next : "/operations";
+
+  useEffect(() => {
+    if (demoEmail) setEmail(demoEmail);
+  }, [demoEmail]);
 
   return (
     <form action={formAction} className="space-y-6 sm:space-y-6">
@@ -31,14 +40,20 @@ export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFor
             : " Use the demo account below."}
         </p>
       ) : null}
-      {state?.error && (
+      {state?.needsVerification ? (
+        <LoginVerificationNotice
+          email={email.trim() || demoEmail || ""}
+          redirectNext={verificationRedirectNext}
+        />
+      ) : null}
+      {state?.error && !state?.needsVerification ? (
         <div
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
           role="alert"
         >
           {state.error}
         </div>
-      )}
+      ) : null}
       <div className="space-y-2">
         <label
           htmlFor="login-email"
@@ -58,7 +73,8 @@ export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFor
             required
             autoComplete="email"
             placeholder="you@company.com"
-            defaultValue={demoEmail}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className={`${inputBase} border-slate-200 hover:border-slate-300 dark:hover:border-slate-500`}
           />
         </div>
@@ -97,9 +113,10 @@ export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFor
       </div>
       <button
         type="submit"
-        className="w-full min-h-[52px] rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 ease-out hover:-translate-y-px hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:transition-none active:scale-[0.99] sm:min-h-0"
+        disabled={isPending}
+        className="w-full min-h-[52px] rounded-xl bg-[var(--accent)] px-4 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 ease-out hover:-translate-y-px hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:transition-none active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0"
       >
-        Sign in
+        {isPending ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-center text-[15px] text-slate-600 dark:text-slate-300">
         Don&apos;t have an account?{" "}
