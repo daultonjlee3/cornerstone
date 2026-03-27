@@ -87,6 +87,7 @@ export function TourProvider({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isDemoWorkspace = isDemoGuest || searchParams.get("demo") === "true";
   const [activeTour, setActiveTour] = useState<TourConfig | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [pendingStepIndex, setPendingStepIndex] = useState<number | null>(null);
@@ -287,14 +288,14 @@ export function TourProvider({
 
   // Auto-start tour when pathname matches and tour not completed.
   useEffect(() => {
-    if (isDemoGuest) return;
+    if (isDemoWorkspace || activeTour) return;
     const config = getTourForPath(pathname);
     if (!config || completedTourIds.has(config.id)) return;
     if (hasAutoStarted.current === config.id) return;
     hasAutoStarted.current = config.id;
     const timer = setTimeout(() => runTour(config), 400);
     return () => clearTimeout(timer);
-  }, [pathname, completedTourIds, runTour, isDemoGuest]);
+  }, [pathname, completedTourIds, runTour, isDemoWorkspace, activeTour]);
 
   // Reset auto-start when leaving the path so revisiting can trigger again if not completed.
   useEffect(() => {
