@@ -12,6 +12,8 @@ export type TourStep = {
   content: string;
   /** Optional CTA for the Next button (e.g. "Next: See how work starts"). */
   cta?: string;
+  /** Optional explicit selector (falls back to data-tour="tourId:stepId"). */
+  selector?: string;
   /** Short label for the action the user takes on the highlighted control (action-driven demos). */
   actionCta?: string;
   /** For cross-route tours: route to be on for this step (navigate here before showing step). */

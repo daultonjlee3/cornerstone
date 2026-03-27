@@ -22,22 +22,6 @@ function pathnameMatchesStep(pathname: string, step: TourStep): boolean {
   return norm === path || (path !== "/" && norm.startsWith(path + "/"));
 }
 
-const DEMO_90_WO_COMPLETED = "cornerstone:demo-90:wo-completed";
-
-function isWorkOrdersListPath(pathname: string): boolean {
-  const n = pathname.replace(/\/$/, "") || "/";
-  return n === "/work-orders" || n.startsWith("/work-orders?");
-}
-
-function isWorkOrderDetailPath(pathname: string): boolean {
-  const n = pathname.replace(/\/$/, "") || "/";
-  const m = n.match(/^\/work-orders\/([^/]+)$/);
-  if (!m) return false;
-  const seg = m[1];
-  if (seg === "new") return false;
-  return true;
-}
-
 type TourContextValue = {
   /** Currently running tour or null. */
   activeTour: TourConfig | null;
@@ -75,6 +59,21 @@ export function useTour() {
 
 const SPOTLIGHT_PADDING = 8;
 const DEMO_SPOTLIGHT_PADDING = 10;
+const TARGET_POLL_MAX_ATTEMPTS = 12;
+const TARGET_POLL_INTERVAL_MS = 120;
+
+function resolveStepElement(config: TourConfig, step: TourStep): HTMLElement | null {
+  const selector = step.selector ?? tourStepSelector(config.id, step.id);
+  return document.querySelector<HTMLElement>(selector);
+}
+
+function isElementVisible(el: HTMLElement): boolean {
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  return true;
+}
 
 export function TourProvider({
   children,
@@ -97,6 +96,7 @@ export function TourProvider({
   );
   const hasAutoStarted = useRef<string | null>(null);
   const tourStepRef = useRef({ activeTour: null as TourConfig | null, stepIndex: 0 });
+  const targetPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshCompleted = useCallback(async () => {
     const ids = await getCompletedTourIds();
@@ -146,19 +146,18 @@ export function TourProvider({
     []
   );
 
-  const updateTargetRect = useCallback((config: TourConfig, index: number) => {
+  const updateTargetRect = useCallback((config: TourConfig, index: number): boolean => {
     const step = config.steps[index];
     if (!step) {
       setTargetRect(null);
-      return;
+      return true;
     }
     if (step.variant === "cta") {
       setTargetRect(null);
-      return;
+      return true;
     }
-    const sel = tourStepSelector(config.id, step.id);
-    const el = document.querySelector<HTMLElement>(sel);
-    if (el) {
+    const el = resolveStepElement(config, step);
+    if (el && isElementVisible(el)) {
       const pad = config.id === "demo-guided" ? DEMO_SPOTLIGHT_PADDING : SPOTLIGHT_PADDING;
       const rect = el.getBoundingClientRect();
       setTargetRect(
@@ -169,8 +168,10 @@ export function TourProvider({
           rect.height + pad * 2
         )
       );
+      return true;
     } else {
       setTargetRect(null);
+      return false;
     }
   }, []);
 
@@ -178,13 +179,45 @@ export function TourProvider({
     (config: TourConfig, index: number) => {
       const step = config.steps[index];
       if (!step || step.variant === "cta") return;
-      const sel = tourStepSelector(config.id, step.id);
-      const el = document.querySelector<HTMLElement>(sel);
-      if (el) {
+      const el = resolveStepElement(config, step);
+      if (el && isElementVisible(el)) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     },
     []
+  );
+
+  const clearTargetPolling = useCallback(() => {
+    if (targetPollTimeoutRef.current) {
+      clearTimeout(targetPollTimeoutRef.current);
+      targetPollTimeoutRef.current = null;
+    }
+  }, []);
+
+  const pollForStepTarget = useCallback(
+    (config: TourConfig, index: number) => {
+      const poll = (attempt: number) => {
+        const step = config.steps[index];
+        if (!step || step.variant === "cta") {
+          setTargetRect(null);
+          return;
+        }
+        const found = updateTargetRect(config, index);
+        if (found) return;
+        if (attempt >= TARGET_POLL_MAX_ATTEMPTS) {
+          if (config.id === "demo-guided" && index < config.steps.length - 1) {
+            setStepIndex((prev) => (prev === index ? index + 1 : prev));
+          }
+          return;
+        }
+        clearTargetPolling();
+        targetPollTimeoutRef.current = setTimeout(() => {
+          poll(attempt + 1);
+        }, TARGET_POLL_INTERVAL_MS);
+      };
+      poll(0);
+    },
+    [clearTargetPolling, updateTargetRect]
   );
 
   const next = useCallback(() => {
@@ -203,8 +236,8 @@ export function TourProvider({
     }
     setStepIndex(nextIndex);
     scrollToStep(activeTour, nextIndex);
-    requestAnimationFrame(() => updateTargetRect(activeTour, nextIndex));
-  }, [activeTour, stepIndex, pathname, endTour, scrollToStep, updateTargetRect, router]);
+    requestAnimationFrame(() => pollForStepTarget(activeTour, nextIndex));
+  }, [activeTour, stepIndex, pathname, endTour, scrollToStep, pollForStepTarget, router]);
 
   const back = useCallback(() => {
     if (!activeTour || stepIndex <= 0) return;
@@ -218,8 +251,8 @@ export function TourProvider({
     }
     setStepIndex(prevIndex);
     scrollToStep(activeTour, prevIndex);
-    requestAnimationFrame(() => updateTargetRect(activeTour, prevIndex));
-  }, [activeTour, stepIndex, pathname, scrollToStep, updateTargetRect, router]);
+    requestAnimationFrame(() => pollForStepTarget(activeTour, prevIndex));
+  }, [activeTour, stepIndex, pathname, scrollToStep, pollForStepTarget, router]);
 
   const skip = useCallback(() => {
     if (!activeTour) return;
@@ -238,59 +271,19 @@ export function TourProvider({
     setStepIndex(0);
     setPendingStepIndex(null);
     scrollToStep(activeTour, 0);
-    requestAnimationFrame(() => updateTargetRect(activeTour, 0));
-  }, [activeTour, pathname, scrollToStep, updateTargetRect, router]);
+    requestAnimationFrame(() => pollForStepTarget(activeTour, 0));
+  }, [activeTour, pathname, scrollToStep, pollForStepTarget, router]);
 
   // When step index or active tour changes, update target rect (after a tick so DOM is ready).
   useEffect(() => {
     if (!activeTour) return;
-    const t = setTimeout(() => updateTargetRect(activeTour, stepIndex), 100);
+    const t = setTimeout(() => pollForStepTarget(activeTour, stepIndex), 100);
     return () => clearTimeout(t);
-  }, [activeTour, stepIndex, updateTargetRect]);
+  }, [activeTour, stepIndex, pollForStepTarget]);
 
   useEffect(() => {
     tourStepRef.current = { activeTour, stepIndex };
   }, [activeTour, stepIndex]);
-
-  // 90s demo: advance when the user navigates (not via Next).
-  useEffect(() => {
-    if (!activeTour || activeTour.id !== "demo-guided") return;
-    const step = activeTour.steps[stepIndex];
-    if (!step) return;
-    if (step.id === "priority-plan" && isWorkOrdersListPath(pathname)) {
-      setStepIndex(1);
-      setPendingStepIndex(null);
-      const t = setTimeout(() => {
-        updateTargetRect(activeTour, 1);
-        scrollToStep(activeTour, 1);
-      }, 120);
-      return () => clearTimeout(t);
-    }
-    if (step.id === "urgent-wo-row" && isWorkOrderDetailPath(pathname)) {
-      setStepIndex(2);
-      setPendingStepIndex(null);
-      const t = setTimeout(() => {
-        updateTargetRect(activeTour, 2);
-        scrollToStep(activeTour, 2);
-      }, 120);
-      return () => clearTimeout(t);
-    }
-  }, [pathname, activeTour, stepIndex, updateTargetRect, scrollToStep]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handler = () => {
-      const { activeTour: t, stepIndex: si } = tourStepRef.current;
-      if (!t || t.id !== "demo-guided") return;
-      const s = t.steps[si];
-      if (s?.id !== "complete-work") return;
-      setStepIndex(3);
-      setPendingStepIndex(null);
-      router.push("/operations");
-    };
-    window.addEventListener(DEMO_90_WO_COMPLETED, handler);
-    return () => window.removeEventListener(DEMO_90_WO_COMPLETED, handler);
-  }, [router]);
 
   // Auto-start tour when pathname matches and tour not completed.
   useEffect(() => {
@@ -315,9 +308,12 @@ export function TourProvider({
     if (activeTour.id === "demo-guided") return;
     const config = getTourForPath(pathname);
     if (!config || config.id !== activeTour.id) {
-      setActiveTour(null);
-      setStepIndex(0);
-      setTargetRect(null);
+      const cleanup = setTimeout(() => {
+        setActiveTour(null);
+        setStepIndex(0);
+        setTargetRect(null);
+      }, 0);
+      return () => clearTimeout(cleanup);
     }
   }, [pathname, activeTour]);
 
@@ -326,20 +322,29 @@ export function TourProvider({
     if (!activeTour || activeTour.id !== "demo-guided" || pendingStepIndex === null) return;
     const step = activeTour.steps[pendingStepIndex];
     if (!step || !pathnameMatchesStep(pathname, step)) return;
-    setStepIndex(pendingStepIndex);
-    setPendingStepIndex(null);
-    scrollToStep(activeTour, pendingStepIndex);
-    const t = setTimeout(() => updateTargetRect(activeTour, pendingStepIndex), 150);
+    const t = setTimeout(() => {
+      setStepIndex(pendingStepIndex);
+      setPendingStepIndex(null);
+      scrollToStep(activeTour, pendingStepIndex);
+      pollForStepTarget(activeTour, pendingStepIndex);
+    }, 150);
     return () => clearTimeout(t);
-  }, [pathname, activeTour, pendingStepIndex, scrollToStep, updateTargetRect]);
+  }, [pathname, activeTour, pendingStepIndex, scrollToStep, pollForStepTarget]);
 
   // Start demo-guided from URL param (e.g. Settings "Start tour" -> /operations?startTour=demo-guided).
   useEffect(() => {
     const startParam = searchParams.get("startTour");
     if (pathname.replace(/\/$/, "") !== "/operations" || startParam !== "demo-guided") return;
-    runTour(demoGuidedTourConfig);
-    router.replace("/operations", { scroll: false });
+    const kickoff = setTimeout(() => {
+      runTour(demoGuidedTourConfig);
+      router.replace("/operations", { scroll: false });
+    }, 0);
+    return () => clearTimeout(kickoff);
   }, [pathname, searchParams, runTour, router]);
+
+  useEffect(() => {
+    return () => clearTargetPolling();
+  }, [clearTargetPolling]);
 
   const value: TourContextValue = {
     activeTour,
