@@ -6,6 +6,7 @@ import { calculateAssetHealth } from "@/src/lib/assets/assetHealthService";
 import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelligenceService";
 import { getAssetHierarchyNode, wouldCreateAssetCycle } from "@/src/lib/assets/hierarchy";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 import { revalidatePath } from "next/cache";
 import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 
@@ -79,6 +80,7 @@ export async function saveAsset(
   formData: FormData
 ): Promise<AssetFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -316,6 +318,7 @@ export async function saveAsset(
 
 export async function deleteAsset(id: string): Promise<AssetFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
@@ -355,6 +358,7 @@ export async function updateAssetStatus(
   status: "active" | "inactive" | "retired"
 ): Promise<AssetFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);

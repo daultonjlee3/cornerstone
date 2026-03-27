@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { requirePermission } from "@/src/lib/permissions";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 export type VendorFormState = { error?: string; success?: boolean };
 
@@ -13,6 +14,7 @@ export async function saveVendor(
 ): Promise<VendorFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const id = (formData.get("id") as string | null)?.trim() ?? "";
   const companyId = (formData.get("company_id") as string | null)?.trim() ?? "";
@@ -67,6 +69,7 @@ export async function deleteVendor(id: string): Promise<VendorFormState> {
 
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: existing } = await scope.supabase
     .from("vendors")
@@ -116,6 +119,7 @@ export async function saveVendorPricing(
 ): Promise<VendorPricingFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const id = (formData.get("id") as string | null)?.trim() ?? "";
   const vendorId = (formData.get("vendor_id") as string | null)?.trim() ?? "";
@@ -194,6 +198,7 @@ export async function saveVendorPricing(
 export async function deleteVendorPricing(vendorId: string, pricingId: string): Promise<VendorPricingFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: existing } = await scope.supabase
     .from("vendor_pricing")

@@ -15,7 +15,7 @@ import {
   type PreventiveMaintenanceFrequencyType,
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
-import { getTenantIdForUser, companyBelongsToTenant, isDemoGuestUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
 import { requirePermission } from "@/src/lib/permissions";
 import {
   TERMINAL_STATUSES,
@@ -24,6 +24,7 @@ import {
   canTransitionStatus,
   isSupportedStatus,
 } from "@/src/lib/work-orders/status";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 /** Returned from updateWorkOrderAssignment so dispatch can merge DB truth without waiting on RSC. */
 export type WorkOrderAssignmentSnapshot = {
@@ -423,8 +424,8 @@ export async function saveWorkOrder(
   options?: SaveWorkOrderOptions
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
-  if (!options?.portalContext && (await isDemoGuestUser(supabase))) {
-    return { success: true };
+  if (!options?.portalContext && (await isDemoReadOnlyUser(supabase))) {
+    return { error: DEMO_READ_ONLY_ERROR };
   }
   const id = (formData.get("id") as string)?.trim() || null;
   const companyId = (formData.get("company_id") as string)?.trim();
@@ -904,6 +905,7 @@ export async function deleteWorkOrder(id: string): Promise<WorkOrderFormState> {
   }
 
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
@@ -947,6 +949,7 @@ export async function updateWorkOrderStatus(
   newStatus: string
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (!isSupportedStatus(newStatus)) return { error: "Invalid status." };
@@ -1155,6 +1158,7 @@ export async function logDispatchRebalance(
   companyId: string | null
 ): Promise<{ error?: string }> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
@@ -1184,6 +1188,7 @@ export async function upsertWorkOrderSlaPolicies(
   policies: WorkOrderSlaPolicyInput[]
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (!companyId) return { error: "Company is required." };
@@ -1255,46 +1260,7 @@ export async function updateWorkOrderAssignment(
     console.log("[dispatch-trace][step4][incoming-payload]", { id, payload });
   }
   const supabase = await createClient();
-  if (await isDemoGuestUser(supabase)) {
-    const nextTechnicianId = payload.assigned_technician_id || null;
-    const nextCrewId = payload.assigned_crew_id || null;
-    const nextVendorId = payload.assigned_vendor_id || null;
-    const nextScheduledDate = payload.scheduled_date ?? null;
-    const nextScheduledStart = payload.scheduled_start
-      ? new Date(payload.scheduled_start).toISOString()
-      : null;
-    const nextScheduledEnd = payload.scheduled_end
-      ? new Date(payload.scheduled_end).toISOString()
-      : null;
-    const hasSchedule = Boolean(nextScheduledDate || nextScheduledStart || nextScheduledEnd);
-    const hasAssignment = Boolean(nextTechnicianId || nextCrewId || nextVendorId);
-    const demoStatus = hasSchedule && hasAssignment ? "scheduled" : "ready_to_schedule";
-    if (traceEnabled) {
-      // eslint-disable-next-line no-console
-      console.log("[dispatch-trace][step4][demo-short-circuit]", {
-        id,
-        nextTechnicianId,
-        nextCrewId,
-        nextScheduledStart,
-        nextScheduledEnd,
-        demoStatus,
-      });
-    }
-    return {
-      success: true,
-      assignmentSnapshot: {
-        id,
-        assigned_technician_id: nextTechnicianId,
-        assigned_crew_id: nextCrewId,
-        vendor_id: nextVendorId,
-        scheduled_date: nextScheduledDate,
-        scheduled_start: nextScheduledStart,
-        scheduled_end: nextScheduledEnd,
-        status: demoStatus,
-        updated_at: new Date().toISOString(),
-      },
-    };
-  }
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
@@ -1634,9 +1600,7 @@ export async function completeWorkOrder(
   payload: WorkOrderCompletionPayload
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
-  if (await isDemoGuestUser(supabase)) {
-    return { success: true };
-  }
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -1968,6 +1932,7 @@ export async function logWorkOrderLabor(
   payload: WorkOrderLaborLogPayload
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
@@ -2084,6 +2049,7 @@ export async function addWorkOrderNote(
   technicianId: string | null = null
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
@@ -2168,6 +2134,7 @@ export async function uploadWorkOrderAttachment(
   }
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -2306,6 +2273,7 @@ export async function toggleWorkOrderChecklistItem(
   completed: boolean
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const actorId = await getActorId(supabase);
@@ -2367,6 +2335,7 @@ export async function addWorkOrderChecklistItem(
   label: string
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const trimmed = (label ?? "").trim();
@@ -2445,6 +2414,7 @@ export async function addWorkOrderPartUsage(
   payload: AddPartUsagePayload
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (payload.quantity_used <= 0) return { error: "Quantity must be greater than zero." };
@@ -2911,6 +2881,7 @@ export async function addWorkOrderMaterialLine(
   input: { product_id: string; required_quantity: number; stock_location_id?: string | null; unit_cost_snapshot?: number | null }
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: wo } = await supabase
@@ -2961,6 +2932,7 @@ export async function updateWorkOrderMaterialLine(
   input: { required_quantity?: number; stock_location_id?: string | null }
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: line } = await supabase
@@ -3026,6 +2998,7 @@ export async function updateWorkOrderMaterialLine(
 
 export async function removeWorkOrderMaterialLine(lineId: string): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: line } = await supabase
@@ -3051,6 +3024,7 @@ export async function reserveWorkOrderMaterial(
   quantity: number
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (!Number.isFinite(quantity) || quantity <= 0) return { error: "Reserve quantity must be greater than zero." };
@@ -3128,6 +3102,7 @@ export async function releaseWorkOrderReservation(
   quantity?: number
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: line } = await supabase
@@ -3181,6 +3156,7 @@ export async function issueWorkOrderMaterial(
   quantity: number
 ): Promise<WorkOrderFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   if (!Number.isFinite(quantity) || quantity <= 0) return { error: "Issue quantity must be greater than zero." };

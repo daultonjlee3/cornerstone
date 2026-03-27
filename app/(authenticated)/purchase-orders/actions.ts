@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { resolveTaxable } from "@/src/lib/procurement/pricing";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 export type PurchaseOrderFormState = {
   error?: string;
@@ -42,6 +43,7 @@ export async function savePurchaseOrder(
 ): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const id = ((formData.get("id") as string | null) ?? "").trim();
   const companyId = ((formData.get("company_id") as string | null) ?? "").trim();
@@ -235,6 +237,7 @@ export async function savePurchaseOrder(
 export async function deletePurchaseOrder(id: string): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: existing } = await scope.supabase
     .from("purchase_orders")
@@ -302,6 +305,7 @@ export async function savePurchaseOrderLine(
 ): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: po } = await scope.supabase
     .from("purchase_orders")
@@ -406,6 +410,7 @@ export async function deletePurchaseOrderLine(
 ): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: po } = await scope.supabase
     .from("purchase_orders")
@@ -452,6 +457,7 @@ export async function receivePurchaseOrderLine(input: {
 }): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
   if (!Number.isFinite(input.quantityReceived) || input.quantityReceived <= 0) {
     return { error: "Received quantity must be greater than zero." };
   }
@@ -573,6 +579,7 @@ export async function receivePurchaseOrderAllRemaining(input: {
 }): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: po } = await scope.supabase
     .from("purchase_orders")
@@ -788,6 +795,7 @@ export async function savePurchaseOrderTemplate(
 ): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const id = (formData.get("id") as string | null)?.trim() ?? "";
   const companyId = (formData.get("company_id") as string | null)?.trim() ?? "";
@@ -845,6 +853,7 @@ export async function savePurchaseOrderTemplateLines(
 ): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: t } = await scope.supabase
     .from("purchase_order_templates")
@@ -880,6 +889,7 @@ export async function savePurchaseOrderTemplateLines(
 export async function deletePurchaseOrderTemplate(templateId: string): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: t } = await scope.supabase
     .from("purchase_order_templates")
@@ -901,6 +911,7 @@ export async function deletePurchaseOrderTemplate(templateId: string): Promise<P
 export async function createTemplateFromPo(poId: string, templateName: string): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: po } = await scope.supabase
     .from("purchase_orders")
@@ -1164,6 +1175,7 @@ export type SaveVendorInvoiceInput = {
 export async function saveVendorInvoice(input: SaveVendorInvoiceInput): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
   if (!companyInScope(input.company_id, scope.companyIds)) return { error: "Unauthorized." };
   if (!input.invoice_number?.trim()) return { error: "Invoice number is required." };
   const validStatuses = ["draft", "pending", "matched", "paid", "cancelled"];
@@ -1269,6 +1281,7 @@ export async function saveVendorInvoice(input: SaveVendorInvoiceInput): Promise<
 export async function deleteVendorInvoice(invoiceId: string, purchaseOrderId?: string | null): Promise<PurchaseOrderFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const { data: inv } = await scope.supabase
     .from("vendor_invoices")

@@ -11,6 +11,7 @@ import {
 } from "@/src/lib/preventive-maintenance/schedule";
 import { revalidatePath } from "next/cache";
 import { getTenantIdForUser, companyBelongsToTenant } from "@/src/lib/auth-context";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 const FREQUENCY_TYPES = [
   "daily",
@@ -92,6 +93,7 @@ export async function savePMProgramPlan(
   formData: FormData
 ): Promise<PMProgramPlanFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -135,6 +137,7 @@ export async function updatePMProgramPlanActive(
   active: boolean
 ): Promise<PMProgramPlanFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
@@ -543,6 +546,7 @@ export async function savePreventiveMaintenancePlan(
   formData: FormData
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -765,6 +769,7 @@ export async function deletePreventiveMaintenancePlan(
   id: string
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
@@ -798,6 +803,7 @@ export async function updatePreventiveMaintenancePlanStatus(
   status: "active" | "paused" | "archived"
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -852,6 +858,7 @@ export async function duplicatePreventiveMaintenancePlan(
   id: string
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -902,6 +909,7 @@ export async function savePreventiveMaintenanceTemplate(
   formData: FormData
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -1025,6 +1033,7 @@ export async function deletePreventiveMaintenanceTemplate(
   id: string
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
   const { data: row } = await supabase
@@ -1055,6 +1064,7 @@ export async function bulkCreatePlansFromTemplate(
   formData: FormData
 ): Promise<PreventiveMaintenanceFormState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -1142,6 +1152,7 @@ export async function generatePreventiveMaintenanceNow(
   planId: string
 ): Promise<PreventiveMaintenanceGenerationState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 
@@ -1190,6 +1201,7 @@ export async function generateDuePreventiveMaintenanceRuns(
   targetDate?: string
 ): Promise<PreventiveMaintenanceGenerationState> {
   const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) return { error: "Unauthorized." };
 

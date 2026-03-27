@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { insertActivityLog } from "@/src/lib/activity-logs";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 export type InventoryFormState = { error?: string; success?: boolean };
 
@@ -24,6 +25,9 @@ export async function saveStockLocation(
 ): Promise<InventoryFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) {
+    return { error: DEMO_READ_ONLY_ERROR };
+  }
 
   const id = ((formData.get("id") as string | null) ?? "").trim();
   const companyId = ((formData.get("company_id") as string | null) ?? "").trim();
@@ -148,6 +152,9 @@ export async function recordInventoryAdjustment(
 ): Promise<InventoryFormState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
+  if (await isDemoReadOnlyUser(scope.supabase)) {
+    return { error: DEMO_READ_ONLY_ERROR };
+  }
   if (!Number.isFinite(payload.quantityChange) || payload.quantityChange === 0) {
     return { error: "Quantity change must be non-zero." };
   }

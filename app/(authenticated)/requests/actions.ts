@@ -7,7 +7,7 @@ import { dispatchNotificationEvent } from "@/src/lib/notifications/dispatch";
 import { sendEmailAlert, getCompanyAlertRecipients } from "@/src/lib/notifications";
 import { companyInScope, resolveProcurementScope } from "@/src/lib/procurement/scope";
 import { saveWorkOrder } from "@/app/(authenticated)/work-orders/actions";
-import { isDemoGuestUser } from "@/src/lib/auth-context";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 export type WorkRequestActionState = {
   error?: string;
@@ -45,9 +45,7 @@ export async function submitWorkRequest(
 ): Promise<WorkRequestActionState> {
   const scope = await resolveProcurementScope().catch(() => null);
   if (!scope) return { error: "Unauthorized." };
-  if (await isDemoGuestUser(scope.supabase)) {
-    return { success: true };
-  }
+  if (await isDemoReadOnlyUser(scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const requesterName = ((formData.get("requester_name") as string | null) ?? "").trim();
   const requesterEmail = ((formData.get("requester_email") as string | null) ?? "").trim();
@@ -205,7 +203,7 @@ async function getScopedRequestOrError(
 export async function approveWorkRequest(requestId: string): Promise<WorkRequestActionState> {
   const scoped = await getScopedRequestOrError(requestId);
   if ("error" in scoped) return { error: scoped.error };
-  if (await isDemoGuestUser(scoped.scope.supabase)) return { success: true, requestId };
+  if (await isDemoReadOnlyUser(scoped.scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const currentStatus = String(scoped.row.status ?? "");
   if (currentStatus === "rejected") {
@@ -239,7 +237,7 @@ export async function approveWorkRequest(requestId: string): Promise<WorkRequest
 export async function rejectWorkRequest(requestId: string): Promise<WorkRequestActionState> {
   const scoped = await getScopedRequestOrError(requestId);
   if ("error" in scoped) return { error: scoped.error };
-  if (await isDemoGuestUser(scoped.scope.supabase)) return { success: true, requestId };
+  if (await isDemoReadOnlyUser(scoped.scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const currentStatus = String(scoped.row.status ?? "");
   if (currentStatus === "completed") {
@@ -272,9 +270,7 @@ export async function convertWorkRequestToWorkOrder(
 ): Promise<WorkRequestActionState> {
   const scoped = await getScopedRequestOrError(requestId);
   if ("error" in scoped) return { error: scoped.error };
-  if (await isDemoGuestUser(scoped.scope.supabase)) {
-    return { success: true, requestId };
-  }
+  if (await isDemoReadOnlyUser(scoped.scope.supabase)) return { error: DEMO_READ_ONLY_ERROR };
 
   const request = scoped.row;
   const currentStatus = String(request.status ?? "");
