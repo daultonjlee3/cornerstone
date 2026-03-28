@@ -2,6 +2,7 @@
  * Refreshes Supabase session and protects app/onboarding routes.
  * - Unauthenticated users hitting /operations, /dashboard, or /onboarding → redirect to /login
  * - Authenticated users hitting /login or /signup → redirect to /operations
+ *   (exception: /signup?source=demo so demo workspace “Start Free Trial” can load signup)
  *   (authenticated layout will redirect to /onboarding if user has no tenant)
  */
 
@@ -117,6 +118,12 @@ export async function middleware(request: NextRequest) {
   const portalActor = isPortalOnly || isImpersonating;
 
   if (isAuthPath(pathname)) {
+    const allowDemoSignup =
+      (pathname === "/signup" || pathname.startsWith("/signup/")) &&
+      request.nextUrl.searchParams.get("source") === "demo";
+    if (allowDemoSignup) {
+      return response;
+    }
     return NextResponse.redirect(new URL(portalActor ? "/portal" : "/operations", request.url));
   }
 
