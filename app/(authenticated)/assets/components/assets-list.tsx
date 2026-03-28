@@ -285,7 +285,7 @@ export function AssetsList({
   }
 
   return (
-    <div className="space-y-4" data-tour="assets:asset-list">
+    <div className="space-y-4">
       {message && (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -356,7 +356,7 @@ export function AssetsList({
           />
         </>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-4" data-tour="assets:schedule-pm">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Assets</h2>
         <button
           type="button"
@@ -591,7 +591,7 @@ export function AssetsList({
                       <th className="w-28 px-4 py-3 font-semibold">Actions</th>
                     </tr>
                   </thead>
-                  <tbody data-tour="assets:maintenance-history">
+                  <tbody>
                     {initialAssets.map((a) => (
                       <tr
                         key={a.id}

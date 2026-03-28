@@ -6,7 +6,6 @@ import { PreventiveMaintenancePlansList } from "./components/pm-plans-list";
 import type { PreventiveMaintenanceTemplate } from "./components/pm-template-form-modal";
 import type { PreventiveMaintenancePlan } from "./components/pm-plan-form-modal";
 import { PageHeader } from "@/src/components/ui/page-header";
-import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 export const metadata = {
   title: "Preventive Maintenance | Cornerstone Tech",
@@ -84,7 +83,6 @@ export default async function PreventiveMaintenancePage({
           icon={<Repeat className="size-5" />}
           title="Preventive Maintenance"
           subtitle="Build recurring plans and auto-generate preventive work orders."
-          actions={<TakeTourButton />}
         />
         <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-12 text-center">
           <p className="text-[var(--muted)]">
@@ -370,7 +368,6 @@ export default async function PreventiveMaintenancePage({
         icon={<Repeat className="size-5" />}
         title="Preventive Maintenance"
         subtitle="Build recurring plans and auto-generate preventive work orders."
-        actions={<TakeTourButton />}
       />
       <PreventiveMaintenancePlansList
         plans={plans}

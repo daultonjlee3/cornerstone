@@ -13,8 +13,6 @@ export type PageHeaderProps = {
   meta?: ReactNode;
   /** Optional: wrap header in a subtle surface/divider for emphasis */
   variant?: "default" | "surface";
-  /** Optional data-tour target on title text */
-  titleTourId?: string;
   className?: string;
 };
 
@@ -25,7 +23,6 @@ export function PageHeader({
   actions,
   meta,
   variant = "default",
-  titleTourId,
   className = "",
 }: PageHeaderProps) {
   const content = (
@@ -37,7 +34,7 @@ export function PageHeader({
           </div>
         ) : null}
         <div className="min-w-0 flex-1">
-          <h1 className="ui-page-title" {...(titleTourId ? { "data-tour": titleTourId } : {})}>
+          <h1 className="ui-page-title">
             {title}
           </h1>
           {subtitle ? (

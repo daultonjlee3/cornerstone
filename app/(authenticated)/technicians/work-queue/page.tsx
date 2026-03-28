@@ -235,7 +235,7 @@ export default async function TechnicianWorkQueuePage({
   });
 
   return (
-    <div className="space-y-6" data-tour="demo-guided:technician-execution">
+    <div className="space-y-6">
       <PageHeader
         icon={<ListChecks className="size-5" />}
         title="Technician Work Queue"
@@ -359,7 +359,6 @@ export default async function TechnicianWorkQueuePage({
                 {filteredRows.map((workOrder) => (
                   <tr
                     key={workOrder.id}
-                    data-demo-scenario-target="technician-task-row"
                     data-work-order-id={workOrder.id}
                     className="border-b border-[var(--card-border)] last:border-0 transition-colors hover:bg-[var(--background)]/50"
                   >

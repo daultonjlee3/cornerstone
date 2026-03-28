@@ -28,7 +28,6 @@ export function WorkOrderLocationCard({ workOrder }: WorkOrderLocationCardProps)
 
   return (
     <div
-      data-demo-scenario-target="work-order-asset-card"
       data-work-order-id={workOrderId}
       className={cardClass}
     >

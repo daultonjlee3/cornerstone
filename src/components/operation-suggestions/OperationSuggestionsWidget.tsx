@@ -181,7 +181,7 @@ export function OperationSuggestionsWidget({
   if (!topSuggestions.length) return null;
 
   return (
-    <section className="space-y-3" data-tour="dashboard:ai-suggestions">
+    <section className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Recommended Actions</h2>

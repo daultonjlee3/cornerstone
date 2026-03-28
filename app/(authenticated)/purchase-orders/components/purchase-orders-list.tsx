@@ -126,7 +126,7 @@ export function PurchaseOrdersList({
   };
 
   return (
-    <div className="space-y-4" data-tour="purchase-orders:ordering">
+    <div className="space-y-4">
       {message ? (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -183,7 +183,7 @@ export function PurchaseOrdersList({
         </div>
       </div>
 
-      <div data-tour="purchase-orders:receiving">
+      <div>
       <DataTable>
         <Table className="min-w-[980px]">
           <TableHead>

@@ -17,8 +17,6 @@ import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
 import { useIsLg } from "@/src/lib/use-media-query";
 import Link from "next/link";
 import { ResponsiveOverlayPanel } from "@/src/components/ui/panels/ResponsiveOverlayPanel";
-import { useDemoScenario } from "@/hooks/useDemoScenario";
-import { useGuidance } from "@/hooks/useGuidance";
 
 const STEPS = [
   {
@@ -79,15 +77,10 @@ export function GetStartedChecklist() {
     markSkipped,
     resumeOnboarding,
   } = useGetStartedOnboarding();
-  const { isDemoMode } = useDemoScenario();
-  const { startTour } = useGuidance();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dismissedSuccess, setDismissedSuccess] = useState(false);
   const completedCount = STEPS.filter((step) => stepComplete(step.id, checklist)).length;
   const progressPct = Math.round((completedCount / STEPS.length) * 100);
-
-  // When the live demo is active, it becomes the only guidance system on screen.
-  if (isDemoMode) return null;
 
   if (loading || skipped) return null;
 
@@ -106,7 +99,7 @@ export function GetStartedChecklist() {
         const Icon = step.icon;
         return (
           <li key={step.id}>
-            <div className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-[var(--background)]/80">
+            <div className="flex min-h-[44px] items-center rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-[var(--background)]/80">
               <button
                 type="button"
                 onClick={() => handleStepClick(step.href)}
@@ -122,26 +115,6 @@ export function GetStartedChecklist() {
                   {step.label}
                 </span>
               </button>
-              {!done ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    void startTour(
-                      step.id === "asset"
-                        ? "onboarding-create-asset"
-                        : step.id === "work-order"
-                          ? "onboarding-create-work-order"
-                          : step.id === "assign"
-                            ? "onboarding-assign-technician"
-                            : "onboarding-complete-work-order",
-                      { force: true }
-                    )
-                  }
-                  className="shrink-0 rounded-md border border-[var(--card-border)] px-2 py-1 text-[11px] font-medium text-[var(--muted-strong)] hover:bg-[var(--background)]"
-                >
-                  Tour
-                </button>
-              ) : null}
             </div>
           </li>
         );

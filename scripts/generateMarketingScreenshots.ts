@@ -192,7 +192,7 @@ function screenshotUrl(route: string): string {
 /** Suppress all tours/modals via localStorage and apply CSS zoom for readability. */
 async function setScreenshotModeStorage(page: Page) {
   await page.evaluate((zoom) => {
-    // Disable new guided product tour
+    // Legacy keys (harmless if unused)
     localStorage.setItem("cornerstone_demo_tour_completed", "1");
     // Signal app-level screenshot mode flag
     localStorage.setItem("screenshot_mode", "true");
@@ -223,7 +223,7 @@ async function expandSidebar(page: Page) {
 
 /** Close any visible overlay/modal/tour that could obscure the screenshot. */
 async function dismissOverlays(page: Page) {
-  // Skip buttons (guided tour, demo welcome)
+  // Close overlays that could obscure the screenshot
   for (const label of ["Skip Tour", "Skip", "Explore the Live Demo", "Continue Exploring"]) {
     const btn = page.locator(`button:has-text("${label}")`).first();
     if (await btn.isVisible({ timeout: 300 }).catch(() => false)) {

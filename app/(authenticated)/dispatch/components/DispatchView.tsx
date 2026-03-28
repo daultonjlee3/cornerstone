@@ -47,9 +47,8 @@ import { Button } from "@/src/components/ui/button";
 import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Hint } from "@/src/components/ui/hint";
-import { useDemoScenario } from "@/hooks/useDemoScenario";
+import { useGuidance } from "@/hooks/useGuidance";
 import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
-import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 import { toDateOnlyString } from "@/src/lib/date-utils";
 
 const DispatchMapPanel = dynamic(
@@ -329,7 +328,7 @@ export function DispatchView({
   initialData,
   filterState,
 }: DispatchViewProps) {
-  const { isDemoMode } = useDemoScenario();
+  const { isDemoGuest } = useGuidance();
   const { markAssignedTechnician } = useGetStartedOnboarding();
   const DEMO_DISPATCH_STATE_KEY = "cornerstone_demo_dispatch_runtime_v1";
   const router = useRouter();
@@ -366,7 +365,7 @@ export function DispatchView({
 
   /** Persist demo state before syncing from server/sessionStorage so the next effect reads fresh data. */
   useEffect(() => {
-    if (!isDemoMode || typeof window === "undefined") return;
+    if (!isDemoGuest || typeof window === "undefined") return;
     try {
       window.sessionStorage.setItem(
         DEMO_DISPATCH_STATE_KEY,
@@ -375,10 +374,10 @@ export function DispatchView({
     } catch {
       // Best-effort persistence only.
     }
-  }, [isDemoMode, optimisticWorkOrders]);
+  }, [isDemoGuest, optimisticWorkOrders]);
 
   useEffect(() => {
-    if (isDemoMode && typeof window !== "undefined") {
+    if (isDemoGuest && typeof window !== "undefined") {
       const raw = window.sessionStorage.getItem(DEMO_DISPATCH_STATE_KEY);
       if (raw) {
         try {
@@ -406,7 +405,7 @@ export function DispatchView({
         initialData.crews
       );
     });
-  }, [initialData.workOrders, isDemoMode, initialData.workforce.technicians, initialData.crews]);
+  }, [initialData.workOrders, isDemoGuest, initialData.workforce.technicians, initialData.crews]);
 
   useEffect(() => {
     setSelectedMapTechnicianId(filterState.technicianId || null);
@@ -1007,15 +1006,12 @@ export function DispatchView({
         markAssignedTechnician();
       }
 
-      if (!isDemoMode) {
-        queueMicrotask(() => {
-          router.refresh();
-          window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
-        });
-      }
+      queueMicrotask(() => {
+        router.refresh();
+        window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+      });
     },
     [
-      isDemoMode,
       optimisticWorkOrders,
       router,
       initialData.workforce.technicians,
@@ -1677,15 +1673,7 @@ export function DispatchView({
 
   return (
     <div
-      className={`flex min-w-0 flex-col ${
-        isDemoMode && !isFullScreen
-          ? "h-auto min-h-[820px]"
-          : "h-full min-h-0"
-      } ${opsMode ? "gap-0" : isFullScreen ? "gap-1" : "gap-2"}
-      ${
-        isDemoMode && !isFullScreen ? "overflow-visible" : ""
-      }`}
-      data-tour="demo-guided:dispatch"
+      className={`flex min-w-0 min-h-0 flex-1 flex-col ${opsMode ? "gap-0" : isFullScreen ? "gap-1" : "gap-2"}`}
       data-get-started="assign"
     >
       {opsMode ? (
@@ -1694,7 +1682,6 @@ export function DispatchView({
             Dispatch · Ops
           </span>
           <div className="flex items-center gap-1.5">
-            <TakeTourButton compact />
             <Button
               variant="secondary"
               size="sm"
@@ -1733,7 +1720,6 @@ export function DispatchView({
             >
               {isFullScreen ? "Exit Full Screen" : "⛶ Full Screen"}
             </Button>
-            <TakeTourButton compact />
             <HelpTriggerButton onClick={() => setHelpOpen(true)} />
           </div>
         </header>
@@ -1750,9 +1736,7 @@ export function DispatchView({
       )}
 
       <div
-        className={`flex min-h-0 min-w-0 flex-1 flex-col border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
-          isDemoMode && !isFullScreen ? "overflow-visible" : "overflow-hidden"
-        } ${
+        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-[var(--card-border)] bg-white/88 shadow-[var(--shadow-soft)] ${
           opsMode ? "rounded-lg" : "rounded-xl"
         }`}
       >
@@ -1787,7 +1771,7 @@ export function DispatchView({
 
         <div className="flex min-h-0 flex-1 min-w-0">
           {filterState.viewMode === "map" ? (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2" data-tour="dispatch:routing">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2">
               <DispatchMapPanel
                 viewMode={filterState.viewMode}
                 mapPanelVisible={true}
@@ -1843,10 +1827,7 @@ export function DispatchView({
                       showMobileMapButton: true,
                     })}
                     <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
-                      <section
-                        className="min-h-0 min-w-0 flex-1 overflow-hidden"
-                        data-tour="dispatch:technician-columns"
-                      >
+                      <section className="min-h-0 min-w-0 flex-1 overflow-hidden">
                         {dispatchBoardMode === "technicians" &&
                         initialData.workforce.technicians.length === 0 ? (
                           <div className="flex h-full items-center justify-center border-b border-[var(--card-border)] bg-[var(--card)]/30 px-4 py-8">
@@ -1855,14 +1836,13 @@ export function DispatchView({
                             </p>
                           </div>
                         ) : (
-                          <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
+                          <div className="h-full min-h-0">
                             <DispatchBoard
                               lanes={filteredLanes}
                               workOrdersByLane={filteredWorkOrdersByLane}
                               selectedDate={filterState.selectedDate}
                               overDropId={overDropId}
                               isDraggingWorkOrder={Boolean(activeWo)}
-                              isDemoMode={isDemoMode}
                               view="day"
                               workOrders={optimisticWorkOrders}
                               routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}
@@ -1873,7 +1853,6 @@ export function DispatchView({
                               onSelectDate={handleSelectDate}
                               onResizeEnd={handleResizeEnd}
                               onOpenWorkOrder={handleOpenWorkOrder}
-                              usePageScroll={isDemoMode && !isFullScreen}
                             />
                           </div>
                         )}
@@ -1909,10 +1888,7 @@ export function DispatchView({
                             </div>
                           </div>
                         ) : null}
-                        <div
-                          className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-2"
-                          data-tour="dispatch:routing"
-                        >
+                        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-2">
                           <DispatchMapPanel
                             viewMode="combined"
                             mapPanelVisible={true}
@@ -1981,7 +1957,7 @@ export function DispatchView({
                             />
                           </div>
                         ) : null}
-                        <div className="min-h-[min(50vh,360px)] flex-1 overflow-hidden p-2" data-tour="dispatch:routing">
+                        <div className="min-h-[min(50vh,360px)] flex-1 overflow-hidden p-2">
                           <DispatchMapPanel
                             viewMode="combined"
                             mapPanelVisible={true}
@@ -2065,15 +2041,14 @@ export function DispatchView({
                       </p>
                     </div>
                   ) : (
-                    <div className="min-h-0 flex-1" data-tour="dispatch:technician-columns">
-                      <div className="h-full min-h-0" data-tour="dispatch:drag-drop">
+                    <div className="min-h-0 flex-1">
+                      <div className="h-full min-h-0">
                       <DispatchBoard
                         lanes={filteredLanes}
                         workOrdersByLane={filteredWorkOrdersByLane}
                         selectedDate={filterState.selectedDate}
                         overDropId={overDropId}
                         isDraggingWorkOrder={Boolean(activeWo)}
-                        isDemoMode={isDemoMode}
                         view={filterState.viewMode}
                         workOrders={optimisticWorkOrders}
                         routeTravelByWorkOrderId={selectedRoute?.travelByWorkOrderId}
@@ -2084,7 +2059,6 @@ export function DispatchView({
                         onSelectDate={handleSelectDate}
                         onResizeEnd={handleResizeEnd}
                         onOpenWorkOrder={handleOpenWorkOrder}
-                        usePageScroll={isDemoMode && !isFullScreen}
                       />
                       </div>
                     </div>

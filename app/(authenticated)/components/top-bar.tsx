@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Menu, Bell, MapPin } from "lucide-react";
+import { Search, Menu, Bell } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { useGuidance } from "@/hooks/useGuidance";
 
@@ -63,11 +63,7 @@ export function TopBar({
   onReturnToProfile,
 }: TopBarProps) {
   const router = useRouter();
-  const {
-    startProductTourForCurrentPage,
-    hasProductTourForCurrentPage,
-    isLiveDemoMode,
-  } = useGuidance();
+  const { isLiveDemoMode } = useGuidance();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -320,20 +316,9 @@ export function TopBar({
                   Return to My Profile
                 </button>
               ) : null}
-              <button
-                type="button"
-                role="menuitem"
-                disabled={!hasProductTourForCurrentPage}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={async () => {
-                  setAccountOpen(false);
-                  await startProductTourForCurrentPage();
-                }}
+              <div
+                className={`px-3 py-2 ${isImpersonating ? "border-t border-[var(--card-border)]" : ""}`}
               >
-                <MapPin className="size-4 text-[var(--accent)]" aria-hidden />
-                {hasProductTourForCurrentPage ? "Take Tour" : "Tour Unavailable"}
-              </button>
-              <div className="border-t border-[var(--card-border)] px-3 py-2">
                 <SignOutButton />
               </div>
             </div>

@@ -39,7 +39,6 @@ import {
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
 import { navConfig, type NavGroup, type NavItem } from "../nav-config";
 import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
-import { useDemoScenario } from "@/hooks/useDemoScenario";
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -111,8 +110,7 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { skipped, allComplete, resumeOnboarding } = useGetStartedOnboarding();
-  const { isDemoMode } = useDemoScenario();
-  const showResume = showResumeOnboarding && skipped && !allComplete && !isDemoMode;
+  const showResume = showResumeOnboarding && skipped && !allComplete;
 
   const navGroups = isDemoGuest
     ? navConfig.filter((g) => g.label !== "Organization")
@@ -321,12 +319,10 @@ function NavGroupBlock({
         {group.items.map((item) => {
           const active = isActive(item.href, pathname);
           const Icon = getIcon(item);
-          const navTourId = demoNavTourId(item.href);
           const linkContent = (
             <Link
               href={item.href}
               onClick={onClose}
-              {...(item.tourId ? { "data-tour": item.tourId } : {})}
               className={`
                 group flex min-h-[44px] cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm transition-all duration-150
                 ${collapsed ? "justify-center px-2" : ""}
@@ -338,7 +334,6 @@ function NavGroupBlock({
             >
               {Icon ? (
                 <span
-                  {...(navTourId ? { "data-tour": navTourId } : {})}
                   className={`
                     flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105
                     ${active

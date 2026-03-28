@@ -76,9 +76,7 @@ export type DispatchBoardProps = {
   onHoverWorkOrder?: (workOrderId: string | null) => void;
   /** When set, the matching technician lane (tech-{id}) is visually highlighted. */
   selectedTechnicianId?: string | null;
-  /** Suppress visual effects that conflict with demo overlays. */
-  isDemoMode?: boolean;
-  /** In demo mode, let the page own vertical scrolling. */
+  /** When true, board height follows content and the page scrolls vertically. */
   usePageScroll?: boolean;
 };
 
@@ -288,7 +286,6 @@ export function DispatchBoard({
   hoveredWorkOrderId = null,
   onHoverWorkOrder,
   selectedTechnicianId = null,
-  isDemoMode = false,
   usePageScroll = false,
 }: DispatchBoardProps) {
   const timeLabels = useMemo(() => getTimeSlotLabels(), []);
@@ -304,7 +301,7 @@ export function DispatchBoard({
     () => now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
     [now]
   );
-  const showCurrentTimeIndicator = !isDemoMode;
+  const showCurrentTimeIndicator = true;
   useEffect(() => {
     if (view !== "day") return;
     if (nowPercent == null) return;

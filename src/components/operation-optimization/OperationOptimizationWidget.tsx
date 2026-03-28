@@ -35,7 +35,7 @@ export function OperationOptimizationWidget({ maxVisible = 3 }: { maxVisible?: n
   if (!top.length) return null;
 
   return (
-    <section className="space-y-3" data-tour="dashboard:optimization-proposals">
+    <section className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Operations Optimization</h2>

@@ -1,10 +1,7 @@
 /**
- * Help content for Cornerstone AI: in-app docs and tour guidance.
- * Used to ground HELP intent answers. No CMS; static content + tour config.
+ * Help content for Cornerstone AI: in-app docs. Used to ground HELP intent answers.
+ * Module docs are loaded from docs/modules when present.
  */
-
-import { tourConfigs, demoGuidedTourConfig } from "@/src/lib/tours/config";
-import type { TourConfig } from "@/src/lib/tours/types";
 
 const MODULE_KEYS = [
   "operations-center",
@@ -30,33 +27,6 @@ export type HelpSection = {
   path?: string;
 };
 
-/** Build help sections from tour configs (title + content per step). */
-function getTourHelpSections(): HelpSection[] {
-  const sections: HelpSection[] = [];
-  const configs: TourConfig[] = [demoGuidedTourConfig, ...tourConfigs];
-  for (const config of configs) {
-    const moduleKey = config.id;
-    const moduleName = config.name ?? config.id;
-    for (const step of config.steps ?? []) {
-      sections.push({
-        moduleKey,
-        moduleName,
-        title: step.title ?? step.id,
-        content: step.content ?? "",
-        path: config.path,
-      });
-    }
-  }
-  return sections;
-}
-
-let cachedTourSections: HelpSection[] | null = null;
-
-function getCachedTourSections(): HelpSection[] {
-  if (!cachedTourSections) cachedTourSections = getTourHelpSections();
-  return cachedTourSections;
-}
-
 /** Load markdown from docs/modules if available (server-only). */
 function loadModuleDoc(moduleKey: string): string | null {
   try {
@@ -73,27 +43,55 @@ function loadModuleDoc(moduleKey: string): string | null {
   return null;
 }
 
-/** All help sections (tour steps + optional doc excerpts). Used for search. */
+function moduleNameFromKey(moduleKey: string): string {
+  return moduleKey
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** All help sections from static module list + optional doc excerpts. */
 export function getAllHelpSections(): HelpSection[] {
-  return getCachedTourSections();
+  const sections: HelpSection[] = [];
+  for (const key of MODULE_KEYS) {
+    const doc = loadModuleDoc(key);
+    if (doc?.trim()) {
+      sections.push({
+        moduleKey: key,
+        moduleName: moduleNameFromKey(key),
+        title: moduleNameFromKey(key),
+        content: doc.slice(0, 4000),
+      });
+    }
+  }
+  return sections;
 }
 
-/** Get help content for a specific module (tour steps + doc if present). */
-export function getHelpDocByModule(moduleKey: string): { sections: HelpSection[]; docExcerpt: string | null } {
-  const norm = (k: string) => k.toLowerCase().replace(/-/g, "");
-  const tourSections = getCachedTourSections().filter(
-    (s) => norm(s.moduleKey) === norm(moduleKey)
-  );
+/** Get help content for a specific module (doc excerpt if present). */
+export function getHelpDocByModule(moduleKey: string): {
+  sections: HelpSection[];
+  docExcerpt: string | null;
+} {
   const doc = loadModuleDoc(moduleKey);
-  return { sections: tourSections, docExcerpt: doc };
+  if (!doc?.trim()) return { sections: [], docExcerpt: null };
+  return {
+    sections: [
+      {
+        moduleKey,
+        moduleName: moduleNameFromKey(moduleKey),
+        title: moduleNameFromKey(moduleKey),
+        content: doc.slice(0, 4000),
+      },
+    ],
+    docExcerpt: doc,
+  };
 }
 
-/** Simple keyword search over tour help sections. Returns sections with matching title or content. */
+/** Simple keyword search over help sections. */
 export function searchHelpDocs(query: string): HelpSection[] {
   const q = query.toLowerCase().trim();
   if (!q) return [];
-  const all = getCachedTourSections();
-  return all.filter(
+  return getAllHelpSections().filter(
     (s) =>
       s.title.toLowerCase().includes(q) ||
       s.content.toLowerCase().includes(q) ||
@@ -101,14 +99,14 @@ export function searchHelpDocs(query: string): HelpSection[] {
   );
 }
 
-/** Get page/route help context (e.g. for "What is this page for?"). */
+/** Page/route help context (e.g. for "What is this page for?"). */
 export function getPageHelpContext(routeOrModuleKey: string): HelpSection[] {
-  const key = routeOrModuleKey.replace(/^\//, "").replace(/\//g, "-") || "operations";
-  const byModule = getHelpDocByModule(key);
-  if (byModule.sections.length) return byModule.sections;
-  const all = getCachedTourSections();
-  const pathMatch = all.filter((s) => s.path && routeOrModuleKey.startsWith(s.path));
-  return pathMatch.length ? pathMatch : all.slice(0, 5);
+  const key =
+    routeOrModuleKey.replace(/^\//, "").replace(/\//g, "-") || "operations";
+  const { sections } = getHelpDocByModule(key);
+  if (sections.length) return sections;
+  const all = getAllHelpSections();
+  return all.slice(0, 5);
 }
 
 export { MODULE_KEYS };

@@ -269,7 +269,6 @@ export function TodaysFocusPanel({ workOrders }: TodaysFocusPanelProps) {
   return (
     <div
       className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card)] shadow-[var(--shadow-soft)]"
-      data-tour="work-orders:todays-focus"
     >
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-[var(--card-border)] bg-[var(--background)]/60 px-4 py-2.5">

@@ -34,7 +34,6 @@ import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
-import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 
 export const metadata = {
   title: "Operations Center | Cornerstone Tech",
@@ -223,22 +222,20 @@ export default async function OperationsCenterPage() {
     operations.backlog.upcomingPmTasks === 0;
 
   return (
-    <div className="space-y-8" data-tour="dashboard:overview" data-testid="operations-center-page">
+    <div className="space-y-8" data-testid="operations-center-page">
       <div className="space-y-8">
         <PageHeader
           icon={<LayoutGrid className="size-5" />}
           title="Operations Command Center"
-          titleTourId="operations-center-title"
           subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
           actions={
-            <div className="flex items-center gap-2" data-tour="dashboard:quick-actions">
-              <TakeTourButton />
+            <div className="flex items-center gap-2">
               <DashboardHeaderActions />
             </div>
           }
         />
 
-        <div className="space-y-3" data-tour="demo-guided:priority-plan">
+        <div className="space-y-3">
           <div>
             <h2 className="text-lg font-semibold text-[var(--foreground)]">Daily Priority Plan</h2>
             <p className="text-sm text-[var(--muted)]">
@@ -260,7 +257,7 @@ export default async function OperationsCenterPage() {
         <DashboardSetupGuidance noCompanies={noCompanies} emptyButConfigured={hasNoVisibleActivity} />
       )}
 
-      <section data-tour="dashboard:metrics">
+      <section>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           title="Open Work Orders"
@@ -312,7 +309,7 @@ export default async function OperationsCenterPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3" data-tour="dashboard:technicians">
+      <section className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Asset Health</CardTitle>
@@ -398,7 +395,7 @@ export default async function OperationsCenterPage() {
         <PmComplianceSection intelligencePromise={intelligencePromise} />
       </Suspense>
 
-      <section className="grid gap-4 lg:grid-cols-2" data-tour="dashboard:urgent">
+      <section className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Operational Alerts</CardTitle>

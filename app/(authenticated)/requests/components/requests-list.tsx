@@ -114,7 +114,7 @@ export function RequestsList({ requests }: { requests: WorkRequestListItem[] }) 
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end justify-between gap-3" data-tour="requests:filters">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-[280px] flex-1 flex-wrap items-end gap-2">
           <label className="w-full max-w-sm">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">Search</span>
@@ -153,7 +153,7 @@ export function RequestsList({ requests }: { requests: WorkRequestListItem[] }) 
         </Link>
       </div>
 
-      <div data-tour="requests:table">
+      <div>
         <DataTable>
         <Table className="min-w-[1120px]">
           <TableHead>
@@ -183,11 +183,7 @@ export function RequestsList({ requests }: { requests: WorkRequestListItem[] }) 
               const canConvert = request.status === "submitted" || request.status === "approved";
 
               return (
-                <Tr
-                  key={request.id}
-                  data-demo-scenario-target="request-row"
-                  data-work-request-id={request.id}
-                >
+                <Tr key={request.id} data-work-request-id={request.id}>
                   <Td>
                     <p className="font-medium text-[var(--foreground)]">{request.requester_name}</p>
                     <p className="text-xs text-[var(--muted)]">{request.requester_email}</p>

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
-import { useDemoScenario } from "@/hooks/useDemoScenario";
 
 const btnBase =
   "rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]/80 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]";
@@ -42,11 +41,8 @@ export function WorkOrderHeader({
   onSummarize,
   isPending = false,
 }: WorkOrderHeaderProps) {
-  const { isDemoMode } = useDemoScenario();
-
   return (
     <header
-      data-demo-scenario-target="work-order-header"
       data-work-order-id={workOrderId}
       className={`rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-6 shadow-sm ${isCompleted ? "border-emerald-500/20 bg-emerald-500/5" : ""}`}
     >
@@ -68,44 +64,39 @@ export function WorkOrderHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!isDemoMode ? (
-            <>
-              {onSummarize && (
-                <button type="button" onClick={onSummarize} className={btnBase}>
-                  <Sparkles className="mr-1.5 inline size-4 text-[var(--accent)]" aria-hidden />
-                  Summarize
-                </button>
-              )}
-              <Link href={`/work-orders?edit=${workOrderId}`} className={btnBase}>
-                Edit Work Order
-              </Link>
-              <button type="button" onClick={onAssignTechnician} className={btnBase}>
-                Assign Technician
-              </button>
-              <button type="button" onClick={onAssignCrew} className={btnBase}>
-                Assign Crew
-              </button>
-              <button
-                type="button"
-                onClick={onChangeStatusClick}
-                disabled={isPending}
-                className={btnBase}
-              >
-                Change Status
-              </button>
-              {!isCompleted && (
-                <button
-                  type="button"
-                  onClick={onCompleteClick}
-                  disabled={isPending}
-                  className={btnPrimary}
-                  data-tour="demo-guided:complete-work"
-                >
-                  Complete Work Order
-                </button>
-              )}
-            </>
-          ) : null}
+          {onSummarize && (
+            <button type="button" onClick={onSummarize} className={btnBase}>
+              <Sparkles className="mr-1.5 inline size-4 text-[var(--accent)]" aria-hidden />
+              Summarize
+            </button>
+          )}
+          <Link href={`/work-orders?edit=${workOrderId}`} className={btnBase}>
+            Edit Work Order
+          </Link>
+          <button type="button" onClick={onAssignTechnician} className={btnBase}>
+            Assign Technician
+          </button>
+          <button type="button" onClick={onAssignCrew} className={btnBase}>
+            Assign Crew
+          </button>
+          <button
+            type="button"
+            onClick={onChangeStatusClick}
+            disabled={isPending}
+            className={btnBase}
+          >
+            Change Status
+          </button>
+          {!isCompleted && (
+            <button
+              type="button"
+              onClick={onCompleteClick}
+              disabled={isPending}
+              className={btnPrimary}
+            >
+              Complete Work Order
+            </button>
+          )}
         </div>
       </div>
     </header>

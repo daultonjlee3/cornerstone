@@ -210,7 +210,7 @@ export function InventoryView({
           }
         />
       )}
-      <div className="grid gap-3 sm:grid-cols-3" data-tour="inventory:products">
+      <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard title="Inventory rows" value={rows.length} icon={Package} />
         <MetricCard
           title="Low stock alerts"
@@ -221,7 +221,7 @@ export function InventoryView({
         <MetricCard title="Tracked locations" value={locations.length} icon={MapPin} />
       </div>
 
-      <div data-tour="inventory:stock-locations">
+      <div>
       <TableToolbar>
         <div className="flex flex-1 flex-wrap items-end gap-2">
           <label className="w-full max-w-sm">
@@ -417,7 +417,7 @@ export function InventoryView({
         </div>
       </Modal>
 
-      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4" data-tour="inventory:transactions">
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] p-4">
         <h2 className="text-lg font-semibold text-[var(--foreground)]">Recent inventory transactions</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Audited movement history for receipts, work-order usage, and adjustments.

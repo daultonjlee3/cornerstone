@@ -2,7 +2,6 @@ import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Shell } from "./components/shell";
 import { isPlatformSuperAdmin, isDemoGuestUser } from "@/src/lib/auth-context";
-import { getCompletedTourIds } from "./tours/actions";
 import { getImpersonationStateFromCookie } from "@/src/lib/impersonation";
 import { getImpersonationSession } from "@/src/lib/portal/access";
 import { getActingTenantIdFromCookie } from "@/src/lib/acting-tenant";
@@ -71,7 +70,6 @@ export default async function AuthenticatedLayout({
     impersonationSession,
     membershipRolesResult,
     companyResult,
-    completedTourIds,
     isDemoGuest,
     actingUserResult,
     displayUserResult,
@@ -90,7 +88,6 @@ export default async function AuthenticatedLayout({
       .eq("tenant_id", membership.tenant_id)
       .limit(1)
       .maybeSingle(),
-    getCompletedTourIds(),
     isDemoGuestUser(supabase, user.id),
     // Impersonation banner: name of user being acted as
     impersonationState?.actingAsUserId
@@ -152,7 +149,6 @@ export default async function AuthenticatedLayout({
       userName={userName}
       showPlatformAdmin={showPlatformAdmin}
       impersonationBanner={impersonationBanner}
-      completedTourIds={completedTourIds}
       isDemoGuest={effectiveIsDemoGuest}
     >
       {children}

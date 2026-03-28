@@ -268,7 +268,7 @@ export function PreventiveMaintenancePlansList({
   }
 
   return (
-    <div className="space-y-4" data-tour="preventive-maintenance:pm-schedules">
+    <div className="space-y-4">
       {message && (
         <div
           className={`rounded-lg px-4 py-2 text-sm ${
@@ -318,7 +318,7 @@ export function PreventiveMaintenancePlansList({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3" data-tour="preventive-maintenance:generated-wo">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-medium text-[var(--foreground)]">Preventive Maintenance</h2>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -532,7 +532,7 @@ export function PreventiveMaintenancePlansList({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm" data-tour="preventive-maintenance:recurrence">
+        <div className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead>

@@ -253,7 +253,7 @@ export const SEO: Record<string, { title: string; description: string }> = {
   },
   [ROUTES.contact]: {
     title: "Contact & Demo | Cornerstone OS CMMS",
-    description: "Get in touch or request a demo of our maintenance management software. Start a free trial or explore the product tour.",
+    description: "Get in touch or request a demo of our maintenance management software. Start a free trial or explore the product.",
   },
   "/industries": {
     title: "Industries | Facility Maintenance Software by Sector",

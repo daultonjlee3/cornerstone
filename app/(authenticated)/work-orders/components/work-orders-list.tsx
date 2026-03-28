@@ -26,7 +26,6 @@ import { HelpDrawer } from "@/src/components/ui/help-drawer";
 import { HelpTriggerButton } from "@/src/components/ui/help-trigger-button";
 import { Pagination } from "@/src/components/ui/pagination";
 import { CornerstoneAiPanel } from "@/app/(authenticated)/components/cornerstone-ai-panel";
-import { TakeTourButton } from "@/src/components/guidance/TakeTourButton";
 import { Sparkles } from "lucide-react";
 
 import { formatDate } from "@/src/lib/date-utils";
@@ -118,8 +117,6 @@ type WorkOrderRowProps = {
   onOpenDetail: (wo: WorkOrderListRow) => void;
   onChangeStatus: (wo: WorkOrderListRow, status: (typeof STATUS_OPTIONS_QUICK)[number]) => void;
   onAssign: (wo: WorkOrderListRow) => void;
-  /** Highlights the WO number link for the 90s product demo spotlight. */
-  demoTourHighlight?: boolean;
 };
 
 const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
@@ -131,7 +128,6 @@ const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
   onOpenDetail,
   onChangeStatus,
   onAssign,
-  demoTourHighlight = false,
 }: WorkOrderRowProps) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -180,7 +176,6 @@ const WorkOrderTableRow = React.memo(function WorkOrderTableRow({
           <div className="flex items-baseline gap-2">
             <Link
               href={`/work-orders/${wo.id}`}
-              data-tour={demoTourHighlight ? "demo-guided:urgent-wo-row" : undefined}
               className="shrink-0 text-[13px] font-medium text-[var(--accent)] transition-colors hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -282,19 +277,6 @@ export function WorkOrdersList({
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const hasAutoOpened = useRef(false);
   const hasEditOpened = useRef(false);
-
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const firstDemoUrgentIndex = useMemo(() => {
-    const urgentOrOverdue = initialList.findIndex((wo) => {
-      if (wo.status === "completed" || wo.status === "cancelled") return false;
-      const urgent = wo.priority === "emergency" || wo.priority === "urgent";
-      const due = (wo as { due_date?: string | null }).due_date;
-      const overdue = Boolean(due && due < today);
-      return urgent || overdue;
-    });
-    if (urgentOrOverdue >= 0) return urgentOrOverdue;
-    return initialList.findIndex((wo) => wo.status !== "completed" && wo.status !== "cancelled");
-  }, [initialList, today]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -459,7 +441,6 @@ export function WorkOrdersList({
         subtitle="Triage, dispatch, and manage work orders. Use filters and bulk actions for fast operations."
         actions={
           <div className="flex items-center gap-2">
-          <TakeTourButton />
           <Tooltip placement="bottom">
             <TooltipTrigger>
             <div className="relative">
@@ -589,8 +570,7 @@ export function WorkOrdersList({
           }
         />
       )}
-      <div data-tour="demo-guided:completion" data-get-started="complete">
-        <div data-tour="work-orders:statuses">
+      <div data-get-started="complete">
         <WorkOrderKpiBar
           stats={{
             open: stats.open,
@@ -601,13 +581,11 @@ export function WorkOrdersList({
             completedToday: stats.completedToday,
           }}
         />
-        </div>
       </div>
       <Suspense fallback={null}>
         <WorkOrderSavedViews />
       </Suspense>
       <Suspense fallback={<div className="h-12 animate-pulse rounded-lg bg-[var(--card-border)]/50" />}>
-        <div data-tour="work-orders:scheduling">
         <WorkOrderFilters
           options={{
             companies,
@@ -619,7 +597,6 @@ export function WorkOrdersList({
             crews,
           }}
         />
-        </div>
       </Suspense>
 
       {selectedIds.size > 0 && (
@@ -706,11 +683,8 @@ export function WorkOrdersList({
       ) : (
         <CommandCenterLayout
           listContent={
-            <div data-tour="demo-guided:execution">
-              <div
-                className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)]/80 bg-[var(--card)] shadow-sm"
-                data-tour="work-orders:assignment"
-              >
+            <div>
+              <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)]/80 bg-[var(--card)] shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] text-left text-sm">
                     <thead>
@@ -731,8 +705,8 @@ export function WorkOrdersList({
                         <th className="w-24 px-3 py-3.5 font-medium">Actions</th>
                       </tr>
                     </thead>
-                    <tbody data-tour="work-orders:completion">
-                      {initialList.map((wo, rowIndex) => (
+                    <tbody>
+                      {initialList.map((wo) => (
                         <WorkOrderTableRow
                           key={wo.id}
                           wo={wo}
@@ -743,9 +717,6 @@ export function WorkOrdersList({
                           onOpenDetail={setDetailDrawerRow}
                           onChangeStatus={setStatusForRow}
                           onAssign={setAssigningWorkOrder}
-                          demoTourHighlight={
-                            firstDemoUrgentIndex >= 0 && rowIndex === firstDemoUrgentIndex
-                          }
                         />
                       ))}
                     </tbody>
