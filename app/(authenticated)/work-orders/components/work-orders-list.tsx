@@ -4,7 +4,7 @@ import React, { Suspense, useTransition, useState, useEffect, useRef, useCallbac
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus, bulkUpdateWorkOrderStatus, bulkDeleteWorkOrders, exportWorkOrdersCsv } from "../actions";
-import type { WorkOrder, WorkOrderPrefill } from "./work-order-form-modal";
+import type { WorkOrder, WorkOrderPrefill, ParentWorkOrderOption } from "./work-order-form-modal";
 import { WorkOrderFormModal } from "./work-order-form-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
 import { WorkOrderKpiBar, type WorkOrderKpiStats } from "./work-order-kpi-bar";
@@ -93,6 +93,7 @@ type WorkOrdersListProps = {
   pageSize: number;
   totalCount: number;
   error?: string | null;
+  parentWorkOrderOptions?: ParentWorkOrderOption[];
 };
 
 function assignedDisplay(wo: WorkOrderListRow): string {
@@ -258,6 +259,7 @@ export function WorkOrdersList({
   pageSize,
   totalCount,
   error: initialError,
+  parentWorkOrderOptions = [],
 }: WorkOrdersListProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -772,6 +774,7 @@ export function WorkOrdersList({
           crews={crews}
           vendors={vendors}
           saveAction={saveWorkOrder}
+          parentWorkOrderOptions={parentWorkOrderOptions}
         />
       ) : null}
 

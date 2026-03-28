@@ -247,15 +247,26 @@ export default async function WorkOrdersPage({
     : { data: [] as BuildingRow[] };
 
   const buildingIds = ((buildingsData ?? []) as BuildingRow[]).map((b) => b.id);
-  const { data: unitsData } = buildingIds.length
-    ? await supabase
-        .from("units")
-        .select("id, unit_name, name_or_number, building_id")
-        .in("building_id", buildingIds)
-        .order("unit_name")
-        .order("name_or_number")
-        .limit(500)
-    : { data: [] as UnitRow[] };
+  const [{ data: unitsData }, { data: parentWoCandidates }] = await Promise.all([
+    buildingIds.length
+      ? supabase
+          .from("units")
+          .select("id, unit_name, name_or_number, building_id")
+          .in("building_id", buildingIds)
+          .order("unit_name")
+          .order("name_or_number")
+          .limit(500)
+      : Promise.resolve({ data: [] as UnitRow[] }),
+    supabase
+      .from("work_orders")
+      .select(
+        "id, work_order_number, title, company_id, customer_id, property_id, building_id, unit_id, asset_id, description, safety_notes, category, priority, requested_by_name, requested_by_email, requested_by_phone"
+      )
+      .in("company_id", companyIds)
+      .is("parent_work_order_id", null)
+      .order("updated_at", { ascending: false })
+      .limit(500),
+  ]);
   const assetHierarchyRows = (assetsData ?? []) as Array<{
     id: string;
     asset_name: string | null;
@@ -595,6 +606,28 @@ export default async function WorkOrdersPage({
     };
   }) as (WorkOrder & { technician_name?: string; crew_name?: string; vendor_name?: string; company_name?: string; customer_name?: string; location?: string; asset_name?: string })[];
 
+  const parentWorkOrderOptions = (parentWoCandidates ?? []).map((row) => {
+    const r = row as Record<string, unknown>;
+    return {
+      id: r.id as string,
+      work_order_number: (r.work_order_number as string | null) ?? null,
+      title: String(r.title ?? ""),
+      company_id: r.company_id as string,
+      customer_id: (r.customer_id as string | null) ?? null,
+      property_id: (r.property_id as string | null) ?? null,
+      building_id: (r.building_id as string | null) ?? null,
+      unit_id: (r.unit_id as string | null) ?? null,
+      asset_id: (r.asset_id as string | null) ?? null,
+      description: (r.description as string | null) ?? null,
+      safety_notes: (r.safety_notes as string | null) ?? null,
+      category: (r.category as string | null) ?? null,
+      priority: String(r.priority ?? "medium"),
+      requested_by_name: (r.requested_by_name as string | null) ?? null,
+      requested_by_email: (r.requested_by_email as string | null) ?? null,
+      requested_by_phone: (r.requested_by_phone as string | null) ?? null,
+    };
+  });
+
   const stats = {
     open: openStats.count ?? 0,
     inProgress: inProgressStats.count ?? 0,
@@ -636,6 +669,7 @@ export default async function WorkOrdersPage({
         pageSize={pageSize}
         totalCount={totalCount}
         error={error?.message ?? null}
+        parentWorkOrderOptions={parentWorkOrderOptions}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LocationBreadcrumb } from "@/src/components/ui/location-breadcrumb";
 
 export type WorkOrder = {
@@ -74,6 +75,26 @@ export type WorkOrderPrefill = {
   parent_work_order_id?: string;
 };
 
+/** Top-level work orders eligible as a parent (for sub-work order picker). */
+export type ParentWorkOrderOption = {
+  id: string;
+  work_order_number: string | null;
+  title: string;
+  company_id: string;
+  customer_id: string | null;
+  property_id: string | null;
+  building_id: string | null;
+  unit_id: string | null;
+  asset_id: string | null;
+  description: string | null;
+  safety_notes: string | null;
+  category: string | null;
+  priority: string;
+  requested_by_name: string | null;
+  requested_by_email: string | null;
+  requested_by_phone: string | null;
+};
+
 type WorkOrderFormModalProps = {
   open: boolean;
   onClose: () => void;
@@ -92,6 +113,7 @@ type WorkOrderFormModalProps = {
     prev: { error?: string; success?: boolean },
     formData: FormData
   ) => Promise<{ error?: string; success?: boolean }>;
+  parentWorkOrderOptions?: ParentWorkOrderOption[];
 };
 
 /** Wraps a date or datetime input with a calendar button that opens the native picker. Input remains typeable. */
@@ -205,6 +227,40 @@ const CATEGORIES = [
   "general",
 ] as const;
 
+type CreateDraftFields = {
+  parent_work_order_id: string;
+  title: string;
+  description: string;
+  safety_notes: string;
+  category: string;
+  priority: string;
+  requested_by_name: string;
+  requested_by_email: string;
+  requested_by_phone: string;
+};
+
+function emptyCreateDraft(): CreateDraftFields {
+  return {
+    parent_work_order_id: "",
+    title: "",
+    description: "",
+    safety_notes: "",
+    category: "",
+    priority: "medium",
+    requested_by_name: "",
+    requested_by_email: "",
+    requested_by_phone: "",
+  };
+}
+
+function normalizeWorkOrderPriority(p: string | null | undefined): string {
+  return p && PRIORITIES.includes(p as (typeof PRIORITIES)[number]) ? p : "medium";
+}
+
+function validWorkOrderCategory(c: string | null | undefined): string {
+  return c && CATEGORIES.includes(c as (typeof CATEGORIES)[number]) ? c : "";
+}
+
 function getInitialLocation(
   workOrder: WorkOrder | null,
   prefill: WorkOrderPrefill | null
@@ -261,6 +317,7 @@ export function WorkOrderFormModal({
   crews,
   vendors,
   saveAction,
+  parentWorkOrderOptions = [],
 }: WorkOrderFormModalProps) {
   const isEdit = !!workOrder?.id;
   const [state, formAction, isPending] = useActionState(saveAction, {});
@@ -381,14 +438,98 @@ export function WorkOrderFormModal({
       }
     }
   };
+
+  const [createDraft, setCreateDraft] = useState<CreateDraftFields>(emptyCreateDraft);
+
+  const resetCreateForm = useCallback(() => {
+    const loc = getInitialLocation(workOrder, prefill);
+    const defaultCo = loc.companyId || (companies.length === 1 ? companies[0]?.id : "") || "";
+    const pid = (prefill?.parent_work_order_id ?? "").trim();
+    const p = pid ? parentWorkOrderOptions.find((o: ParentWorkOrderOption) => o.id === pid) : undefined;
+
+    setCompanyId(defaultCo);
+    if (p) {
+      setCustomerId(p.customer_id ?? "");
+      setPropertyId(p.property_id ?? "");
+      setBuildingId(p.building_id ?? "");
+      setUnitId(p.unit_id ?? "");
+      setAssetId(p.asset_id ?? "");
+      setCreateDraft({
+        parent_work_order_id: p.id,
+        title: prefill?.title ?? p.title ?? "",
+        description: (prefill?.description ?? p.description) ?? "",
+        safety_notes: p.safety_notes ?? "",
+        category: validWorkOrderCategory(p.category),
+        priority: normalizeWorkOrderPriority(p.priority),
+        requested_by_name: p.requested_by_name ?? "",
+        requested_by_email: p.requested_by_email ?? "",
+        requested_by_phone: p.requested_by_phone ?? "",
+      });
+    } else {
+      setCustomerId(loc.customerId);
+      setPropertyId(loc.propertyId);
+      setBuildingId(loc.buildingId);
+      setUnitId(loc.unitId);
+      setAssetId(loc.assetId);
+      setCreateDraft({
+        parent_work_order_id: pid,
+        title: prefill?.title ?? "",
+        description: prefill?.description ?? "",
+        safety_notes: "",
+        category: "",
+        priority: "medium",
+        requested_by_name: "",
+        requested_by_email: "",
+        requested_by_phone: "",
+      });
+    }
+  }, [workOrder, prefill, parentWorkOrderOptions, companies]);
+
+  useEffect(() => {
+    if (!open || isEdit) return;
+    resetCreateForm();
+  }, [open, isEdit, resetCreateForm]);
+
+  const onParentWorkOrderChange = useCallback(
+    (nextId: string) => {
+      if (!nextId) {
+        const loc = getInitialLocation(workOrder, prefill);
+        setCompanyId(loc.companyId || (companies.length === 1 ? companies[0]?.id : "") || "");
+        setCustomerId(loc.customerId);
+        setPropertyId(loc.propertyId);
+        setBuildingId(loc.buildingId);
+        setUnitId(loc.unitId);
+        setAssetId(loc.assetId);
+        setCreateDraft((d) => ({ ...d, parent_work_order_id: "" }));
+        return;
+      }
+      const p = parentWorkOrderOptions.find((o: ParentWorkOrderOption) => o.id === nextId);
+      if (!p) return;
+      setCompanyId(p.company_id);
+      setCustomerId(p.customer_id ?? "");
+      setPropertyId(p.property_id ?? "");
+      setBuildingId(p.building_id ?? "");
+      setUnitId(p.unit_id ?? "");
+      setAssetId(p.asset_id ?? "");
+      setCreateDraft((d) => ({
+        ...d,
+        parent_work_order_id: p.id,
+        title: p.title || d.title,
+        description: (p.description ?? d.description) ?? "",
+        safety_notes: (p.safety_notes ?? d.safety_notes) ?? "",
+        category: validWorkOrderCategory(p.category) || d.category,
+        priority: normalizeWorkOrderPriority(p.priority),
+        requested_by_name: p.requested_by_name ?? d.requested_by_name,
+        requested_by_email: p.requested_by_email ?? d.requested_by_email,
+        requested_by_phone: p.requested_by_phone ?? d.requested_by_phone,
+      }));
+    },
+    [workOrder, prefill, parentWorkOrderOptions, companies]
+  );
+
   if (!open) return null;
 
   const wo = workOrder ?? emptyWorkOrder;
-  const titleDefault = isEdit ? wo.title : (prefill?.title ?? wo.title);
-  const descriptionDefault = isEdit ? (wo.description ?? "") : (prefill?.description ?? wo.description ?? "");
-  const parentWorkOrderIdDefault = isEdit
-    ? (wo.parent_work_order_id ?? "")
-    : (prefill?.parent_work_order_id ?? "");
   const inputClass = "ui-input";
   const labelClass = "ui-label";
   const sectionTitleClass = "mb-3 text-sm font-semibold text-[var(--foreground)] border-b border-[var(--card-border)] pb-2";
@@ -429,54 +570,172 @@ export function WorkOrderFormModal({
               </div>
               <div>
                 <label htmlFor="title" className={labelClass}>Title *</label>
-                <input id="title" name="title" type="text" required defaultValue={titleDefault} className={inputClass} />
+                {isEdit ? (
+                  <input id="title" name="title" type="text" required defaultValue={wo.title} className={inputClass} />
+                ) : (
+                  <input
+                    id="title"
+                    name="title"
+                    type="text"
+                    required
+                    value={createDraft.title}
+                    onChange={(e) => setCreateDraft((d) => ({ ...d, title: e.target.value }))}
+                    className={inputClass}
+                  />
+                )}
               </div>
               <div>
                 <label htmlFor="description" className={labelClass}>Description</label>
-                <textarea id="description" name="description" rows={2} defaultValue={descriptionDefault} className={inputClass} />
+                {isEdit ? (
+                  <textarea id="description" name="description" rows={2} defaultValue={wo.description ?? ""} className={inputClass} />
+                ) : (
+                  <textarea
+                    id="description"
+                    name="description"
+                    rows={2}
+                    value={createDraft.description}
+                    onChange={(e) => setCreateDraft((d) => ({ ...d, description: e.target.value }))}
+                    className={inputClass}
+                  />
+                )}
               </div>
               <div>
-                <label htmlFor="parent_work_order_id" className={labelClass}>Parent Work Order ID (optional)</label>
-                <input
-                  id="parent_work_order_id"
-                  name="parent_work_order_id"
-                  type="text"
-                  defaultValue={parentWorkOrderIdDefault}
-                  placeholder="UUID of parent work order"
-                  className={inputClass}
-                />
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  Use this field to create a sub work order. Leave blank for top-level.
-                </p>
+                {isEdit ? (
+                  wo.parent_work_order_id ? (
+                    <div>
+                      <span className={labelClass}>Parent work order</span>
+                      <input type="hidden" name="parent_work_order_id" value={wo.parent_work_order_id} />
+                      <div className="mt-1">
+                        <Link
+                          href={`/work-orders/${wo.parent_work_order_id}`}
+                          className="text-sm text-[var(--accent)] hover:underline"
+                        >
+                          Open parent work order
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <input type="hidden" name="parent_work_order_id" value="" />
+                  )
+                ) : parentWorkOrderOptions.length > 0 ? (
+                  <>
+                    <label htmlFor="parent_work_order_select" className={labelClass}>
+                      Parent work order (optional)
+                    </label>
+                    <input type="hidden" name="parent_work_order_id" value={createDraft.parent_work_order_id} />
+                    <select
+                      id="parent_work_order_select"
+                      value={createDraft.parent_work_order_id}
+                      onChange={(e) => onParentWorkOrderChange(e.target.value)}
+                      className={inputClass}
+                      aria-label="Parent work order"
+                    >
+                      <option value="">None (top-level work order)</option>
+                      {createDraft.parent_work_order_id &&
+                      !parentWorkOrderOptions.some((o: ParentWorkOrderOption) => o.id === createDraft.parent_work_order_id) ? (
+                        <option value={createDraft.parent_work_order_id}>
+                          Parent from link (open list may be truncated)
+                        </option>
+                      ) : null}
+                      {parentWorkOrderOptions.map((p: ParentWorkOrderOption) => (
+                        <option key={p.id} value={p.id}>
+                          {(p.work_order_number || "").trim() || p.id.slice(0, 8)} — {p.title || "Untitled"}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Selecting a parent fills company, location, customer context, and key fields from that work order.
+                      You can edit anything before saving.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <label htmlFor="parent_work_order_id" className={labelClass}>
+                      Parent Work Order ID (optional)
+                    </label>
+                    <input
+                      id="parent_work_order_id"
+                      name="parent_work_order_id"
+                      type="text"
+                      defaultValue={prefill?.parent_work_order_id ?? ""}
+                      placeholder="UUID of parent work order"
+                      className={inputClass}
+                    />
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Use this field to create a sub work order. Leave blank for top-level.
+                    </p>
+                  </>
+                )}
               </div>
               <div>
                 <label htmlFor="safety_notes" className={labelClass}>Safety Notes</label>
-                <textarea
-                  id="safety_notes"
-                  name="safety_notes"
-                  rows={2}
-                  defaultValue={wo.safety_notes ?? ""}
-                  placeholder="Lockout/tagout, PPE requirements, hazard warnings..."
-                  className={inputClass}
-                />
+                {isEdit ? (
+                  <textarea
+                    id="safety_notes"
+                    name="safety_notes"
+                    rows={2}
+                    defaultValue={wo.safety_notes ?? ""}
+                    placeholder="Lockout/tagout, PPE requirements, hazard warnings..."
+                    className={inputClass}
+                  />
+                ) : (
+                  <textarea
+                    id="safety_notes"
+                    name="safety_notes"
+                    rows={2}
+                    value={createDraft.safety_notes}
+                    onChange={(e) => setCreateDraft((d) => ({ ...d, safety_notes: e.target.value }))}
+                    placeholder="Lockout/tagout, PPE requirements, hazard warnings..."
+                    className={inputClass}
+                  />
+                )}
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="category" className={labelClass}>Category</label>
-                  <select id="category" name="category" defaultValue={wo.category ?? ""} className={inputClass}>
-                    <option value="">None</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c.replace(/_/g, " ")}</option>
-                    ))}
-                  </select>
+                  {isEdit ? (
+                    <select id="category" name="category" defaultValue={wo.category ?? ""} className={inputClass}>
+                      <option value="">None</option>
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c.replace(/_/g, " ")}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      id="category"
+                      name="category"
+                      value={createDraft.category}
+                      onChange={(e) => setCreateDraft((d) => ({ ...d, category: e.target.value }))}
+                      className={inputClass}
+                    >
+                      <option value="">None</option>
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c.replace(/_/g, " ")}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="priority" className={labelClass}>Priority</label>
-                  <select id="priority" name="priority" defaultValue={wo.priority} className={inputClass}>
-                    {PRIORITIES.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
+                  {isEdit ? (
+                    <select id="priority" name="priority" defaultValue={wo.priority} className={inputClass}>
+                      {PRIORITIES.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      id="priority"
+                      name="priority"
+                      value={createDraft.priority}
+                      onChange={(e) => setCreateDraft((d) => ({ ...d, priority: e.target.value }))}
+                      className={inputClass}
+                    >
+                      {PRIORITIES.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="status" className={labelClass}>Status</label>
@@ -528,15 +787,48 @@ export function WorkOrderFormModal({
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="requested_by_name" className={labelClass}>Requested By Name</label>
-                  <input id="requested_by_name" name="requested_by_name" type="text" defaultValue={wo.requested_by_name ?? ""} className={inputClass} />
+                  {isEdit ? (
+                    <input id="requested_by_name" name="requested_by_name" type="text" defaultValue={wo.requested_by_name ?? ""} className={inputClass} />
+                  ) : (
+                    <input
+                      id="requested_by_name"
+                      name="requested_by_name"
+                      type="text"
+                      value={createDraft.requested_by_name}
+                      onChange={(e) => setCreateDraft((d) => ({ ...d, requested_by_name: e.target.value }))}
+                      className={inputClass}
+                    />
+                  )}
                 </div>
                 <div>
                   <label htmlFor="requested_by_email" className={labelClass}>Requested By Email</label>
-                  <input id="requested_by_email" name="requested_by_email" type="email" defaultValue={wo.requested_by_email ?? ""} className={inputClass} />
+                  {isEdit ? (
+                    <input id="requested_by_email" name="requested_by_email" type="email" defaultValue={wo.requested_by_email ?? ""} className={inputClass} />
+                  ) : (
+                    <input
+                      id="requested_by_email"
+                      name="requested_by_email"
+                      type="email"
+                      value={createDraft.requested_by_email}
+                      onChange={(e) => setCreateDraft((d) => ({ ...d, requested_by_email: e.target.value }))}
+                      className={inputClass}
+                    />
+                  )}
                 </div>
                 <div>
                   <label htmlFor="requested_by_phone" className={labelClass}>Requested By Phone</label>
-                  <input id="requested_by_phone" name="requested_by_phone" type="text" defaultValue={wo.requested_by_phone ?? ""} className={inputClass} />
+                  {isEdit ? (
+                    <input id="requested_by_phone" name="requested_by_phone" type="text" defaultValue={wo.requested_by_phone ?? ""} className={inputClass} />
+                  ) : (
+                    <input
+                      id="requested_by_phone"
+                      name="requested_by_phone"
+                      type="text"
+                      value={createDraft.requested_by_phone}
+                      onChange={(e) => setCreateDraft((d) => ({ ...d, requested_by_phone: e.target.value }))}
+                      className={inputClass}
+                    />
+                  )}
                 </div>
               </div>
             </div>
