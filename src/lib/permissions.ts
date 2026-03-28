@@ -61,8 +61,8 @@ export type Permission =
   | "companies.view"
   | "companies.manage";
 
-/** Extended role type — includes demo_guest for trial/demo accounts. */
-type AnyRole = TenantMembershipRole | "platform_super_admin" | "demo_guest";
+/** Extended role type — platform_super_admin is synthetic for permission checks. */
+type AnyRole = TenantMembershipRole | "platform_super_admin";
 
 /** Built-in role to permissions. Owner/admin get full access; member/viewer limited. */
 const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
@@ -153,6 +153,16 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "customers.view",
     "companies.view",
   ],
+  /** Field / linked technician: execution-focused; no org settings. */
+  technician: [
+    "assets.view",
+    "work_orders.view",
+    "work_orders.complete",
+    "pm.view",
+    "properties.view",
+    "buildings.view",
+    "units.view",
+  ],
   /**
    * demo_guest: read + create/edit access for exploring the demo environment.
    * Cannot delete records, approve POs, or manage settings/users.
@@ -187,21 +197,7 @@ export async function can(permission: Permission): Promise<boolean> {
   if (!user) return false;
   if (await isPlatformSuperAdmin(supabase)) return true;
   const role = await getMembershipRoleForUser(supabase);
-  if (!role) {
-    // Check if this is a demo_guest role (not in TenantMembershipRole union)
-    const { data: membership } = await supabase
-      .from("tenant_memberships")
-      .select("role")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    const rawRole = (membership as { role?: string } | null)?.role;
-    if (rawRole === "demo_guest") {
-      return Array.isArray(ROLE_PERMISSIONS.demo_guest) &&
-        ROLE_PERMISSIONS.demo_guest.includes(permission);
-    }
-    return false;
-  }
+  if (!role) return false;
   const allowed = ROLE_PERMISSIONS[role as AnyRole];
   return Array.isArray(allowed) && allowed.includes(permission);
 }

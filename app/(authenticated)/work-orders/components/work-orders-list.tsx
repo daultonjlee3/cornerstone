@@ -3,7 +3,15 @@
 import React, { Suspense, useTransition, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { deleteWorkOrder, saveWorkOrder, updateWorkOrderStatus, bulkUpdateWorkOrderStatus, bulkDeleteWorkOrders, exportWorkOrdersCsv } from "../actions";
+import {
+  deleteWorkOrder,
+  saveWorkOrder,
+  updateWorkOrderStatus,
+  bulkUpdateWorkOrderStatusDetailed,
+  exportWorkOrdersCsv,
+} from "../actions";
+import { WorkOrdersBulkActionBar } from "./work-orders-bulk-action-bar";
+import { isFatalBulkError, summarizeBulk, type BulkFeedbackMessage } from "./work-orders-bulk-feedback";
 import type { WorkOrder, WorkOrderPrefill, ParentWorkOrderOption } from "./work-order-form-modal";
 import { WorkOrderFormModal } from "./work-order-form-modal";
 import { WorkOrderAssignmentModal } from "./work-order-assignment-modal";
@@ -18,7 +26,6 @@ import { WorkOrderCommandCenterPane } from "./work-order-command-center-pane";
 import { WorkOrderSlaSettingsModal } from "./work-order-sla-settings-modal";
 import { ClipboardList } from "lucide-react";
 import { PageHeader } from "@/src/components/ui/page-header";
-import { ActionBar } from "@/src/components/ui/action-bar";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 import { Hint } from "@/src/components/ui/hint";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
@@ -268,11 +275,10 @@ export function WorkOrdersList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [prefill, setPrefill] = useState<WorkOrderPrefill | null>(initialPrefill);
-  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [message, setMessage] = useState<BulkFeedbackMessage | null>(null);
   const [assigningWorkOrder, setAssigningWorkOrder] = useState<WorkOrderListRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailDrawerRow, setDetailDrawerRow] = useState<WorkOrderListRow | null>(null);
-  const [bulkStatusDropdown, setBulkStatusDropdown] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [slaModalOpen, setSlaModalOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -293,6 +299,11 @@ export function WorkOrdersList({
     else setSelectedIds(new Set(initialList.map((wo) => wo.id)));
   };
   const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedRows = useMemo(
+    () => initialList.filter((wo) => selectedIds.has(wo.id)).map((wo) => ({ id: wo.id, company_id: wo.company_id ?? "" })),
+    [initialList, selectedIds]
+  );
 
   useEffect(() => {
     setPrefill(initialPrefill);
@@ -359,30 +370,14 @@ export function WorkOrdersList({
     });
   };
 
-  const handleBulkStatus = (newStatus: string) => {
-    setBulkStatusDropdown(false);
+  const handleBulkStatusQuick = (newStatus: string) => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     startTransition(async () => {
-      const result = await bulkUpdateWorkOrderStatus(ids, newStatus);
-      if (result.error) setMessage({ type: "error", text: result.error });
-      else {
-        setMessage({ type: "success", text: `Status updated for ${ids.length} work order(s).` });
-        setSelectedIds(new Set());
-        router.refresh();
-      }
-    });
-  };
-
-  const handleBulkDelete = () => {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} work order(s)? This cannot be undone.`)) return;
-    startTransition(async () => {
-      const result = await bulkDeleteWorkOrders(ids);
-      if (result.error) setMessage({ type: "error", text: result.error });
-      else {
-        setMessage({ type: "success", text: `Deleted ${ids.length} work order(s).` });
+      const r = await bulkUpdateWorkOrderStatusDetailed(ids, newStatus);
+      const label = newStatus.replace(/_/g, " ");
+      setMessage(summarizeBulk(`set to ${label}`, r));
+      if (!isFatalBulkError(r) && r.succeeded > 0) {
         setSelectedIds(new Set());
         router.refresh();
       }
@@ -430,7 +425,9 @@ export function WorkOrdersList({
           className={`rounded-lg px-4 py-2 text-sm ${
             message.type === "error"
               ? "bg-red-500/10 text-red-600 dark:text-red-400"
-              : "bg-[var(--accent)]/10 text-[var(--accent)]"
+              : message.type === "warning"
+                ? "border border-amber-200/80 bg-amber-500/10 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                : "bg-[var(--accent)]/10 text-[var(--accent)]"
           }`}
           role="alert"
         >
@@ -467,7 +464,10 @@ export function WorkOrdersList({
                     <>
                       <button
                         type="button"
-                        onClick={() => { handleBulkStatus("in_progress"); setQuickActionsOpen(false); }}
+                        onClick={() => {
+                          handleBulkStatusQuick("in_progress");
+                          setQuickActionsOpen(false);
+                        }}
                         disabled={isPending}
                         className="block w-full px-3 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
                       >
@@ -602,60 +602,16 @@ export function WorkOrdersList({
       </Suspense>
 
       {selectedIds.size > 0 && (
-        <ActionBar className="flex flex-wrap items-center gap-3 border-[var(--accent)]/30 bg-[var(--accent)]/5">
-          <span className="text-sm font-medium text-[var(--foreground)]">
-            {selectedIds.size} selected
-          </span>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setBulkStatusDropdown((v) => !v)}
-              className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
-            >
-              Change status
-            </button>
-            {bulkStatusDropdown && (
-              <>
-                <div className="absolute left-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-lg">
-                  {STATUS_OPTIONS_QUICK.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => handleBulkStatus(s)}
-                      disabled={isPending}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-50"
-                    >
-                      {s.replace(/_/g, " ")}
-                    </button>
-                  ))}
-                </div>
-                <div className="fixed inset-0 z-0" aria-hidden onClick={() => setBulkStatusDropdown(false)} />
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => handleExport(Array.from(selectedIds))}
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
-          >
-            Export selected
-          </button>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            disabled={isPending}
-            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-          >
-            Delete selected
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-          >
-            Clear selection
-          </button>
-        </ActionBar>
+        <WorkOrdersBulkActionBar
+          selectedIds={selectedIds}
+          selectedRows={selectedRows}
+          technicians={technicians}
+          crews={crews}
+          vendors={vendors}
+          onClearSelection={clearSelection}
+          setMessage={setMessage}
+          onRefresh={() => router.refresh()}
+        />
       )}
 
       {initialList.length === 0 ? (

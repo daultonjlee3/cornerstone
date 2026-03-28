@@ -150,27 +150,14 @@ export async function setNotificationPreference(
   );
 }
 
-/** Ensure default preference rows exist for a user (all categories, in_app + email + sms, enabled). */
+/**
+ * Legacy category-based rows are no longer seeded here: delivery policy uses
+ * notification_user_event_preferences + role/company layers (see policy.ts).
+ * Old notification_preferences rows, if present, are ignored by dispatch.
+ */
 export async function ensureDefaultPreferences(
-  supabase: SupabaseClient,
-  userId: string
+  _supabase: SupabaseClient,
+  _userId: string
 ): Promise<void> {
-  const categories = [
-    "work_orders",
-    "assignments",
-    "overdue",
-    "completions",
-    "pm",
-    "purchase_orders",
-    "inventory",
-    "portal_requests",
-  ];
-  for (const channel of ["in_app", "email", "sms"] as const) {
-    for (const category of categories) {
-      await supabase.from("notification_preferences").upsert(
-        { user_id: userId, channel, category, enabled: true },
-        { onConflict: "user_id,channel,category" }
-      );
-    }
-  }
+  /* intentionally empty */
 }

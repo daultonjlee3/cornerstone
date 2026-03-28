@@ -13,7 +13,13 @@ import {
 } from "@/src/lib/impersonation";
 import { getActingTenantIdFromCookie } from "@/src/lib/acting-tenant";
 
-export type TenantMembershipRole = "owner" | "admin" | "member" | "viewer";
+export type TenantMembershipRole =
+  | "owner"
+  | "admin"
+  | "member"
+  | "viewer"
+  | "technician"
+  | "demo_guest";
 
 export type AuthContext = {
   user: User;
@@ -135,7 +141,15 @@ export async function getMembershipRoleForUser(
     .maybeSingle();
   const role = (data as { role?: string } | null)?.role;
   if (!role) return null;
-  if (["owner", "admin", "member", "viewer"].includes(role)) return role as TenantMembershipRole;
+  const known: TenantMembershipRole[] = [
+    "owner",
+    "admin",
+    "member",
+    "viewer",
+    "technician",
+    "demo_guest",
+  ];
+  if (known.includes(role as TenantMembershipRole)) return role as TenantMembershipRole;
   return null;
 }
 

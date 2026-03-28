@@ -1,6 +1,12 @@
 import type { NotificationChannel } from "@/src/lib/notifications/types";
 
-export const CHANNELS: NotificationChannel[] = ["in_app", "email", "sms"];
+/** Settings UI columns (push reserved for future delivery). */
+export const SETTINGS_CHANNELS: NotificationChannel[] = [
+  "in_app",
+  "email",
+  "sms",
+  "push",
+];
 
 export const CATEGORY_LABELS: Record<string, string> = {
   work_orders: "Work orders",

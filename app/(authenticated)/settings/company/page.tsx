@@ -7,6 +7,11 @@ export default async function SettingsCompanyPage() {
   const ctx = await getAuthContext(supabase);
   const tenantId = ctx.tenantId;
   if (!tenantId) redirect("/operations");
+  const canManageOrg =
+    ctx.isPlatformSuperAdmin ||
+    ctx.membershipRole === "owner" ||
+    ctx.membershipRole === "admin";
+  if (!canManageOrg) redirect("/settings/notifications");
 
   const { data: tenant } = await supabase
     .from("tenants")

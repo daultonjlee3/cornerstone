@@ -1,4 +1,10 @@
-import { cloneElement, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from "react";
+import {
+  cloneElement,
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md";
@@ -28,14 +34,10 @@ const sizeClasses: Record<ButtonSize, string> = {
 const buttonClassName = (variant: ButtonVariant, size: ButtonSize, className: string) =>
   `inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
-export function Button({
-  children,
-  variant = "primary",
-  size = "md",
-  className = "",
-  asChild = false,
-  ...props
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { children, variant = "primary", size = "md", className = "", asChild = false, ...props },
+  ref
+) {
   const resolvedClassName = buttonClassName(variant, size, className);
 
   if (asChild && typeof children === "object" && children !== null && "type" in (children as ReactElement)) {
@@ -46,11 +48,8 @@ export function Button({
   }
 
   return (
-    <button
-      {...props}
-      className={resolvedClassName}
-    >
+    <button ref={ref} {...props} className={resolvedClassName}>
       {children}
     </button>
   );
-}
+});

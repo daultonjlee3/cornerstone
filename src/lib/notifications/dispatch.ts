@@ -6,10 +6,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createNotification } from "@/src/lib/notifications/service";
 import { sendEmailAlert } from "@/src/lib/notifications";
-import { eventTypeToCategory } from "@/src/lib/notifications/types";
-import type { NotificationChannel } from "@/src/lib/notifications/types";
-
-const CHANNELS: NotificationChannel[] = ["in_app", "email", "sms"];
+import { CHANNELS as ALL_CHANNELS, type NotificationChannel } from "@/src/lib/notifications/types";
+import { isChannelEnabledForUserResolved } from "@/src/lib/notifications/policy";
 
 export type DispatchParams = {
   tenantId: string;
@@ -36,13 +34,15 @@ type EventTypeDefaults = {
   default_in_app: boolean;
   default_email: boolean;
   default_sms: boolean;
+  default_push: boolean;
 };
 
 type RoleRule = {
-  in_app: boolean;
-  email: boolean;
-  sms: boolean;
-  enabled: boolean;
+  in_app: boolean | null;
+  email: boolean | null;
+  sms: boolean | null;
+  push: boolean | null;
+  enabled: boolean | null;
 };
 
 /** Get the tenant role for a user (from tenant_memberships). */
@@ -83,13 +83,13 @@ export async function getEventTypeDefaults(
 ): Promise<EventTypeDefaults | null> {
   const { data } = await supabase
     .from("notification_event_types")
-    .select("default_in_app, default_email, default_sms")
+    .select("default_in_app, default_email, default_sms, default_push")
     .eq("code", eventType)
     .maybeSingle();
   return data as EventTypeDefaults | null;
 }
 
-/** Fetch role-level rule for tenant + role + event_type. */
+/** Tenant-wide role rule (company_id IS NULL). */
 export async function getRoleRule(
   supabase: SupabaseClient,
   tenantId: string,
@@ -98,57 +98,82 @@ export async function getRoleRule(
 ): Promise<RoleRule | null> {
   const { data } = await supabase
     .from("notification_rules")
-    .select("in_app, email, sms, enabled")
+    .select("in_app, email, sms, push, enabled")
     .eq("tenant_id", tenantId)
     .eq("role", role)
     .eq("event_type", eventType)
+    .is("company_id", null)
     .maybeSingle();
   return data as RoleRule | null;
 }
 
 /**
  * Whether a channel is enabled for a user for this event.
- * Precedence: user preference (if row exists) → role rule (if exists) → event type default.
+ * Delegates to centralized policy (company + role + user event prefs + system defaults).
  */
 export async function isChannelEnabledForUser(
   supabase: SupabaseClient,
   userId: string,
   tenantId: string,
   eventType: string,
-  channel: NotificationChannel
+  channel: NotificationChannel,
+  companyId?: string | null
 ): Promise<boolean> {
-  const category = eventTypeToCategory(eventType);
-
-  // 1) User preference (notification_preferences)
-  const { data: pref } = await supabase
-    .from("notification_preferences")
-    .select("enabled")
-    .eq("user_id", userId)
-    .eq("channel", channel)
-    .eq("category", category)
-    .maybeSingle();
-  if (pref != null) return (pref as { enabled: boolean }).enabled;
-
-  // 2) Role rule
   const role = await getRoleForUserInTenant(supabase, tenantId, userId);
-  if (role) {
-    const rule = await getRoleRule(supabase, tenantId, role, eventType);
-    if (rule && rule.enabled) {
-      if (channel === "in_app") return rule.in_app;
-      if (channel === "email") return rule.email;
-      if (channel === "sms") return rule.sms;
+  return isChannelEnabledForUserResolved(
+    supabase,
+    userId,
+    tenantId,
+    companyId ?? null,
+    eventType,
+    channel,
+    role
+  );
+}
+
+/**
+ * Recipients for work-order assignment / schedule alerts: assigned tech users, crew tech users,
+ * plus dispatch-style roles (owner, admin, member). Does not notify tenant-wide.
+ */
+export async function expandWorkOrderAssignmentRecipientUserIds(
+  supabase: SupabaseClient,
+  technicianId: string | null,
+  crewId: string | null
+): Promise<{ recipientUserIds: string[]; recipientRoles: string[] }> {
+  const recipientUserIds: string[] = [];
+  if (technicianId) {
+    const { data } = await supabase
+      .from("technicians")
+      .select("user_id")
+      .eq("id", technicianId)
+      .maybeSingle();
+    const uid = (data as { user_id?: string | null } | null)?.user_id;
+    if (uid) recipientUserIds.push(uid);
+  }
+  if (crewId) {
+    const { data: members } = await supabase
+      .from("crew_members")
+      .select("technician_id")
+      .eq("crew_id", crewId);
+    const techIds = [
+      ...new Set(
+        ((members ?? []) as Array<{ technician_id?: string | null }>)
+          .map((m) => m.technician_id)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+    for (const tid of techIds) {
+      const { data } = await supabase
+        .from("technicians")
+        .select("user_id")
+        .eq("id", tid)
+        .maybeSingle();
+      const uid = (data as { user_id?: string | null } | null)?.user_id;
+      if (uid) recipientUserIds.push(uid);
     }
   }
-
-  // 3) Event type default
-  const defaults = await getEventTypeDefaults(supabase, eventType);
-  if (defaults) {
-    if (channel === "in_app") return defaults.default_in_app;
-    if (channel === "email") return defaults.default_email;
-    if (channel === "sms") return defaults.default_sms;
-  }
-
-  return channel === "in_app";
+  const recipientRoles = ["owner", "admin", "member"];
+  return { recipientUserIds: [...new Set(recipientUserIds)], recipientRoles };
 }
 
 /**
@@ -248,14 +273,27 @@ export async function dispatchNotificationEvent(
   let emailQueued = 0;
   let smsQueued = 0;
 
+  const roleCache = new Map<string, string | null>();
+
   for (const userId of userIds) {
-    for (const channel of CHANNELS) {
-      const enabled = await isChannelEnabledForUser(
+    let membershipRole = roleCache.get(userId);
+    if (membershipRole === undefined) {
+      membershipRole = await getRoleForUserInTenant(supabase, tenantId, userId);
+      roleCache.set(userId, membershipRole);
+    }
+    for (const channel of ALL_CHANNELS) {
+      if (channel === "push") {
+        // Reserved for mobile push; policy already resolves the flag.
+        continue;
+      }
+      const enabled = await isChannelEnabledForUserResolved(
         supabase,
         userId,
         tenantId,
+        companyId ?? null,
         eventType,
-        channel
+        channel,
+        membershipRole
       );
       if (!enabled) continue;
 

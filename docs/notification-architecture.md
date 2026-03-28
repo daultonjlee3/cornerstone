@@ -2,7 +2,16 @@
 
 ## Overview
 
-Notifications support **in-app**, **email**, and **SMS** (SMS wiring ready; provider pluggable). Delivery is configurable at **role level** (tenant defaults) and **user level** (overrides). Use the **central dispatch** so all modules send through one path and respect preferences.
+Notifications support **in-app**, **email**, **SMS**, and a reserved **push** flag (UI + policy ready; delivery skipped in dispatch until a provider exists). Configuration is **layered**:
+
+1. **System defaults** — `notification_event_types` per `code` (plus optional `audience_scopes`, `default_push`).
+2. **Company overrides** — `notification_company_rules` per `(company_id, event_type)`; nullable columns mean *inherit*.
+3. **Role defaults** — `notification_rules` per tenant, `role`, and `event_type`, optionally scoped with `company_id` (null = tenant-wide). Nullable columns inherit from the company + system stack.
+4. **User overrides** — `notification_user_event_preferences` per `(user_id, event_type)`; per-channel null = inherit from role/company/system.
+
+**Legacy** `notification_preferences` (category × channel) is **not** read by dispatch or the new settings UI. It may remain in the database for older data but has no effect on delivery.
+
+Use **`dispatchNotificationEvent`** for event-driven sends so **policy resolution** and delivery logging stay centralized.
 
 ## Tables
 
@@ -15,74 +24,108 @@ Notifications support **in-app**, **email**, and **SMS** (SMS wiring ready; prov
 ### notification_event_types
 
 - **`public.notification_event_types`** (registry)
-  - `code` (PK), `name`, `category`, `default_in_app`, `default_email`, `default_sms`.
-  - Seeded with event types (e.g. `work_order.assigned`, `work_request.submitted`, `pm.due_soon`). Add new rows for new event types.
+  - `code` (PK), `name`, `category`, `default_in_app`, `default_email`, `default_sms`, `default_push`, `audience_scopes` (text[]).
+  - `audience_scopes` documents who the event is meant for (e.g. `assigned_user`, `dispatch_roles`); dispatch code should expand recipients accordingly.
+
+### notification_company_rules
+
+- **`public.notification_company_rules`**
+  - `tenant_id`, `company_id`, `event_type`, optional `enabled`, `in_app`, `email`, `sms`, `push`, optional `audience_scopes`.
+  - Unique `(company_id, event_type)`. NULL on a field = inherit from `notification_event_types`.
 
 ### notification_rules
 
 - **`public.notification_rules`** (role-level defaults)
-  - `tenant_id`, `role`, `event_type` (FK to `notification_event_types.code`), `in_app`, `email`, `sms`, `enabled`.
-  - Unique on `(tenant_id, role, event_type)`. Admins configure which channels each role gets per event type.
+  - `tenant_id`, `role`, `event_type`, optional `company_id` (null = tenant-wide role default), nullable `enabled`, `in_app`, `email`, `sms`, `push`.
+  - Partial uniques: `(tenant_id, role, event_type)` where `company_id` IS NULL; `(tenant_id, role, event_type, company_id)` where `company_id` IS NOT NULL.
 
-### notification_preferences
+### notification_user_event_preferences
+
+- **`public.notification_user_event_preferences`**
+  - `user_id`, `event_type`, nullable `in_app`, `email`, `sms`, `push`.
+  - Unique `(user_id, event_type)`. Per-channel NULL = inherit from layers below.
+
+### notification_preferences (legacy)
 
 - **`public.notification_preferences`**
-  - `user_id`, `channel` (`in_app` | `email` | `sms`), `category`, `enabled`.
-  - Unique on `(user_id, channel, category)`. User overrides; when no row exists, role rule or event-type default applies.
+  - Category-wide overrides; **unused** by current dispatch. Prefer per-event user rows above.
 
 ### notification_deliveries
 
 - **`public.notification_deliveries`** (send log for email/SMS)
-  - `id`, `notification_id` (nullable), `user_id`, `channel` (`email`|`sms`), `event_type`, `entity_type`, `entity_id`, `title`, `message`, `status` (`pending`|`sent`|`failed`), `sent_at`, `error_message`, `created_at`.
-  - In-app delivery is the row in `notifications`; email/SMS are logged here for status and failure handling.
+  - `id`, `user_id`, `channel` (`email`|`sms`), `event_type`, `entity_type`, `entity_id`, `title`, `message`, `status`, `sent_at`, `error_message`, `created_at`.
 
-## Precedence (channel on/off)
+## Precedence (per channel)
 
-1. **User preference** – If a row exists in `notification_preferences` for (user, channel, category), use `enabled`.
-2. **Role rule** – Else if a row exists in `notification_rules` for (tenant, user’s role, event_type) and `enabled`, use the rule’s `in_app` / `email` / `sms` for that channel.
-3. **Event type default** – Else use `notification_event_types.default_in_app` / `default_email` / `default_sms` for the event’s `code`.
+Implemented in **`src/lib/notifications/policy.ts`** (`computeNotificationLayersFromState`, `resolveNotificationChannelLayers`, `isChannelEnabledForUserResolved`):
 
-Category for user preferences comes from **`eventTypeToCategory(eventType)`** in **`src/lib/notifications/types.ts`**.
+1. Start from **event type defaults**.
+2. Apply **company rule** non-null fields; if `company.enabled === false`, all channels off for that company.
+3. Apply **role rule** (company-scoped row if present, else tenant-wide); if `role.enabled === false`, all channels off for that role in that resolution context.
+4. Apply **user per-event** non-null channel fields.
 
-## Recipients
+**Net effect:** user choice wins over role, role over company, company over system defaults—unless a master `enabled` flag at company or role layer forces all channels off.
 
-- **`resolveRecipients`** in **`src/lib/notifications/dispatch.ts`** builds the recipient set from:
-  - `recipientUserIds` (explicit)
-  - `recipientRoles` (expand to user IDs via `tenant_memberships`)
-  - `includeAllTenantMembers: true` (all tenant members)
-- Exclude via `excludeUserIds`. Deduplication is automatic.
+## Recipients and targeting
+
+- **`resolveRecipients`** in **`src/lib/notifications/dispatch.ts`**: `recipientUserIds`, `recipientRoles` (via `tenant_memberships`), optional `includeAllTenantMembers`, `excludeUserIds`.
+- **`expandWorkOrderAssignmentRecipientUserIds`**: assigned technician’s linked user, crew members’ linked users, plus roles `owner`, `admin`, `member` (dispatch desk). Use this instead of `includeAllTenantMembers` for assignment/schedule events so technicians are not spammed with everyone else’s work.
+- Audience scope labels for the UI: **`src/lib/notifications/audiences.ts`**.
 
 ## Central dispatch
 
-- **`dispatchNotificationEvent(supabase, params)`** in **`src/lib/notifications/dispatch.ts`** is the single entry point for sending.
-- Params: `tenantId`, `eventType`, `entityType`, `entityId`, `title`, `message`, optional `body`, `companyId`, `recipientUserIds`, `recipientRoles`, `includeAllTenantMembers`, `excludeUserIds`, optional `getContactForUser`.
-- For each recipient and each channel (in_app, email, sms), it checks **`isChannelEnabledForUser`** (precedence above). If enabled: in_app → insert into `notifications`; email/sms → insert `notification_deliveries` (pending), send (email via Resend, SMS placeholder), then update status/sent_at/error_message.
-- **Do not** call `createNotification` / `createTenantNotification` / `sendEmailAlert` directly from feature modules for event-driven notifications; use **`dispatchNotificationEvent`** so role and user preferences apply.
+- **`dispatchNotificationEvent(supabase, params)`** in **`src/lib/notifications/dispatch.ts`**.
+- Params include `tenantId`, `companyId`, `eventType`, entity fields, title/message, recipients, `getContactForUser`, etc.
+- For each recipient, resolves channels with **`isChannelEnabledForUserResolved`** (cached membership role per batch). **Push** is resolved but not sent yet.
+- **`isChannelEnabledForUser`** remains as a thin wrapper that loads the user’s role and calls the resolver.
 
-## Event types and categories
+**Do not** call `createNotification` / `sendEmailAlert` directly for policy-governed events; use **`dispatchNotificationEvent`**.
 
-Event types (in `notification_event_types` and **`src/lib/notifications/types.ts`**): e.g. `work_order.created`, `work_order.assigned`, `work_order.status_changed`, `work_order.overdue`, `work_order.completed`, `work_order.vendor_assigned`, `work_request.submitted`, `pm.due_soon`, `pm.overdue`, `inventory.low_stock`, `purchase_order.created`, `purchase_order.received`.
+## Settings UI
 
-Categories: `work_orders`, `assignments`, `overdue`, `completions`, `pm`, `purchase_orders`, `inventory`, `portal_requests`.
+- **Settings → Notifications** (`app/(authenticated)/settings/notifications/`): tabs **Company defaults**, **Role defaults**, **My preferences** (non-admins see only My preferences).
+- Server actions: **`app/(authenticated)/settings/notifications/actions.ts`** (`upsertCompanyNotificationRule`, `upsertRoleNotificationRule`, `setUserEventNotificationChannel`).
+- Row building / maps: **`src/lib/notifications/settings-view.ts`**.
+
+## Code map
+
+| Area | Location |
+|------|----------|
+| Policy / precedence | `src/lib/notifications/policy.ts` |
+| Dispatch + recipients | `src/lib/notifications/dispatch.ts` |
+| Event type constants | `src/lib/notifications/types.ts` |
+| Audience labels | `src/lib/notifications/audiences.ts` |
+| In-app CRUD | `src/lib/notifications/service.ts` |
+
+## Migrations (reference)
+
+- `20260315000000_saas_foundation.sql`: `notifications`, `notification_preferences`.
+- `20260325000000_notification_suite.sql`: event types, role rules, deliveries.
+- `20260330100000_notification_policy_layers.sql`: company rules, user event prefs, nullable role rules, `company_id` on rules, `audience_scopes`, `default_push`.
+- `20260330110000_notification_rules_push_column.sql`: `push` on `notification_rules`.
 
 ## Adding a new event type
 
-1. Insert a row into **`notification_event_types`** (`code`, `name`, `category`, `default_in_app`, `default_email`, `default_sms`).
-2. Add the code to **`NOTIFICATION_EVENT_TYPES`** and implement **`eventTypeToCategory`** in **`src/lib/notifications/types.ts`** if the event maps to a new category.
-3. Call **`dispatchNotificationEvent`** from the feature with the new `eventType` and appropriate recipients.
+1. Insert into **`notification_event_types`** (including `audience_scopes` and `default_push` as needed).
+2. Add the code to **`NOTIFICATION_EVENT_TYPES`** in **`src/lib/notifications/types.ts`** and extend **`eventTypeToCategory`** if needed for legacy grouping.
+3. Call **`dispatchNotificationEvent`** with explicit recipients (and `companyId` when applicable) so only the intended audience is notified.
 
-No change to dispatch logic or rule evaluation is required.
+## Example role defaults (reference)
 
-## User preferences UI
+Configure under **Settings → Notifications → Role defaults**. These are **starting points**, not auto-seeded:
 
-- **Settings → Notifications**: per-category toggles for **In-app**, **Email**, and **SMS**. Persist via **`setNotificationPreference`** (server action).
+| Event group | Technician | Member (dispatcher) | Owner / Admin |
+|-------------|------------|---------------------|----------------|
+| Work order assigned / schedule / status / comments / due / overdue | In-app (+ email/SMS for assigned path only if desired) | In-app + email for dispatch-facing events | In-app + email; email for escalations (overdue, emergency) |
+| Work order created / emergency | Off or in-app only | In-app + email | In-app + email + SMS for emergency |
+| Portal requests | Off | In-app + email | In-app + email |
+| PM assigned / due / overdue | In-app for assigned PMs | In-app + email | + email for overdue |
+| PO / inventory | Off | Email for submitted POs | Full management alerts |
 
-## Email and SMS
+Technicians should use **tenant-wide** role rows with narrow **Event on** and channels so only **assigned-user**-style events matter in practice; dispatch still must target recipients (see `expandWorkOrderAssignmentRecipientUserIds`).
 
-- Email: **Resend** via **`sendEmailAlert`** in **`src/lib/notifications.ts`**. Recipient email can be provided by **`getContactForUser`** (e.g. from **`createGetContactForUser()`** in **`src/lib/notifications/get-contact.ts`** using Auth Admin).
-- SMS: Architecture is in place (delivery row, status, error_message). Wire a provider in dispatch where SMS is sent and set status/sent_at accordingly.
+## Follow-ups
 
-## Migration
-
-- **`20260315000000_saas_foundation.sql`**: `notifications`, `notification_preferences`.
-- **`20260325000000_notification_suite.sql`**: `notification_event_types`, `notification_rules`, `notification_preferences` SMS channel, `notification_deliveries`.
+- Narrow **`includeAllTenantMembers`** usage in remaining call sites (e.g. portal requests) to explicit audiences.
+- Enforce **RLS** (or service role) consistently for `notification_company_rules`, `notification_rules`, and `notification_user_event_preferences` if not already aligned with tenant isolation.
+- Wire **push** delivery when a mobile client exists; dispatch already skips sending but resolves the flag.

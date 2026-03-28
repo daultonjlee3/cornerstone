@@ -6,7 +6,10 @@ import { revalidateAssetIntelligenceCaches } from "@/src/lib/assets/assetIntelli
 import { resolveAssetLocation } from "@/src/lib/assets/hierarchy";
 import { insertActivityLog } from "@/src/lib/activity-logs";
 import { createNotification } from "@/src/lib/notifications/service";
-import { dispatchNotificationEvent } from "@/src/lib/notifications/dispatch";
+import {
+  dispatchNotificationEvent,
+  expandWorkOrderAssignmentRecipientUserIds,
+} from "@/src/lib/notifications/dispatch";
 import { sendEmailAlert, getCompanyAlertRecipients } from "@/src/lib/notifications";
 import { validateLocationHierarchy } from "@/src/lib/location-hierarchy";
 import {
@@ -1151,6 +1154,212 @@ export async function bulkDeleteWorkOrders(ids: string[]): Promise<WorkOrderForm
   return { success: true };
 }
 
+/** Per-row outcomes for command-center bulk operations (partial success supported). */
+export type BulkWorkOrderOpResult = {
+  succeeded: number;
+  failed: Array<{ id: string; error: string }>;
+};
+
+export async function bulkUpdateWorkOrderStatusDetailed(
+  ids: string[],
+  newStatus: string
+): Promise<BulkWorkOrderOpResult | { error: string }> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  if (!isSupportedStatus(newStatus)) return { error: "Invalid status." };
+  const normalizedStatus = normalizeStatus(newStatus);
+  if (normalizedStatus === "completed") {
+    return { error: "Use Complete Work Order to mark work orders as completed." };
+  }
+  const failed: BulkWorkOrderOpResult["failed"] = [];
+  let succeeded = 0;
+  for (const id of ids) {
+    const r = await updateWorkOrderStatus(id, newStatus);
+    if (r.error) failed.push({ id, error: r.error });
+    else succeeded++;
+  }
+  if (succeeded > 0) {
+    revalidatePath("/work-orders");
+    revalidatePath("/dispatch");
+  }
+  return { succeeded, failed };
+}
+
+export async function bulkAssignWorkOrders(
+  ids: string[],
+  targets: {
+    assigned_technician_id: string | null;
+    assigned_crew_id: string | null;
+    assigned_vendor_id: string | null;
+  }
+): Promise<BulkWorkOrderOpResult | { error: string }> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+
+  const failed: BulkWorkOrderOpResult["failed"] = [];
+  let succeeded = 0;
+
+  for (const id of ids) {
+    const { data: row } = await supabase
+      .from("work_orders")
+      .select("scheduled_date, scheduled_start, scheduled_end, company_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) {
+      failed.push({ id, error: "Work order not found." });
+      continue;
+    }
+    const companyId = (row as { company_id: string }).company_id;
+    if (!(await companyBelongsToTenant(companyId, tenantId))) {
+      failed.push({ id, error: "Unauthorized." });
+      continue;
+    }
+    const schedule = row as {
+      scheduled_date: string | null;
+      scheduled_start: string | null;
+      scheduled_end: string | null;
+    };
+    const r = await updateWorkOrderAssignment(id, {
+      assigned_technician_id: targets.assigned_technician_id,
+      assigned_crew_id: targets.assigned_crew_id,
+      assigned_vendor_id: targets.assigned_vendor_id,
+      scheduled_date: schedule.scheduled_date,
+      scheduled_start: schedule.scheduled_start,
+      scheduled_end: schedule.scheduled_end,
+    });
+    if (r.error) failed.push({ id, error: r.error });
+    else succeeded++;
+  }
+  if (succeeded > 0) {
+    revalidatePath("/work-orders");
+    revalidatePath("/dispatch");
+  }
+  return { succeeded, failed };
+}
+
+export async function bulkScheduleWorkOrders(
+  ids: string[],
+  schedule: {
+    scheduled_date: string | null;
+    scheduled_start: string | null;
+    scheduled_end: string | null;
+  }
+): Promise<BulkWorkOrderOpResult | { error: string }> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+
+  const failed: BulkWorkOrderOpResult["failed"] = [];
+  let succeeded = 0;
+
+  for (const id of ids) {
+    const { data: row } = await supabase
+      .from("work_orders")
+      .select("assigned_technician_id, assigned_crew_id, vendor_id, company_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) {
+      failed.push({ id, error: "Work order not found." });
+      continue;
+    }
+    const r0 = row as {
+      company_id: string;
+      assigned_technician_id: string | null;
+      assigned_crew_id: string | null;
+      vendor_id: string | null;
+    };
+    if (!(await companyBelongsToTenant(r0.company_id, tenantId))) {
+      failed.push({ id, error: "Unauthorized." });
+      continue;
+    }
+    const r = await updateWorkOrderAssignment(id, {
+      assigned_technician_id: r0.assigned_technician_id,
+      assigned_crew_id: r0.assigned_crew_id,
+      assigned_vendor_id: r0.vendor_id,
+      scheduled_date: schedule.scheduled_date,
+      scheduled_start: schedule.scheduled_start,
+      scheduled_end: schedule.scheduled_end,
+    });
+    if (r.error) failed.push({ id, error: r.error });
+    else succeeded++;
+  }
+  if (succeeded > 0) {
+    revalidatePath("/work-orders");
+    revalidatePath("/dispatch");
+  }
+  return { succeeded, failed };
+}
+
+const VALID_BULK_PRIORITIES = ["low", "medium", "high", "urgent", "emergency"] as const;
+
+export async function bulkUpdateWorkOrderPriorityDetailed(
+  ids: string[],
+  priority: string
+): Promise<BulkWorkOrderOpResult | { error: string }> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  if (!VALID_BULK_PRIORITIES.includes(priority as (typeof VALID_BULK_PRIORITIES)[number])) {
+    return { error: "Invalid priority." };
+  }
+  const supabase = await createClient();
+  if (await isDemoReadOnlyUser(supabase)) return { error: DEMO_READ_ONLY_ERROR };
+  const tenantId = await getTenantIdForUser(supabase);
+  if (!tenantId) return { error: "Unauthorized." };
+  const actorId = await getActorId(supabase);
+
+  const failed: BulkWorkOrderOpResult["failed"] = [];
+  let succeeded = 0;
+
+  for (const id of ids) {
+    const { data: row } = await supabase
+      .from("work_orders")
+      .select("company_id, status")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) {
+      failed.push({ id, error: "Work order not found." });
+      continue;
+    }
+    if (!(await companyBelongsToTenant((row as { company_id: string }).company_id, tenantId))) {
+      failed.push({ id, error: "Unauthorized." });
+      continue;
+    }
+    const status = String((row as { status: string }).status ?? "");
+    if (TERMINAL_STATUSES.has(normalizeStatus(status))) {
+      failed.push({ id, error: "Cannot change priority on completed or cancelled work orders." });
+      continue;
+    }
+    const { error } = await supabase
+      .from("work_orders")
+      .update({ priority, created_by_user_id: actorId })
+      .eq("id", id);
+    if (error) failed.push({ id, error: error.message });
+    else succeeded++;
+  }
+  if (succeeded > 0) {
+    revalidatePath("/work-orders");
+    revalidatePath("/dispatch");
+  }
+  return { succeeded, failed };
+}
+
+export async function bulkDeleteWorkOrdersDetailed(
+  ids: string[]
+): Promise<BulkWorkOrderOpResult | { error: string }> {
+  if (ids.length === 0) return { error: "No work orders selected." };
+  const failed: BulkWorkOrderOpResult["failed"] = [];
+  let succeeded = 0;
+  for (const id of ids) {
+    const r = await deleteWorkOrder(id);
+    if (r.error) failed.push({ id, error: r.error });
+    else succeeded++;
+  }
+  return { succeeded, failed };
+}
+
 /** Log a dispatch rebalance event (schedule optimization applied). */
 export async function logDispatchRebalance(
   movedJobIds: string[],
@@ -1448,6 +1657,12 @@ export async function updateWorkOrderAssignment(
         (afterState.title as string | null) ??
         "Work order";
       const msg = `${workOrderLabel} was assigned.`;
+      const { recipientUserIds, recipientRoles } =
+        await expandWorkOrderAssignmentRecipientUserIds(
+          supabase,
+          nextTechnicianId,
+          nextCrewId
+        );
       await dispatchNotificationEvent(supabase, {
         tenantId,
         companyId,
@@ -1456,7 +1671,9 @@ export async function updateWorkOrderAssignment(
         entityId: id,
         title: msg,
         message: msg,
-        includeAllTenantMembers: true,
+        recipientUserIds,
+        recipientRoles,
+        excludeUserIds: actorId ? [actorId] : [],
       });
       const recipients = await getCompanyAlertRecipients(
         supabase,
@@ -1510,6 +1727,35 @@ export async function updateWorkOrderAssignment(
       },
       metadata: { source: "updateWorkOrderAssignment", route_update: true },
     });
+    try {
+      const workOrderLabel =
+        (afterState.work_order_number as string | null) ??
+        (afterState.title as string | null) ??
+        "Work order";
+      const msg = beforeHadSchedule
+        ? `${workOrderLabel} schedule was updated.`
+        : `${workOrderLabel} was scheduled.`;
+      const { recipientUserIds, recipientRoles } =
+        await expandWorkOrderAssignmentRecipientUserIds(
+          supabase,
+          nextTechnicianId,
+          nextCrewId
+        );
+      await dispatchNotificationEvent(supabase, {
+        tenantId,
+        companyId,
+        eventType: "work_order.schedule_changed",
+        entityType: "work_order",
+        entityId: id,
+        title: msg,
+        message: msg,
+        recipientUserIds,
+        recipientRoles,
+        excludeUserIds: actorId ? [actorId] : [],
+      });
+    } catch {
+      // best-effort
+    }
   }
   if (!hasSchedule && !hasAssignment && (beforeHadSchedule || beforeHadAssignment)) {
     await insertActivityLog(supabase, {

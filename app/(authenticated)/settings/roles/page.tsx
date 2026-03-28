@@ -13,6 +13,11 @@ export default async function SettingsRolesPage() {
   const supabase = await createClient();
   const ctx = await getAuthContext(supabase);
   if (!ctx.tenantId) redirect("/operations");
+  const canManageOrg =
+    ctx.isPlatformSuperAdmin ||
+    ctx.membershipRole === "owner" ||
+    ctx.membershipRole === "admin";
+  if (!canManageOrg) redirect("/settings/notifications");
 
   return (
     <div className="space-y-6">

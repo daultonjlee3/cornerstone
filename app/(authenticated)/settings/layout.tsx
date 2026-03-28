@@ -38,8 +38,15 @@ export default async function SettingsLayout({
   if (isDemoGuest && !isSuperAdmin) redirect("/operations");
 
   const role = await getMembershipRoleForUser(supabase, user.id);
-  const canAccess = isSuperAdmin || role === "owner" || role === "admin";
-  if (!canAccess) redirect("/operations");
+  const canManageOrgSettings =
+    isSuperAdmin || role === "owner" || role === "admin";
+  const canOpenSettings =
+    canManageOrgSettings ||
+    role === "member" ||
+    role === "viewer" ||
+    role === "technician" ||
+    role === "demo_guest";
+  if (!canOpenSettings) redirect("/operations");
 
   return (
     <div className="space-y-6">
@@ -49,15 +56,19 @@ export default async function SettingsLayout({
         subtitle="Manage your organization, users, roles, and notifications."
       />
       <nav className="flex flex-wrap gap-2 border-b border-[var(--card-border)] pb-4">
-        {settingsNav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded-lg border border-[var(--card-border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
-          >
-            {item.label}
-          </Link>
-        ))}
+        {settingsNav
+          .filter((item) =>
+            item.href === "/settings/notifications" ? true : canManageOrgSettings
+          )
+          .map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-lg border border-[var(--card-border)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--card)]"
+            >
+              {item.label}
+            </Link>
+          ))}
       </nav>
       {children}
     </div>
