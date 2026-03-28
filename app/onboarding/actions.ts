@@ -72,6 +72,9 @@ export async function onboardingAction(
     return { error: membershipError.message || "Failed to add you to the organization." };
   }
 
+  // Drop live-demo memberships so the account is no longer treated as a demo visitor.
+  void supabase.from("tenant_memberships").delete().eq("user_id", user.id).eq("role", "demo_guest");
+
   if (source === "demo") {
     redirect("/operations?onboarding=1&guide=create-asset&source=demo");
   }

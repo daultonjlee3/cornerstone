@@ -139,7 +139,11 @@ export async function getMembershipRoleForUser(
   return null;
 }
 
-/** True if the user has any tenant_membership with role demo_guest (temporary live demo access). */
+/**
+ * True when the user should be treated as a live-demo visitor (shared tenant, read-only writes).
+ * False if they are a platform super admin, or have any non–demo_guest tenant membership
+ * (e.g. owner after signup/onboarding), even if a stale demo_guest row still exists.
+ */
 export async function isDemoGuestUser(
   supabase?: Awaited<ReturnType<typeof createClient>>,
   effectiveUserId?: string | null
@@ -147,6 +151,17 @@ export async function isDemoGuestUser(
   const client = supabase ?? (await getSupabaseClient());
   const userId = effectiveUserId ?? (await getEffectiveUserId(client));
   if (!userId) return false;
+  if (await isUserPlatformSuperAdmin(userId, client)) return false;
+
+  const { data: nonDemoRow } = await client
+    .from("tenant_memberships")
+    .select("role")
+    .eq("user_id", userId)
+    .neq("role", "demo_guest")
+    .limit(1)
+    .maybeSingle();
+  if (nonDemoRow) return false;
+
   const { data } = await client
     .from("tenant_memberships")
     .select("role")
