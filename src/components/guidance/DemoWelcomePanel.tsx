@@ -7,7 +7,6 @@ import {
   Truck,
   Box,
   CalendarCheck,
-  Sparkles,
   Warehouse,
   Store,
   ShoppingCart,
@@ -17,6 +16,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { useGuidance } from "@/hooks/useGuidance";
+import { DemoStartFreeTrialButton } from "./DemoStartFreeTrialButton";
 
 const DEMO_PATH = [
   {
@@ -128,13 +128,7 @@ export function DemoWelcomePanel() {
             You are viewing safe sample data. Use this guided path to explore core workflows quickly.
           </p>
         </div>
-        <Link
-          href="/signup?source=demo"
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)]"
-        >
-          <Sparkles className="size-4" aria-hidden />
-          Start Free Trial
-        </Link>
+        <DemoStartFreeTrialButton />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
