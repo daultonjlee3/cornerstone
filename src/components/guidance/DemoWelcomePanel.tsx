@@ -108,10 +108,17 @@ const SECONDARY_PATH = [
   },
 ] as const;
 
-export function DemoWelcomePanel() {
+type DemoWelcomePanelProps = {
+  /** Current header tenant name, when the user is a demo guest—explains it is sample data, not a private org. */
+  headerOrganizationName?: string;
+};
+
+export function DemoWelcomePanel({ headerOrganizationName }: DemoWelcomePanelProps) {
   const { isLiveDemoMode } = useGuidance();
 
   if (!isLiveDemoMode) return null;
+
+  const orgLabel = headerOrganizationName?.trim() ?? "";
 
   return (
     <section
@@ -127,6 +134,13 @@ export function DemoWelcomePanel() {
           <p className="mt-1 text-sm text-[var(--muted)]">
             You are viewing safe sample data. Use this guided path to explore core workflows quickly.
           </p>
+          {orgLabel ? (
+            <p className="mt-3 border-l-2 border-[var(--accent)]/25 pl-3 text-sm text-[var(--muted)]">
+              The name &ldquo;{orgLabel}&rdquo; in the header is part of this shared sample—it does not mean you
+              already have a private company workspace. Demo visitors use read-only access so everyone sees the same
+              data.
+            </p>
+          ) : null}
         </div>
         <DemoStartFreeTrialButton />
       </div>

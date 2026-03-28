@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isDemoGuestUser } from "@/src/lib/auth-context";
 
+/** Shown when server actions reject writes for demo visitors (shared sample tenant). */
 export const DEMO_READ_ONLY_ERROR =
-  "This live demo workspace is read-only. Start a free trial to save changes.";
+  "You're signed in with demo visitor access. The company name in the header is sample data for this shared workspace—database changes are not saved. Start a free trial for your own organization.";
 
 /**
  * Demo guests share seeded tenants, so all writes must be blocked to avoid
