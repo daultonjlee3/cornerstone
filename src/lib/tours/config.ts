@@ -1,76 +1,68 @@
 import type { TourConfig } from "./types";
 
+const DEMO_DWELL_MS = 5000;
+
 /**
- * Four-step action-only demo: real navigation and completion—no passive Next/Back.
- * Advances on route changes + work-order completion event.
+ * Prospect walkthrough: one primary surface per step, manual Next/Back, minimum dwell time.
+ * Order: Dashboard → Assets → Work Orders → Dispatch → Technician view → trial CTA.
  */
 export const demoGuidedTourConfig: TourConfig = {
   id: "demo-guided",
-  name: "Guided workflow demo",
+  name: "Product walkthrough",
   path: "/operations",
   autoStart: false,
+  dwellMsPerStep: DEMO_DWELL_MS,
   steps: [
     {
       id: "dashboard",
       path: "/operations",
-      title: "Operations center at a glance",
-      content: "Start in the command center where priorities and KPIs are surfaced.",
-      cta: "Next: Assets",
-      selector: `[data-tour="dashboard:overview"]`,
+      title: "Operations dashboard",
+      content:
+        "Start here for live KPIs, backlog, and signals—so you know what to run first before anyone dispatches a truck.",
+      cta: "Next",
+      selector: `[data-tour="dashboard:metrics"]`,
     },
     {
       id: "assets",
       path: "/assets",
-      title: "Asset history and context",
-      content: "Asset records link maintenance history, hierarchy, and execution context.",
-      cta: "Next: Preventive maintenance",
+      title: "Assets",
+      content:
+        "Every piece of equipment and location stays linked to history and hierarchy—so work always lands on the right asset.",
+      cta: "Next",
       selector: `[data-tour="assets:asset-list"]`,
-    },
-    {
-      id: "pm",
-      path: "/preventive-maintenance",
-      title: "Preventive plans drive reliability",
-      content: "Recurring PM plans generate actionable work before failures happen.",
-      cta: "Next: Work orders",
-      selector: `[data-tour="preventive-maintenance:pm-schedules"]`,
     },
     {
       id: "work-orders",
       path: "/work-orders",
-      title: "Work order pipeline",
-      content: "Track status, scheduling, and assignment from a single operational queue.",
-      cta: "Next: Dispatch",
+      title: "Work orders",
+      content:
+        "Track the full pipeline: status, scheduling, and assignment from one operational queue your whole team shares.",
+      cta: "Next",
       selector: `[data-tour="work-orders:statuses"]`,
     },
     {
       id: "dispatch",
       path: "/dispatch",
-      title: "Dispatch and rebalance workload",
-      content: "Drag-and-drop scheduling keeps technician workload balanced in real time.",
-      cta: "Next: Technician workflow",
+      title: "Dispatch",
+      content:
+        "Rebalance workload and schedule by technician—see the board, not a spreadsheet, when you move work.",
+      cta: "Next",
       selector: `[data-tour="dispatch:technician-columns"]`,
     },
     {
-      id: "technician-workflow",
+      id: "technician-view",
       path: "/technicians/work-queue",
-      title: "Technician execution workflow",
-      content: "Technicians run assigned work with notes, labor, and completion updates.",
-      cta: "Next: Intelligence",
+      title: "Technician view",
+      content:
+        "This is what crews see in the field: assigned jobs, status, and close-out—execution feeds straight back to Operations.",
+      cta: "Next",
       selector: `[data-tour="demo-guided:technician-execution"]`,
     },
     {
-      id: "intelligence",
-      path: "/assets/intelligence",
-      title: "AI-assisted asset intelligence",
-      content: "Portfolio-level risk and optimization insights prioritize where to act next.",
-      cta: "Next: Free trial",
-      selector: `[data-tour="demo-guided:asset-intelligence"]`,
-    },
-    {
       id: "trial-cta",
-      path: "/assets/intelligence",
-      title: "Your operations just updated",
-      content: "Launch your own workspace to save changes and run this workflow on live data.",
+      path: "/technicians/work-queue",
+      title: "Your operations, your data",
+      content: "Run the same workflow on your properties and team—start a free trial when you are ready.",
       actionCta: "Start Free Trial",
       variant: "cta",
     },

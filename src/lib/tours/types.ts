@@ -32,6 +32,11 @@ export type TourConfig = {
   steps: TourStep[];
   /** If false, tour is only started manually (e.g. welcome modal); never auto-started by path. Default true. */
   autoStart?: boolean;
+  /**
+   * For demo-guided: minimum ms on each spotlight step before Next unlocks.
+   * Pausing the tour freezes this timer. CTA / final steps ignore this.
+   */
+  dwellMsPerStep?: number;
 };
 
 /** Build data-tour attribute value for a step. */

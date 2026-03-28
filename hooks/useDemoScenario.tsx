@@ -16,6 +16,7 @@ import {
   type DemoScenarioContext,
 } from "@/app/(authenticated)/demo-scenario/actions";
 import { DEMO_STEPS, type DemoScenarioStep, type DemoScenarioStepKey } from "@/src/lib/demo-scenario/steps";
+import { DEMO_SESSION_RESET_EVENT } from "@/src/components/ui/tour";
 
 type DemoScenarioContextValue = {
   isDemoMode: boolean;
@@ -93,6 +94,9 @@ export function DemoScenarioProvider({ children, isDemoGuest }: DemoScenarioProv
     setExploreMode(isDemoGuest ? true : false);
     setStepIndex(0);
     setIsIntroOpen(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(DEMO_SESSION_RESET_EVENT));
+    }
   }, [isDemoEntry, isDemoGuest, pathname, searchParams]);
 
   const navigateToStep = useCallback(

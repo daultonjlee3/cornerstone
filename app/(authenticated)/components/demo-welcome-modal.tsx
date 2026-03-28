@@ -51,14 +51,14 @@ export function DemoWelcomeModal({ isDemoGuest, onStartGuidedTour }: Props) {
           Welcome to the demo workspace
         </h2>
         <p className="mt-2 text-[var(--muted)]">
-          Four steps, real clicks—open a priority job, complete it, see the board move. About two minutes.
+          A calm walkthrough: Operations, Assets, Work Orders, Dispatch, and the technician queue—with time to read each screen.
         </p>
 
         <div className="mt-5 space-y-3 rounded-lg border border-[var(--card-border)] bg-[var(--background)]/50 p-4">
           <div>
-            <p className="font-medium text-[var(--foreground)]">Guided workflow demo</p>
+            <p className="font-medium text-[var(--foreground)]">Guided product tour</p>
             <p className="mt-0.5 text-sm text-[var(--muted)]">
-              Priority plan → work order → mark complete → back to Operations. No slide-through Next buttons.
+              Use Next and Back, pause anytime, or replay from the start. Each step stays on screen for a few seconds before Next unlocks.
             </p>
           </div>
           <div>

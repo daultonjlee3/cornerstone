@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -15,6 +16,17 @@ import { tourStepSelector } from "@/src/lib/tours/types";
 import type { TourConfig, TourStep } from "@/src/lib/tours/types";
 import { getCompletedTourIds, markTourComplete } from "@/app/(authenticated)/tours/actions";
 
+export const DEMO_SESSION_RESET_EVENT = "cornerstone:demo-session-reset";
+
+function computeDemoDwellElapsed(
+  stepEngagedAt: number,
+  pausedAccumMs: number,
+  pauseBeganAt: number | null
+): number {
+  const pauseExtra = pauseBeganAt != null ? Date.now() - pauseBeganAt : 0;
+  return Date.now() - stepEngagedAt - pausedAccumMs - pauseExtra;
+}
+
 function pathnameMatchesStep(pathname: string, step: TourStep): boolean {
   const path = step.path?.replace(/\/$/, "") || "";
   if (!path) return true;
@@ -23,29 +35,24 @@ function pathnameMatchesStep(pathname: string, step: TourStep): boolean {
 }
 
 type TourContextValue = {
-  /** Currently running tour or null. */
   activeTour: TourConfig | null;
-  /** 0-based step index. */
   stepIndex: number;
-  /** Total steps. */
   stepCount: number;
-  /** Current step's target element (if any). */
   targetRect: DOMRect | null;
-  /** True when the live demo / demo guest workspace is active (suppresses generic path tours). */
   isDemoGuest: boolean;
-  /** Go to next step or finish. */
+  /** Demo-guided: true when minimum dwell time has passed for the current spotlight step. */
+  canAdvanceNext: boolean;
+  /** Demo-guided: seconds remaining until Next unlocks (0 when ready). */
+  dwellSecondsRemaining: number;
+  isTourPaused: boolean;
   next: () => void;
-  /** Go to previous step. */
   back: () => void;
-  /** Skip the tour (end without marking complete so it can show again, or we could mark complete - per product choice). We'll mark complete on skip so it doesn't re-appear until restart. */
   skip: () => void;
-  /** Start a specific tour (e.g. from settings "Start tour"). */
   startTour: (tourId: string) => void;
-  /** Restart current tour from step 0. */
   restartCurrent: () => void;
-  /** Set of tour IDs the user has completed (so we don't auto-start again). */
+  toggleTourPause: () => void;
+  replayDemoFromStart: () => void;
   completedTourIds: Set<string>;
-  /** Refreshes completed set from server (after restart in settings). */
   refreshCompleted: () => Promise<void>;
 };
 
@@ -59,8 +66,9 @@ export function useTour() {
 
 const SPOTLIGHT_PADDING = 8;
 const DEMO_SPOTLIGHT_PADDING = 10;
-const TARGET_POLL_MAX_ATTEMPTS = 12;
-const TARGET_POLL_INTERVAL_MS = 120;
+const TARGET_POLL_MAX_ATTEMPTS = 40;
+const TARGET_POLL_INTERVAL_MS = 150;
+const PENDING_STEP_SETTLE_MS = 320;
 
 function resolveStepElement(config: TourConfig, step: TourStep): HTMLElement | null {
   const selector = step.selector ?? tourStepSelector(config.id, step.id);
@@ -96,8 +104,13 @@ export function TourProvider({
     () => new Set(initialCompleted)
   );
   const hasAutoStarted = useRef<string | null>(null);
-  const tourStepRef = useRef({ activeTour: null as TourConfig | null, stepIndex: 0 });
   const targetPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [isTourPaused, setIsTourPaused] = useState(false);
+  const [tick, setTick] = useState(0);
+  const stepEngagedAtRef = useRef(0);
+  const pausedAccumMsRef = useRef(0);
+  const pauseBeganAtRef = useRef<number | null>(null);
 
   const refreshCompleted = useCallback(async () => {
     const ids = await getCompletedTourIds();
@@ -109,6 +122,24 @@ export function TourProvider({
     setStepIndex(0);
     setPendingStepIndex(null);
     setTargetRect(null);
+    setIsTourPaused(false);
+    pausedAccumMsRef.current = 0;
+    pauseBeganAtRef.current = null;
+    stepEngagedAtRef.current = Date.now();
+  }, []);
+
+  const endTour = useCallback((markComplete: boolean, tourId: string) => {
+    setActiveTour(null);
+    setStepIndex(0);
+    setTargetRect(null);
+    setPendingStepIndex(null);
+    setIsTourPaused(false);
+    pauseBeganAtRef.current = null;
+    pausedAccumMsRef.current = 0;
+    if (markComplete) {
+      setCompletedTourIds((prev) => new Set(prev).add(tourId));
+      void markTourComplete(tourId);
+    }
   }, []);
 
   const startTour = useCallback(
@@ -134,19 +165,6 @@ export function TourProvider({
     [pathname, runTour, router]
   );
 
-  const endTour = useCallback(
-    (markComplete: boolean, tourId: string) => {
-      setActiveTour(null);
-      setStepIndex(0);
-      setTargetRect(null);
-      if (markComplete) {
-        setCompletedTourIds((prev) => new Set(prev).add(tourId));
-        void markTourComplete(tourId);
-      }
-    },
-    []
-  );
-
   const updateTargetRect = useCallback((config: TourConfig, index: number): boolean => {
     const step = config.steps[index];
     if (!step) {
@@ -170,23 +188,19 @@ export function TourProvider({
         )
       );
       return true;
-    } else {
-      setTargetRect(null);
-      return false;
     }
+    setTargetRect(null);
+    return false;
   }, []);
 
-  const scrollToStep = useCallback(
-    (config: TourConfig, index: number) => {
-      const step = config.steps[index];
-      if (!step || step.variant === "cta") return;
-      const el = resolveStepElement(config, step);
-      if (el && isElementVisible(el)) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    },
-    []
-  );
+  const scrollToStep = useCallback((config: TourConfig, index: number) => {
+    const step = config.steps[index];
+    if (!step || step.variant === "cta") return;
+    const el = resolveStepElement(config, step);
+    if (el && isElementVisible(el)) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
 
   const clearTargetPolling = useCallback(() => {
     if (targetPollTimeoutRef.current) {
@@ -205,12 +219,7 @@ export function TourProvider({
         }
         const found = updateTargetRect(config, index);
         if (found) return;
-        if (attempt >= TARGET_POLL_MAX_ATTEMPTS) {
-          if (config.id === "demo-guided" && index < config.steps.length - 1) {
-            setStepIndex((prev) => (prev === index ? index + 1 : prev));
-          }
-          return;
-        }
+        if (attempt >= TARGET_POLL_MAX_ATTEMPTS) return;
         clearTargetPolling();
         targetPollTimeoutRef.current = setTimeout(() => {
           poll(attempt + 1);
@@ -223,6 +232,18 @@ export function TourProvider({
 
   const next = useCallback(() => {
     if (!activeTour) return;
+    if (activeTour.id === "demo-guided") {
+      const cur = activeTour.steps[stepIndex];
+      const dwell = activeTour.dwellMsPerStep ?? 0;
+      if (cur?.variant !== "cta" && dwell > 0) {
+        const elapsed = computeDemoDwellElapsed(
+          stepEngagedAtRef.current,
+          pausedAccumMsRef.current,
+          pauseBeganAtRef.current
+        );
+        if (elapsed < dwell) return;
+      }
+    }
     if (stepIndex >= activeTour.steps.length - 1) {
       endTour(true, activeTour.id);
       return;
@@ -275,7 +296,76 @@ export function TourProvider({
     requestAnimationFrame(() => pollForStepTarget(activeTour, 0));
   }, [activeTour, pathname, scrollToStep, pollForStepTarget, router]);
 
-  // When step index or active tour changes, update target rect (after a tick so DOM is ready).
+  const replayDemoFromStart = useCallback(() => {
+    if (!activeTour || activeTour.id !== "demo-guided") {
+      restartCurrent();
+      return;
+    }
+    setIsTourPaused(false);
+    pauseBeganAtRef.current = null;
+    pausedAccumMsRef.current = 0;
+    clearTargetPolling();
+    setStepIndex(0);
+    setPendingStepIndex(null);
+    const step0 = activeTour.steps[0];
+    if (step0?.path && !pathnameMatchesStep(pathname, step0)) {
+      setPendingStepIndex(0);
+      router.push(step0.path);
+    } else {
+      scrollToStep(activeTour, 0);
+      requestAnimationFrame(() => pollForStepTarget(activeTour, 0));
+    }
+    stepEngagedAtRef.current = Date.now();
+  }, [activeTour, pathname, router, restartCurrent, scrollToStep, pollForStepTarget, clearTargetPolling]);
+
+  const toggleTourPause = useCallback(() => {
+    setIsTourPaused((p) => {
+      if (!p) {
+        pauseBeganAtRef.current = Date.now();
+      } else if (pauseBeganAtRef.current != null) {
+        pausedAccumMsRef.current += Date.now() - pauseBeganAtRef.current;
+        pauseBeganAtRef.current = null;
+      }
+      return !p;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!activeTour || activeTour.id !== "demo-guided") return;
+    stepEngagedAtRef.current = Date.now();
+    pausedAccumMsRef.current = 0;
+    pauseBeganAtRef.current = null;
+    setIsTourPaused(false);
+  }, [activeTour?.id, stepIndex]);
+
+  useEffect(() => {
+    if (!activeTour || activeTour.id !== "demo-guided" || isTourPaused) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 200);
+    return () => clearInterval(id);
+  }, [activeTour, isTourPaused, stepIndex]);
+
+  const { canAdvanceNext, dwellSecondsRemaining } = useMemo(() => {
+    if (!activeTour || activeTour.id !== "demo-guided") {
+      return { canAdvanceNext: true, dwellSecondsRemaining: 0 };
+    }
+    const step = activeTour.steps[stepIndex];
+    const dwellMs = activeTour.dwellMsPerStep ?? 0;
+    if (!step || step.variant === "cta" || dwellMs <= 0) {
+      return { canAdvanceNext: true, dwellSecondsRemaining: 0 };
+    }
+    void tick;
+    const elapsed = computeDemoDwellElapsed(
+      stepEngagedAtRef.current,
+      pausedAccumMsRef.current,
+      pauseBeganAtRef.current
+    );
+    const remainingMs = Math.max(0, dwellMs - elapsed);
+    return {
+      canAdvanceNext: elapsed >= dwellMs,
+      dwellSecondsRemaining: Math.ceil(remainingMs / 1000),
+    };
+  }, [activeTour, stepIndex, tick, isTourPaused]);
+
   useEffect(() => {
     if (!activeTour) return;
     const t = setTimeout(() => pollForStepTarget(activeTour, stepIndex), 100);
@@ -283,10 +373,26 @@ export function TourProvider({
   }, [activeTour, stepIndex, pollForStepTarget]);
 
   useEffect(() => {
-    tourStepRef.current = { activeTour, stepIndex };
-  }, [activeTour, stepIndex]);
+    if (!activeTour || activeTour.id !== "demo-guided") return;
+    const onResizeOrScroll = () => pollForStepTarget(activeTour, stepIndex);
+    window.addEventListener("resize", onResizeOrScroll);
+    window.addEventListener("scroll", onResizeOrScroll, true);
+    return () => {
+      window.removeEventListener("resize", onResizeOrScroll);
+      window.removeEventListener("scroll", onResizeOrScroll, true);
+    };
+  }, [activeTour, stepIndex, pollForStepTarget]);
 
-  // Auto-start tour when pathname matches and tour not completed.
+  useEffect(() => {
+    const onSessionReset = () => {
+      if (activeTour?.id === "demo-guided") {
+        endTour(false, "demo-guided");
+      }
+    };
+    window.addEventListener(DEMO_SESSION_RESET_EVENT, onSessionReset);
+    return () => window.removeEventListener(DEMO_SESSION_RESET_EVENT, onSessionReset);
+  }, [activeTour, endTour]);
+
   useEffect(() => {
     if (isDemoWorkspace || activeTour) return;
     const config = getTourForPath(pathname);
@@ -297,13 +403,11 @@ export function TourProvider({
     return () => clearTimeout(timer);
   }, [pathname, completedTourIds, runTour, isDemoWorkspace, activeTour]);
 
-  // Reset auto-start when leaving the path so revisiting can trigger again if not completed.
   useEffect(() => {
     const config = getTourForPath(pathname);
     if (!config) hasAutoStarted.current = null;
   }, [pathname]);
 
-  // When navigating away from the tour's path, end the active tour (except cross-route demo-guided).
   useEffect(() => {
     if (!activeTour) return;
     if (activeTour.id === "demo-guided") return;
@@ -318,7 +422,6 @@ export function TourProvider({
     }
   }, [pathname, activeTour]);
 
-  // Cross-route demo-guided: after navigating, land on the step when pathname matches.
   useEffect(() => {
     if (!activeTour || activeTour.id !== "demo-guided" || pendingStepIndex === null) return;
     const step = activeTour.steps[pendingStepIndex];
@@ -328,11 +431,10 @@ export function TourProvider({
       setPendingStepIndex(null);
       scrollToStep(activeTour, pendingStepIndex);
       pollForStepTarget(activeTour, pendingStepIndex);
-    }, 150);
+    }, PENDING_STEP_SETTLE_MS);
     return () => clearTimeout(t);
   }, [pathname, activeTour, pendingStepIndex, scrollToStep, pollForStepTarget]);
 
-  // Start demo-guided from URL param (e.g. Settings "Start tour" -> /operations?startTour=demo-guided).
   useEffect(() => {
     const startParam = searchParams.get("startTour");
     if (pathname.replace(/\/$/, "") !== "/operations" || startParam !== "demo-guided") return;
@@ -353,18 +455,19 @@ export function TourProvider({
     stepCount: activeTour?.steps.length ?? 0,
     targetRect,
     isDemoGuest,
+    canAdvanceNext,
+    dwellSecondsRemaining,
+    isTourPaused,
     next,
     back,
     skip,
     startTour,
     restartCurrent,
+    toggleTourPause,
+    replayDemoFromStart,
     completedTourIds,
     refreshCompleted,
   };
 
-  return (
-    <TourContext.Provider value={value}>
-      {children}
-    </TourContext.Provider>
-  );
+  return <TourContext.Provider value={value}>{children}</TourContext.Provider>;
 }
