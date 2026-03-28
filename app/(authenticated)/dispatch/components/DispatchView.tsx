@@ -154,6 +154,34 @@ function mergeWorkOrdersFromServer(prev: DispatchWorkOrder[], server: DispatchWo
   return out;
 }
 
+/** Demo workspace is read-only on the server; build a snapshot so the same merge path as real saves runs locally. */
+function demoAssignmentSnapshotFromPayload(
+  workOrder: DispatchWorkOrder,
+  payload: {
+    assigned_technician_id: string | null;
+    assigned_crew_id: string | null;
+    assigned_vendor_id?: string | null;
+    scheduled_date: string | null;
+    scheduled_start: string | null;
+    scheduled_end: string | null;
+  },
+  patch: Partial<DispatchWorkOrder>
+): WorkOrderAssignmentSnapshot {
+  const merged = { ...workOrder, ...patch };
+  const updatedAt = new Date().toISOString();
+  return {
+    id: workOrder.id,
+    assigned_technician_id: payload.assigned_technician_id ?? null,
+    assigned_crew_id: payload.assigned_crew_id ?? null,
+    vendor_id: payload.assigned_vendor_id ?? (merged.vendor_id as string | null | undefined) ?? null,
+    scheduled_date: payload.scheduled_date,
+    scheduled_start: payload.scheduled_start,
+    scheduled_end: payload.scheduled_end,
+    status: (patch.status as string | null | undefined) ?? merged.status ?? null,
+    updated_at: updatedAt,
+  };
+}
+
 function applyAssignmentSnapshotToRow(
   base: DispatchWorkOrder,
   snap: WorkOrderAssignmentSnapshot,
@@ -959,6 +987,37 @@ export function DispatchView({
         }
         return current.map((row) => (row.id === workOrder.id ? merged : row));
       });
+
+      if (isDemoGuest) {
+        const snap = demoAssignmentSnapshotFromPayload(workOrder, payload, patch);
+        const pending = readPendingAssignments();
+        pending[snap.id] = { ...snap, savedAtMs: Date.now() };
+        writePendingAssignments(pending);
+        setOptimisticWorkOrders((current) => {
+          const idx = current.findIndex((r) => r.id === snap.id);
+          const base = idx >= 0 ? current[idx] : workOrder;
+          const next = applyAssignmentSnapshotToRow(
+            base,
+            snap,
+            initialData.workforce.technicians,
+            initialData.crews
+          );
+          if (idx === -1) return [...current, next];
+          return current.map((row) => (row.id === snap.id ? next : row));
+        });
+        if (
+          payload.assigned_technician_id != null ||
+          payload.assigned_crew_id != null ||
+          payload.assigned_vendor_id != null
+        ) {
+          markAssignedTechnician();
+        }
+        queueMicrotask(() => {
+          window.dispatchEvent(new CustomEvent("cornerstone:ops-optimization-refresh"));
+        });
+        return;
+      }
+
       let result: Awaited<ReturnType<typeof updateWorkOrderAssignment>>;
       try {
         result = await updateWorkOrderAssignment(workOrder.id, payload);
@@ -1017,6 +1076,7 @@ export function DispatchView({
       initialData.workforce.technicians,
       initialData.crews,
       markAssignedTechnician,
+      isDemoGuest,
     ]
   );
 
