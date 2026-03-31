@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/marketing-site";
 import { AuthHashHandler } from "./components/auth-hash-handler";
 import "./globals.css";
@@ -97,6 +98,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <Analytics />
       </body>
     </html>
   );
