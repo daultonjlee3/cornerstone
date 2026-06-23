@@ -59,7 +59,10 @@ export type Permission =
   | "customers.view"
   | "customers.manage"
   | "companies.view"
-  | "companies.manage";
+  | "companies.manage"
+  | "fleet.view"
+  | "fleet.manage"
+  | "integrations.manage";
 
 /** Extended role type — platform_super_admin is synthetic for permission checks. */
 type AnyRole = TenantMembershipRole | "platform_super_admin";
@@ -83,6 +86,7 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "technicians.view", "technicians.manage",
     "customers.view", "customers.manage",
     "companies.view", "companies.manage",
+    "fleet.view", "fleet.manage", "integrations.manage",
   ],
   owner: [
     "assets.view", "assets.create", "assets.edit", "assets.delete",
@@ -101,6 +105,7 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "technicians.view", "technicians.manage",
     "customers.view", "customers.manage",
     "companies.view", "companies.manage",
+    "fleet.view", "fleet.manage", "integrations.manage",
   ],
   admin: [
     "assets.view", "assets.create", "assets.edit", "assets.delete",
@@ -119,6 +124,7 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "technicians.view", "technicians.manage",
     "customers.view", "customers.manage",
     "companies.view", "companies.manage",
+    "fleet.view", "fleet.manage", "integrations.manage",
   ],
   member: [
     "assets.view", "assets.create", "assets.edit",
@@ -136,6 +142,7 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "technicians.view",
     "customers.view",
     "companies.view",
+    "fleet.view", "fleet.manage",
   ],
   viewer: [
     "assets.view",
@@ -152,6 +159,7 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "technicians.view",
     "customers.view",
     "companies.view",
+    "fleet.view",
   ],
   /** Field / linked technician: execution-focused; no org settings. */
   technician: [
@@ -184,6 +192,7 @@ const ROLE_PERMISSIONS: Record<AnyRole, Permission[]> = {
     "technicians.view",
     "customers.view",
     "companies.view",
+    "fleet.view", "fleet.manage",
   ],
 };
 

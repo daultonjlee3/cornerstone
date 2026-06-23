@@ -26,6 +26,7 @@ type ShellProps = {
   showPlatformAdmin?: boolean;
   impersonationBanner?: { actingAsName: string; companyName: string } | null;
   isDemoGuest?: boolean;
+  productProfile?: import("@/src/types/fleet").ProductProfile;
 };
 
 export function Shell({
@@ -36,6 +37,7 @@ export function Shell({
   showPlatformAdmin = false,
   impersonationBanner = null,
   isDemoGuest = false,
+  productProfile = "cmms",
 }: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -79,6 +81,7 @@ export function Shell({
                   showPlatformAdmin={showPlatformAdmin}
                   isDemoGuest={isDemoGuest}
                   showResumeOnboarding={!isDemoGuest && !isScreenshotMode}
+                  productProfile={productProfile}
                 />
               ) : null}
               <div

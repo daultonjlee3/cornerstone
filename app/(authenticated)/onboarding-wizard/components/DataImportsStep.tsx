@@ -71,6 +71,71 @@ const DATASETS: DatasetConfig[] = [
   },
 ];
 
+const FLEET_DATASETS: DatasetConfig[] = [
+  {
+    id: "fleet_branches",
+    title: "Fleet Branches",
+    description: "Import operating yards / branches (import first).",
+    requiredFields: ["branch_code", "name"],
+    optionalFields: [
+      "address_line1",
+      "city",
+      "state",
+      "postal_code",
+      "latitude",
+      "longitude",
+      "timezone",
+      "external_id",
+    ],
+  },
+  {
+    id: "fleet_customer_sites",
+    title: "Customer Sites",
+    description: "Import job sites with geocoded addresses.",
+    requiredFields: ["site_name", "address_line1"],
+    optionalFields: [
+      "city",
+      "state",
+      "postal_code",
+      "latitude",
+      "longitude",
+      "customer_name",
+      "external_id",
+    ],
+  },
+  {
+    id: "fleet_trucks",
+    title: "Fleet Trucks",
+    description: "Import truck roster by branch.",
+    requiredFields: ["branch_code", "unit_number", "truck_type"],
+    optionalFields: ["capacity_gallons", "status", "telematics_device_id", "external_id"],
+  },
+  {
+    id: "fleet_operators",
+    title: "Fleet Operators",
+    description: "Import drivers and operators.",
+    requiredFields: ["branch_code", "name", "operator_role"],
+    optionalFields: ["email", "external_id"],
+  },
+  {
+    id: "fleet_jobs",
+    title: "Fleet Jobs",
+    description: "Import dispatch jobs with required revenue.",
+    requiredFields: [
+      "branch_code",
+      "site_name",
+      "title",
+      "scheduled_start",
+      "scheduled_end",
+      "revenue_estimate",
+      "required_truck_type",
+    ],
+    optionalFields: ["priority", "status", "unit_number", "external_id", "site_external_id"],
+  },
+];
+
+const ALL_DATASETS = [...DATASETS, ...FLEET_DATASETS];
+
 function parseCsvLine(line: string): string[] {
   const cells: string[] = [];
   let current = "";
@@ -206,8 +271,8 @@ function downloadTemplateFile(config: DatasetConfig): void {
 }
 
 async function downloadSampleCsvPack(): Promise<void> {
-  for (let index = 0; index < DATASETS.length; index += 1) {
-    downloadTemplateFile(DATASETS[index]);
+  for (let index = 0; index < ALL_DATASETS.length; index += 1) {
+    downloadTemplateFile(ALL_DATASETS[index]);
     // Small delay helps browsers process sequential downloads.
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
@@ -434,7 +499,7 @@ export function DataImportsStep({ action, onBack, onDone }: DataImportsStepProps
         </button>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
-        {DATASETS.map((dataset) => (
+        {ALL_DATASETS.map((dataset) => (
           <DatasetImportCard key={dataset.id} config={dataset} action={action} />
         ))}
       </div>

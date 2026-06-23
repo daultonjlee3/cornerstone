@@ -1,11 +1,11 @@
 /**
  * Navigation configuration for the app shell sidebar.
  * Icon keys are resolved in the Sidebar component via lucide-react.
- * Groups: Operations, Assets, People, Supply, Analytics, Admin.
- * Operations Center is the primary landing page (/operations).
  */
 
 import { featureFlags } from "@/src/lib/features";
+import type { ProductProfile } from "@/src/types/fleet";
+
 export type NavItem = {
   label: string;
   href: string;
@@ -34,7 +34,7 @@ function isAdminItemEnabled(item: NavItem): boolean {
   return true;
 }
 
-export const navConfig: NavGroup[] = [
+const baseNavConfig: NavGroup[] = [
   {
     label: "Operations",
     items: [
@@ -96,3 +96,30 @@ export const navConfig: NavGroup[] = [
     items: [{ label: "Settings", href: "/settings", icon: "Settings" }],
   },
 ];
+
+const fleetNavGroup: NavGroup = {
+  label: "Fleet",
+  items: [
+    { label: "Branches", href: "/branches", icon: "Warehouse" },
+    { label: "Trucks", href: "/fleet/trucks", icon: "Package" },
+    { label: "Jobs", href: "/fleet/jobs", icon: "ClipboardList" },
+    { label: "Sites", href: "/fleet/sites", icon: "MapPin" },
+    { label: "Operators", href: "/fleet/operators", icon: "Users" },
+  ],
+};
+
+export function getNavConfig(productProfile: ProductProfile = "cmms"): NavGroup[] {
+  const showFleet = productProfile === "fleet_intelligence" || productProfile === "hybrid";
+  if (!showFleet) return baseNavConfig;
+
+  const groups = [...baseNavConfig];
+  groups.splice(1, 0, fleetNavGroup);
+  return groups;
+}
+
+/** @deprecated Use getNavConfig(productProfile) — kept for gradual migration */
+export const navConfig: NavGroup[] = baseNavConfig;
+
+export function isFleetProductProfile(productProfile: ProductProfile): boolean {
+  return productProfile === "fleet_intelligence" || productProfile === "hybrid";
+}

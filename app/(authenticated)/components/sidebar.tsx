@@ -34,10 +34,12 @@ import {
   ChevronRight,
   X,
   ListChecks,
+  Container,
   type LucideIcon,
 } from "lucide-react";
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
-import { navConfig, type NavGroup, type NavItem } from "../nav-config";
+import { getNavConfig, type NavGroup, type NavItem } from "../nav-config";
+import type { ProductProfile } from "@/src/types/fleet";
 import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -68,6 +70,7 @@ const iconMap: Record<string, LucideIcon> = {
   FileText,
   Receipt,
   Settings,
+  Container,
 };
 
 function getIcon(item: NavItem): LucideIcon | null {
@@ -84,6 +87,7 @@ type SidebarProps = {
   isDemoGuest?: boolean;
   /** When true, show "Resume get started" when onboarding was skipped. */
   showResumeOnboarding?: boolean;
+  productProfile?: ProductProfile;
 };
 
 function isActive(href: string, pathname: string): boolean {
@@ -107,14 +111,15 @@ export function Sidebar({
   showPlatformAdmin = false,
   isDemoGuest = false,
   showResumeOnboarding = false,
+  productProfile = "cmms",
 }: SidebarProps) {
   const pathname = usePathname();
   const { skipped, allComplete, resumeOnboarding } = useGetStartedOnboarding();
   const showResume = showResumeOnboarding && skipped && !allComplete;
 
-  const navGroups = isDemoGuest
-    ? navConfig.filter((g) => g.label !== "Organization")
-    : navConfig;
+  const navGroups = (isDemoGuest
+    ? getNavConfig(productProfile).filter((g) => g.label !== "Organization")
+    : getNavConfig(productProfile));
 
   return (
     <>

@@ -5,6 +5,8 @@ import { ImpersonateButton } from "./impersonate-button";
 import { WorkInTenantButton } from "../work-in-tenant-button";
 import { Suspense } from "react";
 import { TenantAiAllowanceModalWrapper } from "./tenant-ai-allowance-wrapper";
+import { ProductProfileForm } from "./product-profile-form";
+import type { ProductProfile } from "@/src/types/fleet";
 
 export default async function PlatformTenantDetailPage({
   params,
@@ -16,7 +18,7 @@ export default async function PlatformTenantDetailPage({
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, slug")
+    .select("id, name, slug, product_profile")
     .eq("id", tenantId)
     .maybeSingle();
   if (!tenant) notFound();
@@ -34,6 +36,11 @@ export default async function PlatformTenantDetailPage({
     .order("role");
 
   const tenantName = (tenant as { name: string }).name;
+  const rawProfile = (tenant as { product_profile?: string }).product_profile;
+  const productProfile: ProductProfile =
+    rawProfile === "fleet_intelligence" || rawProfile === "hybrid" || rawProfile === "cmms"
+      ? rawProfile
+      : "cmms";
   const companyRows = (companies ?? []) as Array<{ id: string; name: string; status: string | null }>;
   const memberRows = (memberships ?? []).map((row) => {
     const record = row as Record<string, unknown>;
@@ -80,6 +87,12 @@ export default async function PlatformTenantDetailPage({
         {(tenant as { slug?: string }).slug ? (
           <p className="text-xs text-[var(--muted)]">Slug: {(tenant as { slug: string }).slug}</p>
         ) : null}
+      </section>
+      <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+          Product profile
+        </h2>
+        <ProductProfileForm tenantId={tenantId} initialProfile={productProfile} />
       </section>
       <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
         <div className="mb-3 flex items-center justify-between gap-2">

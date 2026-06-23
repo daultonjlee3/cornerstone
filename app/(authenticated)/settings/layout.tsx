@@ -6,12 +6,14 @@ import {
   getCurrentUser,
   getTenantIdForUser,
   getMembershipRoleForUser,
+  getProductProfileForTenant,
   isDemoGuestUser,
   isPlatformSuperAdmin,
 } from "@/src/lib/auth-context";
+import type { ProductProfile } from "@/src/types/fleet";
 import { PageHeader } from "@/src/components/ui/page-header";
 
-const settingsNav = [
+const baseSettingsNav = [
   { label: "Company", href: "/settings/company" },
   { label: "Users", href: "/settings/users" },
   { label: "Roles & Permissions", href: "/settings/roles" },
@@ -47,6 +49,18 @@ export default async function SettingsLayout({
     role === "technician" ||
     role === "demo_guest";
   if (!canOpenSettings) redirect("/operations");
+
+  let productProfile: ProductProfile = "cmms";
+  if (tenantId) {
+    productProfile = await getProductProfileForTenant(tenantId, supabase);
+  }
+
+  const settingsNav = [
+    ...baseSettingsNav,
+    ...(productProfile === "fleet_intelligence" || productProfile === "hybrid"
+      ? [{ label: "Integrations" as const, href: "/settings/integrations" as const }]
+      : []),
+  ];
 
   return (
     <div className="space-y-6">

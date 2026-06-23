@@ -27,20 +27,26 @@ export default async function AuthenticatedLayout({
 
   // ── Phase 2: Resolve tenant membership ────────────────────────────────────
   // Super admins may have an acting-tenant override; normal users get their own.
-  let membership: { tenant_id: string; tenants: { name: string } | { name: string }[] | null } | null = null;
+  let membership: {
+    tenant_id: string;
+    tenants: { name: string; product_profile?: string } | { name: string; product_profile?: string }[] | null;
+  } | null = null;
 
   if (isSuperAdmin) {
     const actingTenantId = await getActingTenantIdFromCookie();
     if (actingTenantId) {
       const { data: tenant } = await supabase
         .from("tenants")
-        .select("id, name")
+        .select("id, name, product_profile")
         .eq("id", actingTenantId)
         .maybeSingle();
       if (tenant?.id) {
         membership = {
           tenant_id: tenant.id,
-          tenants: { name: (tenant as { name?: string }).name ?? "Tenant" },
+          tenants: {
+            name: (tenant as { name?: string }).name ?? "Tenant",
+            product_profile: (tenant as { product_profile?: string }).product_profile ?? "cmms",
+          },
         };
       }
     }
@@ -49,7 +55,7 @@ export default async function AuthenticatedLayout({
   if (!membership) {
     membership = await supabase
       .from("tenant_memberships")
-      .select("tenant_id, tenants(name)")
+      .select("tenant_id, tenants(name, product_profile)")
       .eq("user_id", effectiveUserId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -122,8 +128,14 @@ export default async function AuthenticatedLayout({
 
   const tenantData = (membership as { tenants?: { name: string }[] | { name: string } | null })
     ?.tenants;
-  const tenantName =
-    (Array.isArray(tenantData) ? tenantData[0]?.name : tenantData?.name) ?? "Organization";
+  const tenantRecord = Array.isArray(tenantData) ? tenantData[0] : tenantData;
+  const tenantName = tenantRecord?.name ?? "Organization";
+  const rawProfile = (tenantRecord as { product_profile?: string } | null | undefined)
+    ?.product_profile;
+  const productProfile =
+    rawProfile === "fleet_intelligence" || rawProfile === "hybrid" || rawProfile === "cmms"
+      ? rawProfile
+      : "cmms";
 
   const companyName = companyResult.data?.name ?? "—";
   const displayUser = displayUserResult?.data as { full_name?: string | null } | null;
@@ -150,6 +162,7 @@ export default async function AuthenticatedLayout({
       showPlatformAdmin={showPlatformAdmin}
       impersonationBanner={impersonationBanner}
       isDemoGuest={effectiveIsDemoGuest}
+      productProfile={productProfile}
     >
       {children}
     </Shell>

@@ -12,6 +12,7 @@ import {
   getEffectiveUserId as getEffectiveUserIdFromCookie,
 } from "@/src/lib/impersonation";
 import { getActingTenantIdFromCookie } from "@/src/lib/acting-tenant";
+import type { ProductProfile } from "@/src/types/fleet";
 
 export type TenantMembershipRole =
   | "owner"
@@ -32,6 +33,7 @@ export type AuthContext = {
   defaultCompanyId: string | null;
   membershipRole: TenantMembershipRole | null;
   isPlatformSuperAdmin: boolean;
+  productProfile: ProductProfile;
 };
 
 export async function getSupabaseClient(): Promise<Awaited<ReturnType<typeof createClient>>> {
@@ -265,6 +267,11 @@ export async function getAuthContext(
 
   if (!tenantId && !isPlatformSuperAdminFlag) throw new Error("No tenant membership.");
 
+  const resolvedTenantId = tenantId ?? "";
+  const resolvedProductProfile = resolvedTenantId
+    ? await getProductProfileForTenant(resolvedTenantId, client)
+    : ("cmms" as ProductProfile);
+
   const defaultCompanyId = companyIds[0] ?? null;
 
   return {
@@ -272,11 +279,12 @@ export async function getAuthContext(
     userId: user.id,
     effectiveUserId: resolvedEffective,
     isImpersonating: !!isImpersonating,
-    tenantId: tenantId ?? "",
+    tenantId: resolvedTenantId,
     companyIds,
     defaultCompanyId,
     membershipRole,
     isPlatformSuperAdmin: isPlatformSuperAdminFlag,
+    productProfile: resolvedProductProfile,
   };
 }
 
@@ -300,4 +308,22 @@ export async function canAccessCompany(
   const tenantId = await getTenantIdForUser(client);
   if (!tenantId) return false;
   return companyBelongsToTenant(companyId, tenantId, client);
+}
+
+/** Product profile for tenant UI gating (fleet vs CMMS). */
+export async function getProductProfileForTenant(
+  tenantId: string,
+  supabase?: Awaited<ReturnType<typeof createClient>>
+): Promise<ProductProfile> {
+  const client = supabase ?? (await getSupabaseClient());
+  const { data } = await client
+    .from("tenants")
+    .select("product_profile")
+    .eq("id", tenantId)
+    .maybeSingle();
+  const profile = (data as { product_profile?: string } | null)?.product_profile;
+  if (profile === "fleet_intelligence" || profile === "hybrid" || profile === "cmms") {
+    return profile;
+  }
+  return "cmms";
 }

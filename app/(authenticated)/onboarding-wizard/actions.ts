@@ -24,7 +24,12 @@ export type OnboardingImportDataset =
   | "technicians"
   | "pm_schedules"
   | "inventory"
-  | "vendors";
+  | "vendors"
+  | "fleet_branches"
+  | "fleet_customer_sites"
+  | "fleet_trucks"
+  | "fleet_operators"
+  | "fleet_jobs";
 
 export type OnboardingDatasetImportState = {
   error?: string;
@@ -750,6 +755,11 @@ export async function importOnboardingDatasetAction(
     return { error: "Invalid import payload." };
   }
   if (!Array.isArray(rows) || rows.length === 0) return { error: "No rows to import." };
+
+  if (dataset.startsWith("fleet_")) {
+    const { importFleetDatasetAction } = await import("./fleet-import-actions");
+    return importFleetDatasetAction(_prev, formData);
+  }
 
   let result: OnboardingDatasetImportState;
   if (dataset === "work_orders") {
