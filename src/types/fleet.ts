@@ -192,3 +192,113 @@ export type IntegrationSyncRun = {
   error_summary: string | null;
   metadata: Record<string, unknown>;
 };
+
+export type UtilizationDailyRow = {
+  id: string;
+  tenant_id: string;
+  truck_id: string;
+  branch_id: string;
+  date: string;
+  billable_hours: number;
+  idle_hours: number;
+  total_hours: number;
+  miles: number;
+  revenue: number;
+  deadhead_miles: number;
+  committed_hours: number;
+  refreshed_at: string;
+};
+
+export type BranchCapacitySnapshot = {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  date: string;
+  available_truck_hours: number;
+  committed_hours: number;
+  refreshed_at: string;
+};
+
+export type FleetCommandCenterData = {
+  activeTrucks: number;
+  idleTrucks: number;
+  jobsToday: number;
+  unassignedJobs: number;
+  utilizationPercent: number | null;
+  revenuePerTruckMtd: number | null;
+  truckCount: number;
+};
+
+export type FleetDispatchJob = {
+  id: string;
+  title: string;
+  status: FleetJobStatus;
+  priority: FleetJobPriority;
+  branch_id: string;
+  branch_name: string | null;
+  assigned_truck_id: string | null;
+  required_truck_type: string;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  revenue_estimate: number;
+  site_name: string | null;
+  site_latitude: number | null;
+  site_longitude: number | null;
+  estimated_deadhead_miles: number | null;
+  estimated_travel_minutes: number | null;
+};
+
+export type FleetDispatchTruckLane = {
+  truck_id: string;
+  unit_number: string;
+  truck_type: string;
+  branch_id: string;
+  status: TruckStatus;
+  committed_hours: number;
+  available_hours: number;
+  utilization: number;
+  jobs: FleetDispatchJob[];
+  latitude: number | null;
+  longitude: number | null;
+  telematics_status: TruckTelematicsStatus;
+};
+
+export type FleetDispatchBoardData = {
+  date: string;
+  jobs: FleetDispatchJob[];
+  unassignedJobs: FleetDispatchJob[];
+  truckLanes: FleetDispatchTruckLane[];
+  branchCapacity: Array<{
+    branch_id: string;
+    branch_name: string;
+    available_truck_hours: number;
+    committed_hours: number;
+    utilization: number;
+  }>;
+};
+
+export type FleetUtilizationReportRow = {
+  truck_id: string;
+  unit_number: string;
+  branch_name: string;
+  date: string;
+  billable_hours: number;
+  idle_hours: number;
+  total_hours: number;
+  miles: number;
+  revenue: number;
+  deadhead_miles: number;
+  utilization_percent: number | null;
+};
+
+export type FleetUtilizationReportData = {
+  from: string;
+  to: string;
+  rows: FleetUtilizationReportRow[];
+  weekOverWeek: Array<{ label: string; utilization_percent: number; revenue: number }>;
+  summary: {
+    totalRevenue: number;
+    avgUtilizationPercent: number | null;
+    totalDeadheadMiles: number;
+  };
+};

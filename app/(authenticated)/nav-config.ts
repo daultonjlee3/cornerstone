@@ -34,71 +34,86 @@ function isAdminItemEnabled(item: NavItem): boolean {
   return true;
 }
 
-const baseNavConfig: NavGroup[] = [
-  {
-    label: "Operations",
-    items: [
-      { label: "Operations Center", href: "/operations", icon: "LayoutGrid" },
-      { label: "Dispatch", href: "/dispatch", icon: "Truck" },
-      { label: "Work Orders", href: "/work-orders", icon: "ClipboardList" },
-      { label: "Work Requests", href: "/requests", icon: "Inbox" },
-      { label: "Request Portal", href: "/request", icon: "ExternalLink" },
-      { label: "Work Queue", href: "/technicians/work-queue", icon: "ListTodo" },
-      { label: "Technician Portal", href: "/portal", icon: "Smartphone" },
-      { label: "Asset Intelligence", href: "/assets/intelligence", icon: "Activity" },
-    ],
-  },
-  {
-    label: "Assets",
-    secondary: true,
-    items: [
-      { label: "Assets", href: "/assets", icon: "Box" },
-      { label: "Preventive Maintenance", href: "/preventive-maintenance", icon: "CalendarCheck" },
-      { label: "Properties", href: "/properties", icon: "MapPin" },
-      { label: "Buildings", href: "/buildings", icon: "Building2" },
-      { label: "Units", href: "/units", icon: "Layers" },
-    ],
-  },
-  {
-    label: "People",
-    secondary: true,
-    items: [
-      { label: "Technicians", href: "/technicians", icon: "Users" },
-      { label: "Crews", href: "/crews", icon: "UsersRound" },
-    ],
-  },
-  {
-    label: "Supply",
-    secondary: true,
-    items: [
-      { label: "Inventory", href: "/inventory", icon: "Warehouse" },
-      { label: "Products", href: "/products", icon: "Package" },
-      { label: "Vendors", href: "/vendors", icon: "Store" },
-      { label: "Purchase Orders", href: "/purchase-orders", icon: "ShoppingCart" },
-    ],
-  },
-  {
-    label: "Analytics",
-    secondary: true,
-    items: [
-      { label: "Reports", href: "/reports", icon: "BarChart2" },
-      { label: "Operations Intelligence", href: "/reports/operations", icon: "BarChart2" },
-    ],
-  },
-  {
-    label: "Admin",
-    secondary: true,
-    items: adminItems.filter(isAdminItemEnabled),
-  },
-  {
-    label: "Organization",
-    secondary: true,
-    items: [{ label: "Settings", href: "/settings", icon: "Settings" }],
-  },
-];
+const cmmsOperationsGroup: NavGroup = {
+  label: "Operations",
+  items: [
+    { label: "Operations Center", href: "/operations", icon: "LayoutGrid" },
+    { label: "Dispatch", href: "/dispatch", icon: "Truck" },
+    { label: "Work Orders", href: "/work-orders", icon: "ClipboardList" },
+    { label: "Work Requests", href: "/requests", icon: "Inbox" },
+    { label: "Request Portal", href: "/request", icon: "ExternalLink" },
+    { label: "Work Queue", href: "/technicians/work-queue", icon: "ListTodo" },
+    { label: "Technician Portal", href: "/portal", icon: "Smartphone" },
+    { label: "Asset Intelligence", href: "/assets/intelligence", icon: "Activity" },
+  ],
+};
+
+const fleetPrimaryOperationsGroup: NavGroup = {
+  label: "Fleet Operations",
+  items: [
+    { label: "Command Center", href: "/operations", icon: "LayoutGrid" },
+    { label: "Dispatch Board", href: "/dispatch", icon: "Truck" },
+    { label: "Utilization Report", href: "/reports/operations", icon: "BarChart2" },
+    { label: "Integrations", href: "/settings/integrations", icon: "Plug" },
+  ],
+};
+
+const assetsGroup: NavGroup = {
+  label: "Assets",
+  secondary: true,
+  items: [
+    { label: "Assets", href: "/assets", icon: "Box" },
+    { label: "Preventive Maintenance", href: "/preventive-maintenance", icon: "CalendarCheck" },
+    { label: "Properties", href: "/properties", icon: "MapPin" },
+    { label: "Buildings", href: "/buildings", icon: "Building2" },
+    { label: "Units", href: "/units", icon: "Layers" },
+  ],
+};
+
+const peopleGroup: NavGroup = {
+  label: "People",
+  secondary: true,
+  items: [
+    { label: "Technicians", href: "/technicians", icon: "Users" },
+    { label: "Crews", href: "/crews", icon: "UsersRound" },
+  ],
+};
+
+const supplyGroup: NavGroup = {
+  label: "Supply",
+  secondary: true,
+  items: [
+    { label: "Inventory", href: "/inventory", icon: "Warehouse" },
+    { label: "Products", href: "/products", icon: "Package" },
+    { label: "Vendors", href: "/vendors", icon: "Store" },
+    { label: "Purchase Orders", href: "/purchase-orders", icon: "ShoppingCart" },
+  ],
+};
+
+const analyticsGroup: NavGroup = {
+  label: "Analytics",
+  secondary: true,
+  items: [
+    { label: "Reports", href: "/reports", icon: "BarChart2" },
+    { label: "Operations Intelligence", href: "/reports/operations", icon: "BarChart2" },
+  ],
+};
+
+const adminGroup: NavGroup = {
+  label: "Admin",
+  secondary: true,
+  items: adminItems.filter(isAdminItemEnabled),
+};
+
+const organizationGroup: NavGroup = {
+  label: "Organization",
+  secondary: true,
+  items: [{ label: "Settings", href: "/settings", icon: "Settings" }],
+};
 
 const fleetNavGroup: NavGroup = {
-  label: "Fleet",
+  label: "Fleet Admin",
+  secondary: true,
   items: [
     { label: "Branches", href: "/branches", icon: "Warehouse" },
     { label: "Trucks", href: "/fleet/trucks", icon: "Package" },
@@ -108,13 +123,51 @@ const fleetNavGroup: NavGroup = {
   ],
 };
 
-export function getNavConfig(productProfile: ProductProfile = "cmms"): NavGroup[] {
-  const showFleet = productProfile === "fleet_intelligence" || productProfile === "hybrid";
-  if (!showFleet) return baseNavConfig;
+const baseNavConfig: NavGroup[] = [
+  cmmsOperationsGroup,
+  assetsGroup,
+  peopleGroup,
+  supplyGroup,
+  analyticsGroup,
+  adminGroup,
+  organizationGroup,
+];
 
-  const groups = [...baseNavConfig];
-  groups.splice(1, 0, fleetNavGroup);
-  return groups;
+function getFleetIntelligenceNavConfig(): NavGroup[] {
+  return [
+    fleetPrimaryOperationsGroup,
+    fleetNavGroup,
+    { ...assetsGroup, secondary: true },
+    { ...peopleGroup, secondary: true },
+    { ...supplyGroup, secondary: true },
+    { ...analyticsGroup, secondary: true },
+    { ...adminGroup, secondary: true },
+    organizationGroup,
+  ];
+}
+
+function getHybridNavConfig(): NavGroup[] {
+  return [
+    fleetPrimaryOperationsGroup,
+    { ...cmmsOperationsGroup, label: "CMMS Operations", secondary: true },
+    fleetNavGroup,
+    assetsGroup,
+    peopleGroup,
+    supplyGroup,
+    analyticsGroup,
+    adminGroup,
+    organizationGroup,
+  ];
+}
+
+export function getNavConfig(productProfile: ProductProfile = "cmms"): NavGroup[] {
+  if (productProfile === "fleet_intelligence") {
+    return getFleetIntelligenceNavConfig();
+  }
+  if (productProfile === "hybrid") {
+    return getHybridNavConfig();
+  }
+  return baseNavConfig;
 }
 
 /** @deprecated Use getNavConfig(productProfile) — kept for gradual migration */

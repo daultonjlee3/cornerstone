@@ -267,6 +267,7 @@ export async function assignTruckToJob(
     .eq("tenant_id", auth.tenantId);
   if (error) return { error: error.message };
   revalidatePath("/fleet/jobs");
+  revalidatePath("/dispatch");
   return { success: true };
 }
 

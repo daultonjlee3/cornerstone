@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/integrations/samsara-poll",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/fleet/refresh-marts",
+      "schedule": "0 2 * * *"
     }
   ]
 }

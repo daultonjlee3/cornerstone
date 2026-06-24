@@ -88,5 +88,12 @@ export async function finalizeIngestRun(
     });
   }
 
+  if (status === "success" || status === "partial") {
+    const { triggerMartRefreshAfterIngest } = await import(
+      "@/src/lib/fleet/marts/refresh-utilization-daily"
+    );
+    void triggerMartRefreshAfterIngest(supabase, input.tenantId);
+  }
+
   return status;
 }

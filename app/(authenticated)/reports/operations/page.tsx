@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BarChart3, CheckCircle, Clock, AlertTriangle, Percent } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, getProductProfileForTenant } from "@/src/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { MetricCard } from "@/src/components/ui/metric-card";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
@@ -13,11 +13,11 @@ import {
   loadOperationsIntelligenceData,
   type OperationsReportType,
 } from "@/src/lib/dashboard/operations-intelligence";
-
-export const metadata = {
-  title: "Operations Intelligence Reports | Cornerstone Tech",
-  description: "Reporting and analytics for maintenance operations",
-};
+import { isFleetProductProfile } from "../../nav-config";
+import { loadFleetUtilizationReport } from "@/src/lib/fleet/queries/utilization-report";
+import { listBranchesForTenant, listTrucksForTenant } from "@/src/lib/fleet/queries";
+import { FleetUtilizationReport } from "./components/fleet-utilization-report";
+import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat(undefined, {
@@ -89,7 +89,11 @@ function BarSeries({
   );
 }
 
-export default async function OperationsReportsPage() {
+export default async function OperationsReportsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams | Promise<SearchParams>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -98,6 +102,69 @@ export default async function OperationsReportsPage() {
 
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
+
+  const productProfile = await getProductProfileForTenant(tenantId, supabase);
+  const showFleetReport = isFleetProductProfile(productProfile);
+  const fleetOnly = productProfile === "fleet_intelligence";
+
+  const params = await resolveSearchParams(searchParams);
+  const from = typeof params?.from === "string" ? params.from : undefined;
+  const to = typeof params?.to === "string" ? params.to : undefined;
+  const branchId = typeof params?.branch_id === "string" ? params.branch_id : null;
+  const truckId = typeof params?.truck_id === "string" ? params.truck_id : null;
+
+  if (showFleetReport) {
+    const [utilizationData, branches, trucks] = await Promise.all([
+      loadFleetUtilizationReport(supabase, tenantId, { from, to, branchId, truckId }),
+      listBranchesForTenant(supabase, tenantId),
+      listTrucksForTenant(supabase, tenantId),
+    ]);
+
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={<BarChart3 className="size-5" />}
+          title="Truck Utilization & Revenue"
+          subtitle="Utilization by truck and branch with week-over-week trends from fleet marts."
+          meta={
+            <span>
+              Reporting window: {utilizationData.from} to {utilizationData.to}
+            </span>
+          }
+          actions={
+            <>
+              <Link href="/operations">
+                <Button variant="secondary">Command Center</Button>
+              </Link>
+              <Link href="/dispatch">
+                <Button variant="secondary">Dispatch Board</Button>
+              </Link>
+            </>
+          }
+        />
+        <FleetUtilizationReport
+          data={utilizationData}
+          branches={branches.map((b) => ({
+            id: (b as { id: string }).id,
+            name: (b as { name: string }).name,
+          }))}
+          trucks={trucks.map((t) => ({
+            id: (t as { id: string }).id,
+            unit_number: (t as { unit_number: string }).unit_number,
+          }))}
+          branchId={branchId}
+          truckId={truckId}
+        />
+        {!fleetOnly ? (
+          <p className="text-sm text-[var(--muted)]">
+            <Link href="/reports" className="text-[var(--accent)] hover:underline">
+              View CMMS maintenance reports →
+            </Link>
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   const { data: companies } = await supabase
     .from("companies")
@@ -136,9 +203,7 @@ export default async function OperationsReportsPage() {
         }
       />
 
-      <section
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      >
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="PM On-Time"
           value={intelligence.pmCompliance.completedOnTime}

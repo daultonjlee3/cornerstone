@@ -35,6 +35,7 @@ import {
   X,
   ListChecks,
   Container,
+  Plug,
   type LucideIcon,
 } from "lucide-react";
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
@@ -71,6 +72,7 @@ const iconMap: Record<string, LucideIcon> = {
   Receipt,
   Settings,
   Container,
+  Plug,
 };
 
 function getIcon(item: NavItem): LucideIcon | null {

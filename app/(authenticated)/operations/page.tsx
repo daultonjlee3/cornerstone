@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
+import { getTenantIdForUser, getProductProfileForTenant } from "@/src/lib/auth-context";
 import { loadOperationsDashboardData } from "@/src/lib/dashboard/operations";
 import { loadOperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -34,6 +34,10 @@ import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
+import { FleetCommandCenterSection } from "./components/fleet-command-center-section";
+import { FleetRecommendationsPlaceholder } from "./components/fleet-recommendations-placeholder";
+import { loadFleetCommandCenterData } from "@/src/lib/fleet/queries/command-center";
+import { isFleetProductProfile } from "../nav-config";
 
 export const metadata = {
   title: "Operations Center | Cornerstone Tech",
@@ -202,6 +206,14 @@ export default async function OperationsCenterPage() {
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
 
+  const productProfile = await getProductProfileForTenant(tenantId, supabase);
+  const showFleet = isFleetProductProfile(productProfile);
+  const fleetOnly = productProfile === "fleet_intelligence";
+
+  const fleetCommandCenter = showFleet
+    ? await loadFleetCommandCenterData(supabase, tenantId)
+    : null;
+
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
@@ -226,8 +238,12 @@ export default async function OperationsCenterPage() {
       <div className="space-y-8">
         <PageHeader
           icon={<LayoutGrid className="size-5" />}
-          title="Operations Command Center"
-          subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
+          title={fleetOnly ? "Fleet Command Center" : "Operations Command Center"}
+          subtitle={
+            fleetOnly
+              ? "Morning briefing — fleet utilization, idle trucks, and revenue signals."
+              : "Live operational intelligence across work orders, preventive maintenance, and technician execution."
+          }
           actions={
             <div className="flex items-center gap-2">
               <DashboardHeaderActions />
@@ -235,6 +251,14 @@ export default async function OperationsCenterPage() {
           }
         />
 
+        {showFleet && fleetCommandCenter ? (
+          <>
+            <FleetCommandCenterSection data={fleetCommandCenter} />
+            <FleetRecommendationsPlaceholder />
+          </>
+        ) : null}
+
+        {!fleetOnly ? (
         <div className="space-y-3">
           <div>
             <h2 className="text-lg font-semibold text-[var(--foreground)]">Daily Priority Plan</h2>
@@ -250,13 +274,18 @@ export default async function OperationsCenterPage() {
           </div>
           <OperationOptimizationWidget maxVisible={3} />
         </div>
+        ) : null}
 
+      {!fleetOnly ? (
       <DashboardHelperTips overdueWorkOrders={operations.kpis.overdueWorkOrders} />
+      ) : null}
 
-      {(noCompanies || hasNoVisibleActivity) && (
+      {!fleetOnly && (noCompanies || hasNoVisibleActivity) && (
         <DashboardSetupGuidance noCompanies={noCompanies} emptyButConfigured={hasNoVisibleActivity} />
       )}
 
+      {!fleetOnly ? (
+      <>
       <section>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard
@@ -568,6 +597,8 @@ export default async function OperationsCenterPage() {
           icon={Calendar}
         />
       </section>
+      </>
+      ) : null}
       </div>
     </div>
   );
