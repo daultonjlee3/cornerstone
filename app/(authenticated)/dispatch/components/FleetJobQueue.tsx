@@ -29,7 +29,9 @@ export function FleetJobQueue({
       </div>
       <ul className="flex-1 space-y-2 overflow-y-auto p-2">
         {jobs.length === 0 ? (
-          <li className="px-2 py-4 text-center text-xs text-[var(--muted)]">No unassigned jobs today.</li>
+          <li className="px-2 py-4 text-center text-xs text-[var(--muted)]">
+            No unassigned jobs in queue.
+          </li>
         ) : (
           jobs.map((job) => {
             const selected = selectedJobId === job.id;

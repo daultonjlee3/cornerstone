@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FleetDispatchBoardData, FleetDispatchJob } from "@/src/types/fleet";
 import { assignTruckToJob } from "../../fleet/actions";
 import { FleetJobQueue } from "./FleetJobQueue";
@@ -8,6 +9,13 @@ import { FleetTruckLanes } from "./FleetTruckLanes";
 import { FleetCapacityPanel } from "./FleetCapacityPanel";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { Button } from "@/src/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 type FleetDispatchViewProps = {
   initialBoard: FleetDispatchBoardData;
@@ -19,6 +27,17 @@ export function FleetDispatchView({ initialBoard, selectedDate }: FleetDispatchV
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const navigateDate = useCallback(
+    (date: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      next.set("date", date);
+      router.push(`/dispatch?${next.toString()}`);
+    },
+    [router, searchParams]
+  );
 
   const refreshBoard = useCallback(async () => {
     const res = await fetch(
@@ -73,7 +92,30 @@ export function FleetDispatchView({ initialBoard, selectedDate }: FleetDispatchV
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[var(--muted)]">{selectedDate}</span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            aria-label="Previous day"
+            onClick={() => navigateDate(shiftDate(selectedDate, -1))}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => navigateDate(e.target.value)}
+            className="rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-1 text-sm"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            aria-label="Next day"
+            onClick={() => navigateDate(shiftDate(selectedDate, 1))}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
           <Button type="button" variant="secondary" size="sm" onClick={() => void refreshBoard()} disabled={pending}>
             Refresh
           </Button>

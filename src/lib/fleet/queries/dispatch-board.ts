@@ -12,12 +12,14 @@ function truckCapacityHours(capacity: Record<string, unknown> | null | undefined
 }
 
 function mapJobRow(row: Record<string, unknown>, truckPoint?: { latitude: number | null; longitude: number | null }): FleetDispatchJob {
-  const site = row.customer_sites as {
+  const siteRaw = row.customer_sites;
+  const site = (Array.isArray(siteRaw) ? siteRaw[0] : siteRaw) as {
     name?: string;
     latitude?: number | null;
     longitude?: number | null;
   } | null;
-  const branches = row.branches as { name?: string } | null;
+  const branchRaw = row.branches;
+  const branches = (Array.isArray(branchRaw) ? branchRaw[0] : branchRaw) as { name?: string } | null;
 
   const job: FleetDispatchJob = {
     id: row.id as string,
@@ -52,34 +54,78 @@ function mapJobRow(row: Record<string, unknown>, truckPoint?: { latitude: number
   return job;
 }
 
+function mergeJobRows(
+  scheduled: Record<string, unknown>[],
+  backlog: Record<string, unknown>[]
+): Record<string, unknown>[] {
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const row of [...scheduled, ...backlog]) {
+    byId.set(row.id as string, row);
+  }
+  return [...byId.values()];
+}
+
+function isScheduledOnDate(
+  scheduledStart: string | null | undefined,
+  scheduledEnd: string | null | undefined,
+  date: string
+): boolean {
+  if (!scheduledStart) return false;
+  const dayStart = Date.parse(`${date}T00:00:00.000Z`);
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  const start = Date.parse(scheduledStart);
+  const end = scheduledEnd ? Date.parse(scheduledEnd) : start + 2 * 60 * 60 * 1000;
+  return start < dayEnd && end > dayStart;
+}
+
 export async function loadFleetDispatchBoardData(
   supabase: SupabaseClient,
   tenantId: string,
   date: string,
   branchId?: string | null
 ): Promise<FleetDispatchBoardData> {
-  const dayStart = `${date}T00:00:00.000Z`;
-  const dayEnd = `${date}T23:59:59.999Z`;
+  const jobSelect =
+    "id, title, status, priority, branch_id, assigned_truck_id, required_truck_type, scheduled_start, scheduled_end, revenue_estimate, customer_sites(name, latitude, longitude), branches(name)";
 
   let jobsQuery = supabase
     .from("fleet_jobs")
-    .select(
-      "id, title, status, priority, branch_id, assigned_truck_id, required_truck_type, scheduled_start, scheduled_end, revenue_estimate, customer_sites(name, latitude, longitude), branches(name)"
-    )
+    .select(jobSelect)
     .eq("tenant_id", tenantId)
-    .gte("scheduled_start", dayStart)
-    .lte("scheduled_start", dayEnd)
     .not("status", "eq", "cancelled")
-    .order("scheduled_start", { ascending: true });
+    .order("scheduled_start", { ascending: true, nullsFirst: false });
 
   if (branchId) jobsQuery = jobsQuery.eq("branch_id", branchId);
 
-  const { data: jobData, error: jobsError } = await jobsQuery;
+  const { data: allJobs, error: jobsError } = await jobsQuery;
   if (jobsError) throw new Error(jobsError.message);
+
+  const allJobRows = (allJobs ?? []) as Record<string, unknown>[];
+  const scheduledForDay = allJobRows.filter((row) =>
+    isScheduledOnDate(
+      row.scheduled_start as string | null,
+      row.scheduled_end as string | null,
+      date
+    )
+  );
+  const backlogRows = allJobRows.filter(
+    (row) =>
+      row.status === "unassigned" ||
+      row.assigned_truck_id == null ||
+      row.assigned_truck_id === ""
+  );
+  const assignedUnscheduled = allJobRows.filter(
+    (row) =>
+      row.assigned_truck_id &&
+      row.status !== "unassigned" &&
+      !row.scheduled_start
+  );
+  const rawJobs = mergeJobRows(scheduledForDay, [...backlogRows, ...assignedUnscheduled]);
 
   let trucksQuery = supabase
     .from("trucks")
-    .select("id, unit_number, truck_type, branch_id, status, capacity, home_latitude, home_longitude, last_telematics_at")
+    .select(
+      "id, unit_number, truck_type, branch_id, status, capacity, home_latitude, home_longitude, last_telematics_at, branches(name, latitude, longitude)"
+    )
     .eq("tenant_id", tenantId)
     .neq("status", "retired")
     .order("unit_number");
@@ -119,23 +165,28 @@ export async function loadFleetDispatchBoardData(
   const { data: capacityData, error: capacityError } = await capacityQuery;
   if (capacityError) throw new Error(capacityError.message);
 
-  const rawJobs = (jobData ?? []) as Record<string, unknown>[];
   const truckPoints = (truckData ?? []).map((truck) => {
     const t = truck as {
       id: string;
       home_latitude: number | null;
       home_longitude: number | null;
+      branches: { latitude?: number | null; longitude?: number | null } | Array<{ latitude?: number | null; longitude?: number | null }> | null;
     };
+    const branch = Array.isArray(t.branches) ? t.branches[0] : t.branches;
     const pos = positionByTruck.get(t.id);
     return {
       truck_id: t.id,
-      latitude: pos?.latitude ?? t.home_latitude,
-      longitude: pos?.longitude ?? t.home_longitude,
+      latitude: pos?.latitude ?? t.home_latitude ?? branch?.latitude ?? null,
+      longitude: pos?.longitude ?? t.home_longitude ?? branch?.longitude ?? null,
     };
   });
 
   function nearestTruckPoint(job: Record<string, unknown>) {
-    const site = job.customer_sites as { latitude?: number | null; longitude?: number | null } | null;
+    const siteRaw = job.customer_sites;
+    const site = (Array.isArray(siteRaw) ? siteRaw[0] : siteRaw) as {
+      latitude?: number | null;
+      longitude?: number | null;
+    } | null;
     if (!site?.latitude || !site?.longitude) return undefined;
     let best: { latitude: number; longitude: number } | undefined;
     let bestDist = Infinity;
@@ -165,7 +216,9 @@ export async function loadFleetDispatchBoardData(
     }
     return mapJobRow(row, truckPoint);
   });
-  const unassignedJobs = jobs.filter((j) => !j.assigned_truck_id || j.status === "unassigned");
+  const unassignedJobs = jobs.filter(
+    (j) => j.status === "unassigned" || !j.assigned_truck_id
+  );
 
   const truckLanes: FleetDispatchTruckLane[] = (truckData ?? []).map((truck) => {
     const t = truck as {
@@ -178,16 +231,25 @@ export async function loadFleetDispatchBoardData(
       home_latitude: number | null;
       home_longitude: number | null;
       last_telematics_at: string | null;
+      branches: { latitude?: number | null; longitude?: number | null } | Array<{ latitude?: number | null; longitude?: number | null }> | null;
     };
 
+    const branch = Array.isArray(t.branches) ? t.branches[0] : t.branches;
     const pos = positionByTruck.get(t.id);
     const truckPoint = {
-      latitude: pos?.latitude ?? t.home_latitude,
-      longitude: pos?.longitude ?? t.home_longitude,
+      latitude: pos?.latitude ?? t.home_latitude ?? branch?.latitude ?? null,
+      longitude: pos?.longitude ?? t.home_longitude ?? branch?.longitude ?? null,
     };
 
-    const assignedJobs = rawJobs
-      .filter((j) => j.assigned_truck_id === t.id)
+    const assignedJobs = allJobRows
+      .filter((j) => {
+        if (j.assigned_truck_id !== t.id) return false;
+        if (!j.assigned_truck_id || j.status === "unassigned") return false;
+        const start = j.scheduled_start as string | null;
+        const end = j.scheduled_end as string | null;
+        if (!start) return true;
+        return isScheduledOnDate(start, end, date) || j.status === "in_progress";
+      })
       .map((j) => mapJobRow(j, truckPoint));
 
     const available = truckCapacityHours(t.capacity);
