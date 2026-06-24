@@ -102,8 +102,8 @@ const fleetNavGroup: NavGroup = {
   items: [
     { label: "Branches", href: "/branches", icon: "Warehouse" },
     { label: "Trucks", href: "/fleet/trucks", icon: "Package" },
-    { label: "Jobs", href: "/fleet/jobs", icon: "ClipboardList" },
     { label: "Sites", href: "/fleet/sites", icon: "MapPin" },
+    { label: "Jobs", href: "/fleet/jobs", icon: "ClipboardList" },
     { label: "Operators", href: "/fleet/operators", icon: "Users" },
   ],
 };
