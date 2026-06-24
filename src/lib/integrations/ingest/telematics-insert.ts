@@ -21,6 +21,7 @@ export type TelematicsInsertResult = {
   processed: number;
   failed: number;
   errors: TelematicsInsertError[];
+  affectedDates: string[];
 };
 
 async function resolveTruckId(
@@ -147,6 +148,7 @@ export async function insertTelematicsBatch(
   const max = input.maxBatch ?? 100;
   const slice = input.events.slice(0, max);
   const errors: TelematicsInsertError[] = [];
+  const affectedDates = new Set<string>();
   let processed = 0;
 
   for (const event of slice) {
@@ -158,6 +160,14 @@ export async function insertTelematicsBatch(
     });
     if (result.ok) {
       processed += 1;
+      const dateOnly = event.recorded_at?.slice(0, 10);
+      if (
+        typeof dateOnly === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(dateOnly) &&
+        !Number.isNaN(Date.parse(`${dateOnly}T00:00:00.000Z`))
+      ) {
+        affectedDates.add(dateOnly);
+      }
     } else {
       errors.push({
         external_truck_id: event.external_truck_id ?? "unknown",
@@ -166,7 +176,12 @@ export async function insertTelematicsBatch(
     }
   }
 
-  return { processed, failed: errors.length, errors };
+  return {
+    processed,
+    failed: errors.length,
+    errors,
+    affectedDates: [...affectedDates].sort((a, b) => a.localeCompare(b)),
+  };
 }
 
 export function normalizeTelematicsWebhookBody(body: Record<string, unknown>): TelematicsWebhookEvent[] {

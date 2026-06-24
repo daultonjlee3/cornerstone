@@ -81,6 +81,7 @@ export async function runSamsaraFullSync(connectionId: string, tenantId: string)
         ...vehicleResult.unmapped.map((u) => ({ type: "unmapped_vehicle", ...u })),
         ...positionResult.errors,
       ],
+      affectedDates: positionResult.affectedDates,
     });
   } catch (error) {
     await finalizeIngestRun(supabase, {

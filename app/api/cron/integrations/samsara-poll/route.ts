@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pollAllSamsaraConnections } from "@/src/lib/integrations/connectors/samsara/run-sync";
+import { isAdminClientConfigError } from "@/src/lib/supabase/admin";
 
 export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET?.trim();
@@ -16,6 +17,13 @@ export async function POST(request: Request) {
     const result = await pollAllSamsaraConnections();
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    if (isAdminClientConfigError(error)) {
+      console.error("[samsara-poll] admin client misconfigured");
+      return NextResponse.json(
+        { error: "Service temporarily unavailable." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Cron failed" },
       { status: 500 }

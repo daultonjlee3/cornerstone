@@ -320,6 +320,13 @@ export function defaultMartRefreshDateRange(): { from: string; to: string } {
   };
 }
 
+function normalizeDateOnly(value: string): string | null {
+  const dateOnly = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
+  if (Number.isNaN(Date.parse(`${dateOnly}T00:00:00.000Z`))) return null;
+  return dateOnly;
+}
+
 /** Fire-and-forget mart refresh after ingest — errors are logged, not thrown. */
 export async function triggerMartRefreshAfterIngest(
   supabase: SupabaseClient,
@@ -327,12 +334,14 @@ export async function triggerMartRefreshAfterIngest(
   dates?: string[]
 ): Promise<void> {
   try {
-    const uniqueDates = dates?.length
-      ? [...new Set(dates.map((d) => d.slice(0, 10)))]
-      : null;
-    if (uniqueDates && uniqueDates.length > 0) {
-      const from = uniqueDates.sort()[0];
-      const to = uniqueDates.sort().at(-1) as string;
+    const normalizedDates = (dates ?? [])
+      .map((d) => normalizeDateOnly(d))
+      .filter((d): d is string => d !== null);
+    const uniqueDates = [...new Set(normalizedDates)];
+    if (uniqueDates.length > 0) {
+      const sortedDates = uniqueDates.sort((a, b) => a.localeCompare(b));
+      const from = sortedDates[0];
+      const to = sortedDates[sortedDates.length - 1];
       await refreshUtilizationDailyForTenant(supabase, tenantId, from, to);
     } else {
       const { from, to } = defaultMartRefreshDateRange();

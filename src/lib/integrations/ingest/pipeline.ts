@@ -46,6 +46,7 @@ export async function finalizeIngestRun(
     failed: number;
     errors?: Array<Record<string, unknown>>;
     errorSummary?: string | null;
+    affectedDates?: string[];
   }
 ): Promise<IntegrationSyncRunStatus> {
   const { finishSyncRun } = await import("@/src/lib/integrations/sync-runs");
@@ -92,7 +93,11 @@ export async function finalizeIngestRun(
     const { triggerMartRefreshAfterIngest } = await import(
       "@/src/lib/fleet/marts/refresh-utilization-daily"
     );
-    void triggerMartRefreshAfterIngest(supabase, input.tenantId);
+    void triggerMartRefreshAfterIngest(
+      supabase,
+      input.tenantId,
+      input.affectedDates
+    );
   }
 
   return status;

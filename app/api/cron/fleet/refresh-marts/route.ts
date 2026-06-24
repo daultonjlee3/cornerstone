@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/src/lib/supabase/admin";
+import {
+  createAdminClient,
+  isAdminClientConfigError,
+} from "@/src/lib/supabase/admin";
 import {
   defaultMartRefreshDateRange,
   refreshUtilizationDailyForAllTenants,
@@ -35,6 +38,13 @@ export async function POST(request: Request) {
       results,
     });
   } catch (error) {
+    if (isAdminClientConfigError(error)) {
+      console.error("[fleet-refresh-marts] admin client misconfigured");
+      return NextResponse.json(
+        { error: "Service temporarily unavailable." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Cron failed" },
       { status: 500 }
