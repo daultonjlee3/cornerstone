@@ -8,6 +8,7 @@ import { FleetJobQueue } from "./FleetJobQueue";
 import { FleetTruckLanes } from "./FleetTruckLanes";
 import { FleetCapacityPanel } from "./FleetCapacityPanel";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
+import { FleetDispatchRecommendationsPanel } from "./FleetDispatchRecommendationsPanel";
 import { Button } from "@/src/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
@@ -155,7 +156,14 @@ export function FleetDispatchView({ initialBoard, selectedDate }: FleetDispatchV
           />
         </div>
 
-        <FleetCapacityPanel branchCapacity={board.branchCapacity} truckLanes={board.truckLanes} />
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+          <FleetCapacityPanel branchCapacity={board.branchCapacity} truckLanes={board.truckLanes} />
+          <FleetDispatchRecommendationsPanel
+            selectedDate={selectedDate}
+            branchId={searchParams.get("branch_id")}
+            onRecommendationApplied={refreshBoard}
+          />
+        </div>
       </div>
     </div>
   );

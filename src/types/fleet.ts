@@ -302,3 +302,87 @@ export type FleetUtilizationReportData = {
     totalDeadheadMiles: number;
   };
 };
+
+export type FleetRecommendationType =
+  | "truck_assignment"
+  | "capacity_overload"
+  | "idle_truck_match";
+
+export type FleetRecommendationStatus =
+  | "pending"
+  | "accepted"
+  | "dismissed"
+  | "expired";
+
+export type FleetRecommendationOutcomeAction =
+  | "accepted"
+  | "dismissed"
+  | "expired";
+
+export type FleetRecommendationFactors = {
+  travelImpact: number;
+  utilizationImpact: number;
+  capacityImpact: number;
+  telematicsFreshness: number;
+};
+
+export type FleetRecommendationRationale = {
+  title: string;
+  reasons: string[];
+  factors: FleetRecommendationFactors;
+  entities: {
+    job_id?: string;
+    truck_id?: string;
+    source_branch_id?: string;
+    target_branch_id?: string;
+  };
+  candidates?: Array<{
+    truck_id: string;
+    unit_number: string;
+    score: number;
+  }>;
+};
+
+export type FleetRecommendationInstance = {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  recommendation_type: FleetRecommendationType;
+  status: FleetRecommendationStatus;
+  score: number;
+  rationale: FleetRecommendationRationale;
+  engine_version: string;
+  created_at: string;
+  expires_at: string;
+};
+
+export type FleetRecommendationOutcome = {
+  id: string;
+  recommendation_id: string;
+  action: FleetRecommendationOutcomeAction;
+  acted_by: string | null;
+  acted_at: string;
+  estimated_impact: Record<string, unknown>;
+  notes: string | null;
+};
+
+export type FleetRecommendationHistoryEntry = FleetRecommendationInstance & {
+  latest_outcome: FleetRecommendationOutcome | null;
+};
+
+export type FleetRecommendationSummary = {
+  volume: number;
+  accepted: number;
+  dismissed: number;
+  expired: number;
+  acceptanceRate: number | null;
+  dismissalRate: number | null;
+};
+
+export type FleetRecommendationsResponse = {
+  generatedAt: string;
+  engineVersion: string;
+  pending: FleetRecommendationInstance[];
+  history: FleetRecommendationHistoryEntry[];
+  summary: FleetRecommendationSummary;
+};
