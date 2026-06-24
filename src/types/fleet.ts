@@ -70,6 +70,12 @@ export type CustomerSite = {
   updated_at: string;
 };
 
+export type TelematicsEventSource =
+  | "samsara"
+  | "webhook_telematics"
+  | "csv_manual"
+  | "backfill";
+
 export type Truck = {
   id: string;
   branch_id: string;
@@ -84,9 +90,43 @@ export type Truck = {
   home_longitude: number | null;
   external_asset_id: string | null;
   notes: string | null;
+  last_telematics_at: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type TelematicsEvent = {
+  id: string;
+  tenant_id: string;
+  truck_id: string;
+  connection_id: string | null;
+  recorded_at: string;
+  latitude: number;
+  longitude: number;
+  speed_mph: number | null;
+  odometer_miles: number | null;
+  engine_on: boolean | null;
+  idle: boolean | null;
+  heading_deg: number | null;
+  source: TelematicsEventSource;
+  external_event_id: string | null;
+  raw_payload: Record<string, unknown>;
+  ingested_at: string;
+};
+
+export type TruckLatestPosition = {
+  truck_id: string;
+  tenant_id: string;
+  recorded_at: string;
+  latitude: number;
+  longitude: number;
+  speed_mph: number | null;
+  engine_on: boolean | null;
+  idle: boolean | null;
+  source: TelematicsEventSource;
+};
+
+export type TruckTelematicsStatus = "online" | "stale" | "offline";
 
 export type FleetOperator = {
   id: string;

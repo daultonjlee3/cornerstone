@@ -6,6 +6,17 @@ export async function startSyncRun(
   connectionId: string,
   tenantId: string
 ): Promise<IntegrationSyncRun> {
+  const { data: connection } = await supabase
+    .from("integration_connections")
+    .select("id")
+    .eq("id", connectionId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (!connection) {
+    throw new Error("Invalid connection for tenant.");
+  }
+
   const { data, error } = await supabase
     .from("integration_sync_runs")
     .insert({

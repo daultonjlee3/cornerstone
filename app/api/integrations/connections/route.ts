@@ -43,6 +43,33 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as Record<string, unknown>;
+  const action = String(body.action ?? "upsert").trim();
+
+  if (action === "create_webhook") {
+    const provider = String(body.provider ?? "").trim();
+    if (provider !== "webhook_jobs" && provider !== "webhook_telematics") {
+      return NextResponse.json({ error: "Invalid webhook provider" }, { status: 400 });
+    }
+    const { createWebhookConnection } = await import("@/src/lib/integrations/connections");
+    const { connection, webhookSecret } = await createWebhookConnection(supabase, {
+      tenantId: auth.tenantId,
+      provider,
+      displayName: body.display_name != null ? String(body.display_name) : null,
+      config: (body.config as Record<string, unknown>) ?? {},
+      userId: auth.userId,
+    });
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
+    const webhookPath =
+      provider === "webhook_jobs"
+        ? "/api/integrations/webhooks/jobs"
+        : "/api/integrations/webhooks/telematics";
+    return NextResponse.json({
+      connection,
+      webhook_secret: webhookSecret,
+      webhook_url: `${baseUrl}${webhookPath}?connection=${connection.id}`,
+    });
+  }
+
   const provider = String(body.provider ?? "").trim();
   const displayName = body.display_name != null ? String(body.display_name) : null;
   const status = body.status != null ? String(body.status) : "pending";

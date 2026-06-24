@@ -28,6 +28,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   "purchase_order.approved",
   "purchase_order.received",
   "inventory.low_stock",
+  "integration.sync_failed",
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -42,6 +43,7 @@ export const NOTIFICATION_CATEGORIES = [
   "purchase_orders",
   "inventory",
   "portal_requests",
+  "integrations",
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -66,5 +68,6 @@ export function eventTypeToCategory(eventType: string): NotificationCategory {
   if (eventType.startsWith("purchase_order.")) return "purchase_orders";
   if (eventType.startsWith("inventory.")) return "inventory";
   if (eventType.startsWith("work_request.")) return "portal_requests";
+  if (eventType.startsWith("integration.")) return "integrations";
   return "work_orders";
 }

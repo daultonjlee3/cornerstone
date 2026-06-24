@@ -22,6 +22,8 @@ import {
 type JobRow = FleetJob & {
   branch_name?: string | null;
   site_name?: string | null;
+  external_source_id?: string | null;
+  job_source?: string;
 };
 
 type JobsListProps = {
@@ -141,6 +143,8 @@ export function JobsList({
           <Table className="min-w-[700px]">
             <TableHead>
               <Th>Title</Th>
+              <Th>Source</Th>
+              <Th>External ID</Th>
               <Th>Branch</Th>
               <Th>Site</Th>
               <Th>Status</Th>
@@ -151,6 +155,10 @@ export function JobsList({
               {initialJobs.map((j) => (
                 <Tr key={j.id}>
                   <Td>{j.title}</Td>
+                  <Td className="text-[var(--muted)] text-sm">{j.job_source ?? "Manual"}</Td>
+                  <Td className="text-[var(--muted)] text-sm font-mono text-xs">
+                    {j.external_source_id ?? "—"}
+                  </Td>
                   <Td className="text-[var(--muted)]">{j.branch_name ?? "—"}</Td>
                   <Td className="text-[var(--muted)]">{j.site_name ?? "—"}</Td>
                   <Td>

@@ -30,15 +30,21 @@ export async function resolveExternalMapping(
   supabase: SupabaseClient,
   connectionId: string,
   entityType: ExternalEntityType,
-  externalId: string
+  externalId: string,
+  tenantId?: string
 ): Promise<string | null> {
-  const { data } = await supabase
+  let query = supabase
     .from("external_entity_mappings")
     .select("internal_id")
     .eq("connection_id", connectionId)
     .eq("entity_type", entityType)
-    .eq("external_id", externalId)
-    .maybeSingle();
+    .eq("external_id", externalId);
+
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+
+  const { data } = await query.maybeSingle();
 
   return (data as { internal_id?: string } | null)?.internal_id ?? null;
 }

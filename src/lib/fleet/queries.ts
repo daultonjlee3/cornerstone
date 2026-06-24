@@ -49,3 +49,46 @@ export async function listFleetOperatorsForTenant(supabase: SupabaseClient, tena
   if (error) throw new Error(error.message);
   return data ?? [];
 }
+
+const DEFAULT_ONLINE_THRESHOLD_MS = 10 * 60 * 1000;
+
+export function computeTelematicsStatus(
+  lastTelematicsAt: string | null | undefined,
+  thresholdMs = DEFAULT_ONLINE_THRESHOLD_MS
+): "online" | "stale" | "offline" {
+  if (!lastTelematicsAt) return "offline";
+  const age = Date.now() - Date.parse(lastTelematicsAt);
+  if (Number.isNaN(age)) return "offline";
+  if (age <= thresholdMs) return "online";
+  if (age <= thresholdMs * 3) return "stale";
+  return "offline";
+}
+
+export async function listTruckLatestPositions(
+  supabase: SupabaseClient,
+  tenantId: string
+): Promise<
+  Array<{
+    truck_id: string;
+    recorded_at: string;
+    latitude: number;
+    longitude: number;
+    speed_mph: number | null;
+    source: string;
+  }>
+> {
+  const { data, error } = await supabase
+    .from("truck_latest_position")
+    .select("truck_id, recorded_at, latitude, longitude, speed_mph, source")
+    .eq("tenant_id", tenantId);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Array<{
+    truck_id: string;
+    recorded_at: string;
+    latitude: number;
+    longitude: number;
+    speed_mph: number | null;
+    source: string;
+  }>;
+}

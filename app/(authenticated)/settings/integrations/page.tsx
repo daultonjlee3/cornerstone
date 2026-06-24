@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Plug } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -34,7 +35,9 @@ export default async function IntegrationsSettingsPage() {
         title="Integration Control Plane"
         subtitle="Monitor connections, sync runs, and fleet data imports."
       />
-      <IntegrationsClient />
+      <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading integrations…</p>}>
+        <IntegrationsClient />
+      </Suspense>
     </div>
   );
 }

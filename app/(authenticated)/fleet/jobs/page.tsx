@@ -37,7 +37,7 @@ export default async function JobsPage({
       supabase
         .from("fleet_jobs")
         .select(
-          "id, branch_id, customer_site_id, title, description, status, priority, scheduled_start, scheduled_end, revenue_estimate, required_truck_type, assigned_truck_id, branches(name), customer_sites(name)",
+          "id, branch_id, customer_site_id, title, description, status, priority, scheduled_start, scheduled_end, revenue_estimate, required_truck_type, assigned_truck_id, external_source_id, branches(name), customer_sites(name)",
           { count: "exact" }
         )
         .eq("tenant_id", tenantId)
@@ -72,6 +72,9 @@ export default async function JobsPage({
       required_truck_type: String(record.required_truck_type),
       assigned_truck_id:
         record.assigned_truck_id == null ? null : String(record.assigned_truck_id),
+      external_source_id:
+        record.external_source_id == null ? null : String(record.external_source_id),
+      job_source: record.external_source_id ? "Webhook" : "Manual",
       branch_name: branchRecord?.name ?? null,
       site_name: siteRecord?.name ?? null,
     };

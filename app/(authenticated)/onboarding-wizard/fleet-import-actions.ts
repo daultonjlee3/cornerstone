@@ -29,43 +29,30 @@ async function resolveFleetImportScope(
   companyIdFromForm?: string | null
 ): Promise<FleetImportScope | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { getAuthContext, companyBelongsToTenant } = await import("@/src/lib/auth-context");
 
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership?.tenant_id) return null;
+  let auth;
+  try {
+    auth = await getAuthContext(supabase);
+  } catch {
+    return null;
+  }
+
+  if (!auth.tenantId) return null;
 
   let companyId = companyIdFromForm?.trim() || "";
   if (companyId) {
-    const { data: company } = await supabase
-      .from("companies")
-      .select("id")
-      .eq("id", companyId)
-      .eq("tenant_id", membership.tenant_id)
-      .maybeSingle();
-    if (!company) return null;
+    if (!(await companyBelongsToTenant(companyId, auth.tenantId, supabase))) {
+      return null;
+    }
   } else {
-    const { data: company } = await supabase
-      .from("companies")
-      .select("id")
-      .eq("tenant_id", membership.tenant_id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (!company?.id) return null;
-    companyId = company.id;
+    companyId = auth.defaultCompanyId ?? auth.companyIds[0] ?? "";
+    if (!companyId) return null;
   }
 
   return {
-    userId: user.id,
-    tenantId: membership.tenant_id,
+    userId: auth.userId,
+    tenantId: auth.tenantId,
     companyId,
     supabase,
   };
@@ -545,7 +532,8 @@ export async function importFleetDatasetAction(
       await scope.supabase
         .from("integration_connections")
         .update({ last_sync_at: new Date().toISOString(), last_error: null, status: "active" })
-        .eq("id", connectionId);
+        .eq("id", connectionId)
+        .eq("tenant_id", scope.tenantId);
 
       return importResult;
     });

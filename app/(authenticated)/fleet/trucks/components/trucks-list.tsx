@@ -19,7 +19,13 @@ import {
   Td,
 } from "@/src/components/ui/data-table";
 
-type TruckRow = Truck & { branch_name?: string | null };
+type TruckRow = Truck & {
+  branch_name?: string | null;
+  last_telematics_at?: string | null;
+  telematics_status?: "online" | "stale" | "offline";
+  latest_latitude?: number | null;
+  latest_longitude?: number | null;
+};
 
 type TrucksListProps = {
   trucks: TruckRow[];
@@ -29,6 +35,24 @@ type TrucksListProps = {
   page?: number;
   pageSize?: number;
 };
+
+function formatRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = Date.parse(iso);
+  if (Number.isNaN(d)) return "—";
+  const mins = Math.round((Date.now() - d) / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 48) return `${hrs}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+const TELEMATICS_LABELS = {
+  online: "Online",
+  stale: "Stale",
+  offline: "Offline",
+} as const;
 
 function buildParams(searchParams: URLSearchParams, updates: Record<string, string>): string {
   const next = new URLSearchParams(searchParams.toString());
@@ -132,6 +156,8 @@ export function TrucksList({
               <Th>Unit #</Th>
               <Th>Type</Th>
               <Th>Branch</Th>
+              <Th>GPS</Th>
+              <Th>Last GPS</Th>
               <Th>Status</Th>
               <Th className="w-24">Actions</Th>
             </TableHead>
@@ -141,6 +167,29 @@ export function TrucksList({
                   <Td>{t.unit_number}</Td>
                   <Td className="text-[var(--muted)]">{t.truck_type}</Td>
                   <Td className="text-[var(--muted)]">{t.branch_name ?? "—"}</Td>
+                  <Td>
+                    <span
+                      className={
+                        t.telematics_status === "online"
+                          ? "text-emerald-600 dark:text-emerald-400 text-sm"
+                          : t.telematics_status === "stale"
+                            ? "text-amber-600 dark:text-amber-400 text-sm"
+                            : "text-[var(--muted)] text-sm"
+                      }
+                      title={
+                        t.latest_latitude != null && t.latest_longitude != null
+                          ? `${t.latest_latitude.toFixed(4)}, ${t.latest_longitude.toFixed(4)}`
+                          : undefined
+                      }
+                    >
+                      {t.telematics_status
+                        ? TELEMATICS_LABELS[t.telematics_status]
+                        : "Offline"}
+                    </span>
+                  </Td>
+                  <Td className="text-[var(--muted)] text-sm">
+                    {formatRelativeTime(t.last_telematics_at)}
+                  </Td>
                   <Td>
                     <StatusBadge status={t.status} />
                   </Td>
