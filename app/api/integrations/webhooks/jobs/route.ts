@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/src/lib/supabase/admin";
+import {
+  createAdminClient,
+  isAdminClientConfigError,
+} from "@/src/lib/supabase/admin";
 import {
   extractWebhookSecret,
   resolveWebhookConnection,
@@ -16,7 +19,19 @@ export async function POST(request: Request) {
   const connectionId = url.searchParams.get("connection")?.trim() ?? "";
   const secret = extractWebhookSecret(request);
 
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    if (isAdminClientConfigError(error)) {
+      console.error("[fleet-webhook-jobs] admin client misconfigured");
+      return NextResponse.json(
+        { error: "Service temporarily unavailable." },
+        { status: 503 }
+      );
+    }
+    throw error;
+  }
   const connection = await resolveWebhookConnection(admin, connectionId, secret);
 
   if (!connection || connection.provider !== "webhook_jobs") {
@@ -52,6 +67,7 @@ export async function POST(request: Request) {
     processed: result.processed,
     failed: result.failed,
     errors: result.errors,
+    affectedDates: result.affectedDates,
   });
 
   const httpStatus = status === "failed" ? 422 : 200;

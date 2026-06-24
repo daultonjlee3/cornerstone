@@ -27,7 +27,17 @@ export type JobUpsertResult = {
   processed: number;
   failed: number;
   errors: JobUpsertError[];
+  affectedDates: string[];
 };
+
+function toDateOnly(value: string | null | undefined): string | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  const dateOnly = raw.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
+  if (Number.isNaN(Date.parse(`${dateOnly}T00:00:00.000Z`))) return null;
+  return dateOnly;
+}
 
 async function resolveCompanyId(
   supabase: SupabaseClient,
@@ -153,7 +163,10 @@ export async function upsertJobFromWebhook(
     connectionConfig: Record<string, unknown>;
     job: JobWebhookPayload;
   }
-): Promise<{ ok: true; jobId: string } | { ok: false; reason: string }> {
+): Promise<
+  | { ok: true; jobId: string; affectedDates: string[] }
+  | { ok: false; reason: string }
+> {
   const { tenantId, connectionId, connectionConfig, job } = input;
 
   const externalId = job.external_id?.trim();
@@ -255,7 +268,17 @@ export async function upsertJobFromWebhook(
     internalId: jobId,
   });
 
-  return { ok: true, jobId };
+  const affectedDates = new Set<string>();
+  const startDate = toDateOnly(job.scheduled_start);
+  const endDate = toDateOnly(job.scheduled_end);
+  if (startDate) affectedDates.add(startDate);
+  if (endDate) affectedDates.add(endDate);
+
+  return {
+    ok: true,
+    jobId,
+    affectedDates: [...affectedDates].sort((a, b) => a.localeCompare(b)),
+  };
 }
 
 export async function upsertJobsBatch(
@@ -268,12 +291,14 @@ export async function upsertJobsBatch(
   }
 ): Promise<JobUpsertResult> {
   const errors: JobUpsertError[] = [];
+  const affectedDates = new Set<string>();
   let processed = 0;
 
   for (const job of input.jobs) {
     const result = await upsertJobFromWebhook(supabase, { ...input, job });
     if (result.ok) {
       processed += 1;
+      for (const date of result.affectedDates) affectedDates.add(date);
     } else {
       errors.push({
         external_id: job.external_id ?? "unknown",
@@ -282,7 +307,12 @@ export async function upsertJobsBatch(
     }
   }
 
-  return { processed, failed: errors.length, errors };
+  return {
+    processed,
+    failed: errors.length,
+    errors,
+    affectedDates: [...affectedDates].sort((a, b) => a.localeCompare(b)),
+  };
 }
 
 export function normalizeJobWebhookBody(body: Record<string, unknown>): JobWebhookPayload[] {

@@ -3,6 +3,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getAuthContext } from "@/src/lib/auth-context";
 import { can } from "@/src/lib/permissions";
 import { runSamsaraFullSync } from "@/src/lib/integrations/connectors/samsara/run-sync";
+import { isAdminClientConfigError } from "@/src/lib/supabase/admin";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -41,6 +42,13 @@ export async function POST(request: Request) {
     await runSamsaraFullSync(connectionId, auth.tenantId);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (isAdminClientConfigError(error)) {
+      console.error("[samsara-sync] admin client misconfigured");
+      return NextResponse.json(
+        { error: "Service temporarily unavailable." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Sync failed" },
       { status: 500 }

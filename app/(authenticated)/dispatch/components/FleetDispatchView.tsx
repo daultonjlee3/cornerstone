@@ -10,6 +10,7 @@ import { FleetCapacityPanel } from "./FleetCapacityPanel";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { Button } from "@/src/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -40,13 +41,13 @@ export function FleetDispatchView({ initialBoard, selectedDate }: FleetDispatchV
   );
 
   const refreshBoard = useCallback(async () => {
-    const res = await fetch(
-      `/api/fleet/dispatch-board?date=${encodeURIComponent(selectedDate)}`
-    );
+    const branchId = searchParams.get("branch_id");
+    const query = buildFleetDispatchBoardQuery(selectedDate, branchId);
+    const res = await fetch(`/api/fleet/dispatch-board?${query}`);
     if (!res.ok) return;
     const data = (await res.json()) as FleetDispatchBoardData;
     setBoard(data);
-  }, [selectedDate]);
+  }, [searchParams, selectedDate]);
 
   const handleAssign = useCallback(
     (jobId: string, truckId: string) => {
