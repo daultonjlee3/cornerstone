@@ -123,8 +123,14 @@ function buildTruckAssignmentRecommendations(
     if (byPriority !== 0) return byPriority;
     return a.id.localeCompare(b.id);
   });
+  const highPriorityJobs = sortedJobs.filter((job) => {
+    const p = priorityWeight(job.priority);
+    return p >= 0.8;
+  });
+  const jobsForDirectAssignment =
+    highPriorityJobs.length > 0 ? highPriorityJobs : sortedJobs.slice(0, 3);
 
-  for (const job of sortedJobs.slice(0, MAX_TRUCK_ASSIGNMENT)) {
+  for (const job of jobsForDirectAssignment.slice(0, MAX_TRUCK_ASSIGNMENT)) {
     const estimatedHours = parseJobHours(job);
     const eligibleLanes = board.truckLanes.filter((lane) => {
       if (lane.status !== "active") return false;
