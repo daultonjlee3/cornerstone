@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
-import type { FleetSeverity } from "@/src/lib/fleet/ui/severity";
-import { fleetChipClass, fleetDotClass } from "@/src/lib/fleet/ui/severity";
+import { EmptyState, StatusChip } from "@/src/components/design-system";
+import { fleetLegacySeverityToTone } from "@/src/components/design-system/chip-maps";
+import type { ChipTone } from "@/src/components/design-system/types";
+
+/** @deprecated Use ChipTone from design-system */
+export type FleetSeverity = "critical" | "warning" | "success" | "info" | "neutral" | "accent";
 
 type FleetStatusChipProps = {
   label: string;
@@ -15,12 +19,8 @@ export function FleetStatusChip({
   showDot = true,
   className = "",
 }: FleetStatusChipProps) {
-  return (
-    <span className={`${fleetChipClass(severity)} ${className}`}>
-      {showDot ? <span className={fleetDotClass(severity)} aria-hidden /> : null}
-      {label}
-    </span>
-  );
+  const tone: ChipTone = fleetLegacySeverityToTone(severity);
+  return <StatusChip label={label} tone={tone} showDot={showDot} className={className} />;
 }
 
 type FleetEmptyStateProps = {
@@ -30,13 +30,7 @@ type FleetEmptyStateProps = {
   action?: ReactNode;
 };
 
-export function FleetEmptyState({ icon, title, description, action }: FleetEmptyStateProps) {
-  return (
-    <div className="fleet-empty">
-      {icon ? <div className="text-[var(--muted)]">{icon}</div> : null}
-      <p className="font-medium text-[var(--foreground)]">{title}</p>
-      {description ? <p className="max-w-sm text-sm">{description}</p> : null}
-      {action ? <div className="mt-2">{action}</div> : null}
-    </div>
-  );
+/** @deprecated Use EmptyState from design-system. */
+export function FleetEmptyState(props: FleetEmptyStateProps) {
+  return <EmptyState {...props} />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -10,36 +10,71 @@ import {
   Clock,
   DollarSign,
   Percent,
+  Radio,
+  Route,
   Sparkles,
-  TrendingDown,
-  TrendingUp,
-  Minus,
   Truck,
+  Users,
 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import {
+  DataTable,
+  Table,
+  TableHead,
+  Th,
+  TBody,
+  Tr,
+  Td,
+} from "@/src/components/ui/data-table";
+import type { ChipTone } from "@/src/components/design-system/types";
+import {
+  EmptyState,
+  HeroPanel,
+  KpiCard,
+  PageLayout,
+  PageSection,
+  Panel,
+  SectionHeader,
+  StatusChip,
+} from "@/src/components/design-system";
+import { fleetLegacySeverityToTone } from "@/src/components/design-system/chip-maps";
 import type {
   FleetMetricDelta,
   FleetOperationalException,
+  FleetRecommendationHistoryEntry,
+  FleetRecommendationInstance,
   FleetTodayViewData,
 } from "@/src/types/fleet";
+import { formatFleetCurrency, formatDataFreshness } from "@/src/lib/fleet/ui/format";
+import { severityToFleetSeverity } from "@/src/lib/fleet/ui/severity";
 import {
-  FleetEmptyState,
-  FleetKpi,
-  FleetPanel,
-  FleetRecommendationCard,
-  FleetSectionHeader,
-  FleetStatusChip,
-} from "@/src/components/fleet/ui";
-import { formatFleetCurrency } from "@/src/lib/fleet/ui/format";
-import {
-  fleetPanelSeverityClass,
-  severityToFleetSeverity,
-} from "@/src/lib/fleet/ui/severity";
+  confidenceLabel,
+  formatRecommendationType,
+  recommendationConfidence,
+  type RecommendationConfidence,
+} from "./fleet-recommendation-utils";
 
 type FleetTodayViewProps = {
   initialData: FleetTodayViewData;
 };
+
+function shiftGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function confidenceTone(confidence: RecommendationConfidence): ChipTone {
+  switch (confidence) {
+    case "high":
+      return "success";
+    case "medium":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
 
 function formatDeltaValue(delta: FleetMetricDelta): string {
   const { today, format } = delta;
@@ -56,13 +91,6 @@ function formatDeltaValue(delta: FleetMetricDelta): string {
     default:
       return String(Math.round(today));
   }
-}
-
-function DeltaIcon({ direction }: { direction: FleetMetricDelta["direction"] }) {
-  if (direction === "improved") return <TrendingUp className="size-3.5 text-[var(--success)]" />;
-  if (direction === "declined") return <TrendingDown className="size-3.5 text-[var(--danger)]" />;
-  if (direction === "unchanged") return <Minus className="size-3.5 text-[var(--muted)]" />;
-  return null;
 }
 
 export function FleetTodayView({ initialData }: FleetTodayViewProps) {
@@ -98,472 +126,731 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
   );
 
   const cc = data.commandCenter;
+  const insights = data.executiveInsights;
   const criticalCount = data.exceptions.filter((e) => e.severity === "critical").length;
   const primaryRec = data.recommendations.pending[0];
   const secondaryRecs = data.recommendations.pending.slice(1);
+  const recentHistory = data.recommendations.history.slice(0, 6);
+
+  const contributionProtected = useMemo(() => {
+    if (primaryRec?.rationale.candidate_snapshots?.[0]?.estimated_contribution != null) {
+      return primaryRec.rationale.candidate_snapshots[0].estimated_contribution;
+    }
+    return insights?.contributionAtRisk ?? cc.contributionAtRisk ?? data.revenueAtRisk;
+  }, [primaryRec, insights, cc.contributionAtRisk, data.revenueAtRisk]);
+
+  const jobsAtRisk = cc.unassignedJobs;
+  const acceptanceRate =
+    data.recommendationRoi?.acceptanceRate ?? data.recommendations.summary.acceptanceRate;
+
+  const hero = (
+    <HeroPanel id="fleet-command-hero" className="space-y-6">
+      {/* Briefing header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="cs-text-eyebrow">Operational briefing</p>
+          <h1 className="cs-text-display">{shiftGreeting()}</h1>
+          <p className="cs-text-body cs-text-muted max-w-3xl">{data.executiveSummary}</p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <span className="cs-text-caption cs-text-muted">{data.date}</span>
+          <span className="inline-flex items-center gap-1.5 cs-text-caption cs-text-muted">
+            <Radio className="size-3.5 text-[var(--brand-operational)]" strokeWidth={2} aria-hidden />
+            Data {formatDataFreshness(data.recommendations.generatedAt)}
+          </span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()} disabled={pending}>
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Operational health */}
+      <div className="flex flex-wrap gap-2">
+        <StatusChip
+          label={data.pendingActionCount > 0 ? `${data.pendingActionCount} need attention` : "Operations nominal"}
+          tone={data.pendingActionCount > 0 ? "warning" : "success"}
+        />
+        {criticalCount > 0 ? (
+          <StatusChip label={`${criticalCount} critical`} tone="danger" />
+        ) : null}
+        <StatusChip
+          label={`${cc.activeTrucks} trucks live`}
+          tone="operational"
+        />
+        <StatusChip
+          label={jobsAtRisk > 0 ? `${jobsAtRisk} jobs at risk` : "No jobs at risk"}
+          tone={jobsAtRisk > 0 ? "danger" : "success"}
+        />
+        {data.integrationHealth.map((conn) => (
+          <StatusChip
+            key={conn.id}
+            label={conn.displayName}
+            tone={
+              conn.status === "healthy"
+                ? "success"
+                : conn.status === "error"
+                  ? "danger"
+                  : "warning"
+            }
+          />
+        ))}
+      </div>
+
+      {/* Hero metrics */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <p className="cs-text-micro cs-text-muted">Contribution protected today</p>
+          <p className="cs-text-kpi mt-1 text-[var(--status-success)]">
+            {formatFleetCurrency(contributionProtected ?? 0)}
+          </p>
+        </div>
+        <div>
+          <p className="cs-text-micro cs-text-muted">Today&apos;s contribution</p>
+          <p className="cs-text-kpi mt-1">
+            {cc.estimatedContributionToday != null
+              ? formatFleetCurrency(cc.estimatedContributionToday)
+              : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="cs-text-micro cs-text-muted">Fleet utilization</p>
+          <p className="cs-text-kpi mt-1">
+            {cc.utilizationPercent != null ? `${cc.utilizationPercent.toFixed(1)}%` : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="cs-text-micro cs-text-muted">Revenue at risk</p>
+          <p className="cs-text-kpi mt-1">
+            {data.revenueAtRisk > 0 ? formatFleetCurrency(data.revenueAtRisk) : "—"}
+          </p>
+        </div>
+      </div>
+
+      {/* Top recommendation — focal action inside hero */}
+      <div id="fleet-recommendations" className="scroll-mt-6 space-y-4 border-t border-[var(--surface-border-subtle)] pt-6">
+        <SectionHeader
+          eyebrow="Highest-value decision"
+          title={primaryRec ? primaryRec.rationale.title : "No pending recommendations"}
+          description={
+            primaryRec
+              ? formatRecommendationType(primaryRec.recommendation_type)
+              : "Fleet is operating within normal parameters. Monitor exceptions below or open dispatch."
+          }
+          action={
+            primaryRec ? (
+              <div className="flex flex-wrap gap-2">
+                <StatusChip label={`Score ${primaryRec.score.toFixed(0)}`} tone="info" showDot={false} />
+                <StatusChip
+                  label={confidenceLabel(recommendationConfidence(primaryRec))}
+                  tone={confidenceTone(recommendationConfidence(primaryRec))}
+                />
+              </div>
+            ) : null
+          }
+        />
+
+        {primaryRec ? (
+          <HeroRecommendationBody
+            recommendation={primaryRec}
+            pending={pending}
+            onAction={onRecommendationAction}
+          />
+        ) : (
+          <EmptyState
+            icon={<CheckCircle2 className="size-8 text-[var(--status-success)]" />}
+            title="All recommendations addressed"
+            description="Check back after dispatch changes or when new jobs are ingested."
+            action={
+              <Button type="button" variant="secondary" size="sm" asChild>
+                <Link href="/dispatch">View Dispatch</Link>
+              </Button>
+            }
+          />
+        )}
+      </div>
+    </HeroPanel>
+  );
 
   return (
-    <div className="space-y-8" data-testid="fleet-today-view">
-      {/* Mission header */}
-      <FleetPanel variant="elevated" className="p-5 lg:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="fleet-eyebrow">Fleet Command Center</p>
-            </div>
-            <p className="max-w-3xl text-base leading-relaxed text-[var(--muted-strong)]">
-              {data.executiveSummary}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <FleetStatusChip
-                label={`${data.pendingActionCount} need attention`}
-                severity={data.pendingActionCount > 0 ? "warning" : "success"}
-              />
-              {criticalCount > 0 ? (
-                <FleetStatusChip label={`${criticalCount} critical`} severity="critical" />
-              ) : null}
-              <span className="text-xs text-[var(--muted)]">{data.date}</span>
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href="/dispatch">Dispatch Intelligence</Link>
-            </Button>
-            <Button type="button" size="sm" onClick={() => void refresh()} disabled={pending}>
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </FleetPanel>
-
-      {/* Operational pulse */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <FleetKpi
-          label="Contribution today"
-          value={
-            cc.estimatedContributionToday != null
-              ? formatFleetCurrency(cc.estimatedContributionToday)
-              : "—"
-          }
-          hint="Operational margin"
-          icon={DollarSign}
-          emphasis={cc.estimatedContributionToday != null && cc.estimatedContributionToday >= 0 ? "success" : "default"}
-        />
-        <FleetKpi
-          label="Utilization"
-          value={cc.utilizationPercent != null ? `${cc.utilizationPercent.toFixed(1)}%` : "—"}
-          hint="Billable today"
-          icon={Percent}
-        />
-        <FleetKpi
-          label="Live on GPS"
-          value={cc.activeTrucks}
-          hint="Active trucks"
-          icon={Truck}
-          emphasis="success"
-        />
-        <FleetKpi
-          label="Needs attention"
-          value={cc.idleTrucks}
-          hint="Stale or offline"
-          icon={Clock}
-          emphasis={cc.idleTrucks > 0 ? "warning" : "default"}
-        />
-        <FleetKpi
-          label="Jobs today"
-          value={cc.jobsToday}
-          hint={`${cc.unassignedJobs} unassigned`}
-          icon={ClipboardList}
-          emphasis={cc.unassignedJobs > 0 ? "warning" : "default"}
-        />
-        <FleetKpi
-          label="Pending decisions"
-          value={data.recommendations.pending.length}
-          hint="Recommendations"
-          icon={Sparkles}
-          emphasis={data.recommendations.pending.length > 0 ? "info" : "default"}
-        />
-      </div>
-
+    <div data-testid="fleet-today-view">
+      <PageLayout hero={hero}>
       {error ? (
-        <p className="fleet-panel border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.06)] px-4 py-3 text-sm text-[#fca5a5]">
-          {error}
-        </p>
+        <Panel level="default" padding="sm" className="border-[color-mix(in_srgb,var(--status-danger)_25%,transparent)] bg-[var(--status-danger-subtle)]">
+          <p className="cs-text-body text-[var(--status-danger)]">{error}</p>
+        </Panel>
       ) : null}
 
-      {/* Decision-first: recommendations + operational signals */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        <section id="fleet-recommendations" className="scroll-mt-6 space-y-4 lg:col-span-7">
-          <FleetSectionHeader
-            eyebrow="Priority 1"
-            title="Recommended actions"
-            description="Accept or dismiss — each recommendation includes contribution and travel impact."
-            action={
-              data.recommendations.pending.length > 0 ? (
-                <FleetStatusChip
-                  label={`${data.recommendations.pending.length} pending`}
-                  severity="info"
-                />
-              ) : null
+      {/* Supporting KPI strip */}
+      <PageSection>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+          <KpiCard label="Active trucks" value={cc.activeTrucks} hint="Live on GPS" icon={Truck} emphasis="operational" />
+          <KpiCard
+            label="Idle / offline"
+            value={cc.idleTrucks}
+            hint="Needs attention"
+            icon={Clock}
+            emphasis={cc.idleTrucks > 0 ? "warning" : "default"}
+          />
+          <KpiCard
+            label="Jobs today"
+            value={cc.jobsToday}
+            hint={`${cc.unassignedJobs} unassigned`}
+            icon={ClipboardList}
+            emphasis={cc.unassignedJobs > 0 ? "warning" : "default"}
+          />
+          <KpiCard
+            label="Utilization"
+            value={cc.utilizationPercent != null ? `${cc.utilizationPercent.toFixed(1)}%` : "—"}
+            hint="Billable today"
+            icon={Percent}
+          />
+          <KpiCard
+            label="Est. contribution"
+            value={
+              cc.estimatedContributionToday != null
+                ? formatFleetCurrency(cc.estimatedContributionToday)
+                : "—"
+            }
+            hint="Operational margin"
+            icon={DollarSign}
+            emphasis="success"
+          />
+          <KpiCard
+            label="Deadhead cost"
+            value={
+              cc.deadheadCostToday != null ? formatFleetCurrency(cc.deadheadCostToday) : "—"
+            }
+            hint="Today"
+            icon={Route}
+            emphasis={
+              cc.deadheadCostToday != null && cc.deadheadCostToday > 0 ? "warning" : "default"
             }
           />
-          {primaryRec ? (
-            <FleetRecommendationCard
-              recommendation={primaryRec}
-              onAction={onRecommendationAction}
-              pending={pending}
-              variant="hero"
-            />
-          ) : (
-            <FleetPanel className="p-0">
-              <FleetEmptyState
-                icon={<CheckCircle2 className="size-8 text-[var(--success)]" />}
-                title="No pending recommendations"
-                description="Fleet is operating within normal parameters. Check exceptions or refresh after dispatch changes."
-                action={
-                  <Button type="button" size="sm" variant="secondary" onClick={() => void refresh()}>
-                    Refresh briefing
-                  </Button>
-                }
-              />
-            </FleetPanel>
-          )}
-          {secondaryRecs.length > 0 ? (
-            <ul className="space-y-3">
-              {secondaryRecs.map((rec) => (
-                <li key={rec.id}>
-                  <FleetRecommendationCard
-                    recommendation={rec}
-                    onAction={onRecommendationAction}
-                    pending={pending}
-                    variant="compact"
-                  />
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
+          <KpiCard
+            label="Overtime risk"
+            value={
+              cc.overtimeCostToday != null ? formatFleetCurrency(cc.overtimeCostToday) : "—"
+            }
+            hint="Estimated today"
+            icon={Users}
+            emphasis={
+              cc.overtimeCostToday != null && cc.overtimeCostToday > 0 ? "warning" : "default"
+            }
+          />
+          <KpiCard
+            label="Acceptance rate"
+            value={acceptanceRate != null ? `${acceptanceRate.toFixed(0)}%` : "—"}
+            hint={`${data.recommendations.pending.length} pending`}
+            icon={Sparkles}
+            emphasis={data.recommendations.pending.length > 0 ? "info" : "default"}
+          />
+        </div>
+      </PageSection>
 
-        <section id="fleet-exceptions" className="scroll-mt-6 space-y-4 lg:col-span-5">
-          <FleetSectionHeader
-            eyebrow="Operational health"
-            title="Exceptions & alerts"
-            description="Issues that need attention before they become costly."
-            action={
-              criticalCount > 0 ? (
-                <FleetStatusChip label={`${criticalCount} critical`} severity="critical" />
-              ) : null
-            }
-          />
-          {data.exceptions.length === 0 ? (
-            <FleetPanel className="p-0">
-              <FleetEmptyState
-                icon={<CheckCircle2 className="size-8 text-[var(--success)]" />}
-                title="All clear"
+      {/* Recent operational activity */}
+      <PageSection>
+        <div className="grid gap-6 xl:grid-cols-12">
+          {/* More recommendations */}
+          {secondaryRecs.length > 0 ? (
+            <div className="space-y-4 xl:col-span-5">
+              <SectionHeader
+                title="More recommendations"
+                description={`${secondaryRecs.length} additional decision${secondaryRecs.length === 1 ? "" : "s"} ready`}
+              />
+              <ul className="space-y-3">
+                {secondaryRecs.map((rec) => (
+                  <li key={rec.id}>
+                    <CompactRecommendationRow
+                      recommendation={rec}
+                      pending={pending}
+                      onAction={onRecommendationAction}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Exception queue */}
+          <div
+            id="fleet-exceptions"
+            className={`scroll-mt-6 space-y-4 ${secondaryRecs.length > 0 ? "xl:col-span-7" : "xl:col-span-12"}`}
+          >
+            <SectionHeader
+              title="Exception queue"
+              description="Issues that need attention before they become costly."
+              action={
+                criticalCount > 0 ? (
+                  <StatusChip label={`${criticalCount} critical`} tone="danger" />
+                ) : null
+              }
+            />
+            {data.exceptions.length === 0 ? (
+              <EmptyState
+                icon={<CheckCircle2 className="size-7 text-[var(--status-success)]" />}
+                title="No exceptions"
                 description="No operational exceptions detected for today."
               />
-            </FleetPanel>
-          ) : (
-            <ul className="space-y-2">
-              {data.exceptions.map((ex) => (
-                <ExceptionRow key={ex.id} exception={ex} />
-              ))}
-            </ul>
-          )}
+            ) : (
+              <DataTable>
+                <Table className="min-w-[520px]">
+                  <TableHead>
+                    <Th>Severity</Th>
+                    <Th>Issue</Th>
+                    <Th>Recommended action</Th>
+                    <Th className="w-24">Action</Th>
+                  </TableHead>
+                  <TBody>
+                    {data.exceptions.map((ex) => (
+                      <ExceptionTableRow key={ex.id} exception={ex} />
+                    ))}
+                  </TBody>
+                </Table>
+              </DataTable>
+            )}
+          </div>
+        </div>
+      </PageSection>
 
-          {data.revenueAtRisk > 0 ? (
-            <FleetPanel className="flex flex-wrap items-center gap-3 border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.04)] p-4">
-              <AlertTriangle className="size-4 shrink-0 text-[var(--warning)]" />
-              <p className="min-w-0 flex-1 text-sm text-[var(--foreground)]">
-                <strong>{formatFleetCurrency(data.revenueAtRisk)}</strong> revenue at risk from unassigned jobs
-              </p>
-              <Button type="button" size="sm" asChild>
-                <Link href="/dispatch">Dispatch now</Link>
-              </Button>
-            </FleetPanel>
-          ) : null}
-
-          {data.integrationHealth.length > 0 ? (
-            <div className="space-y-2 pt-2">
-              <p className="fleet-kpi-label">Integrations</p>
-              <div className="flex flex-wrap gap-2">
-                {data.integrationHealth.map((conn) => (
-                  <Link key={conn.id} href="/settings/integrations">
-                    <FleetStatusChip
-                      label={`${conn.displayName} · ${conn.status}`}
-                      severity={
-                        conn.status === "healthy"
-                          ? "success"
-                          : conn.status === "error"
-                            ? "critical"
-                            : "warning"
-                      }
-                    />
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </section>
-      </div>
-
-      {/* Profit snapshot */}
-      {data.executiveInsights ? (
-        <section className="space-y-4" data-testid="fleet-executive-insights">
-          <FleetSectionHeader
-            eyebrow="Financial impact"
-            title="Operational profit snapshot"
-            description="Where contribution is created — and where it is leaking today."
+      {/* Recent dispatch decisions */}
+      {recentHistory.length > 0 ? (
+        <PageSection>
+          <SectionHeader
+            title="Recent dispatch decisions"
+            description="Recommendation outcomes from the last few actions."
           />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <FleetKpi
-              label="Today's contribution"
-              value={formatFleetCurrency(data.executiveInsights.todaysContribution)}
-              hint="From utilization mart"
-              icon={DollarSign}
-              emphasis={data.executiveInsights.todaysContribution >= 0 ? "success" : "critical"}
-            />
-            <FleetKpi
-              label="Contribution at risk"
-              value={formatFleetCurrency(data.executiveInsights.contributionAtRisk)}
-              hint="Unassigned jobs"
-              icon={AlertTriangle}
-              emphasis={data.executiveInsights.contributionAtRisk > 0 ? "critical" : "default"}
-            />
-            <FleetKpi
-              label="Best branch"
-              value={data.executiveInsights.highestPerformingBranch?.branch_name ?? "—"}
-              hint={
-                data.executiveInsights.highestPerformingBranch
-                  ? `${formatFleetCurrency(data.executiveInsights.highestPerformingBranch.contribution)} contribution`
-                  : "No mart data"
-              }
-              icon={TrendingUp}
-            />
-            <FleetKpi
-              label="Largest cost leak"
-              value={formatFleetCurrency(data.executiveInsights.largestCostLeak.amount)}
-              hint={data.executiveInsights.largestCostLeak.label}
-              icon={TrendingDown}
-              emphasis={data.executiveInsights.largestCostLeak.amount > 0 ? "warning" : "default"}
-            />
-          </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            {data.executiveInsights.mostProfitableTruck ? (
-              <FleetPanel className="px-4 py-3">
-                <p className="fleet-kpi-label">Most profitable truck</p>
-                <p className="mt-1 font-semibold">{data.executiveInsights.mostProfitableTruck.unit_number}</p>
-                <p className="text-xs text-[var(--muted)]">
-                  {formatFleetCurrency(data.executiveInsights.mostProfitableTruck.contribution)} this week
-                </p>
-              </FleetPanel>
-            ) : null}
-            {data.executiveInsights.mostProfitableOperator ? (
-              <FleetPanel className="px-4 py-3">
-                <p className="fleet-kpi-label">Most profitable operator</p>
-                <p className="mt-1 font-semibold">{data.executiveInsights.mostProfitableOperator.operator_name}</p>
-                <p className="text-xs text-[var(--muted)]">
-                  {formatFleetCurrency(data.executiveInsights.mostProfitableOperator.contribution_generated)} this week
-                </p>
-              </FleetPanel>
-            ) : null}
-            <FleetPanel className="px-4 py-3">
-              <p className="fleet-kpi-label">Recommendation value this week</p>
-              <p className="mt-1 text-lg font-semibold">
-                {formatFleetCurrency(data.executiveInsights.recommendationValueThisWeek)}
-              </p>
-              <p className="text-xs text-[var(--muted)]">
-                {data.executiveInsights.largestRecommendationOpportunity} pending recommendations
-              </p>
-            </FleetPanel>
-          </div>
-        </section>
+          <DataTable>
+            <Table className="min-w-[600px]">
+              <TableHead>
+                <Th>Decision</Th>
+                <Th>Type</Th>
+                <Th>Outcome</Th>
+                <Th>When</Th>
+              </TableHead>
+              <TBody>
+                {recentHistory.map((entry) => (
+                  <HistoryTableRow key={entry.id} entry={entry} />
+                ))}
+              </TBody>
+            </Table>
+          </DataTable>
+        </PageSection>
       ) : null}
 
-      {/* Changes + ROI */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="space-y-4">
-          <FleetSectionHeader title="Changes since yesterday" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            {data.changesSinceYesterday.map((delta) => (
-              <FleetPanel key={delta.key} className="px-4 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="fleet-kpi-label">{delta.label}</p>
-                  <DeltaIcon direction={delta.direction} />
-                </div>
-                <p className="fleet-kpi-value mt-2 text-xl">{formatDeltaValue(delta)}</p>
-                {delta.delta != null && delta.yesterday != null ? (
-                  <p className="mt-1 text-[10px] text-[var(--muted)]">
-                    {delta.direction === "improved"
-                      ? "Improved"
-                      : delta.direction === "declined"
-                        ? "Declined"
-                        : delta.direction === "unchanged"
-                          ? "Unchanged"
-                          : "—"}
-                    {delta.deltaPercent != null && Math.abs(delta.deltaPercent) >= 0.1
-                      ? ` · ${delta.deltaPercent > 0 ? "+" : ""}${delta.deltaPercent.toFixed(1)}%`
-                      : ""}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-[10px] text-[var(--muted)]">No prior-day comparison</p>
-                )}
-              </FleetPanel>
-            ))}
+      {/* Supporting detail */}
+      <PageSection>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            <SectionHeader title="Changes since yesterday" />
+            <DataTable>
+              <Table>
+                <TableHead>
+                  <Th>Metric</Th>
+                  <Th>Today</Th>
+                  <Th>Trend</Th>
+                </TableHead>
+                <TBody>
+                  {data.changesSinceYesterday.map((delta) => (
+                    <Tr key={delta.key}>
+                      <Td className="cs-text-muted">{delta.label}</Td>
+                      <Td className="font-medium">{formatDeltaValue(delta)}</Td>
+                      <Td>
+                        <StatusChip
+                          label={
+                            delta.direction === "improved"
+                              ? "Improved"
+                              : delta.direction === "declined"
+                                ? "Declined"
+                                : delta.direction === "unchanged"
+                                  ? "Unchanged"
+                                  : "—"
+                          }
+                          tone={
+                            delta.direction === "improved"
+                              ? "success"
+                              : delta.direction === "declined"
+                                ? "danger"
+                                : "neutral"
+                          }
+                          showDot={false}
+                        />
+                      </Td>
+                    </Tr>
+                  ))}
+                </TBody>
+              </Table>
+            </DataTable>
           </div>
-        </section>
 
-        <section className="space-y-4" data-testid="fleet-recommendation-roi">
-          <FleetSectionHeader
-            eyebrow="Decision outcomes"
-            title="Recommendation ROI"
-            description="This week · estimated impact from accepted recommendations"
-          />
-          {data.recommendationRoi ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FleetKpi
-                label="Accepted"
-                value={data.recommendationRoi.accepted}
-                hint={`${data.recommendationRoi.acceptanceRate?.toFixed(0) ?? "—"}% acceptance rate`}
-              />
-              <FleetKpi
-                label="Contribution protected"
-                value={formatFleetCurrency(data.recommendationRoi.contributionImprovement)}
-                emphasis="success"
-              />
-              <FleetKpi
-                label="Revenue protected"
-                value={formatFleetCurrency(data.recommendationRoi.revenueProtected)}
-              />
-              <FleetKpi
-                label="Applied / failed"
-                value={`${data.recommendationRoi.applied} / ${data.recommendationRoi.failed}`}
-                emphasis={data.recommendationRoi.failed > 0 ? "warning" : "default"}
-              />
-            </div>
-          ) : (
-            <FleetPanel className="p-0">
-              <FleetEmptyState
+          <div className="space-y-4" data-testid="fleet-recommendation-roi">
+            <SectionHeader
+              title="Recommendation ROI"
+              description="This week · impact from accepted recommendations"
+              action={
+                <Button type="button" variant="ghost" size="sm" asChild>
+                  <Link href="/reports/operations">
+                    Fleet Performance <ArrowRight className="ml-1 size-3.5" />
+                  </Link>
+                </Button>
+              }
+            />
+            {data.recommendationRoi ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <KpiCard
+                  label="Accepted"
+                  value={data.recommendationRoi.accepted}
+                  hint={`${data.recommendationRoi.acceptanceRate?.toFixed(0) ?? "—"}% rate`}
+                />
+                <KpiCard
+                  label="Contribution protected"
+                  value={formatFleetCurrency(data.recommendationRoi.contributionImprovement)}
+                  emphasis="success"
+                />
+                <KpiCard
+                  label="Revenue protected"
+                  value={formatFleetCurrency(data.recommendationRoi.revenueProtected)}
+                />
+                <KpiCard
+                  label="Applied / failed"
+                  value={`${data.recommendationRoi.applied} / ${data.recommendationRoi.failed}`}
+                  emphasis={data.recommendationRoi.failed > 0 ? "warning" : "default"}
+                />
+              </div>
+            ) : (
+              <EmptyState
                 title="No outcomes yet"
                 description="Accept recommendations to start measuring ROI this week."
               />
-            </FleetPanel>
-          )}
-        </section>
-      </div>
+            )}
+          </div>
+        </div>
+      </PageSection>
 
-      {/* Capacity */}
+      {/* Branch capacity */}
       {(data.upcomingCapacityIssues.length > 0 || data.unusedCapacityBranches.length > 0) && (
-        <section className="grid gap-4 lg:grid-cols-2">
-          {data.upcomingCapacityIssues.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Upcoming capacity issues</CardTitle>
-                <CardDescription>Branches approaching or over committed hours.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {data.upcomingCapacityIssues.slice(0, 5).map((b) => (
-                  <Link
-                    key={b.branch_id}
-                    href={b.href}
-                    className="flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--card-border)] px-3 py-2 text-sm transition hover:bg-[var(--card-elevated)]"
-                  >
-                    <span>{b.branch_name}</span>
-                    <FleetStatusChip
-                      label={`${Math.round(b.utilization * 100)}%`}
-                      severity="warning"
-                      showDot={false}
-                    />
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-          {data.unusedCapacityBranches.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Unused capacity</CardTitle>
-                <CardDescription>Branches with room to absorb more work.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {data.unusedCapacityBranches.slice(0, 5).map((b) => (
-                  <Link
-                    key={b.branch_id}
-                    href={b.href}
-                    className="flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--card-border)] px-3 py-2 text-sm transition hover:bg-[var(--card-elevated)]"
-                  >
-                    <span>{b.branch_name}</span>
-                    <FleetStatusChip
-                      label={`${Math.round((1 - b.utilization) * 100)}% available`}
-                      severity="success"
-                      showDot={false}
-                    />
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-        </section>
+        <PageSection>
+          <SectionHeader
+            title="Branch capacity"
+            description="Where the fleet can absorb work — or is overcommitted."
+          />
+          <div className="grid gap-6 lg:grid-cols-2">
+            {data.upcomingCapacityIssues.length > 0 ? (
+              <Panel level="default" padding="none">
+                <div className="border-b border-[var(--surface-border-subtle)] px-5 py-3">
+                  <p className="cs-text-section-title">Approaching limits</p>
+                </div>
+                <DataTable>
+                  <Table>
+                    <TableHead>
+                      <Th>Branch</Th>
+                      <Th>Utilization</Th>
+                    </TableHead>
+                    <TBody>
+                      {data.upcomingCapacityIssues.slice(0, 5).map((b) => (
+                        <Tr key={b.branch_id} clickable>
+                          <Td>
+                            <Link href={b.href} className="hover:underline">
+                              {b.branch_name}
+                            </Link>
+                          </Td>
+                          <Td>
+                            <StatusChip
+                              label={`${Math.round(b.utilization * 100)}%`}
+                              tone="warning"
+                              showDot={false}
+                            />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </TBody>
+                  </Table>
+                </DataTable>
+              </Panel>
+            ) : null}
+            {data.unusedCapacityBranches.length > 0 ? (
+              <Panel level="default" padding="none">
+                <div className="border-b border-[var(--surface-border-subtle)] px-5 py-3">
+                  <p className="cs-text-section-title">Available capacity</p>
+                </div>
+                <DataTable>
+                  <Table>
+                    <TableHead>
+                      <Th>Branch</Th>
+                      <Th>Available</Th>
+                    </TableHead>
+                    <TBody>
+                      {data.unusedCapacityBranches.slice(0, 5).map((b) => (
+                        <Tr key={b.branch_id} clickable>
+                          <Td>
+                            <Link href={b.href} className="hover:underline">
+                              {b.branch_name}
+                            </Link>
+                          </Td>
+                          <Td>
+                            <StatusChip
+                              label={`${Math.round((1 - b.utilization) * 100)}%`}
+                              tone="success"
+                              showDot={false}
+                            />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </TBody>
+                  </Table>
+                </DataTable>
+              </Panel>
+            ) : null}
+          </div>
+        </PageSection>
       )}
 
-      {/* Fleet health footer */}
-      <section className="space-y-4 border-t border-[var(--card-border)] pt-8">
-        <FleetSectionHeader
-          title="Fleet health"
-          description="Performance snapshot — full analysis in Fleet Performance report."
-          action={
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href="/reports/operations">
-                Fleet Performance <ArrowRight className="ml-1 size-3.5" />
-              </Link>
-            </Button>
-          }
-        />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <FleetKpi
-            label="Revenue / truck MTD"
-            value={
-              cc.revenuePerTruckMtd != null ? formatFleetCurrency(cc.revenuePerTruckMtd) : "—"
-            }
-            hint={`${cc.truckCount} active trucks`}
-            icon={DollarSign}
+      {/* Demoted executive detail */}
+      {insights ? (
+        <PageSection>
+          <div data-testid="fleet-executive-insights" className="space-y-4">
+          <SectionHeader
+            title="Profit signals"
+            description="Supporting context — full analysis in Fleet Performance."
           />
-          <FleetKpi label="Truck count" value={cc.truckCount} hint="Active fleet" icon={Truck} />
-          <FleetKpi
-            label="Unassigned jobs"
-            value={cc.unassignedJobs}
-            hint="Requires dispatch"
-            icon={ClipboardList}
-            emphasis={cc.unassignedJobs > 0 ? "warning" : "success"}
-          />
-        </div>
-      </section>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard
+              label="Contribution at risk"
+              value={formatFleetCurrency(insights.contributionAtRisk)}
+              hint="Unassigned jobs"
+              emphasis={insights.contributionAtRisk > 0 ? "danger" : "default"}
+            />
+            <KpiCard
+              label="Best branch"
+              value={insights.highestPerformingBranch?.branch_name ?? "—"}
+              hint={
+                insights.highestPerformingBranch
+                  ? formatFleetCurrency(insights.highestPerformingBranch.contribution)
+                  : undefined
+              }
+            />
+            <KpiCard
+              label="Largest cost leak"
+              value={formatFleetCurrency(insights.largestCostLeak.amount)}
+              hint={insights.largestCostLeak.label}
+              emphasis={insights.largestCostLeak.amount > 0 ? "warning" : "default"}
+            />
+            <KpiCard
+              label="Rec. value this week"
+              value={formatFleetCurrency(insights.recommendationValueThisWeek)}
+              hint={`${insights.largestRecommendationOpportunity} opportunities`}
+            />
+          </div>
+          </div>
+        </PageSection>
+      ) : null}
+      </PageLayout>
     </div>
   );
 }
 
-function ExceptionRow({ exception: ex }: { exception: FleetOperationalException }) {
-  const severity = severityToFleetSeverity(ex.severity);
+function HeroRecommendationBody({
+  recommendation,
+  pending,
+  onAction,
+}: {
+  recommendation: FleetRecommendationInstance;
+  pending: boolean;
+  onAction: (id: string, action: "accept" | "dismiss") => void;
+}) {
+  const candidates = recommendation.rationale.candidates ?? [];
+  const topCandidate = candidates[0];
+  const topSnapshot = recommendation.rationale.candidate_snapshots?.[0];
+  const isCapacityOnly = recommendation.recommendation_type === "capacity_overload";
 
   return (
-    <li
-      className={`fleet-panel px-4 py-3 ${fleetPanelSeverityClass(severity)}`}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <FleetStatusChip label={ex.severity} severity={severity} />
-            <p className="text-sm font-semibold text-[var(--foreground)]">{ex.title}</p>
+    <div className="space-y-5">
+      {topCandidate ? (
+        <p className="cs-text-body">
+          <span className="cs-text-muted">Assign </span>
+          <span className="font-semibold">Truck {topCandidate.unit_number}</span>
+          {recommendation.rationale.entities.job_id ? (
+            <>
+              <span className="cs-text-muted"> to job </span>
+              <span className="font-medium">{recommendation.rationale.entities.job_id.slice(0, 8)}</span>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+
+      {topSnapshot ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="cs-text-micro cs-text-muted">Financial impact</p>
+            <p className="cs-text-kpi mt-1 text-[var(--status-success)]">
+              {formatFleetCurrency(topSnapshot.estimated_contribution)}
+            </p>
           </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-[var(--muted)]">{ex.whyItMatters}</p>
-          <p className="mt-1 text-xs font-medium text-[var(--muted-strong)]">{ex.recommendedAction}</p>
+          {topSnapshot.deadhead_miles != null ? (
+            <div>
+              <p className="cs-text-micro cs-text-muted">Est. deadhead</p>
+              <p className="cs-text-kpi mt-1">{topSnapshot.deadhead_miles.toFixed(1)} mi</p>
+            </div>
+          ) : null}
+          {topSnapshot.travel_minutes != null ? (
+            <div>
+              <p className="cs-text-micro cs-text-muted">Travel savings</p>
+              <p className="cs-text-kpi mt-1">{Math.round(topSnapshot.travel_minutes)} min</p>
+            </div>
+          ) : null}
+          <div>
+            <p className="cs-text-micro cs-text-muted">Data freshness</p>
+            <p className="cs-text-kpi mt-1">{topSnapshot.gps_label}</p>
+          </div>
         </div>
-        <Button type="button" size="sm" variant="secondary" asChild>
-          <Link href={ex.href}>
-            Act <ArrowRight className="ml-1 size-3.5" />
-          </Link>
+      ) : null}
+
+      <div>
+        <p className="cs-text-micro cs-text-muted">Why this truck</p>
+        <ul className="mt-2 space-y-1.5">
+          {recommendation.rationale.reasons.map((reason) => (
+            <li key={reason} className="cs-text-body cs-text-muted flex gap-2">
+              <span className="text-[var(--brand-operational)]">·</span>
+              <span>{reason}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {candidates.length > 1 ? (
+        <div>
+          <p className="cs-text-micro cs-text-muted">Alternatives considered</p>
+          <ul className="mt-2 space-y-1">
+            {candidates.slice(1, 3).map((c) => (
+              <li key={c.truck_id} className="cs-text-caption cs-text-muted">
+                Truck {c.unit_number} — score {c.score.toFixed(0)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-3 pt-2">
+        <Button
+          type="button"
+          size="md"
+          onClick={() => onAction(recommendation.id, "accept")}
+          disabled={pending}
+        >
+          {isCapacityOnly ? "Acknowledge" : "Accept recommendation"}
+        </Button>
+        <Button type="button" size="md" variant="secondary" asChild>
+          <Link href="/dispatch">View dispatch</Link>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => onAction(recommendation.id, "dismiss")}
+          disabled={pending}
+        >
+          Dismiss
         </Button>
       </div>
-    </li>
+    </div>
+  );
+}
+
+function CompactRecommendationRow({
+  recommendation,
+  pending,
+  onAction,
+}: {
+  recommendation: FleetRecommendationInstance;
+  pending: boolean;
+  onAction: (id: string, action: "accept" | "dismiss") => void;
+}) {
+  const confidence = recommendationConfidence(recommendation);
+  const snapshot = recommendation.rationale.candidate_snapshots?.[0];
+  const isCapacityOnly = recommendation.recommendation_type === "capacity_overload";
+
+  return (
+    <Panel level="default" padding="sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="cs-text-body font-medium">{recommendation.rationale.title}</p>
+          <p className="cs-text-caption cs-text-muted mt-0.5">
+            {formatRecommendationType(recommendation.recommendation_type)}
+            {snapshot ? ` · ${formatFleetCurrency(snapshot.estimated_contribution)}` : ""}
+          </p>
+        </div>
+        <StatusChip label={confidenceLabel(confidence)} tone={confidenceTone(confidence)} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => onAction(recommendation.id, "accept")}
+          disabled={pending}
+        >
+          {isCapacityOnly ? "Acknowledge" : "Accept"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => onAction(recommendation.id, "dismiss")}
+          disabled={pending}
+        >
+          Dismiss
+        </Button>
+      </div>
+    </Panel>
+  );
+}
+
+function ExceptionTableRow({ exception: ex }: { exception: FleetOperationalException }) {
+  const tone = fleetLegacySeverityToTone(severityToFleetSeverity(ex.severity));
+
+  return (
+    <Tr>
+      <Td>
+        <StatusChip label={ex.severity} tone={tone} />
+      </Td>
+      <Td>
+        <p className="font-medium">{ex.title}</p>
+        <p className="cs-text-caption cs-text-muted mt-0.5">{ex.whyItMatters}</p>
+      </Td>
+      <Td className="cs-text-caption cs-text-muted">{ex.recommendedAction}</Td>
+      <Td>
+        <Button type="button" size="sm" variant="secondary" asChild>
+          <Link href={ex.href}>Act</Link>
+        </Button>
+      </Td>
+    </Tr>
+  );
+}
+
+function HistoryTableRow({ entry }: { entry: FleetRecommendationHistoryEntry }) {
+  const outcome = entry.latest_outcome;
+  const action = outcome?.action ?? "pending";
+  const tone: ChipTone =
+    action === "accepted" || action === "applied"
+      ? "success"
+      : action === "dismissed" || action === "expired"
+        ? "neutral"
+        : action === "failed"
+          ? "danger"
+          : "info";
+
+  return (
+    <Tr>
+      <Td className="max-w-[200px]">
+        <p className="truncate font-medium">{entry.rationale.title}</p>
+      </Td>
+      <Td className="cs-text-caption cs-text-muted">
+        {formatRecommendationType(entry.recommendation_type)}
+      </Td>
+      <Td>
+        <StatusChip label={action.replace(/_/g, " ")} tone={tone} showDot={false} />
+      </Td>
+      <Td className="cs-text-caption cs-text-muted">
+        {outcome?.acted_at ? formatDataFreshness(outcome.acted_at) : "—"}
+      </Td>
+    </Tr>
   );
 }

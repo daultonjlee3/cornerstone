@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { Panel } from "@/src/components/design-system";
+import { SectionHeader } from "@/src/components/design-system";
 
 export function CommandPanel({
   title,
@@ -12,16 +14,9 @@ export function CommandPanel({
   className?: string;
 }) {
   return (
-    <section
-      className={`rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card-solid)]/90 p-4 shadow-[var(--shadow-soft)] ${className}`}
-    >
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight text-[var(--foreground)]">{title}</h2>
-          {description ? <p className="text-xs text-[var(--muted)]">{description}</p> : null}
-        </div>
-      </div>
+    <Panel level="raised" padding="md" className={className}>
+      <SectionHeader title={title} description={description} className="mb-4" />
       {children}
-    </section>
+    </Panel>
   );
 }

@@ -1,28 +1,29 @@
 @import "tailwindcss";
+@import "./design-system.css";
 
 :root {
   --background: #eef4ff;
   --background-canvas-start: #f4f8ff;
   --background-canvas-end: #dce9ff;
-  --foreground: #10233f;
-  --card: rgba(255, 255, 255, 0.88);
-  --card-solid: #ffffff;
-  --card-elevated: #ffffff;
-  --card-border: #d7e4fa;
-  --muted: #5f7391;
-  --muted-strong: #3b4f6f;
-  --accent: #2f78ff;
-  --accent-hover: #1f63df;
-  --accent-glow: rgba(47, 120, 255, 0.2);
-  --success: #0d9f6e;
-  --warning: #d58b11;
-  --danger: #d23b52;
-  --radius-card: 18px;
-  --radius-control: 12px;
-  --radius-pill: 999px;
-  --shadow-card: 0 20px 38px rgba(16, 35, 63, 0.08);
-  --shadow-soft: 0 8px 20px rgba(16, 35, 63, 0.06);
-  --shadow-glow: 0 10px 28px rgba(47, 120, 255, 0.14);
+  --foreground: var(--text-primary, #10233f);
+  --card: var(--surface-default, rgba(255, 255, 255, 0.88));
+  --card-solid: var(--surface-raised, #ffffff);
+  --card-elevated: var(--surface-raised, #ffffff);
+  --card-border: var(--surface-border, #d7e4fa);
+  --muted: var(--text-muted, #5f7391);
+  --muted-strong: var(--text-muted-strong, #3b4f6f);
+  --accent: var(--brand-action, #ea580c);
+  --accent-hover: var(--brand-action-hover, #c2410c);
+  --accent-glow: rgba(234, 88, 12, 0.18);
+  --success: var(--status-success, #059669);
+  --warning: var(--status-warning, #d97706);
+  --danger: var(--status-danger, #dc2626);
+  --radius-card: var(--radius-xl, 14px);
+  --radius-control: var(--radius-md, 10px);
+  --radius-pill: var(--radius-full, 999px);
+  --shadow-card: var(--elevation-3, 0 12px 32px rgba(16, 35, 63, 0.08));
+  --shadow-soft: var(--elevation-2, 0 4px 16px rgba(16, 35, 63, 0.06));
+  --shadow-glow: 0 8px 24px rgba(234, 88, 12, 0.14);
   /* Marketing design system */
   --mk-section-padding-y: 4rem;
   --mk-section-padding-y-lg: 5rem;
@@ -49,20 +50,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-:root {
-  --background: #eef4ff;
-  --background-canvas-start: #f4f8ff;
-  --background-canvas-end: #dce9ff;
-  --foreground: #10233f;
-  --card: rgba(255, 255, 255, 0.88);
-  --card-solid: #ffffff;
-  --card-elevated: #ffffff;
-  --card-border: #d7e4fa;
-    --muted: #5f7391;
-    --muted-strong: #3b4f6f;
-    --accent: #2f78ff;
-    --accent-hover: #1f63df;
-    --accent-glow: rgba(47, 120, 255, 0.2);
+  :root {
+    /* App theme is attribute-driven; OS dark preference does not override. */
   }
 }
 
@@ -118,10 +107,9 @@ body {
 
 .ui-card {
   border-radius: var(--radius-card);
-  border: 1px solid var(--card-border);
-  background: var(--card);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--surface-border-subtle);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-1);
 }
 
 /* Intro.js guidance theme */
@@ -190,9 +178,9 @@ body {
   overflow: hidden;
   min-width: 0;
   border-radius: var(--radius-card);
-  border: 1px solid var(--card-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.86));
-  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--surface-border-subtle);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-1);
 }
 
 .ui-table-shell .overflow-x-auto {
@@ -226,10 +214,9 @@ body {
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, rgba(47, 120, 255, 0.2), rgba(47, 120, 255, 0.08));
-  color: var(--accent);
-  box-shadow: 0 1px 2px rgba(47, 120, 255, 0.12);
+  border-radius: var(--radius-md);
+  background: var(--brand-operational-subtle);
+  color: var(--brand-operational);
 }
 .ui-page-header-icon svg {
   color: inherit;
@@ -255,18 +242,18 @@ body {
 }
 
 .ui-page-title {
-  font-size: clamp(1.5rem, 2.2vw, 2rem);
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-  color: var(--foreground);
+  font-size: var(--font-size-page-title);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  color: var(--text-primary);
 }
 
 .ui-page-subtitle {
-  margin-top: 0.35rem;
-  font-size: 0.9375rem;
-  line-height: 1.4;
-  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--text-muted);
 }
 
 /* Optional wrapper: subtle surface and divider for header area */
@@ -302,9 +289,9 @@ body {
 }
 
 .ui-kpi-value {
-  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  font-size: var(--font-size-kpi);
   font-weight: 650;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--letter-spacing-tight);
   font-variant-numeric: tabular-nums;
 }
 
@@ -484,198 +471,52 @@ body {
   background-size: 24px 24px;
 }
 
-/* ─── Cornerstone Fleet — operational dark theme ─── */
 [data-fleet-ui="true"] {
-  --background: #0e1218;
-  --background-canvas-start: #11161f;
-  --background-canvas-end: #0a0e14;
-  --foreground: #e6ecf3;
-  --card: rgba(20, 26, 36, 0.88);
-  --card-solid: #141a24;
-  --card-elevated: #1a222e;
-  --card-border: rgba(148, 163, 184, 0.1);
-  --muted: #8b9aad;
-  --muted-strong: #b4c0d0;
-  --accent: #2dd4bf;
-  --accent-hover: #14b8a6;
-  --accent-glow: rgba(45, 212, 191, 0.16);
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --info: #60a5fa;
-  --radius-card: 14px;
-  --radius-control: 10px;
-  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.45);
-  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.32);
-  --shadow-glow: 0 0 24px rgba(45, 212, 191, 0.12);
-}
-
-body:has([data-fleet-ui="true"]) {
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(45, 212, 191, 0.06), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(96, 165, 250, 0.04), transparent 50%),
-    linear-gradient(180deg, var(--background-canvas-start), var(--background-canvas-end));
+  --background: var(--surface-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--surface-default);
+  --card-solid: var(--surface-raised);
+  --card-elevated: var(--surface-raised);
+  --card-border: var(--surface-border);
+  --muted: var(--text-muted);
+  --muted-strong: var(--text-muted-strong);
+  --accent: var(--brand-action);
+  --accent-hover: var(--brand-action-hover);
+  --accent-glow: rgba(234, 88, 12, 0.16);
+  --success: var(--status-success);
+  --warning: var(--status-warning);
+  --danger: var(--status-danger);
 }
 
 [data-fleet-ui="true"] .ui-input,
 [data-fleet-ui="true"] .ui-select,
 [data-fleet-ui="true"] .ui-textarea {
-  background: var(--card-solid);
-  border-color: var(--card-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: var(--surface-raised);
+  border-color: var(--surface-border-subtle);
 }
 
 [data-fleet-ui="true"] .ui-input:focus,
 [data-fleet-ui="true"] .ui-select:focus,
 [data-fleet-ui="true"] .ui-textarea:focus {
-  background: var(--card-elevated);
+  background: var(--surface-hero);
 }
 
 [data-fleet-ui="true"] .ui-page-header-area {
-  background: linear-gradient(180deg, rgba(26, 34, 46, 0.9), rgba(20, 26, 36, 0.75));
-  border-color: var(--card-border);
+  background: var(--surface-default);
+  border-color: var(--surface-border-subtle);
 }
 
 [data-fleet-ui="true"] .ui-action-bar {
-  background: rgba(20, 26, 36, 0.92);
-  border-color: var(--card-border);
+  background: var(--surface-default);
+  border-color: var(--surface-border-subtle);
 }
 
-[data-fleet-ui="true"] .ui-card {
-  background: var(--card);
-  border-color: var(--card-border);
-  backdrop-filter: blur(12px);
+body:has([data-fleet-ui="true"]) {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--brand-operational) 6%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--surface-canvas), color-mix(in srgb, var(--surface-canvas) 85%, #000));
 }
 
 [data-fleet-ui="true"] .leaflet-container {
-  background: #1a222e;
-}
-
-/* Fleet primitives */
-.fleet-panel {
-  border-radius: var(--radius-card);
-  border: 1px solid var(--card-border);
-  background: var(--card);
-  box-shadow: var(--shadow-soft);
-}
-
-.fleet-panel-elevated {
-  border-radius: var(--radius-card);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: var(--card-elevated);
-  box-shadow: var(--shadow-card);
-}
-
-.fleet-panel-accent {
-  border-radius: var(--radius-card);
-  border: 1px solid rgba(45, 212, 191, 0.2);
-  background: linear-gradient(145deg, rgba(45, 212, 191, 0.06), rgba(20, 26, 36, 0.4));
-}
-
-.fleet-eyebrow {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.fleet-section-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--foreground);
-}
-
-.fleet-kpi-value {
-  font-size: clamp(1.5rem, 2.4vw, 2.125rem);
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  color: var(--foreground);
-  line-height: 1.1;
-}
-
-.fleet-kpi-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.fleet-status-dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.fleet-status-dot--critical { background: var(--danger); box-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
-.fleet-status-dot--warning { background: var(--warning); }
-.fleet-status-dot--success { background: var(--success); }
-.fleet-status-dot--info { background: var(--info); }
-.fleet-status-dot--neutral { background: var(--muted); }
-
-.fleet-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-height: 1.625rem;
-  padding: 0.125rem 0.625rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  border: 1px solid transparent;
-  transition: background-color 140ms ease, border-color 140ms ease;
-}
-
-.fleet-chip--critical {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.25);
-  color: #fca5a5;
-}
-
-.fleet-chip--warning {
-  background: rgba(251, 191, 36, 0.1);
-  border-color: rgba(251, 191, 36, 0.22);
-  color: #fcd34d;
-}
-
-.fleet-chip--success {
-  background: rgba(52, 211, 153, 0.1);
-  border-color: rgba(52, 211, 153, 0.22);
-  color: #6ee7b7;
-}
-
-.fleet-chip--info {
-  background: rgba(96, 165, 250, 0.1);
-  border-color: rgba(96, 165, 250, 0.22);
-  color: #93c5fd;
-}
-
-.fleet-chip--accent {
-  background: rgba(45, 212, 191, 0.1);
-  border-color: rgba(45, 212, 191, 0.22);
-  color: var(--accent);
-}
-
-.fleet-chip--neutral {
-  background: rgba(148, 163, 184, 0.08);
-  border-color: var(--card-border);
-  color: var(--muted-strong);
-}
-
-.fleet-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.875rem;
+  background: var(--surface-raised);
 }

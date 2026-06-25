@@ -95,8 +95,8 @@ export function Shell({
                   isDispatchFullscreen
                     ? ""
                     : sidebarCollapsed
-                      ? "lg:pl-[4.25rem]"
-                      : "lg:pl-60"
+                      ? "lg:pl-[var(--nav-rail-width-collapsed)]"
+                      : "lg:pl-[var(--nav-rail-width)]"
                 }`}
               >
                 {!isDispatchFullscreen ? (

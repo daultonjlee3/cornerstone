@@ -1,90 +1,88 @@
-# Cornerstone Fleet Design System
+# Cornerstone Design System
 
-Operational decision platform UI for industrial fleets. Dark-first, premium, calm, and decision-focused.
+Unified UI foundation for the operational decision platform. **Phase 1 complete** — tokens and primitives; screen redesigns follow in Phase 2+.
 
 ## Philosophy
 
-Every screen answers: **"What is the best decision to make right now?"**
+- **One hero per page** — single focal surface; everything else supports it.
+- **Orange** = primary actions only (Accept, Dispatch, Save, Connect).
+- **Teal** = operational state (Live, Connected, GPS fresh, Healthy).
+- **Green / Amber / Red / Blue** = success, warning, critical, information only.
 
-Layout priority:
+## Architecture
 
-1. Recommended action
-2. Operational health
-3. Live fleet visibility
-4. Financial impact
-5. Supporting detail
+```
+app/design-system.css     ← tokens + utility classes (cs-*)
+src/components/design-system/  ← approved primitives
+src/components/ui/          ← backwards-compatible wrappers
+src/components/fleet/ui/    ← deprecated aliases → design-system
+```
 
-## Theme activation
+Fleet dark theme: `[data-fleet-ui="true"]` on shell — same token names, charcoal values.
 
-Fleet tenants (`fleet_intelligence`, `hybrid`) activate the operational dark theme via `data-fleet-ui="true"` on the authenticated shell. CMMS-only tenants keep the existing light theme.
+## Tokens
 
-**Tokens:** `app/globals.css` — `[data-fleet-ui="true"]` block  
-**Primitives:** `src/components/fleet/ui/`  
-**Utilities:** `src/lib/fleet/ui/format.ts`, `src/lib/fleet/ui/severity.ts`
+| Category | CSS variables |
+|----------|----------------|
+| Spacing | `--space-1` … `--space-16` |
+| Typography | `--font-size-display` … `--font-size-micro`, `--font-size-kpi` |
+| Surfaces | `--surface-canvas`, `--surface-default`, `--surface-raised`, `--surface-hero` |
+| Brand | `--brand-action` (orange), `--brand-operational` (teal) |
+| Semantic | `--status-success`, `--status-warning`, `--status-danger`, `--status-info` |
+| Elevation | `--elevation-0` … `--elevation-3` |
+| Radius | `--radius-sm` … `--radius-xl` |
+| Motion | `--duration-fast`, `--ease-standard` |
 
-## Color
+Legacy aliases (`--accent`, `--card`, `--foreground`) map to new tokens for gradual migration.
 
-| Token | Role |
-|-------|------|
-| `--background` | Charcoal canvas `#0e1218` |
-| `--card` / `--card-elevated` | Panel depth |
-| `--accent` | Brand teal `#2dd4bf` — primary actions, focus |
-| `--success` | Operational OK, high confidence |
-| `--warning` | Attention needed |
-| `--danger` | Action required, critical |
-| `--info` | Informational, scores |
+## Approved primitives
 
-Semantic colors only — never decorative.
+| Primitive | Import | Replaces |
+|-----------|--------|----------|
+| `Surface` | `@/src/components/design-system` | raw divs |
+| `Panel` | design-system | `Card`, `FleetPanel`, `CommandPanel` |
+| `HeroPanel` | design-system | accent panels, page hero |
+| `KpiCard` | design-system | `MetricCard`, `FleetKpi` |
+| `StatusChip` | design-system | `StatusBadge`, `PriorityBadge`, `FleetStatusChip` |
+| `Button` | `@/src/components/ui/button` | (refactored to orange primary) |
+| `SectionHeader` | design-system | `FleetSectionHeader`, inline h2s |
+| `PageLayout` | design-system | ad hoc `space-y-*` page wrappers |
+| `Skeleton` | design-system | copy-paste `animate-pulse` blocks |
+| `EmptyState` | design-system | `FleetEmptyState`, `TableEmptyState` patterns |
+| `NavRail*` | design-system | sidebar internals |
+| `TableShell` | design-system | `DataTable` shell |
+| `ModalShell` | design-system | `Modal` |
+| `DrawerShell` | design-system | `HelpDrawer` |
+| `FormSection` | design-system | inline form sections |
 
-## Typography
+## Typography classes
 
-| Class | Use |
-|-------|-----|
-| `.fleet-eyebrow` | Section labels, uppercase accent |
-| `.fleet-section-title` | Section headings |
-| `.fleet-kpi-label` | Metric labels |
-| `.fleet-kpi-value` | Dashboard numbers (tabular) |
+- `.cs-text-display` — marketing / rare
+- `.cs-text-page-title` — page H1
+- `.cs-text-section-title` — section H2
+- `.cs-text-body` — default copy
+- `.cs-text-caption` — secondary copy
+- `.cs-text-micro` — KPI labels, table headers
+- `.cs-text-eyebrow` — operational section labels (teal)
+- `.cs-text-kpi` — metric values
 
-Existing `.ui-page-title` / `.ui-kpi-value` remain for shared pages; fleet screens prefer fleet classes.
+## Surface levels (only four)
 
-## Primitives
+1. **Canvas** — page background
+2. **Default** — subtle grouping
+3. **Raised** — cards, panels, tables
+4. **Hero** — single page focal point
 
-| Component | Purpose |
-|-----------|---------|
-| `FleetPanel` | Base surface (`default`, `elevated`, `accent`) |
-| `FleetSectionHeader` | Eyebrow + title + description + action |
-| `FleetKpi` | Operational metric card |
-| `FleetStatusChip` | Severity / health / count pills |
-| `FleetEmptyState` | Calm empty states |
-| `FleetRecommendationCard` | Shared recommendation UI (hero + compact) |
-| `FleetDataFreshness` | Live data indicator |
+## Phase 2 rollout (not started)
 
-## CSS utilities
-
-- `.fleet-panel`, `.fleet-panel-elevated`, `.fleet-panel-accent`
-- `.fleet-chip--{critical|warning|success|info|neutral}`
-- `.fleet-status-dot--{severity}`
-
-## Screen rollout
-
-| Screen | Status | Notes |
-|--------|--------|-------|
-| Fleet Command Center | ✅ Upgraded | Decision-first layout in `fleet-today-view.tsx` |
-| Integration Center | ✅ Upgraded | `integrations-client.tsx` |
-| Dispatch Intelligence | 🔄 Partial | Status bar uses fleet chips; recommendation card next |
-| Fleet Performance | ⏳ Planned | Executive charts — next pass |
-| Shell / nav | ✅ Theme | Wider max-width (1440px), dark tokens |
-
-## Consolidation targets
-
-- Retire duplicate severity styling in dispatch + today-view (use `src/lib/fleet/ui/severity.ts`)
-- Unify `formatCurrency` → `formatFleetCurrency`
-- Migrate `FleetDispatchRecommendationCard` to `FleetRecommendationCard`
-- Remove dead: `fleet-command-center-section.tsx`, `fleet-recommendations-placeholder.tsx`
+1. Fleet Command Center — hero = primary recommendation
+2. Dispatch — hero = queue + map
+3. Fleet Performance — hero = contribution chart
+4. CMMS screens — migrate off glass cards
 
 ## Do not
 
-- Copy reference mockup layout, colors, or branding
-- Use pure black backgrounds
-- Add gratuitous gradients, borders, or animation
-- Break CMMS light theme for non-fleet tenants
+- Add one-off `rounded-xl border bg-white` panels
+- Use orange for decoration
+- Use teal for primary CTAs
+- Create parallel badge/KPI/card systems

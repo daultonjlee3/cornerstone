@@ -33,7 +33,6 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   X,
   ListChecks,
   Container,
@@ -43,6 +42,15 @@ import {
   AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
+import {
+  NavRail,
+  NavRailBody,
+  NavRailBrand,
+  NavRailFooter,
+  NavRailGroup,
+  NavRailHeader,
+  NavRailItem,
+} from "@/src/components/design-system";
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
 import { getNavConfig, isNavItemActive, type NavGroup, type NavItem } from "../nav-config";
 import type { ProductProfile } from "@/src/types/fleet";
@@ -95,7 +103,6 @@ type SidebarProps = {
   onToggleCollapse?: () => void;
   showPlatformAdmin?: boolean;
   isDemoGuest?: boolean;
-  /** When true, show "Resume get started" when onboarding was skipped. */
   showResumeOnboarding?: boolean;
   productProfile?: ProductProfile;
 };
@@ -142,69 +149,58 @@ export function Sidebar({
           aria-label="Close menu"
         />
       )}
-      <aside
+      <div
         className={`
-          fixed left-0 top-0 z-50 flex h-screen shrink-0 flex-col
-          border-r border-[var(--card-border)] bg-[var(--card)]/95 shadow-[var(--shadow-card)] backdrop-blur-xl
-          transition-[width] duration-200 ease-out
+          fixed left-0 top-0 z-50 h-screen shrink-0 transition-[width] duration-[var(--duration-fast)] ease-[var(--ease-standard)]
           lg:translate-x-0
           ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-          ${collapsed ? "w-[4.25rem]" : "w-60"}
+          ${collapsed ? "w-[var(--nav-rail-width-collapsed)]" : "w-[var(--nav-rail-width)]"}
         `}
-        style={{ boxShadow: "2px 0 12px rgba(0,0,0,0.04)" }}
       >
-        <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-[var(--card-border)] px-3">
-          {collapsed ? (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="flex size-9 items-center justify-center rounded-lg text-[var(--muted)] transition-all duration-150 hover:scale-105 hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-              aria-label="Expand sidebar"
-            >
-              <ChevronRight className="size-5" />
-            </button>
-          ) : (
-            <>
-              <Link
-                href="/operations"
-                className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-2 pr-1 transition-colors hover:bg-[var(--background)]/80"
+        <NavRail collapsed={collapsed} embedded>
+          <NavRailHeader>
+            {collapsed ? (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="flex size-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--surface-default)] hover:text-[var(--text-primary)]"
+                aria-label="Expand sidebar"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)]">
-                  <Truck className="size-5" strokeWidth={2.25} />
-                </span>
-                <span className="min-w-0 truncate text-base font-semibold tracking-tight text-[var(--foreground)]">
-                  Cornerstone{" "}
-                  <span className="font-normal text-[var(--muted)]">
-                    {productProfile === "cmms" ? "OS" : "Fleet"}
-                  </span>
-                </span>
-              </Link>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={onToggleCollapse}
-                  className="hidden size-8 items-center justify-center rounded-lg text-[var(--muted)] transition-all duration-150 hover:scale-105 hover:bg-[var(--background)] hover:text-[var(--foreground)] lg:flex"
-                  aria-label="Collapse sidebar"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)] lg:hidden"
-                  aria-label="Close menu"
-                >
-                  <X className="size-5" />
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                <ChevronRight className="size-5" />
+              </button>
+            ) : (
+              <>
+                <NavRailBrand
+                  href="/operations"
+                  title="Cornerstone"
+                  subtitle={productProfile === "cmms" ? "OS" : "Fleet"}
+                  icon={Truck}
+                />
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={onToggleCollapse}
+                    className="hidden size-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--surface-default)] hover:text-[var(--text-primary)] lg:flex"
+                    aria-label="Collapse sidebar"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex size-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--surface-default)] hover:text-[var(--text-primary)] lg:hidden"
+                    aria-label="Close menu"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
+              </>
+            )}
+          </NavRailHeader>
 
-        <nav className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-3 scrollbar-thin">
+          <NavRailBody>
             {showResume && (
-              <div className={`mb-3 ${collapsed ? "flex justify-center px-1" : "px-1.5"}`}>
+              <div className={`mb-3 ${collapsed ? "flex justify-center" : ""}`}>
                 {collapsed ? (
                   <SidebarTooltip label="Resume get started" side="right">
                     <button
@@ -213,7 +209,7 @@ export function Sidebar({
                         resumeOnboarding();
                         onClose();
                       }}
-                      className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
+                      className="flex size-9 items-center justify-center rounded-[var(--radius-md)] border border-[var(--brand-operational)]/30 bg-[var(--brand-operational-subtle)] text-[var(--brand-operational)]"
                       aria-label="Resume get started"
                     >
                       <ListChecks className="size-4" />
@@ -226,11 +222,9 @@ export function Sidebar({
                       resumeOnboarding();
                       onClose();
                     }}
-                    className="flex w-full cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+                    className="flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 cs-text-body text-[var(--brand-operational)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--brand-operational-subtle)]"
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/10">
-                      <ListChecks className="size-4" />
-                    </span>
+                    <ListChecks className="size-4" />
                     <span>Resume get started</span>
                   </button>
                 )}
@@ -246,62 +240,51 @@ export function Sidebar({
                 onClose={onClose}
               />
             ))}
-          </div>
+          </NavRailBody>
+
           {showPlatformAdmin && (
-            <div className="shrink-0 space-y-1 border-t border-[var(--card-border)] px-2 py-2">
+            <NavRailFooter>
               {collapsed ? (
                 <>
                   <SidebarTooltip label="Platform Admin" side="right">
                     <Link
                       href="/platform"
                       onClick={onClose}
-                      className="group flex cursor-pointer items-center justify-center rounded-full px-2 py-2 text-sm text-[var(--muted)] transition-all duration-150 hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                      className="cs-nav-rail__item cs-nav-rail__item--collapsed"
                     >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] transition-transform duration-150 group-hover:scale-105">
-                        <Settings className="size-4" />
-                      </span>
+                      <Settings className="cs-nav-rail__item-icon" />
                     </Link>
                   </SidebarTooltip>
                   <SidebarTooltip label="Switch tenant" side="right">
                     <Link
                       href="/platform/tenants?switch=1"
                       onClick={onClose}
-                      className="group flex cursor-pointer items-center justify-center rounded-full px-2 py-2 text-sm text-[var(--muted)] transition-all duration-150 hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                      className="cs-nav-rail__item cs-nav-rail__item--collapsed mt-1"
                     >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--muted)]/20 text-[var(--muted)] transition-transform duration-150 group-hover:scale-105">
-                        <Building2 className="size-4" />
-                      </span>
+                      <Building2 className="cs-nav-rail__item-icon" />
                     </Link>
                   </SidebarTooltip>
                 </>
               ) : (
                 <>
-                  <Link
-                    href="/platform"
-                    onClick={onClose}
-                    className="group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm text-[var(--muted)] transition-all duration-150 hover:bg-[var(--background)] hover:text-[var(--foreground)]"
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] transition-transform duration-150 group-hover:scale-105">
-                      <Settings className="size-4" />
-                    </span>
-                    <span>Platform Admin</span>
+                  <Link href="/platform" onClick={onClose} className="cs-nav-rail__item">
+                    <Settings className="cs-nav-rail__item-icon" />
+                    <span className="cs-nav-rail__item-label">Platform Admin</span>
                   </Link>
                   <Link
                     href="/platform/tenants?switch=1"
                     onClick={onClose}
-                    className="group flex cursor-pointer items-center gap-3 rounded-full px-2.5 py-2 text-sm text-[var(--muted)] transition-all duration-150 hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                    className="cs-nav-rail__item mt-1"
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--muted)]/20 text-[var(--muted)] transition-transform duration-150 group-hover:scale-105">
-                      <Building2 className="size-4" />
-                    </span>
-                    <span>Switch tenant</span>
+                    <Building2 className="cs-nav-rail__item-icon" />
+                    <span className="cs-nav-rail__item-label">Switch tenant</span>
                   </Link>
                 </>
               )}
-            </div>
+            </NavRailFooter>
           )}
-        </nav>
-      </aside>
+        </NavRail>
+      </div>
     </>
   );
 }
@@ -319,7 +302,6 @@ function NavGroupBlock({
   collapsed: boolean;
   onClose: () => void;
 }) {
-  const isSecondary = group.secondary ?? false;
   const canCollapse = group.defaultCollapsed ?? false;
 
   const initialCollapsed = useMemo(() => {
@@ -351,96 +333,32 @@ function NavGroupBlock({
     });
   }, [group.id]);
 
-  const showItems = !canCollapse || !sectionCollapsed || collapsed;
-
   return (
-    <div
-      className={`mb-3 ${isSecondary ? "mt-0.5" : ""} ${canCollapse ? "rounded-lg border border-[var(--card-border)]/60 bg-[var(--background)]/30 px-1 py-1" : ""}`}
+    <NavRailGroup
+      label={collapsed ? undefined : group.label}
+      collapsed={collapsed}
+      collapsible={canCollapse && !collapsed}
+      sectionCollapsed={sectionCollapsed}
+      onToggleSection={toggleSection}
     >
-      {!collapsed && (
-        <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
-          {canCollapse ? (
-            <button
-              type="button"
-              onClick={toggleSection}
-              className="flex min-w-0 flex-1 items-center gap-1 rounded-md py-0.5 text-left transition-colors hover:bg-[var(--background)]/80"
-              aria-expanded={!sectionCollapsed}
-            >
-              <ChevronDown
-                className={`size-3.5 shrink-0 text-[var(--muted)] transition-transform ${sectionCollapsed ? "-rotate-90" : ""}`}
-                aria-hidden
-              />
-              <h3
-                className={`truncate text-[10px] font-semibold uppercase tracking-wider ${isSecondary ? "text-[var(--muted)]" : "text-[var(--muted-strong)]"}`}
-              >
-                {group.label}
-              </h3>
-            </button>
-          ) : (
-            <h3
-              className={`px-1 text-[10px] font-semibold uppercase tracking-wider ${isSecondary ? "text-[var(--muted)]" : "text-[var(--muted-strong)]"}`}
-            >
-              {group.label}
-            </h3>
-          )}
-        </div>
-      )}
-      {collapsed && !isSecondary && (
-        <div className="mb-1.5 h-px bg-[var(--card-border)] px-1" aria-hidden />
-      )}
-      {showItems ? (
-        <ul className="space-y-0.5">
-          {group.items.map((item) => {
-            const active = isNavItemActive(item, pathname, searchParams);
-            const Icon = getIcon(item);
-            const tourId = demoNavTourId(item.href);
-            const linkContent = (
-              <Link
-                href={item.href}
-                onClick={onClose}
-                data-tour={tourId ?? undefined}
-                className={`
-                  group flex min-h-[42px] cursor-pointer items-center gap-3 rounded-full px-2.5 py-1.5 text-sm transition-all duration-150
-                  ${collapsed ? "justify-center px-2" : ""}
-                  ${active
-                    ? "bg-[var(--accent)]/15 font-medium text-[var(--accent)]"
-                    : isSecondary
-                      ? "text-[var(--muted)] hover:bg-[var(--background)]/80 hover:text-[var(--foreground)]"
-                      : "text-[var(--foreground)] hover:bg-[var(--background)]/80"}
-                `}
-                title={collapsed ? undefined : item.label}
-              >
-                {Icon ? (
-                  <span
-                    className={`
-                      flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105
-                      ${active
-                        ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                        : isSecondary
-                          ? "bg-[var(--muted)]/10 text-[var(--muted)]"
-                          : "bg-[var(--accent)]/10 text-[var(--accent)]"}
-                    `}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                ) : null}
-                {!collapsed && <span className="min-w-0 truncate">{item.label}</span>}
-              </Link>
-            );
-            return (
-              <li key={`${group.id}-${item.label}-${item.href}`}>
-                {collapsed ? (
-                  <SidebarTooltip label={item.label} side="right" className="w-full">
-                    {linkContent}
-                  </SidebarTooltip>
-                ) : (
-                  linkContent
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
+      {group.items.map((item) => {
+        const active = isNavItemActive(item, pathname, searchParams);
+        const Icon = getIcon(item);
+        const tourId = demoNavTourId(item.href);
+
+        return (
+          <NavRailItem
+            key={`${group.id}-${item.label}-${item.href}`}
+            href={item.href}
+            label={item.label}
+            icon={Icon ?? undefined}
+            active={active}
+            collapsed={collapsed}
+            onClick={onClose}
+            tourId={tourId ?? undefined}
+          />
+        );
+      })}
+    </NavRailGroup>
   );
 }

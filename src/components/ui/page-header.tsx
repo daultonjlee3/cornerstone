@@ -1,17 +1,11 @@
 import type { ReactNode } from "react";
 
 export type PageHeaderProps = {
-  /** Page title */
   title: string;
-  /** Optional short description under the title */
   subtitle?: string;
-  /** Optional icon (e.g. Lucide icon element) shown in a soft container */
   icon?: ReactNode;
-  /** Right-aligned actions (buttons, links) */
   actions?: ReactNode;
-  /** Optional row below subtitle: stats, filters, breadcrumbs, pills */
   meta?: ReactNode;
-  /** Optional: wrap header in a subtle surface/divider for emphasis */
   variant?: "default" | "surface";
   className?: string;
 };
@@ -34,30 +28,18 @@ export function PageHeader({
           </div>
         ) : null}
         <div className="min-w-0 flex-1">
-          <h1 className="ui-page-title">
-            {title}
-          </h1>
-          {subtitle ? (
-            <p className="ui-page-subtitle">{subtitle}</p>
-          ) : null}
+          <h1 className="cs-text-page-title">{title}</h1>
+          {subtitle ? <p className="cs-text-body cs-text-muted ui-page-subtitle">{subtitle}</p> : null}
         </div>
       </div>
-      {actions ? (
-        <div className="ui-page-header-actions">
-          {actions}
-        </div>
-      ) : null}
-      {meta ? (
-        <div className="ui-page-header-meta">
-          {meta}
-        </div>
-      ) : null}
+      {actions ? <div className="ui-page-header-actions">{actions}</div> : null}
+      {meta ? <div className="ui-page-header-meta">{meta}</div> : null}
     </header>
   );
 
   if (variant === "surface") {
     return (
-      <div className="ui-page-header-area">
+      <div className="ui-page-header-area cs-surface cs-surface--default cs-panel cs-panel--padding-md">
         {content}
       </div>
     );

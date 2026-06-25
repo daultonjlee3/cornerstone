@@ -1,4 +1,9 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import {
+  TablePaginationBar,
+  TableShell,
+  TableToolbar as DesignTableToolbar,
+} from "@/src/components/design-system";
 
 type DataTableProps = {
   children: ReactNode;
@@ -6,11 +11,7 @@ type DataTableProps = {
 };
 
 export function DataTable({ children, className = "" }: DataTableProps) {
-  return (
-    <div className={`ui-table-shell min-w-0 ${className}`}>
-      <div className="overflow-x-auto min-w-0">{children}</div>
-    </div>
-  );
+  return <TableShell className={className}>{children}</TableShell>;
 }
 
 export function Table({ children, className = "" }: DataTableProps) {
@@ -20,7 +21,7 @@ export function Table({ children, className = "" }: DataTableProps) {
 export function TableHead({ children }: { children: ReactNode }) {
   return (
     <thead>
-      <tr className="border-b border-[var(--card-border)] bg-[var(--background)]/55 text-xs uppercase tracking-[0.06em] text-[var(--muted)]">
+      <tr className="border-b border-[var(--surface-border-subtle)] bg-[var(--surface-default)] cs-text-micro cs-text-muted">
         {children}
       </tr>
     </thead>
@@ -28,7 +29,9 @@ export function TableHead({ children }: { children: ReactNode }) {
 }
 
 export function Th({ children, className = "" }: DataTableProps) {
-  return <th className={`px-3 py-2.5 font-semibold sm:px-4 sm:py-3 ${className}`}>{children}</th>;
+  return (
+    <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>
+  );
 }
 
 export function TBody({ children }: { children: ReactNode }) {
@@ -45,7 +48,7 @@ export function Tr({ children, className = "", clickable = false, ...rest }: TrP
   return (
     <tr
       {...rest}
-      className={`border-b border-[var(--card-border)]/90 last:border-0 hover:bg-[var(--background)]/52 ${
+      className={`border-b border-[var(--surface-border-subtle)] last:border-0 transition-colors duration-[var(--duration-fast)] hover:bg-[var(--surface-default)] ${
         clickable ? "cursor-pointer" : ""
       } ${className}`}
     >
@@ -55,17 +58,15 @@ export function Tr({ children, className = "", clickable = false, ...rest }: TrP
 }
 
 export function Td({ children, className = "" }: DataTableProps) {
-  return <td className={`px-3 py-2.5 align-top text-[var(--foreground)] sm:px-4 sm:py-3.5 ${className}`}>{children}</td>;
+  return (
+    <td className={`px-4 py-3 align-top cs-text-body text-[var(--text-primary)] ${className}`}>
+      {children}
+    </td>
+  );
 }
 
 export function TableToolbar({ children, className = "" }: DataTableProps) {
-  return (
-    <div
-      className={`flex min-w-0 flex-wrap items-end justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/75 p-3 sm:p-3 ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <DesignTableToolbar className={className}>{children}</DesignTableToolbar>;
 }
 
 export function TableEmptyState({
@@ -77,22 +78,14 @@ export function TableEmptyState({
 }) {
   return (
     <Tr>
-      <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+      <td colSpan={colSpan} className="px-4 py-10 text-center cs-text-caption cs-text-muted">
         {message}
       </td>
     </Tr>
   );
 }
 
-export function TablePagination({
-  page,
-  totalPages,
-  totalRows,
-  showingFrom,
-  showingTo,
-  onPrevious,
-  onNext,
-}: {
+export function TablePagination(props: {
   page: number;
   totalPages: number;
   totalRows: number;
@@ -101,32 +94,5 @@ export function TablePagination({
   onPrevious: () => void;
   onNext: () => void;
 }) {
-  return (
-    <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/70 px-3 py-2.5">
-      <p className="text-xs text-[var(--muted)]">
-        Showing {showingFrom}-{showingTo} of {totalRows}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={onPrevious}
-          className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
-        >
-          Previous
-        </button>
-        <span className="text-xs text-[var(--muted)]">
-          Page {page} / {totalPages}
-        </span>
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={onNext}
-          className="rounded-[var(--radius-control)] border border-[var(--card-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--foreground)] disabled:opacity-50"
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  );
+  return <TablePaginationBar {...props} />;
 }

@@ -18,12 +18,13 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "border border-transparent bg-[var(--accent)] text-white shadow-[var(--shadow-glow)] hover:bg-[var(--accent-hover)] focus:ring-[var(--accent)]",
+    "border border-transparent bg-[var(--brand-action)] text-white shadow-[var(--elevation-1)] hover:bg-[var(--brand-action-hover)] focus:ring-[var(--brand-action)]",
   secondary:
-    "border border-[var(--card-border)] bg-white/90 text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-white focus:ring-[var(--accent)]",
+    "border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-[var(--elevation-0)] hover:bg-[var(--surface-default)] focus:ring-[var(--brand-action)]",
   ghost:
-    "text-[var(--foreground)] hover:bg-[var(--background)]/80 focus:ring-[var(--accent)]",
-  danger: "border border-red-300 bg-red-500 text-white shadow-sm hover:bg-red-600 focus:ring-red-500",
+    "text-[var(--text-primary)] hover:bg-[var(--surface-default)] focus:ring-[var(--brand-action)]",
+  danger:
+    "border border-transparent bg-[var(--status-danger)] text-white shadow-[var(--elevation-1)] hover:opacity-90 focus:ring-[var(--status-danger)]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -32,7 +33,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 };
 
 const buttonClassName = (variant: ButtonVariant, size: ButtonSize, className: string) =>
-  `inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
+  `inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-md)] font-medium transition-colors duration-[var(--duration-fast)] focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { children, variant = "primary", size = "md", className = "", asChild = false, ...props },

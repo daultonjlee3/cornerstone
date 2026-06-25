@@ -1,6 +1,10 @@
-/** Operational severity and confidence styling — shared across Command Center and Dispatch. */
+/** Operational severity styling — delegates to design-system StatusChip. */
 
-export type FleetSeverity = "critical" | "warning" | "success" | "info" | "neutral";
+import { fleetLegacySeverityToTone } from "@/src/components/design-system/chip-maps";
+import { statusChipClass, statusDotClass } from "@/src/components/design-system/status-chip";
+import type { ChipTone } from "@/src/components/design-system/types";
+
+export type FleetSeverity = "critical" | "warning" | "success" | "info" | "neutral" | "accent";
 export type FleetConfidence = "high" | "medium" | "low";
 
 export function severityToFleetSeverity(
@@ -29,22 +33,26 @@ export function confidenceToFleetSeverity(confidence: FleetConfidence): FleetSev
   }
 }
 
+function toTone(severity: FleetSeverity): ChipTone {
+  return fleetLegacySeverityToTone(severity);
+}
+
 export function fleetChipClass(severity: FleetSeverity): string {
-  return `fleet-chip fleet-chip--${severity}`;
+  return statusChipClass(toTone(severity));
 }
 
 export function fleetDotClass(severity: FleetSeverity): string {
-  return `fleet-status-dot fleet-status-dot--${severity}`;
+  return statusDotClass(toTone(severity));
 }
 
 export function fleetPanelSeverityClass(severity: FleetSeverity): string {
   switch (severity) {
     case "critical":
-      return "border-[rgba(248,113,113,0.2)] bg-[rgba(248,113,113,0.04)]";
+      return "border-[color-mix(in_srgb,var(--status-danger)_20%,transparent)] bg-[var(--status-danger-subtle)]";
     case "warning":
-      return "border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.04)]";
+      return "border-[color-mix(in_srgb,var(--status-warning)_20%,transparent)] bg-[var(--status-warning-subtle)]";
     case "success":
-      return "border-[rgba(52,211,153,0.18)] bg-[rgba(52,211,153,0.04)]";
+      return "border-[color-mix(in_srgb,var(--status-success)_20%,transparent)] bg-[var(--status-success-subtle)]";
     default:
       return "";
   }

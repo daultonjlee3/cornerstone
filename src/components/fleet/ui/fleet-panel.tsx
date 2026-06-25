@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HeroPanel, Panel } from "@/src/components/design-system";
 
 type FleetPanelProps = {
   children: ReactNode;
@@ -7,21 +8,24 @@ type FleetPanelProps = {
   id?: string;
 };
 
-const variantClass: Record<NonNullable<FleetPanelProps["variant"]>, string> = {
-  default: "fleet-panel",
-  elevated: "fleet-panel-elevated",
-  accent: "fleet-panel-accent",
-};
-
+/** @deprecated Use Panel or HeroPanel from design-system. */
 export function FleetPanel({
   children,
   className = "",
   variant = "default",
   id,
 }: FleetPanelProps) {
+  if (variant === "accent") {
+    return (
+      <HeroPanel id={id} className={className}>
+        {children}
+      </HeroPanel>
+    );
+  }
+
   return (
-    <section id={id} className={`${variantClass[variant]} ${className}`}>
+    <Panel id={id} level="raised" padding="md" className={className}>
       {children}
-    </section>
+    </Panel>
   );
 }

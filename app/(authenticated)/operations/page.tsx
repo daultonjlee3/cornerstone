@@ -244,29 +244,21 @@ export default async function OperationsCenterPage() {
         </Suspense>
       ) : null}
       <div className="space-y-8">
-        <PageHeader
-          icon={<LayoutGrid className="size-5" />}
-          title={fleetOnly ? "Fleet Command Center" : "Operations Command Center"}
-          subtitle={
-            fleetOnly
-              ? "What changed, what needs attention, and what to do next."
-              : "Live operational intelligence across work orders, preventive maintenance, and technician execution."
-          }
-          actions={
-            <div className="flex items-center gap-2">
-              <DashboardHeaderActions productProfile={productProfile} />
-            </div>
-          }
-        />
+        {!fleetOnly ? (
+          <PageHeader
+            icon={<LayoutGrid className="size-5" />}
+            title="Operations Command Center"
+            subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
+            actions={
+              <div className="flex items-center gap-2">
+                <DashboardHeaderActions productProfile={productProfile} />
+              </div>
+            }
+          />
+        ) : null}
 
         {showFleet && fleetTodayView ? (
-          fleetOnly ? (
-            <FleetTodayView initialData={fleetTodayView} />
-          ) : (
-            <>
-              <FleetTodayView initialData={fleetTodayView} />
-            </>
-          )
+          <FleetTodayView initialData={fleetTodayView} />
         ) : null}
 
         {!fleetOnly ? (

@@ -12,7 +12,7 @@ export function FleetDataFreshness({ updatedAt, className = "" }: FleetDataFresh
       className={`inline-flex items-center gap-1.5 text-xs text-[var(--muted)] ${className}`}
       title={updatedAt ? new Date(updatedAt).toLocaleString() : undefined}
     >
-      <Radio className="size-3 text-[var(--accent)]" strokeWidth={2} aria-hidden />
+      <Radio className="size-3 text-[var(--brand-operational)]" strokeWidth={2} aria-hidden />
       <span>Data {formatDataFreshness(updatedAt ?? new Date().toISOString())}</span>
     </span>
   );
