@@ -67,6 +67,7 @@ export default async function OperatorsPage({
         icon={<Users className="size-5" />}
         title="Operators"
         subtitle="Manage drivers, operators, and crew leads."
+        variant="surface"
       />
       <OperatorsList
         operators={operatorRows}

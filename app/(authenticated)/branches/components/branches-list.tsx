@@ -9,6 +9,7 @@ import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { Pagination } from "@/src/components/ui/pagination";
+import { EmptyState, KpiCard, SectionHeader, StatusChip } from "@/src/components/design-system";
 import {
   DataTable,
   Table,
@@ -62,6 +63,8 @@ export function BranchesList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const activeCount = initialBranches.filter((branch) => branch.status === "active").length;
+  const inactiveCount = initialBranches.length - activeCount;
 
   const handleDelete = (id: string, name: string) => {
     if (!confirm(`Delete branch "${name}"? This cannot be undone.`)) return;
@@ -98,35 +101,52 @@ export function BranchesList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {message && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
+          className={`rounded-[var(--radius-lg)] border px-4 py-2 text-sm ${
             message.type === "error"
-              ? "bg-red-500/10 text-red-600 dark:text-red-400"
-              : "bg-[var(--accent)]/10 text-[var(--accent)]"
+              ? "border-[color-mix(in_srgb,var(--status-danger)_25%,transparent)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)]"
+              : "border-[color-mix(in_srgb,var(--status-success)_25%,transparent)] bg-[var(--status-success-subtle)] text-[var(--status-success)]"
           }`}
           role="alert"
         >
           {message.text}
         </div>
       )}
-      <div className="flex justify-between items-center gap-4">
-        <h2 className="text-lg font-medium text-[var(--foreground)]">Branches</h2>
-        <Button type="button" onClick={openNew}>
-          New Branch
-        </Button>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Visible branches" value={initialBranches.length} hint="Current page" />
+        <KpiCard label="Active branches" value={activeCount} hint="Operational" emphasis="success" />
+        <KpiCard label="Inactive branches" value={inactiveCount} hint="Non-operational" emphasis={inactiveCount > 0 ? "warning" : "default"} />
+        <KpiCard label="Companies" value={companies.length} hint="Mapped ownership" />
       </div>
 
+      <SectionHeader
+        title="Branch directory"
+        description="Depot records, jurisdiction, and operational status for fleet coverage."
+        action={
+          <div className="flex items-center gap-2">
+            <StatusChip label={`${companies.length} companies`} tone="neutral" showDot={false} />
+            <Button type="button" onClick={openNew}>
+              New Branch
+            </Button>
+          </div>
+        }
+      />
+
       {initialBranches.length === 0 ? (
-        <div className="ui-card py-12 text-center">
-          <p className="text-[var(--muted)]">No branches yet.</p>
-          <Button type="button" onClick={openNew} className="mt-4">
-            Add your first branch
-          </Button>
-        </div>
+        <EmptyState
+          title="No branches yet"
+          description="Add at least one branch to route jobs, compute capacity, and enable branch-level dispatch intelligence."
+          action={
+            <Button type="button" onClick={openNew}>
+              Add your first branch
+            </Button>
+          }
+        />
       ) : (
-        <DataTable>
+        <DataTable className="shadow-[var(--elevation-1)]">
           <Table className="min-w-[600px]">
             <TableHead>
               <Th>Name</Th>

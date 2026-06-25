@@ -9,6 +9,7 @@ import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { Pagination } from "@/src/components/ui/pagination";
+import { EmptyState, KpiCard, SectionHeader, StatusChip } from "@/src/components/design-system";
 import {
   DataTable,
   Table,
@@ -86,6 +87,9 @@ export function TrucksList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const onlineCount = initialTrucks.filter((truck) => truck.telematics_status === "online").length;
+  const staleCount = initialTrucks.filter((truck) => truck.telematics_status === "stale").length;
+  const offlineCount = initialTrucks.length - onlineCount - staleCount;
 
   const handleDelete = (id: string, unitNumber: string) => {
     if (!confirm(`Delete truck "${unitNumber}"? This cannot be undone.`)) return;
@@ -122,35 +126,52 @@ export function TrucksList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {message && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
+          className={`rounded-[var(--radius-lg)] border px-4 py-2 text-sm ${
             message.type === "error"
-              ? "bg-red-500/10 text-red-600 dark:text-red-400"
-              : "bg-[var(--accent)]/10 text-[var(--accent)]"
+              ? "border-[color-mix(in_srgb,var(--status-danger)_25%,transparent)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)]"
+              : "border-[color-mix(in_srgb,var(--status-success)_25%,transparent)] bg-[var(--status-success-subtle)] text-[var(--status-success)]"
           }`}
           role="alert"
         >
           {message.text}
         </div>
       )}
-      <div className="flex justify-between items-center gap-4">
-        <h2 className="text-lg font-medium text-[var(--foreground)]">Trucks</h2>
-        <Button type="button" onClick={openNew}>
-          New Truck
-        </Button>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Visible trucks" value={initialTrucks.length} hint="Current page" />
+        <KpiCard label="GPS online" value={onlineCount} hint="Live telemetry" emphasis="success" />
+        <KpiCard label="GPS stale" value={staleCount} hint="Sync risk" emphasis={staleCount > 0 ? "warning" : "default"} />
+        <KpiCard label="Offline" value={offlineCount} hint="Needs investigation" emphasis={offlineCount > 0 ? "danger" : "default"} />
       </div>
 
+      <SectionHeader
+        title="Truck registry"
+        description="Vehicle records, branch assignment, and telematics health."
+        action={
+          <div className="flex items-center gap-2">
+            <StatusChip label={`${branches.length} branches`} tone="neutral" showDot={false} />
+            <Button type="button" onClick={openNew}>
+              New Truck
+            </Button>
+          </div>
+        }
+      />
+
       {initialTrucks.length === 0 ? (
-        <div className="ui-card py-12 text-center">
-          <p className="text-[var(--muted)]">No trucks yet.</p>
-          <Button type="button" onClick={openNew} className="mt-4">
-            Add your first truck
-          </Button>
-        </div>
+        <EmptyState
+          title="No trucks yet"
+          description="Create your first truck record to unlock dispatch recommendations and utilization tracking."
+          action={
+            <Button type="button" onClick={openNew}>
+              Add your first truck
+            </Button>
+          }
+        />
       ) : (
-        <DataTable>
+        <DataTable className="shadow-[var(--elevation-1)]">
           <Table className="min-w-[600px]">
             <TableHead>
               <Th>Unit #</Th>

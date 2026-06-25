@@ -1,8 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Search, Menu, Bell } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  Activity,
+  Bell,
+  CloudSun,
+  Command,
+  Menu,
+  Plus,
+  Search,
+  Sparkles,
+  Wind,
+} from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { useGuidance } from "@/hooks/useGuidance";
 
@@ -41,6 +52,7 @@ type TopBarProps = {
   companyName: string;
   userName: string;
   onMenuClick: () => void;
+  onOpenAiPanel?: () => void;
   isImpersonating?: boolean;
   onReturnToProfile?: () => void;
 };
@@ -59,26 +71,33 @@ export function TopBar({
   companyName,
   userName,
   onMenuClick,
+  onOpenAiPanel,
   isImpersonating = false,
   onReturnToProfile,
 }: TopBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isLiveDemoMode } = useGuidance();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [weatherLabel, setWeatherLabel] = useState("Weather unavailable");
+  const [branchHistory, setBranchHistory] = useState<string[]>([]);
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
   const accountRef = useRef<HTMLDivElement | null>(null);
+  const quickActionsRef = useRef<HTMLDivElement | null>(null);
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
       const q = searchQuery.trim();
       if (!q) return;
-      router.push(`/work-orders?q=${encodeURIComponent(q)}`);
+      router.push(`/operations?q=${encodeURIComponent(q)}`);
     },
     [searchQuery, router]
   );
@@ -177,44 +196,204 @@ export function TopBar({
     return () => document.removeEventListener("click", handleClickOutside);
   }, [accountOpen]);
 
+  useEffect(() => {
+    if (!quickActionsOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (quickActionsRef.current && !quickActionsRef.current.contains(e.target as Node)) {
+        setQuickActionsOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [quickActionsOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadWeather = async () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const res = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`
+            );
+            if (!res.ok || cancelled) return;
+            const data = (await res.json()) as {
+              current?: { temperature_2m?: number; wind_speed_10m?: number };
+            };
+            const temp = data.current?.temperature_2m;
+            const wind = data.current?.wind_speed_10m;
+            if (temp == null || wind == null || cancelled) return;
+            setWeatherLabel(`${Math.round(temp)}°F · ${Math.round(wind)} mph`);
+          } catch {
+            // Quiet fail: weather is additive only.
+          }
+        },
+        () => {
+          // Keep default label.
+        },
+        { timeout: 3500 }
+      );
+    };
+    void loadWeather();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const branchId = useMemo(() => searchParams.get("branch_id")?.trim() ?? "", [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("cornerstone:recent-branches");
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setBranchHistory(parsed.filter((value): value is string => typeof value === "string").slice(0, 6));
+      }
+    } catch {
+      // Ignore malformed storage data.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !branchId) return;
+    setBranchHistory((prev) => {
+      const next = [branchId, ...prev.filter((id) => id !== branchId)].slice(0, 6);
+      window.localStorage.setItem("cornerstone:recent-branches", JSON.stringify(next));
+      return next;
+    });
+  }, [branchId]);
+
+  const handleBranchChange = useCallback(
+    (nextValue: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (nextValue === "all") next.delete("branch_id");
+      else next.set("branch_id", nextValue);
+      router.push(`${pathname}?${next.toString()}`);
+    },
+    [pathname, router, searchParams]
+  );
+
+  const opsStatus = unreadCount > 0 ? "Needs attention" : "Nominal";
+  const opsStatusClass =
+    unreadCount > 0 ? "text-[var(--status-warning)]" : "text-[var(--status-success)]";
+  const branchOptions = branchId
+    ? [branchId, ...branchHistory.filter((item) => item !== branchId)]
+    : branchHistory;
+
   const unreadLabel = useMemo(() => {
     if (unreadCount <= 0) return null;
     return unreadCount > 9 ? "9+" : String(unreadCount);
   }, [unreadCount]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--card-border)] bg-[var(--card)]/95 px-4 backdrop-blur-xl sm:px-5">
-      <button
-        type="button"
-        onClick={onMenuClick}
-        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)] lg:hidden"
-        aria-label="Open menu"
-      >
-        <Menu className="size-5" />
-      </button>
-      <div className="hidden flex-1 lg:block">
-        <form onSubmit={handleSearchSubmit} className="max-w-sm">
-          <label htmlFor="topbar-search" className="sr-only">
-            Search work orders, assets, technicians
-          </label>
-          <div className="relative">
-            <Search
-              aria-hidden
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--muted)]"
-            />
-            <input
-              id="topbar-search"
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search work orders, assets, technicians..."
-              className="h-9 w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)]/80 pl-9 pr-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              aria-label="Search work orders, assets, technicians"
-            />
+    <header className="cs-command-topbar sticky top-0 z-30 shrink-0 px-3 pb-3 pt-3 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-[var(--surface-border-subtle)] text-[var(--muted)] transition-colors hover:bg-[var(--surface-default)] hover:text-[var(--foreground)] lg:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="size-5" />
+          </button>
+          <div className="hidden min-w-0 sm:block">
+            <p className="truncate text-sm font-semibold text-[var(--foreground)]">{tenantName}</p>
+            <p className="truncate text-xs text-[var(--muted)]">{companyName}</p>
           </div>
-        </form>
-      </div>
-      <div className="flex items-center gap-2 sm:gap-3">
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 lg:justify-center">
+          <form onSubmit={handleSearchSubmit} className="w-full max-w-xl">
+            <label htmlFor="topbar-search" className="sr-only">
+              Global search
+            </label>
+            <div className="relative">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--muted)]"
+              />
+              <input
+                id="topbar-search"
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Global search: jobs, trucks, operators, branches..."
+                className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 pl-9 pr-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                aria-label="Global search"
+              />
+            </div>
+          </form>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-2 lg:flex">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              Branch
+            </label>
+            <select
+              value={branchId || "all"}
+              onChange={(e) => handleBranchChange(e.target.value)}
+              className="h-9 rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2 text-xs text-[var(--foreground)]"
+              aria-label="Branch selector"
+            >
+              <option value="all">All branches</option>
+              {branchOptions.map((option) => (
+                <option key={option} value={option}>
+                  Branch {option.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="relative" ref={quickActionsRef}>
+            <button
+              type="button"
+              onClick={() => setQuickActionsOpen((prev) => !prev)}
+              className="flex size-9 items-center justify-center rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/65 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+              aria-label="Quick actions"
+            >
+              <Plus className="size-4" />
+            </button>
+            {quickActionsOpen ? (
+              <div className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] p-1 shadow-[var(--elevation-2)]">
+                <Link
+                  href="/dispatch"
+                  onClick={() => setQuickActionsOpen(false)}
+                  className="block rounded-md px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--surface-default)]"
+                >
+                  Open Dispatch Board
+                </Link>
+                <Link
+                  href="/operations"
+                  onClick={() => setQuickActionsOpen(false)}
+                  className="block rounded-md px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--surface-default)]"
+                >
+                  View Command Center
+                </Link>
+                <Link
+                  href="/reports/operations"
+                  onClick={() => setQuickActionsOpen(false)}
+                  className="block rounded-md px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--surface-default)]"
+                >
+                  Open Fleet Performance
+                </Link>
+              </div>
+            ) : null}
+          </div>
+          {onOpenAiPanel ? (
+            <button
+              type="button"
+              onClick={onOpenAiPanel}
+              className="hidden h-9 items-center gap-1.5 rounded-lg border border-[var(--brand-operational)]/35 bg-[var(--brand-operational-subtle)] px-3 text-xs font-semibold text-[var(--brand-operational)] transition-colors hover:brightness-110 sm:inline-flex"
+            >
+              <Sparkles className="size-3.5" />
+              AI Copilot
+            </button>
+          ) : null}
         {isLiveDemoMode ? (
           <span className="hidden rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)] sm:inline-flex">
             Demo Workspace
@@ -223,7 +402,7 @@ export function TopBar({
         <div className="relative" ref={notificationPanelRef}>
           <button
             type="button"
-            className="relative flex size-9 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[var(--background)]/60 text-[var(--muted)] transition-colors hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+            className="relative flex size-9 items-center justify-center rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/65 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
             aria-label="Notifications"
             onClick={() => {
               setNotificationOpen((prev) => !prev);
@@ -240,8 +419,8 @@ export function TopBar({
             <Bell className="size-4" />
           </button>
           {notificationOpen ? (
-            <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/96 shadow-[var(--shadow-card)]">
-              <div className="flex items-center justify-between border-b border-[var(--card-border)] px-3 py-2">
+            <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-[var(--radius-card)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] shadow-[var(--elevation-2)]">
+              <div className="flex items-center justify-between border-b border-[var(--surface-border-subtle)] px-3 py-2">
                 <p className="text-sm font-semibold text-[var(--foreground)]">Notifications</p>
                 <button
                   type="button"
@@ -257,7 +436,7 @@ export function TopBar({
                 ) : items.length === 0 ? (
                   <p className="px-3 py-4 text-sm text-[var(--muted)]">No notifications yet.</p>
                 ) : (
-                  <ul className="divide-y divide-[var(--card-border)]">
+                  <ul className="divide-y divide-[var(--surface-border-subtle)]">
                     {items.map((item) => (
                       <li key={item.id}>
                         <a
@@ -268,7 +447,7 @@ export function TopBar({
                             }
                             setNotificationOpen(false);
                           }}
-                          className={`block px-3 py-3 hover:bg-[var(--background)]/60 ${
+                          className={`block px-3 py-3 hover:bg-[var(--surface-default)] ${
                             item.read_at ? "" : "bg-[var(--accent)]/5"
                           }`}
                         >
@@ -291,7 +470,7 @@ export function TopBar({
           <button
             type="button"
             onClick={() => setAccountOpen((o) => !o)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)] hover:opacity-90"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--brand-operational)]/30 bg-[var(--brand-operational-subtle)] text-xs font-semibold text-[var(--brand-operational)] hover:opacity-90"
             aria-expanded={accountOpen}
             aria-haspopup="true"
             aria-label="Account menu"
@@ -300,7 +479,7 @@ export function TopBar({
           </button>
           {accountOpen ? (
             <div
-              className="absolute right-0 top-full z-50 mt-1.5 min-w-[200px] rounded-xl border border-[var(--card-border)] bg-[var(--card)] py-1 shadow-[var(--shadow-card)]"
+              className="absolute right-0 top-full z-50 mt-1.5 min-w-[200px] rounded-xl border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] py-1 shadow-[var(--elevation-2)]"
               role="menu"
             >
               {isImpersonating && onReturnToProfile ? (
@@ -317,12 +496,41 @@ export function TopBar({
                 </button>
               ) : null}
               <div
-                className={`px-3 py-2 ${isImpersonating ? "border-t border-[var(--card-border)]" : ""}`}
+                className={`px-3 py-2 ${isImpersonating ? "border-t border-[var(--surface-border-subtle)]" : ""}`}
               >
                 <SignOutButton />
               </div>
             </div>
           ) : null}
+        </div>
+      </div>
+      </div>
+      <div className="mt-3 cs-command-strip">
+        <div className="cs-command-strip__item">
+          <p className="cs-command-strip__label">Operational status</p>
+          <p className={`cs-command-strip__value inline-flex items-center gap-1.5 ${opsStatusClass}`}>
+            <Activity className="size-3.5" />
+            {opsStatus}
+          </p>
+        </div>
+        <div className="cs-command-strip__item">
+          <p className="cs-command-strip__label">Workspace</p>
+          <p className="cs-command-strip__value">{tenantName}</p>
+        </div>
+        <div className="cs-command-strip__item">
+          <p className="cs-command-strip__label">Weather</p>
+          <p className="cs-command-strip__value inline-flex items-center gap-1.5">
+            <CloudSun className="size-3.5 text-[var(--status-info)]" />
+            {weatherLabel}
+          </p>
+        </div>
+        <div className="cs-command-strip__item">
+          <p className="cs-command-strip__label">Wind / mode</p>
+          <p className="cs-command-strip__value inline-flex items-center gap-1.5">
+            <Wind className="size-3.5 text-[var(--text-muted)]" />
+            Mission Control
+            <Command className="size-3.5 text-[var(--text-muted)]" />
+          </p>
         </div>
       </div>
     </header>

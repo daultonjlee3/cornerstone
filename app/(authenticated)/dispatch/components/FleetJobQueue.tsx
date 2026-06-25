@@ -69,9 +69,9 @@ export function FleetJobQueue({
   return (
     <aside
       id="fleet-job-queue"
-      className="flex flex-col overflow-hidden rounded-lg border border-[var(--card-border)] bg-white shadow-sm dark:bg-[var(--card)]"
+      className="flex flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 shadow-[var(--elevation-1)]"
     >
-      <div className="border-b border-[var(--card-border)] px-3 py-2.5">
+      <div className="border-b border-[var(--surface-border-subtle)] px-3 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Job queue</p>
         <p className="text-[10px] text-[var(--muted)]">
           {jobs.length} unassigned · highest priority first
@@ -101,10 +101,10 @@ export function FleetJobQueue({
             return (
               <li
                 key={job.id}
-                className={`rounded-lg border bg-white transition-all duration-150 dark:bg-[var(--card)] ${priorityUrgencyClass(job.priority)} ${
+                className={`rounded-lg border bg-[var(--surface-default)]/72 transition-all duration-150 ${priorityUrgencyClass(job.priority)} ${
                   selected
-                    ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30"
-                    : "border-[var(--card-border)] hover:border-[var(--foreground)]/15"
+                    ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30 shadow-[var(--elevation-1)]"
+                    : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15"
                 }`}
               >
                 <button
@@ -151,7 +151,7 @@ export function FleetJobQueue({
                   ) : null}
 
                   {topTruck ? (
-                    <div className="mt-2 space-y-1 rounded-md border border-blue-200 bg-white px-2 py-1.5 dark:border-blue-800 dark:bg-[var(--card)]">
+                    <div className="mt-2 space-y-1 rounded-md border border-[color-mix(in_srgb,var(--status-info)_28%,transparent)] bg-[var(--status-info-subtle)] px-2 py-1.5">
                       <div className="flex items-center justify-between gap-1">
                         <span className="flex items-center gap-1 text-[10px] font-bold text-blue-800 dark:text-blue-300">
                           <Sparkles className="size-3" />
@@ -195,7 +195,7 @@ export function FleetJobQueue({
                 </button>
 
                 {selected ? (
-                  <div className="space-y-1 border-t border-[var(--card-border)] px-2.5 pb-2.5 pt-2">
+                  <div className="space-y-1 border-t border-[var(--surface-border-subtle)] px-2.5 pb-2.5 pt-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
                       Quick assign
                     </p>

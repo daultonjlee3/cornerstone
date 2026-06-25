@@ -236,7 +236,7 @@ export function FleetDispatchMapPanel({
       </MapContainer>
 
       {showLegend ? (
-        <div className="pointer-events-none absolute bottom-2 left-2 z-[1000] max-w-[200px] rounded-lg border border-[var(--card-border)] bg-white p-2 text-[10px] shadow-sm dark:bg-[var(--card)]">
+        <div className="pointer-events-none absolute bottom-2 left-2 z-[1000] max-w-[220px] rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 p-2 text-[10px] shadow-[var(--elevation-1)]">
           <p className="font-bold uppercase tracking-wide text-[var(--muted)]">Map intelligence</p>
           {routeLines.map((line) => (
             <div key={line.key} className="mt-1 flex items-center gap-1.5">
@@ -261,13 +261,13 @@ export function FleetDispatchMapPanel({
       ) : null}
 
       {activeRisk ? (
-        <div className="pointer-events-none absolute right-2 top-2 z-[1000] max-w-[180px] rounded-lg border border-red-300 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-700 shadow-sm dark:bg-[var(--card)]">
+        <div className="pointer-events-none absolute right-2 top-2 z-[1000] max-w-[180px] rounded-lg border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--status-danger)] shadow-[var(--elevation-1)]">
           ⚠ {activeRisk}
         </div>
       ) : null}
 
       {/* Future-ready: branch capacity overlays attach here via branchCapacity GeoJSON layer */}
-      <div className="pointer-events-none absolute right-2 bottom-2 z-[1000] hidden rounded border border-[var(--card-border)] bg-white px-1.5 py-0.5 text-[9px] text-[var(--muted)] dark:bg-[var(--card)] lg:block">
+      <div className="pointer-events-none absolute right-2 bottom-2 z-[1000] hidden rounded border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 px-1.5 py-0.5 text-[9px] text-[var(--muted)] lg:block">
         Branch overlays · coming soon
       </div>
     </div>

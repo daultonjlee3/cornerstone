@@ -57,8 +57,8 @@
 
 body {
   background:
-    radial-gradient(circle at 12% 14%, rgba(130, 175, 255, 0.28), transparent 42%),
-    radial-gradient(circle at 86% 84%, rgba(89, 163, 255, 0.22), transparent 38%),
+    radial-gradient(circle at 12% 14%, rgba(130, 175, 255, 0.18), transparent 44%),
+    radial-gradient(circle at 86% 84%, rgba(89, 163, 255, 0.14), transparent 42%),
     linear-gradient(165deg, var(--background-canvas-start), var(--background-canvas-end));
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
@@ -185,6 +185,13 @@ body {
 
 .ui-table-shell .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
+}
+
+.ui-table-shell thead tr,
+.cs-table-shell thead tr {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 /* Page header: icon + title block left, actions right, optional meta row */
@@ -515,6 +522,13 @@ body:has([data-fleet-ui="true"]) {
   background:
     radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--brand-operational) 6%, transparent), transparent 55%),
     linear-gradient(180deg, var(--surface-canvas), color-mix(in srgb, var(--surface-canvas) 85%, #000));
+}
+
+body:has([data-enterprise-ui="true"]) {
+  background:
+    radial-gradient(ellipse 70% 45% at 55% -10%, rgba(34, 211, 238, 0.08), transparent 55%),
+    radial-gradient(circle at 5% 40%, rgba(249, 115, 22, 0.06), transparent 40%),
+    linear-gradient(180deg, #060b11, #0b1420);
 }
 
 [data-fleet-ui="true"] .leaflet-container {

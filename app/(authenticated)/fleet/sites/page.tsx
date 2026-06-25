@@ -73,6 +73,7 @@ export default async function SitesPage({
         icon={<MapPin className="size-5" />}
         title="Customer Sites"
         subtitle="Manage job locations and customer site coordinates."
+        variant="surface"
       />
       <SitesList
         sites={siteRows}

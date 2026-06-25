@@ -8,6 +8,7 @@ import { SiteFormModal } from "./site-form-modal";
 import { Button } from "@/src/components/ui/button";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { Pagination } from "@/src/components/ui/pagination";
+import { EmptyState, KpiCard, SectionHeader, StatusChip } from "@/src/components/design-system";
 import {
   DataTable,
   Table,
@@ -61,6 +62,7 @@ export function SitesList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<CustomerSite | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const geocodedCount = initialSites.filter((site) => site.latitude != null && site.longitude != null).length;
 
   const handleDelete = (id: string, name: string) => {
     if (!confirm(`Delete site "${name}"? This cannot be undone.`)) return;
@@ -97,35 +99,52 @@ export function SitesList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {message && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
+          className={`rounded-[var(--radius-lg)] border px-4 py-2 text-sm ${
             message.type === "error"
-              ? "bg-red-500/10 text-red-600 dark:text-red-400"
-              : "bg-[var(--accent)]/10 text-[var(--accent)]"
+              ? "border-[color-mix(in_srgb,var(--status-danger)_25%,transparent)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)]"
+              : "border-[color-mix(in_srgb,var(--status-success)_25%,transparent)] bg-[var(--status-success-subtle)] text-[var(--status-success)]"
           }`}
           role="alert"
         >
           {message.text}
         </div>
       )}
-      <div className="flex justify-between items-center gap-4">
-        <h2 className="text-lg font-medium text-[var(--foreground)]">Customer Sites</h2>
-        <Button type="button" onClick={openNew}>
-          New Site
-        </Button>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Visible sites" value={initialSites.length} hint="Current page" />
+        <KpiCard label="Geocoded sites" value={geocodedCount} hint="Map-ready" emphasis="success" />
+        <KpiCard label="Missing coordinates" value={initialSites.length - geocodedCount} hint="Needs geocoding" emphasis={initialSites.length - geocodedCount > 0 ? "warning" : "default"} />
+        <KpiCard label="Companies" value={companies.length} hint="Customer accounts" />
       </div>
 
+      <SectionHeader
+        title="Site registry"
+        description="Service locations, coordinates, and customer ownership for dispatch routing."
+        action={
+          <div className="flex items-center gap-2">
+            <StatusChip label={`${companies.length} companies`} tone="neutral" showDot={false} />
+            <Button type="button" onClick={openNew}>
+              New Site
+            </Button>
+          </div>
+        }
+      />
+
       {initialSites.length === 0 ? (
-        <div className="ui-card py-12 text-center">
-          <p className="text-[var(--muted)]">No customer sites yet.</p>
-          <Button type="button" onClick={openNew} className="mt-4">
-            Add your first site
-          </Button>
-        </div>
+        <EmptyState
+          title="No customer sites yet"
+          description="Add sites and coordinates so route previews and deadhead intelligence are accurate."
+          action={
+            <Button type="button" onClick={openNew}>
+              Add your first site
+            </Button>
+          }
+        />
       ) : (
-        <DataTable>
+        <DataTable className="shadow-[var(--elevation-1)]">
           <Table className="min-w-[600px]">
             <TableHead>
               <Th>Name</Th>

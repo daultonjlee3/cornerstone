@@ -160,20 +160,29 @@ export function Sidebar({
         <NavRail collapsed={collapsed} embedded>
           <NavRailHeader>
             {collapsed ? (
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                className="flex size-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--surface-default)] hover:text-[var(--text-primary)]"
-                aria-label="Expand sidebar"
-              >
-                <ChevronRight className="size-5" />
-              </button>
+              <div className="flex w-full items-center justify-between gap-1">
+                <NavRailBrand
+                  href="/operations"
+                  title="Cornerstone"
+                  subtitle="Mission"
+                  icon={Truck}
+                  collapsed
+                />
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="flex size-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--surface-default)] hover:text-[var(--text-primary)]"
+                  aria-label="Expand sidebar"
+                >
+                  <ChevronRight className="size-5" />
+                </button>
+              </div>
             ) : (
               <>
                 <NavRailBrand
                   href="/operations"
                   title="Cornerstone"
-                  subtitle={productProfile === "cmms" ? "OS" : "Fleet"}
+                  subtitle={productProfile === "cmms" ? "Operations Command" : "Fleet Mission Control"}
                   icon={Truck}
                 />
                 <div className="flex shrink-0 items-center gap-0.5">

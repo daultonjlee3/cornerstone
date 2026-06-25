@@ -85,6 +85,7 @@ export default async function TrucksPage({
         icon={<Truck className="size-5" />}
         title="Trucks"
         subtitle="Manage fleet vehicles and unit assignments."
+        variant="surface"
       />
       <TrucksList
         trucks={truckRows}

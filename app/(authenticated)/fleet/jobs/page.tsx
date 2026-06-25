@@ -86,6 +86,7 @@ export default async function JobsPage({
         icon={<ClipboardList className="size-5" />}
         title="Fleet Jobs"
         subtitle="Manage dispatch jobs, revenue estimates, and truck assignments."
+        variant="surface"
       />
       <JobsList
         jobs={jobRows}

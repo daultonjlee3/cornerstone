@@ -187,10 +187,13 @@ export function FleetDispatchView({
   );
 
   return (
-    <div className="relative flex h-[calc(100vh-8rem)] min-h-[560px] flex-col" data-testid="fleet-dispatch-board">
+    <div
+      className="relative flex h-[calc(100vh-11rem)] min-h-[620px] flex-col rounded-[var(--radius-xl)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/80 p-2 shadow-[var(--elevation-2)]"
+      data-testid="fleet-dispatch-board"
+    >
       {pending ? (
         <div className="pointer-events-none absolute inset-0 z-50 flex items-start justify-center pt-24">
-          <div className="flex items-center gap-2 rounded-md border border-[var(--card-border)] bg-white px-3 py-1.5 text-sm shadow-md dark:bg-[var(--card)]">
+          <div className="flex items-center gap-2 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-3 py-1.5 text-sm shadow-[var(--elevation-1)]">
             <Loader2 className="size-4 animate-spin text-[var(--accent)]" />
             Updating…
           </div>
@@ -198,10 +201,11 @@ export function FleetDispatchView({
       ) : null}
 
       {/* Compact header + ops context — above the fold, not dominant */}
-      <div className="shrink-0 space-y-1 border-b border-[var(--card-border)] pb-2">
+      <div className="shrink-0 space-y-2 rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/80 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
           <div>
-            <h1 className="text-base font-semibold text-[var(--foreground)]">Dispatch Intelligence</h1>
+            <p className="cs-text-micro">Dispatch board</p>
+            <h1 className="cs-text-section-title mt-1">Dispatch Intelligence</h1>
             <p className="text-[11px] text-[var(--muted)]">Assign jobs to trucks · {selectedDate}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -218,7 +222,7 @@ export function FleetDispatchView({
               type="date"
               value={selectedDate}
               onChange={(e) => navigateDate(e.target.value)}
-              className="rounded-md border border-[var(--card-border)] bg-white px-2 py-1 text-sm dark:bg-[var(--card)]"
+              className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-sm"
             />
             <Button
               type="button"
@@ -241,11 +245,11 @@ export function FleetDispatchView({
       </div>
 
       {error ? (
-        <p className="shrink-0 border-b border-red-200 bg-white px-3 py-1.5 text-sm text-red-700">{error}</p>
+        <p className="shrink-0 rounded-md border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-3 py-1.5 text-sm text-[var(--status-danger)]">{error}</p>
       ) : null}
 
       {/* Dispatch workspace — primary visual focus */}
-      <div className="grid min-h-0 flex-1 gap-2 pt-2 lg:grid-cols-[280px_minmax(0,1fr)_300px]">
+      <div className="grid min-h-0 flex-1 gap-3 pt-3 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
         <FleetJobQueue
           jobs={board.unassignedJobs}
           board={board}
@@ -260,7 +264,7 @@ export function FleetDispatchView({
         <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
           <div
             id="fleet-dispatch-map"
-            className="min-h-[280px] flex-1 overflow-hidden rounded-lg border border-[var(--card-border)] bg-white shadow-sm dark:bg-[var(--card)]"
+            className="min-h-[320px] flex-1 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] shadow-[var(--elevation-1)]"
           >
             <FleetDispatchMapPanel
               jobs={board.jobs}

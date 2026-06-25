@@ -47,7 +47,7 @@ export function FleetTruckLanes({
   return (
     <div
       id="fleet-truck-lanes"
-      className="max-h-[260px] overflow-x-auto overflow-y-hidden rounded-lg border border-[var(--card-border)] bg-white p-2 shadow-sm dark:bg-[var(--card)]"
+      className="max-h-[280px] overflow-x-auto overflow-y-hidden rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 p-2 shadow-[var(--elevation-1)]"
     >
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
         Fleet units · {lanes.length} trucks
@@ -83,10 +83,10 @@ export function FleetTruckLanes({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") onSelectTruck(highlighted ? null : lane.truck_id);
                 }}
-                className={`w-56 shrink-0 cursor-pointer rounded-lg border bg-white p-2.5 transition-all duration-150 dark:bg-[var(--card)] ${
+                className={`w-56 shrink-0 cursor-pointer rounded-lg border bg-[var(--surface-default)]/70 p-2.5 transition-all duration-150 ${
                   highlighted
                     ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/25"
-                    : "border-[var(--card-border)] hover:border-[var(--foreground)]/15 hover:shadow-sm"
+                    : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15 hover:shadow-sm"
                 }`}
               >
                 <div className="flex items-start justify-between gap-1">
@@ -146,12 +146,12 @@ export function FleetTruckLanes({
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-1 text-[9px]">
-                  <span className="flex items-center gap-0.5 rounded-md bg-[var(--card)] px-1.5 py-1 font-semibold">
+                  <span className="flex items-center gap-0.5 rounded-md bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
                     <DollarSign className="size-2.5 text-emerald-600" />
                     {formatCurrency(lane.revenue_today ?? 0)}
                   </span>
                   {lane.fuel_level_pct != null ? (
-                    <span className="flex items-center gap-0.5 rounded-md bg-[var(--card)] px-1.5 py-1 font-semibold">
+                    <span className="flex items-center gap-0.5 rounded-md bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
                       <Fuel className="size-2.5" />
                       {Math.round(lane.fuel_level_pct)}% fuel
                     </span>
@@ -159,7 +159,7 @@ export function FleetTruckLanes({
                 </div>
 
                 {currentJob ? (
-                  <p className="mt-2 line-clamp-2 rounded-md border border-[var(--card-border)]/60 bg-[var(--card)]/50 px-1.5 py-1 text-[10px] font-medium leading-snug">
+                  <p className="mt-2 line-clamp-2 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/70 px-1.5 py-1 text-[10px] font-medium leading-snug">
                     {currentJob.title}
                   </p>
                 ) : status === "Available" ? (
@@ -176,7 +176,7 @@ export function FleetTruckLanes({
                 ) : null}
 
                 {rec ? (
-                  <p className="mt-1.5 flex items-center gap-1 rounded-md border border-blue-200 px-1.5 py-0.5 text-[9px] font-bold text-blue-700 dark:border-blue-800 dark:text-blue-400">
+                  <p className="mt-1.5 flex items-center gap-1 rounded-md border border-[color-mix(in_srgb,var(--status-info)_28%,transparent)] bg-[var(--status-info-subtle)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--status-info)]">
                     <Sparkles className="size-3" />
                     Cornerstone recommends this truck
                   </p>

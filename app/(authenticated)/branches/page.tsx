@@ -77,6 +77,7 @@ export default async function BranchesPage({
         icon={<Warehouse className="size-5" />}
         title="Branches"
         subtitle="Manage depot and branch locations for your fleet."
+        variant="surface"
       />
       <BranchesList
         branches={branchRows}

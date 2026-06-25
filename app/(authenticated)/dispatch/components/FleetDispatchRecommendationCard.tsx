@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin, Navigation, Sparkles, Truck } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/src/components/ui/button";
 import type { FleetDispatchBoardData, FleetRecommendationInstance } from "@/src/types/fleet";
 import {
@@ -47,11 +48,15 @@ export function FleetDispatchRecommendationCard({
     topCandidate?.truck_id ?? recommendation.rationale.entities.truck_id ?? null;
 
   return (
-    <li
-      className={`rounded-lg border bg-white p-3 shadow-sm transition-all duration-150 dark:bg-[var(--card)] ${
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className={`rounded-lg border bg-[var(--surface-default)]/74 p-3 shadow-[var(--elevation-1)] transition-all duration-150 ${
         active
           ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/25"
-          : "border-[var(--card-border)] hover:border-[var(--foreground)]/15"
+          : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15"
       }`}
       onMouseEnter={() => onHighlight(recommendation)}
       onMouseLeave={() => onHighlight(null)}
@@ -74,7 +79,7 @@ export function FleetDispatchRecommendationCard({
       </div>
 
       {topCandidate ? (
-        <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--card-border)] bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2.5 py-2">
           <Truck className="size-4 text-[var(--accent)]" />
           <div>
             <p className="text-xs font-bold">{topCandidate.unit_number}</p>
@@ -129,6 +134,6 @@ export function FleetDispatchRecommendationCard({
           </Button>
         ) : null}
       </div>
-    </li>
+    </motion.li>
   );
 }

@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
 import { Panel } from "./panel";
 import type { KpiEmphasis } from "./types";
 
@@ -29,13 +30,20 @@ export function KpiCard({
   className = "",
 }: KpiCardProps) {
   return (
-    <Panel padding="md" className={`cs-kpi-card ${EMPHASIS_CLASS[emphasis]} ${className}`}>
-      <div className="cs-kpi-card__header">
-        <p className="cs-text-micro cs-text-muted">{label}</p>
-        {Icon ? <Icon className="cs-icon cs-icon--sm cs-text-muted" strokeWidth={1.5} aria-hidden /> : null}
-      </div>
-      <p className="cs-text-kpi cs-kpi-card__value">{value}</p>
-      {hint ? <p className="cs-text-caption cs-text-muted cs-kpi-card__hint">{hint}</p> : null}
-    </Panel>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      whileHover={{ y: -1.5 }}
+    >
+      <Panel padding="md" className={`cs-kpi-card ${EMPHASIS_CLASS[emphasis]} ${className}`}>
+        <div className="cs-kpi-card__header">
+          <p className="cs-text-micro cs-text-muted">{label}</p>
+          {Icon ? <Icon className="cs-icon cs-icon--sm cs-text-muted" strokeWidth={1.5} aria-hidden /> : null}
+        </div>
+        <p className="cs-text-kpi cs-kpi-card__value">{value}</p>
+        {hint ? <p className="cs-text-caption cs-text-muted cs-kpi-card__hint">{hint}</p> : null}
+      </Panel>
+    </motion.div>
   );
 }

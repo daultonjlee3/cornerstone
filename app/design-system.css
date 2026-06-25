@@ -88,6 +88,38 @@
   --nav-rail-width-collapsed: 4.25rem;
 }
 
+/* Enterprise command-center shell defaults (authenticated app only) */
+[data-enterprise-ui="true"] {
+  --surface-canvas: #080d14;
+  --surface-default: rgba(14, 22, 33, 0.78);
+  --surface-raised: #101a29;
+  --surface-hero: #152236;
+  --surface-border: rgba(148, 163, 184, 0.22);
+  --surface-border-subtle: rgba(148, 163, 184, 0.12);
+  --text-primary: #edf4ff;
+  --text-muted: #9caec7;
+  --text-muted-strong: #c7d4e7;
+  --brand-action: #f97316;
+  --brand-action-hover: #ea580c;
+  --brand-action-subtle: rgba(249, 115, 22, 0.14);
+  --brand-operational: #22d3ee;
+  --brand-operational-subtle: rgba(34, 211, 238, 0.12);
+  --status-success: #22c55e;
+  --status-success-subtle: rgba(34, 197, 94, 0.14);
+  --status-warning: #f59e0b;
+  --status-warning-subtle: rgba(245, 158, 11, 0.14);
+  --status-danger: #f87171;
+  --status-danger-subtle: rgba(248, 113, 113, 0.14);
+  --status-info: #60a5fa;
+  --status-info-subtle: rgba(96, 165, 250, 0.15);
+  --status-neutral-subtle: rgba(148, 163, 184, 0.11);
+  --elevation-1: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 4px 14px rgba(0, 0, 0, 0.36);
+  --elevation-2: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px rgba(0, 0, 0, 0.42);
+  --elevation-3: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 46px rgba(0, 0, 0, 0.5);
+  --nav-rail-width: 16rem;
+  --nav-rail-width-collapsed: 4.5rem;
+}
+
 /* Fleet dark-first theme — same token names, different values */
 [data-fleet-ui="true"] {
   --surface-canvas: #0e1218;
@@ -446,8 +478,9 @@
   overflow: hidden;
   border-radius: var(--radius-xl);
   border: 1px solid var(--surface-border-subtle);
-  background: var(--surface-raised);
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
   box-shadow: var(--elevation-1);
+  backdrop-filter: blur(8px);
 }
 
 .cs-table-shell__scroll {
@@ -661,7 +694,13 @@
   width: var(--nav-rail-width);
   flex-direction: column;
   border-right: 1px solid var(--surface-border-subtle);
-  background: var(--surface-raised);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 94%, transparent),
+      color-mix(in srgb, var(--surface-default) 94%, transparent)
+    );
+  backdrop-filter: blur(12px);
   transition: width var(--duration-fast) var(--ease-standard);
 }
 
@@ -809,18 +848,26 @@
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
   color: var(--text-muted-strong);
-  transition: background-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+  border: 1px solid transparent;
 }
 
 .cs-nav-rail__item:hover {
-  background: var(--surface-default);
+  background: color-mix(in srgb, var(--surface-default) 84%, transparent);
   color: var(--text-primary);
+  border-color: var(--surface-border-subtle);
+  transform: translateX(1px);
 }
 
 .cs-nav-rail__item--active {
   background: var(--brand-operational-subtle);
   color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--brand-operational) 36%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-operational) 14%, transparent);
 }
 
 .cs-nav-rail__item--collapsed {
@@ -855,6 +902,52 @@
   border-radius: 0 var(--radius-full) var(--radius-full) 0;
   background: var(--brand-operational);
   transform: translateY(-50%);
+}
+
+/* Command shell utilities */
+.cs-command-topbar {
+  border-bottom: 1px solid var(--surface-border-subtle);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-default) 92%, transparent),
+      color-mix(in srgb, var(--surface-default) 82%, transparent)
+    );
+  backdrop-filter: blur(12px);
+}
+
+.cs-command-strip {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .cs-command-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.cs-command-strip__item {
+  border: 1px solid var(--surface-border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-raised) 84%, transparent);
+  padding: var(--space-2) var(--space-3);
+}
+
+.cs-command-strip__label {
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cs-command-strip__value {
+  margin-top: 2px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 /* ─── Legacy fleet class aliases (migration bridge) ─── */

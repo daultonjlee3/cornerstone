@@ -9,6 +9,7 @@ import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
 import { ActionsDropdown } from "@/src/components/ui/actions-dropdown";
 import { Pagination } from "@/src/components/ui/pagination";
+import { EmptyState, KpiCard, SectionHeader, StatusChip } from "@/src/components/design-system";
 import {
   DataTable,
   Table,
@@ -75,6 +76,9 @@ export function JobsList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<FleetJob | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const unassignedCount = initialJobs.filter((job) => !job.assigned_truck_id).length;
+  const webhookCount = initialJobs.filter((job) => job.job_source === "Webhook").length;
+  const totalRevenue = initialJobs.reduce((sum, job) => sum + (job.revenue_estimate ?? 0), 0);
 
   const handleDelete = (id: string, title: string) => {
     if (!confirm(`Delete job "${title}"? This cannot be undone.`)) return;
@@ -111,35 +115,53 @@ export function JobsList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {message && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
+          className={`rounded-[var(--radius-lg)] border px-4 py-2 text-sm ${
             message.type === "error"
-              ? "bg-red-500/10 text-red-600 dark:text-red-400"
-              : "bg-[var(--accent)]/10 text-[var(--accent)]"
+              ? "border-[color-mix(in_srgb,var(--status-danger)_25%,transparent)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)]"
+              : "border-[color-mix(in_srgb,var(--status-success)_25%,transparent)] bg-[var(--status-success-subtle)] text-[var(--status-success)]"
           }`}
           role="alert"
         >
           {message.text}
         </div>
       )}
-      <div className="flex justify-between items-center gap-4">
-        <h2 className="text-lg font-medium text-[var(--foreground)]">Fleet Jobs</h2>
-        <Button type="button" onClick={openNew}>
-          New Job
-        </Button>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Visible jobs" value={initialJobs.length} hint="Current page" />
+        <KpiCard label="Unassigned jobs" value={unassignedCount} hint="Pending dispatch" emphasis={unassignedCount > 0 ? "warning" : "default"} />
+        <KpiCard label="Webhook jobs" value={webhookCount} hint="Integrated intake" emphasis="info" />
+        <KpiCard label="Revenue scope" value={formatCurrency(totalRevenue)} hint="Visible rows" emphasis="success" />
       </div>
 
+      <SectionHeader
+        title="Dispatch job ledger"
+        description="Priority, revenue, source, and assignment details for operational scheduling."
+        action={
+          <div className="flex items-center gap-2">
+            <StatusChip label={`${sites.length} sites`} tone="neutral" showDot={false} />
+            <StatusChip label={`${trucks.length} trucks`} tone="neutral" showDot={false} />
+            <Button type="button" onClick={openNew}>
+              New Job
+            </Button>
+          </div>
+        }
+      />
+
       {initialJobs.length === 0 ? (
-        <div className="ui-card py-12 text-center">
-          <p className="text-[var(--muted)]">No fleet jobs yet.</p>
-          <Button type="button" onClick={openNew} className="mt-4">
-            Add your first job
-          </Button>
-        </div>
+        <EmptyState
+          title="No fleet jobs yet"
+          description="Create jobs manually or ingest them from integrations to activate dispatch intelligence."
+          action={
+            <Button type="button" onClick={openNew}>
+              Add your first job
+            </Button>
+          }
+        />
       ) : (
-        <DataTable>
+        <DataTable className="shadow-[var(--elevation-1)]">
           <Table className="min-w-[700px]">
             <TableHead>
               <Th>Title</Th>

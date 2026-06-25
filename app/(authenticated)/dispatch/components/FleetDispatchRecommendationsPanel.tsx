@@ -38,14 +38,14 @@ export function FleetDispatchRecommendationsPanel({
   return (
     <section
       id="fleet-recommendations"
-      className="space-y-2 rounded-lg border border-[var(--card-border)] bg-white p-3 shadow-sm dark:bg-[var(--card)]"
+      className="space-y-2 rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 p-3 shadow-[var(--elevation-1)]"
     >
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
             Cornerstone Recommendations
           </p>
-          <p className="text-[10px] text-[var(--muted)]">
+          <p className="text-[10px] text-[var(--text-muted)]">
             {recommendations.length === 0
               ? "No pending actions"
               : `${recommendations.length} decision${recommendations.length === 1 ? "" : "s"} ready`}
