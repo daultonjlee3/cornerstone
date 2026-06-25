@@ -33,12 +33,14 @@ type FleetDispatchViewProps = {
   initialBoard: FleetDispatchBoardData;
   initialIntel: FleetTodayViewData;
   selectedDate: string;
+  canManageFleet: boolean;
 };
 
 export function FleetDispatchView({
   initialBoard,
   initialIntel,
   selectedDate,
+  canManageFleet,
 }: FleetDispatchViewProps) {
   const [board, setBoard] = useState(initialBoard);
   const [intel, setIntel] = useState(initialIntel);
@@ -143,7 +145,11 @@ export function FleetDispatchView({
           body: JSON.stringify({}),
         });
         if (!res.ok) {
-          setRecError(action === "accept" ? "Unable to accept recommendation." : "Unable to dismiss.");
+          const payload = (await res.json().catch(() => ({}))) as { error?: string };
+          setRecError(
+            payload.error ??
+              (action === "accept" ? "Unable to accept recommendation." : "Unable to dismiss.")
+          );
           return;
         }
         await refreshBoard();
@@ -296,6 +302,7 @@ export function FleetDispatchView({
             recommendations={recommendations}
             board={board}
             activeRecommendationId={activeRecommendation?.id ?? null}
+            canManageFleet={canManageFleet}
             pending={pending}
             error={recError}
             onRefresh={() => void loadRecommendations(true)}

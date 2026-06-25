@@ -8,6 +8,7 @@ import { parseFilterStateFromParams } from "./filter-state";
 import { DispatchViewClient } from "./components/DispatchViewClient";
 import { FleetDispatchViewClient } from "./components/FleetDispatchViewClient";
 import { isFleetProductProfile } from "../nav-config";
+import { can } from "@/src/lib/permissions";
 
 export const metadata = {
   title: "Dispatch Intelligence | Cornerstone Fleet",
@@ -34,6 +35,7 @@ export default async function DispatchPage({
   const filterState = parseFilterStateFromParams(params ?? {});
 
   if (isFleetProductProfile(productProfile)) {
+    const canManageFleet = await can("fleet.manage");
     const branchId =
       typeof params?.branch_id === "string" ? params.branch_id.trim() || null : null;
     const fleetResult = await loadFleetDispatchData(
@@ -48,6 +50,7 @@ export default async function DispatchPage({
         initialBoard={fleetResult.board}
         initialIntel={fleetResult.intel}
         selectedDate={filterState.selectedDate}
+        canManageFleet={canManageFleet}
       />
     );
   }

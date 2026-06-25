@@ -6,6 +6,42 @@ import type {
 } from "@/src/types/fleet";
 import { generateWebhookSecret, hashWebhookSecret } from "@/src/lib/integrations/webhook-secret";
 
+const SENSITIVE_CONFIG_KEYS = new Set([
+  "_tokens",
+  "access_token",
+  "refresh_token",
+  "oauth_token",
+  "oauth_refresh_token",
+  "api_key",
+  "api_secret",
+  "bearer_token",
+  "webhook_secret",
+  "client_secret",
+]);
+
+export function sanitizeIntegrationConnectionConfig(
+  config: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  const source = config ?? {};
+  const sanitizedEntries = Object.entries(source).filter(([key]) => !SENSITIVE_CONFIG_KEYS.has(key));
+  return Object.fromEntries(sanitizedEntries);
+}
+
+export function sanitizeIntegrationConnectionForClient(
+  connection: IntegrationConnection
+): IntegrationConnection {
+  return {
+    ...connection,
+    config: sanitizeIntegrationConnectionConfig(connection.config),
+  };
+}
+
+export function sanitizeIntegrationConnectionsForClient(
+  connections: IntegrationConnection[]
+): IntegrationConnection[] {
+  return connections.map((connection) => sanitizeIntegrationConnectionForClient(connection));
+}
+
 export async function listIntegrationConnections(
   supabase: SupabaseClient,
   tenantId: string

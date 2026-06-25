@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import { getAuthContext } from "@/src/lib/auth-context";
+import { can } from "@/src/lib/permissions";
 import {
   exchangeSamsaraCode,
   mergeTokensIntoConfig,
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const stateParam = url.searchParams.get("state");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
-  const settingsUrl = `${baseUrl}/settings/integrations`;
+  const settingsUrl = `${baseUrl}/implementation/connections`;
 
   if (!code || !stateParam) {
     return NextResponse.redirect(`${settingsUrl}?samsara=error&reason=missing_code`);
@@ -34,6 +35,10 @@ export async function GET(request: Request) {
 
   if (auth.userId !== state.userId || auth.tenantId !== state.tenantId) {
     return NextResponse.redirect(`${settingsUrl}?samsara=error&reason=session_mismatch`);
+  }
+
+  if (!(await can("integrations.manage"))) {
+    return NextResponse.redirect(`${settingsUrl}?samsara=error&reason=forbidden`);
   }
 
   try {

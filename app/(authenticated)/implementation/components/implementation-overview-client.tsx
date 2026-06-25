@@ -32,9 +32,20 @@ type ReadinessSnapshot = {
     connectorsActive: number;
     importsCompleted: number;
     jobs: number;
+    branches: number;
+    operators: number;
+    customers: number;
+    sites: number;
+    trucksTotal: number;
     trucksWithTelematics: number;
     recommendationsPending: number;
   };
+  issues?: Array<{
+    key: string;
+    severity: "critical" | "warning" | "info";
+    title: string;
+    count: number;
+  }>;
 };
 
 type BaselineSnapshot = {
@@ -131,10 +142,15 @@ export function ImplementationOverviewClient() {
     return [
       {
         label: "Company",
-        status: itemStatus(completedObjects.has("branches")),
-        recommendedAction: "Confirm business profile, timezone, and operating defaults.",
+        status: itemStatus(
+          (readiness?.counts.branches ?? 0) > 0 || (readiness?.counts.connectorsActive ?? 0) > 0
+        ),
+        recommendedAction: "Confirm business profile, timezone, currency, and operating defaults.",
         href: "/implementation/settings",
-        percentComplete: completedObjects.has("branches") ? 100 : 40,
+        percentComplete:
+          (readiness?.counts.branches ?? 0) > 0 || (readiness?.counts.connectorsActive ?? 0) > 0
+            ? 100
+            : 40,
       },
       {
         label: "Branches",
@@ -207,6 +223,8 @@ export function ImplementationOverviewClient() {
     const historicalReady = readiness?.checks.find((check) => check.code === "historical_data_readiness");
     const healthyConnectors = connectors.filter((connector) => connector.health.status === "healthy").length;
     const warningConnectors = connectors.filter((connector) => connector.health.status === "warning").length;
+    const openDataQualityIssues =
+      readiness?.issues?.reduce((total, issue) => total + (issue.count > 0 ? 1 : 0), 0) ?? 0;
 
     return [
       {
@@ -261,6 +279,13 @@ export function ImplementationOverviewClient() {
         hint: "Pending recommendation opportunities",
         href: "/implementation/readiness",
         emphasis: (readiness?.counts.recommendationsPending ?? 0) > 0 ? "success" : "default",
+      },
+      {
+        label: "Data Quality",
+        value: openDataQualityIssues > 0 ? `${openDataQualityIssues} open` : "Healthy",
+        hint: "Duplicate, missing, and stale-signal checks",
+        href: "/implementation/readiness",
+        emphasis: openDataQualityIssues > 0 ? "warning" : "success",
       },
     ];
   }, [baseline, connectors, readiness]);

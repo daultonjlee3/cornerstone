@@ -1,11 +1,9 @@
 import { Truck } from "lucide-react";
-import { createClient } from "@/src/lib/supabase/server";
-import { redirect } from "next/navigation";
 import { TrucksList } from "./components/trucks-list";
 import { PageHeader } from "@/src/components/ui/page-header";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { computeTelematicsStatus, listTruckLatestPositions } from "@/src/lib/fleet/queries";
 import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
+import { requireFleetModuleAccess } from "../_lib/access";
 
 export const metadata = {
   title: "Trucks | Cornerstone Tech",
@@ -17,14 +15,8 @@ export default async function TrucksPage({
 }: {
   searchParams: SearchParams | Promise<SearchParams>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const tenantId = await getTenantIdForUser(supabase);
-  if (!tenantId) redirect("/onboarding");
+  const { supabase, auth } = await requireFleetModuleAccess();
+  const tenantId = auth.tenantId;
 
   const params = await resolveSearchParams(searchParams);
   const page = Math.max(1, parseInt(typeof params?.page === "string" ? params.page : "", 10) || 1);

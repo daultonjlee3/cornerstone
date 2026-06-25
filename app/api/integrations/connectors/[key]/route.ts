@@ -6,6 +6,7 @@ import {
   updateConnectorConfig,
 } from "@/src/lib/integrations/connector-service";
 import type { ConnectorKey } from "@/src/lib/integrations/connector-catalog";
+import { sanitizeIntegrationConnectionForClient } from "@/src/lib/integrations/connections";
 
 export async function GET(
   _request: Request,
@@ -51,7 +52,7 @@ export async function PATCH(
     displayName: body.display_name != null ? String(body.display_name) : null,
   });
 
-  return NextResponse.json({ connection: updated });
+  return NextResponse.json({ connection: sanitizeIntegrationConnectionForClient(updated) });
 }
 
 export async function DELETE(

@@ -78,15 +78,6 @@ const fleetSetupGroup: NavGroup = {
   ],
 };
 
-const integrationsGroup: NavGroup = {
-  id: "integrations",
-  label: "Integrations",
-  items: [
-    { label: "Integrations", href: "/settings/integrations", icon: "Plug" },
-    { label: "API & Webhooks", href: "/settings/integrations?focus=webhooks", icon: "Webhook" },
-  ],
-};
-
 const implementationGroup: NavGroup = {
   id: "implementation",
   label: "Implementation",
@@ -215,7 +206,6 @@ const hybridCmmsOperationsGroup: NavGroup = {
 function getFleetIntelligenceNavConfig(): NavGroup[] {
   return [
     fleetOperationsGroup,
-    integrationsGroup,
     implementationGroup,
     fleetAnalyticsGroup,
     { ...administrationGroup, secondary: false },
@@ -230,7 +220,6 @@ function getHybridNavConfig(): NavGroup[] {
       ...fleetOperationsGroup,
       items: [...fleetOperationsGroup.items, ...fleetOperationsHybridExtras],
     },
-    integrationsGroup,
     implementationGroup,
     {
       ...fleetAnalyticsGroup,

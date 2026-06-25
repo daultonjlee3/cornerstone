@@ -8,6 +8,7 @@ type FleetDispatchRecommendationsPanelProps = {
   recommendations: FleetRecommendationInstance[];
   board: FleetDispatchBoardData;
   activeRecommendationId: string | null;
+  canManageFleet: boolean;
   pending?: boolean;
   error?: string | null;
   onRefresh: () => void;
@@ -23,6 +24,7 @@ export function FleetDispatchRecommendationsPanel({
   recommendations,
   board,
   activeRecommendationId,
+  canManageFleet,
   pending,
   error,
   onRefresh,
@@ -64,6 +66,11 @@ export function FleetDispatchRecommendationsPanel({
       </div>
 
       {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {!canManageFleet ? (
+        <p className="text-[10px] text-[var(--muted)]">
+          Viewer mode: recommendation decisions require fleet manager permissions.
+        </p>
+      ) : null}
 
       {panelRecommendations.length === 0 ? (
         <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/65 px-3 py-2 text-xs text-[var(--muted)]">
@@ -77,6 +84,7 @@ export function FleetDispatchRecommendationsPanel({
               recommendation={recommendation}
               board={board}
               pending={pending}
+              canManageFleet={canManageFleet}
               active={activeRecommendationId === recommendation.id}
               onAccept={onAccept}
               onDismiss={onDismiss}

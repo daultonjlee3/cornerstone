@@ -6,6 +6,7 @@ import { getAuthContext, companyBelongsToTenant } from "@/src/lib/auth-context";
 import { requirePermission } from "@/src/lib/permissions";
 import { geocodeAddress } from "@/src/lib/geocoding";
 import { deleteMappingsForInternalId } from "@/src/lib/integrations/mappings";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 import type { FleetFormState } from "../branches/actions";
 
 export async function saveTruck(
@@ -14,6 +15,8 @@ export async function saveTruck(
 ): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -75,6 +78,8 @@ export async function saveTruck(
 export async function deleteTruck(id: string): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
   await deleteMappingsForInternalId(supabase, auth.tenantId, "truck", id);
   const { error } = await supabase
@@ -93,6 +98,8 @@ export async function saveCustomerSite(
 ): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -157,6 +164,8 @@ export async function saveCustomerSite(
 export async function deleteCustomerSite(id: string): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
   await deleteMappingsForInternalId(supabase, auth.tenantId, "customer_site", id);
   const { error } = await supabase
@@ -175,6 +184,8 @@ export async function saveFleetJob(
 ): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -238,6 +249,8 @@ export async function saveFleetJob(
 export async function deleteFleetJob(id: string): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
   await deleteMappingsForInternalId(supabase, auth.tenantId, "fleet_job", id);
   const { error } = await supabase
@@ -256,6 +269,8 @@ export async function assignTruckToJob(
 ): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
   const { error } = await supabase
     .from("fleet_jobs")
@@ -277,6 +292,8 @@ export async function saveFleetOperator(
 ): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
 
   const id = (formData.get("id") as string)?.trim() || null;
@@ -330,6 +347,8 @@ export async function saveFleetOperator(
 export async function deleteFleetOperator(id: string): Promise<FleetFormState> {
   await requirePermission("fleet.manage");
   const supabase = await createClient();
+  const readOnlyError = await getDemoReadOnlyError(supabase);
+  if (readOnlyError) return { error: readOnlyError };
   const auth = await getAuthContext(supabase);
   await deleteMappingsForInternalId(supabase, auth.tenantId, "fleet_operator", id);
   const { error } = await supabase
@@ -347,4 +366,10 @@ function parseFloatOrNull(value: FormDataEntryValue | null): number | null {
   if (!raw) return null;
   const n = parseFloat(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+async function getDemoReadOnlyError(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+  return (await isDemoReadOnlyUser(supabase)) ? DEMO_READ_ONLY_ERROR : null;
 }

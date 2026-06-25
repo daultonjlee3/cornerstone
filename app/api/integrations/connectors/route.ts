@@ -3,6 +3,7 @@ import { getIntegrationApiContext } from "@/app/api/integrations/_lib/access";
 import { connectConnector, listConnectors } from "@/src/lib/integrations/connector-service";
 import type { ConnectorKey } from "@/src/lib/integrations/connector-catalog";
 import type { CredentialInput } from "@/src/lib/integrations/credential-framework";
+import { sanitizeIntegrationConnectionForClient } from "@/src/lib/integrations/connections";
 
 export async function GET() {
   const context = await getIntegrationApiContext("read");
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({
-    connection,
+    connection: sanitizeIntegrationConnectionForClient(connection),
     credential_metadata: credentialMetadata,
   });
 }

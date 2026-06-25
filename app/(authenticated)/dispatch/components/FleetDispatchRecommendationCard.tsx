@@ -18,6 +18,7 @@ import { FleetRecommendationExplainability } from "./FleetRecommendationExplaina
 type FleetDispatchRecommendationCardProps = {
   recommendation: FleetRecommendationInstance;
   board: FleetDispatchBoardData;
+  canManageFleet: boolean;
   pending?: boolean;
   active?: boolean;
   onAccept: (id: string) => void;
@@ -31,6 +32,7 @@ type FleetDispatchRecommendationCardProps = {
 export function FleetDispatchRecommendationCard({
   recommendation,
   board,
+  canManageFleet,
   pending,
   active,
   onAccept,
@@ -80,6 +82,9 @@ export function FleetDispatchRecommendationCard({
           {confidenceLabel(confidence)}
         </span>
       </div>
+      <p className="mt-1 text-[10px] text-[var(--muted)]">
+        Status: {recommendation.status} · Expected impact values are estimated.
+      </p>
 
       {topCandidate ? (
         <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2.5 py-2">
@@ -150,7 +155,7 @@ export function FleetDispatchRecommendationCard({
           type="button"
           size="sm"
           className="h-7 text-[10px]"
-          disabled={pending}
+          disabled={pending || !canManageFleet}
           onClick={() => onAccept(recommendation.id)}
         >
           {isCapacityOnly ? "Acknowledge" : "Accept"}
@@ -160,7 +165,7 @@ export function FleetDispatchRecommendationCard({
           size="sm"
           variant="secondary"
           className="h-7 text-[10px]"
-          disabled={pending}
+          disabled={pending || !canManageFleet}
           onClick={() => onDismiss(recommendation.id)}
         >
           Dismiss

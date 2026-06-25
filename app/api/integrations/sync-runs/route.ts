@@ -1,28 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/src/lib/supabase/server";
-import { getAuthContext } from "@/src/lib/auth-context";
-import { can } from "@/src/lib/permissions";
+import { getIntegrationApiContext } from "@/app/api/integrations/_lib/access";
 import { listSyncRuns, startSyncRun, finishSyncRun } from "@/src/lib/integrations/sync-runs";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-
-  let auth;
-  try {
-    auth = await getAuthContext(supabase);
-  } catch {
-    return NextResponse.json({ runs: [] }, { status: 401 });
-  }
-
-  if (!(await can("integrations.manage"))) {
-    return NextResponse.json({ runs: [] }, { status: 403 });
-  }
+  const context = await getIntegrationApiContext("manage");
+  if (context.response) return context.response;
 
   const url = new URL(request.url);
   const connectionId = url.searchParams.get("connection_id") ?? undefined;
   const limit = Math.min(100, parseInt(url.searchParams.get("limit") ?? "20", 10) || 20);
 
-  const runs = await listSyncRuns(supabase, auth.tenantId, {
+  const runs = await listSyncRuns(context.supabase, context.auth.tenantId, {
     connectionId,
     limit,
   });
@@ -31,18 +19,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-
-  let auth;
-  try {
-    auth = await getAuthContext(supabase);
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!(await can("integrations.manage"))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const context = await getIntegrationApiContext("manage");
+  if (context.response) return context.response;
 
   const body = (await request.json()) as Record<string, unknown>;
   const action = String(body.action ?? "start");
@@ -52,7 +30,7 @@ export async function POST(request: Request) {
     if (!connectionId) {
       return NextResponse.json({ error: "connection_id required" }, { status: 400 });
     }
-    const run = await startSyncRun(supabase, connectionId, auth.tenantId);
+    const run = await startSyncRun(context.supabase, connectionId, context.auth.tenantId);
     return NextResponse.json({ run });
   }
 
@@ -61,7 +39,7 @@ export async function POST(request: Request) {
     if (!runId) {
       return NextResponse.json({ error: "run_id required" }, { status: 400 });
     }
-    await finishSyncRun(supabase, runId, auth.tenantId, {
+    await finishSyncRun(context.supabase, runId, context.auth.tenantId, {
       status: (body.status as "success" | "partial" | "failed") ?? "success",
       recordsProcessed: Number(body.records_processed ?? 0),
       recordsFailed: Number(body.records_failed ?? 0),

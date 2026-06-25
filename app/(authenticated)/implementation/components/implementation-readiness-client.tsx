@@ -24,60 +24,16 @@ import {
   Th,
   Tr,
 } from "@/src/components/ui/data-table";
-
-type ReadinessSnapshot = {
-  implementationProgressPct: number;
-  readinessScorePct: number;
-  checks: Array<{
-    code: string;
-    label: string;
-    status: "ready" | "warning" | "blocked";
-    detail: string;
-    estimated: boolean;
-  }>;
-  counts: {
-    connectorsActive: number;
-    importsCompleted: number;
-    jobs: number;
-    trucksWithTelematics: number;
-    recommendationsPending: number;
-  };
-};
-
-type ImportBatch = {
-  object_type: string;
-  status: string;
-  duplicate_rows: number;
-  error_rows: number;
-};
-
-type SyncRun = {
-  status: string;
-};
-
-type BaselineSnapshot = {
-  metrics: Array<{ key: string; value: number }>;
-};
-
-type ReadinessIssue = {
-  key: string;
-  severity: "critical" | "warning" | "info";
-  title: string;
-  why: string;
-  recommendation: string;
-  href: string;
-  open: boolean;
-};
+import type {
+  ReadinessHealthIndicator,
+  ReadinessIssue,
+  ReadinessSnapshot,
+} from "@/src/lib/integrations/readiness-service";
 
 export function ImplementationReadinessClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<ReadinessSnapshot | null>(null);
-  const [issuesData, setIssuesData] = useState<{
-    imports: ImportBatch[];
-    runs: SyncRun[];
-    baseline: BaselineSnapshot | null;
-  }>({ imports: [], runs: [], baseline: null });
 
   useEffect(() => {
     let active = true;
@@ -85,29 +41,27 @@ export function ImplementationReadinessClient() {
       setLoading(true);
       setError(null);
       try {
-        const [readinessRes, importsRes, runsRes, baselineRes] = await Promise.all([
-          fetch("/api/integrations/readiness", { cache: "no-store" }),
-          fetch("/api/integrations/import/history?limit=120", { cache: "no-store" }),
-          fetch("/api/integrations/sync-history?limit=120", { cache: "no-store" }),
-          fetch("/api/integrations/baseline?window_days=90", { cache: "no-store" }),
-        ]);
+        const readinessRes = await fetch("/api/integrations/readiness", { cache: "no-store" });
 
         if (!readinessRes.ok) throw new Error("Failed to load readiness snapshot.");
-        if (!importsRes.ok) throw new Error("Failed to load import history.");
-        if (!runsRes.ok) throw new Error("Failed to load sync history.");
-        if (!baselineRes.ok) throw new Error("Failed to load baseline snapshot.");
 
-        const readinessData = (await readinessRes.json()) as ReadinessSnapshot;
-        const importsData = (await importsRes.json()) as { batches: ImportBatch[] };
-        const runsData = (await runsRes.json()) as { runs: SyncRun[] };
-        const baselineData = (await baselineRes.json()) as BaselineSnapshot;
+        const readinessPayload = (await readinessRes.json()) as {
+          implementationProgressPct: number;
+          readinessScorePct: number;
+          checks: ReadinessSnapshot["checks"];
+          counts: ReadinessSnapshot["counts"];
+          healthIndicators?: ReadinessHealthIndicator[];
+          issues?: ReadinessIssue[];
+        };
 
         if (!active) return;
-        setReadiness(readinessData);
-        setIssuesData({
-          imports: importsData.batches ?? [],
-          runs: runsData.runs ?? [],
-          baseline: baselineData,
+        setReadiness({
+          implementationProgressPct: readinessPayload.implementationProgressPct,
+          readinessScorePct: readinessPayload.readinessScorePct,
+          checks: readinessPayload.checks ?? [],
+          counts: readinessPayload.counts,
+          healthIndicators: readinessPayload.healthIndicators ?? [],
+          issues: readinessPayload.issues ?? [],
         });
       } catch (loadError) {
         if (!active) return;
@@ -123,127 +77,95 @@ export function ImplementationReadinessClient() {
   }, []);
 
   const checklist = useMemo(() => {
-    return [
-      "GPS",
-      "Jobs",
-      "Operators",
-      "Revenue",
-      "Historical Data",
-      "Customers",
-      "Branches",
-      "Telemetry",
-      "Dispatch Ready",
-      "Recommendation Ready",
-    ].map((label) => {
-      const match = readiness?.checks.find((check) => check.label.toLowerCase().includes(label.toLowerCase()));
-      if (!match) {
-        return { label, status: "warning" as const, detail: "Awaiting additional signal." };
-      }
-      return { label, status: match.status, detail: match.detail };
-    });
-  }, [readiness]);
+    const checkByCode = new Map(readiness?.checks.map((check) => [check.code, check]));
+    const indicatorByKey = new Map(
+      readiness?.healthIndicators.map((indicator) => [indicator.key, indicator])
+    );
 
-  const issues = useMemo<ReadinessIssue[]>(() => {
-    const imports = issuesData.imports;
-    const runs = issuesData.runs;
-    const baseline = issuesData.baseline;
-
-    const hasObject = (objectType: string) =>
-      imports.some((batch) => batch.object_type === objectType && (batch.status === "completed" || batch.status === "partial"));
-    const hasDupes = (objectType: string) =>
-      imports.some((batch) => batch.object_type === objectType && batch.duplicate_rows > 0);
-    const hasFailedSyncs = runs.some((run) => run.status === "failed");
-    const hasIncompleteImports = imports.some((batch) => batch.status === "failed" || batch.error_rows > 0);
-    const revenueMetric = baseline?.metrics.find((metric) => metric.key === "revenue_per_truck")?.value ?? 0;
-    const historicalReady =
-      readiness?.checks.find((check) => check.code === "historical_data_readiness")?.status === "ready";
+    const toStatus = (
+      value: "ready" | "warning" | "blocked" | "healthy" | "critical" | undefined
+    ): "ready" | "warning" | "blocked" => {
+      if (value === "ready" || value === "healthy") return "ready";
+      if (value === "critical" || value === "blocked") return "blocked";
+      return "warning";
+    };
 
     return [
       {
-        key: "missing_trucks",
-        severity: "critical",
-        title: "Missing Trucks",
-        why: "Dispatch readiness requires truck master and telematics identifiers.",
-        recommendation: "Import truck records and map external IDs.",
-        href: "/implementation/imports",
-        open: !hasObject("trucks"),
+        label: "GPS",
+        status: toStatus(indicatorByKey.get("gps_coverage")?.status),
+        detail: indicatorByKey.get("gps_coverage")?.currentStatus ?? "Awaiting GPS coverage signal.",
       },
       {
-        key: "missing_operators",
-        severity: "warning",
-        title: "Missing Operators",
-        why: "Recommendation quality depends on operator availability and utilization.",
-        recommendation: "Import operator roster and branch assignments.",
-        href: "/implementation/imports",
-        open: !hasObject("operators"),
+        label: "Jobs",
+        status:
+          (readiness?.counts.jobs ?? 0) >= 10
+            ? "ready"
+            : (readiness?.counts.jobs ?? 0) > 0
+              ? "warning"
+              : "blocked",
+        detail: `${readiness?.counts.jobs ?? 0} job(s) imported`,
       },
       {
-        key: "missing_revenue",
-        severity: "critical",
-        title: "Missing Revenue",
-        why: "Baseline and contribution KPIs need job revenue signals.",
-        recommendation: "Map revenue fields in job imports.",
-        href: "/implementation/imports",
-        open: revenueMetric <= 0,
+        label: "Operators",
+        status:
+          (readiness?.counts.operators ?? 0) > 0
+            ? "ready"
+            : (readiness?.counts.importsCompleted ?? 0) > 0
+              ? "warning"
+              : "blocked",
+        detail: `${readiness?.counts.operators ?? 0} operator(s) available`,
       },
       {
-        key: "missing_gps",
-        severity: "critical",
-        title: "Missing GPS",
-        why: "Route, deadhead, and utilization analytics need telematics events.",
-        recommendation: "Connect telematics connector and run sync.",
-        href: "/implementation/connections",
-        open: (readiness?.counts.trucksWithTelematics ?? 0) === 0,
+        label: "Revenue",
+        status: toStatus(indicatorByKey.get("revenue_coverage")?.status),
+        detail:
+          indicatorByKey.get("revenue_coverage")?.currentStatus ??
+          "Revenue coverage not available yet",
       },
       {
-        key: "duplicate_trucks",
-        severity: "warning",
-        title: "Duplicate Trucks",
-        why: "Duplicate truck rows degrade dispatch and utilization calculations.",
-        recommendation: "Resolve duplicate unit numbers and external IDs.",
-        href: "/implementation/imports",
-        open: hasDupes("trucks"),
+        label: "Historical Data",
+        status: toStatus(checkByCode.get("historical_data_readiness")?.status),
+        detail:
+          checkByCode.get("historical_data_readiness")?.detail ??
+          "Historical baseline readiness not yet measured",
       },
       {
-        key: "duplicate_operators",
-        severity: "warning",
-        title: "Duplicate Operators",
-        why: "Duplicate operators fragment labor and utilization metrics.",
-        recommendation: "Deduplicate operators and preserve canonical external IDs.",
-        href: "/implementation/imports",
-        open: hasDupes("operators"),
+        label: "Customers",
+        status: (readiness?.counts.customers ?? 0) > 0 ? "ready" : "warning",
+        detail: `${readiness?.counts.customers ?? 0} customer record(s)`,
       },
       {
-        key: "failed_syncs",
-        severity: "critical",
-        title: "Failed Syncs",
-        why: "Integration failures block freshness of operational telemetry.",
-        recommendation: "Review sync logs and retry failed runs.",
-        href: "/implementation/sync-history",
-        open: hasFailedSyncs,
+        label: "Branches",
+        status: (readiness?.counts.branches ?? 0) > 0 ? "ready" : "blocked",
+        detail: `${readiness?.counts.branches ?? 0} branch record(s)`,
       },
       {
-        key: "incomplete_imports",
-        severity: "warning",
-        title: "Incomplete Imports",
-        why: "Partial or failed imports leave onboarding entities incomplete.",
-        recommendation: "Re-run failed import batches after fixing validation errors.",
-        href: "/implementation/imports",
-        open: hasIncompleteImports,
+        label: "Telemetry",
+        status: toStatus(indicatorByKey.get("integration_health")?.status),
+        detail:
+          indicatorByKey.get("integration_health")?.currentStatus ??
+          "Connector telemetry readiness unavailable",
       },
       {
-        key: "missing_historical_data",
-        severity: "warning",
-        title: "Missing Historical Data",
-        why: "Baseline confidence improves with historical utilization coverage.",
-        recommendation: "Import 90–365 day historical data and refresh baseline.",
-        href: "/implementation/baseline",
-        open: !historicalReady,
+        label: "Dispatch Ready",
+        status: toStatus(checkByCode.get("dispatch_readiness")?.status),
+        detail: checkByCode.get("dispatch_readiness")?.detail ?? "Dispatch readiness unavailable",
+      },
+      {
+        label: "Recommendation Ready",
+        status: toStatus(checkByCode.get("recommendation_readiness")?.status),
+        detail:
+          checkByCode.get("recommendation_readiness")?.detail ??
+          "Recommendation readiness unavailable",
       },
     ];
-  }, [issuesData, readiness]);
+  }, [readiness]);
 
-  const openIssues = issues.filter((issue) => issue.open);
+  const openIssues = useMemo(
+    () => (readiness?.issues ?? []).filter((issue) => issue.count > 0),
+    [readiness]
+  );
 
   if (loading) {
     return (
@@ -322,6 +244,41 @@ export function ImplementationReadinessClient() {
 
       <PageSection>
         <SectionHeader
+          title="Operational health indicators"
+          description="Current status, why it matters, and destination to fix across pilot-critical domains."
+        />
+        <div className="grid gap-3 lg:grid-cols-3">
+          {(readiness.healthIndicators ?? []).map((indicator) => (
+            <Panel key={indicator.key} padding="md" className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="cs-text-body font-medium">{indicator.label}</p>
+                <StatusChip
+                  label={indicator.status}
+                  tone={
+                    indicator.status === "healthy"
+                      ? "success"
+                      : indicator.status === "warning"
+                        ? "warning"
+                        : "danger"
+                  }
+                  showDot={false}
+                />
+              </div>
+              <p className="cs-text-caption">{indicator.currentStatus}</p>
+              <p className="cs-text-caption cs-text-muted">{indicator.whyItMatters}</p>
+              <p className="cs-text-caption cs-text-muted">{indicator.recommendedAction}</p>
+              <Button asChild variant="ghost" size="sm">
+                <Link href={indicator.navigateTo}>
+                  Open <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            </Panel>
+          ))}
+        </div>
+      </PageSection>
+
+      <PageSection>
+        <SectionHeader
           title="Actionable issues"
           description="Each issue includes severity, why it matters, recommendation, and navigation to fix."
         />
@@ -330,13 +287,14 @@ export function ImplementationReadinessClient() {
             <TableHead>
               <Th>Issue</Th>
               <Th>Severity</Th>
+              <Th>Count</Th>
               <Th>Why It Matters</Th>
               <Th>Fix Recommendation</Th>
               <Th>Navigate To Fix</Th>
             </TableHead>
             <TBody>
               {openIssues.length === 0 ? (
-                <TableEmptyState colSpan={5} message="No open readiness issues. Platform is ready for pilot rollout." />
+                <TableEmptyState colSpan={6} message="No open readiness issues. Platform is ready for pilot rollout." />
               ) : (
                 openIssues.map((issue) => (
                   <Tr key={issue.key}>
@@ -348,11 +306,12 @@ export function ImplementationReadinessClient() {
                         showDot={false}
                       />
                     </Td>
-                    <Td className="cs-text-caption cs-text-muted">{issue.why}</Td>
-                    <Td className="cs-text-caption">{issue.recommendation}</Td>
+                    <Td className="font-medium">{issue.count.toLocaleString()}</Td>
+                    <Td className="cs-text-caption cs-text-muted">{issue.explanation}</Td>
+                    <Td className="cs-text-caption">{issue.recommendedFix}</Td>
                     <Td>
                       <Button asChild variant="ghost" size="sm">
-                        <Link href={issue.href}>
+                        <Link href={issue.navigateTo}>
                           Open <ArrowRight className="size-3.5" />
                         </Link>
                       </Button>

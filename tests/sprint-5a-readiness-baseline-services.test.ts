@@ -7,11 +7,18 @@ function createSupabaseStub(): SupabaseClient {
   const countBuilder = (count: number) => ({
     eq: () => countBuilder(count),
     in: () => countBuilder(count),
+    or: () => countBuilder(count),
+    is: () => countBuilder(count),
     not: () => countBuilder(count),
     gte: () => countBuilder(count),
     lte: () => countBuilder(count),
+    gt: () => countBuilder(count),
     neq: () => countBuilder(count),
-    then: (resolve: (value: unknown) => unknown) => resolve({ count, error: null }),
+    order: () => countBuilder(count),
+    limit: () => countBuilder(count),
+    maybeSingle: async () => ({ data: null, error: null }),
+    then: (resolve: (value: unknown) => unknown) =>
+      resolve({ count, data: [], error: null }),
   });
 
   const listBuilder = <T>(rows: T[]) => ({

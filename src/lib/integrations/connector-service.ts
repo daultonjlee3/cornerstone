@@ -15,6 +15,8 @@ import {
 import { computeConnectorHealth, type ConnectorHealthSummary } from "@/src/lib/integrations/health";
 import {
   listIntegrationConnections,
+  sanitizeIntegrationConnectionForClient,
+  sanitizeIntegrationConnectionConfig,
   upsertIntegrationConnection,
   updateConnectionSyncStatus,
 } from "@/src/lib/integrations/connections";
@@ -399,8 +401,11 @@ function buildConnectorSummary(
   runs: IntegrationSyncRun[],
   tenantId: string
 ): ConnectorSummary {
-  const health = computeConnectorHealth(connection);
-  const connectionRuns = connection ? runs.filter((run) => run.connection_id === connection.id) : [];
+  const safeConnection = connection ? sanitizeIntegrationConnectionForClient(connection) : null;
+  const health = computeConnectorHealth(safeConnection);
+  const connectionRuns = safeConnection
+    ? runs.filter((run) => run.connection_id === safeConnection.id)
+    : [];
   const syncStats = {
     totalRuns: connectionRuns.length,
     successfulRuns: connectionRuns.filter((run) => run.status === "success").length,
@@ -411,17 +416,19 @@ function buildConnectorSummary(
 
   return {
     connector: definition,
-    connection,
-    connectionStatus: connection?.status ?? "not_connected",
+    connection: safeConnection,
+    connectionStatus: safeConnection?.status ?? "not_connected",
     health,
-    lastSyncAt: connection?.last_sync_at ?? null,
+    lastSyncAt: safeConnection?.last_sync_at ?? null,
     syncStats,
-    errorState: connection?.last_error ?? null,
-    tenantOwned: connection?.tenant_id === tenantId,
-    config: (connection?.config as Record<string, unknown>) ?? {},
-    mappingMetadata: (((connection?.config as Record<string, unknown>) ?? {}).mapping_metadata ??
+    errorState: safeConnection?.last_error ?? null,
+    tenantOwned: safeConnection?.tenant_id === tenantId,
+    config: sanitizeIntegrationConnectionConfig(
+      (safeConnection?.config as Record<string, unknown>) ?? {}
+    ),
+    mappingMetadata: (((safeConnection?.config as Record<string, unknown>) ?? {}).mapping_metadata ??
       {}) as Record<string, unknown>,
-    credentialMetadata: (((connection?.config as Record<string, unknown>) ?? {}).credential_metadata ??
+    credentialMetadata: (((safeConnection?.config as Record<string, unknown>) ?? {}).credential_metadata ??
       null) as Record<string, unknown> | null,
   };
 }
