@@ -4,7 +4,6 @@ import {
   AlertCircle,
   Building2,
   Clock,
-  DollarSign,
   MapPin,
   Sparkles,
   Truck,
@@ -104,12 +103,12 @@ export function FleetJobQueue({
                 className={`rounded-lg border bg-[var(--surface-default)]/72 transition-all duration-150 ${priorityUrgencyClass(job.priority)} ${
                   selected
                     ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30 shadow-[var(--elevation-1)]"
-                    : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15"
+                    : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15 hover:-translate-y-[1px]"
                 }`}
               >
                 <button
                   type="button"
-                  className="w-full p-2.5 text-left"
+                  className="w-full space-y-2.5 p-2.5 text-left"
                   onClick={() => onSelectJob(selected ? null : job.id)}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -120,19 +119,25 @@ export function FleetJobQueue({
                     <PriorityBadge priority={job.priority} />
                   </div>
 
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
-                    <Stat icon={DollarSign} value={formatCurrency(job.revenue_estimate)} label="revenue" />
-                    <Stat icon={DollarSign} value={formatCurrency(estimatedProfit)} label="est. profit" />
-                    {duration != null ? <Stat icon={Clock} value={`${duration}h`} label="duration" /> : null}
-                    <Stat icon={Truck} value={job.required_truck_type} label="truck type" />
-                    <Stat icon={Clock} value={formatTime(job.scheduled_start)} label="arrival" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <DecisionMetric value={formatCurrency(job.revenue_estimate)} label="Revenue" />
+                    <DecisionMetric value={formatCurrency(estimatedProfit)} label="Contribution" />
                   </div>
 
-                  <p className="mt-1.5 text-[10px] text-[var(--muted)]">
-                    Equipment: <span className="font-semibold capitalize text-[var(--foreground)]">{job.required_truck_type.replace("_", " ")}</span>
-                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Stat icon={Clock} value={formatTime(job.scheduled_start)} label="arrival" />
+                    {duration != null ? <Stat icon={Clock} value={`${duration}h`} label="duration" /> : null}
+                    <Stat icon={Truck} value={job.required_truck_type} label="truck type" />
+                    {job.estimated_deadhead_miles != null ? (
+                      <Stat
+                        icon={MapPin}
+                        value={`${job.estimated_deadhead_miles.toFixed(1)} mi`}
+                        label="deadhead"
+                      />
+                    ) : null}
+                  </div>
 
-                  <p className="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--muted)]">
+                  <p className="flex items-center gap-1 text-[10px] text-[var(--muted)]">
                     <MapPin className="size-3 shrink-0" />
                     <span className="truncate">{job.site_name ?? "Site"}</span>
                   </p>
@@ -144,14 +149,14 @@ export function FleetJobQueue({
                   ) : null}
 
                   {job.estimated_deadhead_miles != null ? (
-                    <p className="mt-1.5 text-[10px] font-medium text-amber-800 dark:text-amber-300">
+                    <p className="text-[10px] font-medium text-amber-800 dark:text-amber-300">
                       {job.estimated_deadhead_miles.toFixed(1)} mi deadhead
                       {job.estimated_travel_minutes != null ? ` · ${job.estimated_travel_minutes} min` : ""}
                     </p>
                   ) : null}
 
                   {topTruck ? (
-                    <div className="mt-2 space-y-1 rounded-md border border-[color-mix(in_srgb,var(--status-info)_28%,transparent)] bg-[var(--status-info-subtle)] px-2 py-1.5">
+                    <div className="space-y-1 rounded-md border border-[color-mix(in_srgb,var(--status-info)_28%,transparent)] bg-[var(--status-info-subtle)] px-2 py-1.5">
                       <div className="flex items-center justify-between gap-1">
                         <span className="flex items-center gap-1 text-[10px] font-bold text-blue-800 dark:text-blue-300">
                           <Sparkles className="size-3" />
@@ -178,13 +183,13 @@ export function FleetJobQueue({
                   ) : null}
 
                   {risk ? (
-                    <p className="mt-1.5 flex items-start gap-1 text-[10px] font-semibold text-red-700 dark:text-red-400">
+                    <p className="flex items-start gap-1 text-[10px] font-semibold text-red-700 dark:text-red-400">
                       <AlertCircle className="mt-0.5 size-3 shrink-0" />
                       {risk}
                     </p>
                   ) : null}
 
-                  <div className="mt-1.5 flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1">
                     {late ? (
                       <Badge tone="red" icon={AlertCircle}>
                         Late
@@ -243,12 +248,21 @@ function Stat({
   label?: string;
 }) {
   return (
-    <div className="rounded border border-[var(--card-border)] bg-white px-1.5 py-1 dark:bg-[var(--card)]">
+    <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 px-1.5 py-1">
       <div className="flex items-center gap-1">
-        <Icon className="size-3 text-[var(--muted)]" />
+        <Icon className="size-3 text-[var(--text-muted)]" />
         <span className="truncate text-[10px] font-semibold">{value}</span>
       </div>
       {label ? <p className="text-[9px] capitalize text-[var(--muted)]">{label}</p> : null}
+    </div>
+  );
+}
+
+function DecisionMetric({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 px-2 py-1.5">
+      <p className="text-[9px] uppercase tracking-wide text-[var(--muted)]">{label}</p>
+      <p className="mt-0.5 text-base font-semibold tabular-nums text-[var(--foreground)]">{value}</p>
     </div>
   );
 }
