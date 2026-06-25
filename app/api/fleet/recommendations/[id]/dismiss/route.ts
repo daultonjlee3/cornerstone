@@ -3,6 +3,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getAuthContext } from "@/src/lib/auth-context";
 import { can } from "@/src/lib/permissions";
 import { applyRecommendationOutcome } from "@/src/lib/fleet-recommendation-engine/service";
+import { DEMO_READ_ONLY_ERROR, isDemoReadOnlyUser } from "@/src/lib/demo/readOnly";
 
 type Params = {
   id: string;
@@ -23,6 +24,10 @@ export async function POST(
 
   if (!(await can("fleet.manage"))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (await isDemoReadOnlyUser(supabase)) {
+    return NextResponse.json({ error: DEMO_READ_ONLY_ERROR }, { status: 403 });
   }
 
   if (!auth.tenantId) {

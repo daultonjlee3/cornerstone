@@ -38,6 +38,7 @@ import { OperationOptimizationWidget } from "@/src/components/operation-optimiza
 import { FleetTodayView } from "./components/fleet-today-view";
 import { loadFleetTodayViewData } from "@/src/lib/fleet/queries/today-view";
 import { isFleetProductProfile } from "../nav-config";
+import { can } from "@/src/lib/permissions";
 
 export const metadata = {
   title: "Fleet Command Center | Cornerstone Fleet",
@@ -209,6 +210,7 @@ export default async function OperationsCenterPage() {
   const productProfile = await getProductProfileForTenant(tenantId, supabase);
   const showFleet = isFleetProductProfile(productProfile);
   const fleetOnly = productProfile === "fleet_intelligence";
+  const canManageFleet = showFleet ? await can("fleet.manage") : false;
 
   const fleetTodayView = showFleet ? await loadFleetTodayViewData(supabase, tenantId) : null;
 
@@ -258,7 +260,7 @@ export default async function OperationsCenterPage() {
         ) : null}
 
         {showFleet && fleetTodayView ? (
-          <FleetTodayView initialData={fleetTodayView} />
+          <FleetTodayView initialData={fleetTodayView} canManageFleet={canManageFleet} />
         ) : null}
 
         {!fleetOnly ? (

@@ -160,6 +160,8 @@ export function FleetDispatchMapPanel({
   }, [jobs, truckLanes]);
 
   const showLegend = activeRecommendation != null || routeLines.length > 0;
+  const hasMapPoints = jobs.some((job) => hasCoordinate(job.site_latitude, job.site_longitude)) ||
+    truckLanes.some((lane) => hasCoordinate(lane.latitude, lane.longitude));
 
   return (
     <div className="relative h-full w-full">
@@ -241,6 +243,22 @@ export function FleetDispatchMapPanel({
         })}
       </MapContainer>
 
+      <div className="absolute left-2 top-2 z-[1000] flex items-center gap-1.5 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/90 px-2 py-1 text-[10px] shadow-[var(--elevation-1)]">
+        <span className="font-semibold text-[var(--text-muted-strong)]">Live map</span>
+        <span className="text-[var(--muted)]">
+          {truckLanes.length} trucks · {jobs.length} jobs
+        </span>
+        {selectedJobId ? (
+          <button
+            type="button"
+            className="pointer-events-auto rounded border border-[var(--surface-border-subtle)] px-1 py-0.5 text-[9px] font-semibold text-[var(--text-muted-strong)]"
+            onClick={() => onSelectJob(null)}
+          >
+            Clear selection
+          </button>
+        ) : null}
+      </div>
+
       {showLegend ? (
         <div className="pointer-events-none absolute bottom-2 left-2 z-[1000] max-w-[220px] rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 p-2 text-[10px] shadow-[var(--elevation-1)]">
           <p className="font-bold uppercase tracking-wide text-[var(--muted)]">Map intelligence</p>
@@ -269,6 +287,17 @@ export function FleetDispatchMapPanel({
       {activeRisk ? (
         <div className="pointer-events-none absolute right-2 top-2 z-[1000] max-w-[180px] rounded-lg border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--status-danger)] shadow-[var(--elevation-1)]">
           ⚠ {activeRisk}
+        </div>
+      ) : null}
+
+      {!hasMapPoints ? (
+        <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center">
+          <div className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/95 px-3 py-2 text-center shadow-[var(--elevation-1)]">
+            <p className="text-xs font-semibold text-[var(--foreground)]">Map awaiting telemetry</p>
+            <p className="text-[10px] text-[var(--muted)]">
+              Truck and job markers appear when coordinates are available.
+            </p>
+          </div>
         </div>
       ) : null}
 

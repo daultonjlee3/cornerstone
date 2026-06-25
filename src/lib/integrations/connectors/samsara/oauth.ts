@@ -1,9 +1,16 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const STATE_SECRET =
-  process.env.SAMSARA_OAUTH_STATE_SECRET?.trim() ||
-  process.env.CRON_SECRET?.trim() ||
-  "dev-oauth-state-secret";
+function resolveStateSecret(): string {
+  const configuredSecret =
+    process.env.SAMSARA_OAUTH_STATE_SECRET?.trim() || process.env.CRON_SECRET?.trim();
+  if (configuredSecret) return configuredSecret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SAMSARA_OAUTH_STATE_SECRET is required in production.");
+  }
+  return "dev-oauth-state-secret";
+}
+
+const STATE_SECRET = resolveStateSecret();
 
 export type SamsaraOAuthState = {
   tenantId: string;

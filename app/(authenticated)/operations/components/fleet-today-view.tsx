@@ -56,6 +56,7 @@ import {
 
 type FleetTodayViewProps = {
   initialData: FleetTodayViewData;
+  canManageFleet: boolean;
 };
 
 function shiftGreeting(): string {
@@ -93,14 +94,17 @@ function formatDeltaValue(delta: FleetMetricDelta): string {
   }
 }
 
-export function FleetTodayView({ initialData }: FleetTodayViewProps) {
+export function FleetTodayView({ initialData, canManageFleet }: FleetTodayViewProps) {
   const [data, setData] = useState(initialData);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/fleet/today-view", { cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok) {
+      setError("Unable to refresh command center data.");
+      return;
+    }
     const payload = (await res.json()) as FleetTodayViewData;
     setData(payload);
     setError(null);
@@ -116,7 +120,13 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
           body: JSON.stringify({}),
         });
         if (!res.ok) {
-          setError(action === "accept" ? "Unable to accept recommendation." : "Unable to dismiss recommendation.");
+          const payload = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(
+            payload.error ??
+              (action === "accept"
+                ? "Unable to accept recommendation."
+                : "Unable to dismiss recommendation.")
+          );
           return;
         }
         await refresh();
@@ -244,6 +254,10 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
                   label={confidenceLabel(recommendationConfidence(primaryRec))}
                   tone={confidenceTone(recommendationConfidence(primaryRec))}
                 />
+              <StatusChip label={`Status ${primaryRec.status}`} tone="info" showDot={false} />
+              {!canManageFleet ? (
+                <StatusChip label="Viewer mode" tone="neutral" showDot={false} />
+              ) : null}
               </div>
             ) : null
           }
@@ -253,6 +267,7 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
           <HeroRecommendationBody
             recommendation={primaryRec}
             pending={pending}
+            canManageFleet={canManageFleet}
             onAction={onRecommendationAction}
           />
         ) : (
@@ -363,6 +378,7 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
                     <CompactRecommendationRow
                       recommendation={rec}
                       pending={pending}
+                      canManageFleet={canManageFleet}
                       onAction={onRecommendationAction}
                     />
                   </li>
@@ -651,10 +667,12 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
 function HeroRecommendationBody({
   recommendation,
   pending,
+  canManageFleet,
   onAction,
 }: {
   recommendation: FleetRecommendationInstance;
   pending: boolean;
+  canManageFleet: boolean;
   onAction: (id: string, action: "accept" | "dismiss") => void;
 }) {
   const candidates = recommendation.rationale.candidates ?? [];
@@ -704,6 +722,10 @@ function HeroRecommendationBody({
         </div>
       ) : null}
 
+      <p className="cs-text-caption cs-text-muted">
+        Confidence and impact are operational estimates based on current telemetry and scheduling data.
+      </p>
+
       <div>
         <p className="cs-text-micro cs-text-muted">Why this truck</p>
         <ul className="mt-2 space-y-1.5">
@@ -734,7 +756,7 @@ function HeroRecommendationBody({
           type="button"
           size="md"
           onClick={() => onAction(recommendation.id, "accept")}
-          disabled={pending}
+          disabled={pending || !canManageFleet}
         >
           {isCapacityOnly ? "Acknowledge" : "Accept recommendation"}
         </Button>
@@ -746,11 +768,16 @@ function HeroRecommendationBody({
           size="sm"
           variant="ghost"
           onClick={() => onAction(recommendation.id, "dismiss")}
-          disabled={pending}
+          disabled={pending || !canManageFleet}
         >
           Dismiss
         </Button>
       </div>
+      {!canManageFleet ? (
+        <p className="cs-text-caption cs-text-muted">
+          You have view access. Ask a fleet manager to accept or dismiss recommendations.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -758,10 +785,12 @@ function HeroRecommendationBody({
 function CompactRecommendationRow({
   recommendation,
   pending,
+  canManageFleet,
   onAction,
 }: {
   recommendation: FleetRecommendationInstance;
   pending: boolean;
+  canManageFleet: boolean;
   onAction: (id: string, action: "accept" | "dismiss") => void;
 }) {
   const confidence = recommendationConfidence(recommendation);
@@ -785,7 +814,7 @@ function CompactRecommendationRow({
           type="button"
           size="sm"
           onClick={() => onAction(recommendation.id, "accept")}
-          disabled={pending}
+          disabled={pending || !canManageFleet}
         >
           {isCapacityOnly ? "Acknowledge" : "Accept"}
         </Button>
@@ -794,7 +823,7 @@ function CompactRecommendationRow({
           size="sm"
           variant="ghost"
           onClick={() => onAction(recommendation.id, "dismiss")}
-          disabled={pending}
+          disabled={pending || !canManageFleet}
         >
           Dismiss
         </Button>

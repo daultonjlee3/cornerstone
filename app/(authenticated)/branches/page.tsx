@@ -1,10 +1,8 @@
 import { Warehouse } from "lucide-react";
-import { createClient } from "@/src/lib/supabase/server";
-import { redirect } from "next/navigation";
 import { BranchesList } from "./components/branches-list";
 import { PageHeader } from "@/src/components/ui/page-header";
-import { getTenantIdForUser } from "@/src/lib/auth-context";
 import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
+import { requireFleetModuleAccess } from "@/app/(authenticated)/fleet/_lib/access";
 
 export const metadata = {
   title: "Branches | Cornerstone Tech",
@@ -16,14 +14,8 @@ export default async function BranchesPage({
 }: {
   searchParams: SearchParams | Promise<SearchParams>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const tenantId = await getTenantIdForUser(supabase);
-  if (!tenantId) redirect("/onboarding");
+  const { supabase, auth } = await requireFleetModuleAccess();
+  const tenantId = auth.tenantId;
 
   const params = await resolveSearchParams(searchParams);
   const pageParam = params?.page;

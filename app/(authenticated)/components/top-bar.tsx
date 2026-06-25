@@ -9,6 +9,7 @@ import {
   CloudSun,
   Command,
   Menu,
+  TerminalSquare,
   Plus,
   Search,
   Sparkles,
@@ -57,6 +58,19 @@ type TopBarProps = {
   onReturnToProfile?: () => void;
 };
 
+const RECENT_SEARCHES_KEY = "cornerstone:recent-searches";
+const COMMAND_ACTIONS = [
+  { label: "Open Implementation Overview", href: "/implementation" },
+  { label: "Open Connected Systems", href: "/implementation/connections" },
+  { label: "Open Implementation Imports", href: "/implementation/imports" },
+  { label: "Open Dispatch Intelligence", href: "/dispatch" },
+  { label: "Open Fleet Command Center", href: "/operations" },
+  { label: "Open Fleet Performance", href: "/reports/operations" },
+  { label: "Open Trucks Registry", href: "/fleet/trucks" },
+  { label: "Open Operators Roster", href: "/fleet/operators" },
+  { label: "Open Job Ledger", href: "/fleet/jobs" },
+];
+
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
@@ -82,7 +96,10 @@ export function TopBar({
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [commandQuery, setCommandQuery] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -91,13 +108,21 @@ export function TopBar({
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
   const accountRef = useRef<HTMLDivElement | null>(null);
   const quickActionsRef = useRef<HTMLDivElement | null>(null);
+  const commandInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
       const q = searchQuery.trim();
       if (!q) return;
-      router.push(`/operations?q=${encodeURIComponent(q)}`);
+      setRecentSearches((prev) => {
+        const next = [q, ...prev.filter((item) => item !== q)].slice(0, 8);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+        }
+        return next;
+      });
+      router.push(`/dispatch?q=${encodeURIComponent(q)}`);
     },
     [searchQuery, router]
   );
@@ -241,6 +266,74 @@ export function TopBar({
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setRecentSearches(parsed.filter((value): value is string => typeof value === "string").slice(0, 8));
+      }
+    } catch {
+      // Ignore malformed storage state.
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isOpenShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+      if (!isOpenShortcut) return;
+      event.preventDefault();
+      setCommandOpen(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!commandOpen) return;
+    const timeoutId = window.setTimeout(() => {
+      commandInputRef.current?.focus();
+    }, 20);
+    return () => window.clearTimeout(timeoutId);
+  }, [commandOpen]);
+
+  const closeCommand = useCallback(() => {
+    setCommandOpen(false);
+    setCommandQuery("");
+  }, []);
+
+  const executeCommandSearch = useCallback(
+    (value: string) => {
+      const q = value.trim();
+      if (!q) return;
+      setRecentSearches((prev) => {
+        const next = [q, ...prev.filter((item) => item !== q)].slice(0, 8);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+        }
+        return next;
+      });
+      setSearchQuery(q);
+      closeCommand();
+      router.push(`/dispatch?q=${encodeURIComponent(q)}`);
+    },
+    [closeCommand, router]
+  );
+
+  const filteredCommandActions = useMemo(() => {
+    const query = commandQuery.trim().toLowerCase();
+    if (!query) return COMMAND_ACTIONS;
+    return COMMAND_ACTIONS.filter((item) => item.label.toLowerCase().includes(query));
+  }, [commandQuery]);
+
+  const filteredRecentSearches = useMemo(() => {
+    const query = commandQuery.trim().toLowerCase();
+    if (!query) return recentSearches;
+    return recentSearches.filter((item) => item.toLowerCase().includes(query));
+  }, [commandQuery, recentSearches]);
+
   const branchId = useMemo(() => searchParams.get("branch_id")?.trim() ?? "", [searchParams]);
 
   useEffect(() => {
@@ -322,9 +415,17 @@ export function TopBar({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Global search: jobs, trucks, operators, branches..."
-                className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 pl-9 pr-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                className="h-10 w-full rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 pl-9 pr-14 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                 aria-label="Global search"
               />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--surface-border-subtle)] bg-[var(--surface-default)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--muted)]"
+                onClick={() => setCommandOpen(true)}
+                aria-label="Open command search"
+              >
+                ⌘K
+              </button>
             </div>
           </form>
         </div>
@@ -383,6 +484,15 @@ export function TopBar({
               </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            onClick={() => setCommandOpen(true)}
+            className="hidden h-9 items-center gap-1.5 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/65 px-2.5 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--foreground)] sm:inline-flex"
+            aria-label="Open command search"
+          >
+            <TerminalSquare className="size-3.5" />
+            Command
+          </button>
           {onOpenAiPanel ? (
             <button
               type="button"
@@ -532,6 +642,99 @@ export function TopBar({
           </p>
         </div>
       </div>
+      {commandOpen ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-start justify-center bg-black/50 px-4 pt-20 backdrop-blur-sm"
+          onClick={closeCommand}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] shadow-[var(--elevation-3)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 border-b border-[var(--surface-border-subtle)] px-3 py-2">
+              <Command className="size-4 text-[var(--muted)]" />
+              <input
+                ref={commandInputRef}
+                type="text"
+                value={commandQuery}
+                onChange={(event) => setCommandQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") closeCommand();
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    executeCommandSearch(commandQuery);
+                  }
+                }}
+                placeholder="Search jobs, trucks, operators..."
+                className="h-10 w-full bg-transparent text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none"
+                aria-label="Command search"
+              />
+              <button
+                type="button"
+                className="rounded border border-[var(--surface-border-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--muted)]"
+                onClick={closeCommand}
+              >
+                ESC
+              </button>
+            </div>
+
+            <div className="grid gap-3 p-3 sm:grid-cols-2">
+              <div className="space-y-2 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/70 p-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  Recent searches
+                </p>
+                {filteredRecentSearches.length === 0 ? (
+                  <p className="text-xs text-[var(--muted)]">No recent searches.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {filteredRecentSearches.slice(0, 5).map((item) => (
+                      <li key={item}>
+                        <button
+                          type="button"
+                          className="w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--surface-default)]"
+                          onClick={() => executeCommandSearch(item)}
+                        >
+                          {item}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/70 p-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  Operational shortcuts
+                </p>
+                {filteredCommandActions.length === 0 ? (
+                  <p className="text-xs text-[var(--muted)]">No matching shortcuts.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {filteredCommandActions.slice(0, 6).map((item) => (
+                      <li key={item.href}>
+                        <button
+                          type="button"
+                          className="w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--surface-default)]"
+                          onClick={() => {
+                            closeCommand();
+                            router.push(item.href);
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-[var(--surface-border-subtle)] px-3 py-2 text-[11px] text-[var(--muted)]">
+              Enter to search · Ctrl/Cmd+K to reopen · ESC to close
+            </div>
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

@@ -31,6 +31,7 @@ const protectedPaths = [
   "/preventive-maintenance",
   "/platform",
   "/settings",
+  "/implementation",
 ];
 const authPaths = ["/login", "/signup"];
 const IMPERSONATION_COOKIE = "cs_impersonation";
@@ -176,6 +177,8 @@ export const config = {
     "/platform/:path*",
     "/settings",
     "/settings/:path*",
+    "/implementation",
+    "/implementation/:path*",
     "/login",
     "/signup",
   ],

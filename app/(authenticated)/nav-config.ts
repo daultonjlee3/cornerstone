@@ -78,12 +78,17 @@ const fleetSetupGroup: NavGroup = {
   ],
 };
 
-const integrationsGroup: NavGroup = {
-  id: "integrations",
-  label: "Integrations",
+const implementationGroup: NavGroup = {
+  id: "implementation",
+  label: "Implementation",
   items: [
-    { label: "Integrations", href: "/settings/integrations", icon: "Plug" },
-    { label: "API & Webhooks", href: "/settings/integrations?focus=webhooks", icon: "Webhook" },
+    { label: "Overview", href: "/implementation", icon: "ListChecks" },
+    { label: "Connected Systems", href: "/implementation/connections", icon: "Plug" },
+    { label: "Imports", href: "/implementation/imports", icon: "ClipboardList" },
+    { label: "Baseline", href: "/implementation/baseline", icon: "TrendingUp" },
+    { label: "Readiness", href: "/implementation/readiness", icon: "ListChecks" },
+    { label: "Sync History", href: "/implementation/sync-history", icon: "Activity" },
+    { label: "Settings", href: "/implementation/settings", icon: "Settings" },
   ],
 };
 
@@ -201,7 +206,7 @@ const hybridCmmsOperationsGroup: NavGroup = {
 function getFleetIntelligenceNavConfig(): NavGroup[] {
   return [
     fleetOperationsGroup,
-    integrationsGroup,
+    implementationGroup,
     fleetAnalyticsGroup,
     { ...administrationGroup, secondary: false },
     fleetSetupGroup,
@@ -215,7 +220,7 @@ function getHybridNavConfig(): NavGroup[] {
       ...fleetOperationsGroup,
       items: [...fleetOperationsGroup.items, ...fleetOperationsHybridExtras],
     },
-    integrationsGroup,
+    implementationGroup,
     {
       ...fleetAnalyticsGroup,
       items: [{ label: "Reports", href: "/reports", icon: "BarChart2" }],

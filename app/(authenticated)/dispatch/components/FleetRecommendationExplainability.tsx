@@ -13,7 +13,6 @@ import {
   Shield,
   Sparkles,
   TrendingUp,
-  Truck,
   User,
   Wrench,
   X,
@@ -65,7 +64,7 @@ export function FleetRecommendationExplainability({
 
 function ConfidenceBlock({ explanation }: { explanation: RecommendationExplanation }) {
   return (
-    <div className="rounded-lg border border-[var(--card-border)] bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+    <div className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60 px-2.5 py-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
           Recommendation confidence
@@ -93,7 +92,7 @@ function DataFreshnessBlock({
       className={`rounded-lg border px-2.5 py-2 ${
         freshness.isStale
           ? "border-amber-300 bg-amber-50 dark:bg-amber-500/5"
-          : "border-[var(--card-border)] bg-white dark:bg-[var(--card)]"
+          : "border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60"
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -124,7 +123,7 @@ function CapacityOverloadSummary({
   summary: NonNullable<RecommendationExplanation["capacitySummary"]>;
 }) {
   return (
-    <div className="rounded-lg border border-amber-300 bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+    <div className="rounded-lg border border-amber-300 bg-[var(--status-warning-subtle)] px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
         Branch capacity alert
       </p>
@@ -145,14 +144,14 @@ function ComparisonTable({ explanation }: { explanation: RecommendationExplanati
   if (columns.length === 0) return null;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--card-border)]">
-      <p className="border-b border-[var(--card-border)] bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] dark:bg-[var(--card)]">
+    <div className="overflow-hidden rounded-lg border border-[var(--surface-border-subtle)]">
+      <p className="border-b border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
         Truck comparison
       </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] border-collapse text-[10px]">
           <thead>
-            <tr className="border-b border-[var(--card-border)] bg-white dark:bg-[var(--card)]">
+            <tr className="border-b border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60">
               <th className="px-2 py-1.5 text-left font-semibold text-[var(--muted)]">Metric</th>
               {columns.map((col, index) => (
                 <th
@@ -167,14 +166,14 @@ function ComparisonTable({ explanation }: { explanation: RecommendationExplanati
           </thead>
           <tbody>
             {explanation.comparisonRows.map((row) => (
-              <tr key={row.key} className="border-b border-[var(--card-border)]/60 last:border-0">
+              <tr key={row.key} className="border-b border-[var(--surface-border-subtle)]/60 last:border-0">
                 <td className="px-2 py-1 font-medium text-[var(--muted)]">{row.label}</td>
                 {row.cells.map((cell, index) => {
                   const isWinner = row.winnerIndex === index;
                   return (
                     <td
                       key={`${row.key}-${cell.truckId}`}
-                      className={`px-2 py-1 tabular-nums ${isWinner ? "bg-emerald-50/80 font-bold text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300" : "text-[var(--foreground)]"}`}
+                      className={`px-2 py-1 tabular-nums ${isWinner ? "bg-[var(--status-success-subtle)] font-bold text-[var(--status-success)]" : "text-[var(--foreground)]"}`}
                     >
                       {isWinner ? "▸ " : ""}
                       {cell.display}
@@ -194,7 +193,7 @@ function ExplainWhyPanel({ explanation }: { explanation: RecommendationExplanati
   const winnerLabel = explanation.recommended?.unitNumber ?? "This option";
 
   return (
-    <div className="rounded-lg border border-[var(--card-border)] bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+    <div className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60 px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Explain why</p>
       <p className="mt-1 text-[11px] font-semibold text-[var(--foreground)]">
         Cornerstone selected {winnerLabel} because:
@@ -209,7 +208,7 @@ function ExplainWhyPanel({ explanation }: { explanation: RecommendationExplanati
       </ul>
 
       {explanation.loserReasons.length > 0 ? (
-        <div className="mt-2 border-t border-[var(--card-border)] pt-2">
+        <div className="mt-2 border-t border-[var(--surface-border-subtle)] pt-2">
           <p className="text-[10px] font-semibold text-[var(--muted)]">Why alternatives lost</p>
           <div className="mt-1 space-y-1.5">
             {explanation.loserReasons.map((loser) => (
@@ -250,7 +249,7 @@ function qualityColor(quality: FactorQuality): string {
     case "good":
       return "text-blue-700 border-blue-300 dark:text-blue-400";
     case "neutral":
-      return "text-[var(--muted)] border-[var(--card-border)]";
+      return "text-[var(--muted)] border-[var(--surface-border-subtle)]";
     default:
       return "text-red-700 border-red-300 dark:text-red-400";
   }
@@ -264,7 +263,7 @@ function FactorScoresGrid({
   if (factors.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--card-border)] bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+    <div className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60 px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Decision factors</p>
       <div className="mt-1.5 grid grid-cols-2 gap-1.5">
         {factors.map((factor) => {
@@ -360,7 +359,7 @@ function DecisionImpactPanel({
   if (items.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--card-border)] bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+    <div className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/60 px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
         If you accept
       </p>
@@ -368,7 +367,7 @@ function DecisionImpactPanel({
         {items.map((item) => (
           <div
             key={item.label}
-            className="rounded-md border border-[var(--card-border)] px-2 py-1.5"
+            className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/60 px-2 py-1.5"
           >
             <div className="flex items-center gap-1">
               <item.icon className="size-3 text-[var(--accent)]" />
@@ -384,7 +383,7 @@ function DecisionImpactPanel({
 
 function IgnoreRiskBanner({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-white px-2.5 py-2 dark:bg-[var(--card)]">
+    <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-[var(--status-danger-subtle)] px-2.5 py-2">
       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
       <div>
         <p className="text-[10px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400">

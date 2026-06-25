@@ -19,18 +19,21 @@ type FleetDispatchViewClientProps = {
   initialBoard: FleetDispatchBoardData;
   initialIntel: FleetTodayViewData;
   selectedDate: string;
+  canManageFleet: boolean;
 };
 
 export function FleetDispatchViewClient({
   initialBoard,
   initialIntel,
   selectedDate,
+  canManageFleet,
 }: FleetDispatchViewClientProps) {
   return (
     <FleetDispatchView
       initialBoard={initialBoard}
       initialIntel={initialIntel}
       selectedDate={selectedDate}
+      canManageFleet={canManageFleet}
     />
   );
 }

@@ -1,46 +1,21 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/src/lib/supabase/server";
-import { getAuthContext } from "@/src/lib/auth-context";
-import { can } from "@/src/lib/permissions";
+import { getIntegrationApiContext } from "@/app/api/integrations/_lib/access";
 import { listIntegrationConnections } from "@/src/lib/integrations/connections";
+import type { IntegrationConnectionStatus, IntegrationProvider } from "@/src/types/fleet";
+import { sanitizeIntegrationConnectionForClient } from "@/src/lib/integrations/connections";
 
 export async function GET() {
-  const supabase = await createClient();
-
-  let auth;
-  try {
-    auth = await getAuthContext(supabase);
-  } catch {
-    return NextResponse.json({ connections: [] }, { status: 401 });
-  }
-
-  const allowed =
-    (await can("integrations.manage")) || (await can("fleet.view"));
-  if (!allowed) {
-    return NextResponse.json({ connections: [] }, { status: 403 });
-  }
-
-  if (!auth.tenantId) {
-    return NextResponse.json({ connections: [] });
-  }
-
-  const connections = await listIntegrationConnections(supabase, auth.tenantId);
-  return NextResponse.json({ connections });
+  const context = await getIntegrationApiContext("read");
+  if (context.response) return context.response;
+  const connections = await listIntegrationConnections(context.supabase, context.auth.tenantId);
+  return NextResponse.json({
+    connections: connections.map((connection) => sanitizeIntegrationConnectionForClient(connection)),
+  });
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-
-  let auth;
-  try {
-    auth = await getAuthContext(supabase);
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!(await can("integrations.manage"))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const context = await getIntegrationApiContext("manage");
+  if (context.response) return context.response;
 
   const body = (await request.json()) as Record<string, unknown>;
   const action = String(body.action ?? "upsert").trim();
@@ -51,12 +26,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid webhook provider" }, { status: 400 });
     }
     const { createWebhookConnection } = await import("@/src/lib/integrations/connections");
-    const { connection, webhookSecret } = await createWebhookConnection(supabase, {
-      tenantId: auth.tenantId,
+    const { connection, webhookSecret } = await createWebhookConnection(context.supabase, {
+      tenantId: context.auth.tenantId,
       provider,
       displayName: body.display_name != null ? String(body.display_name) : null,
       config: (body.config as Record<string, unknown>) ?? {},
-      userId: auth.userId,
+      userId: context.auth.userId,
     });
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
     const webhookPath =
@@ -64,7 +39,7 @@ export async function POST(request: Request) {
         ? "/api/integrations/webhooks/jobs"
         : "/api/integrations/webhooks/telematics";
     return NextResponse.json({
-      connection,
+      connection: sanitizeIntegrationConnectionForClient(connection),
       webhook_secret: webhookSecret,
       webhook_url: `${baseUrl}${webhookPath}?connection=${connection.id}`,
     });
@@ -80,14 +55,14 @@ export async function POST(request: Request) {
   }
 
   const { upsertIntegrationConnection } = await import("@/src/lib/integrations/connections");
-  const connection = await upsertIntegrationConnection(supabase, {
-    tenantId: auth.tenantId,
-    provider: provider as "csv_manual" | "samsara" | "webhook_jobs" | "webhook_telematics",
+  const connection = await upsertIntegrationConnection(context.supabase, {
+    tenantId: context.auth.tenantId,
+    provider: provider as IntegrationProvider,
     displayName,
-    status: status as "pending" | "active" | "error" | "disabled",
-    userId: auth.userId,
+    status: status as IntegrationConnectionStatus,
+    userId: context.auth.userId,
     connectionId,
   });
 
-  return NextResponse.json({ connection });
+  return NextResponse.json({ connection: sanitizeIntegrationConnectionForClient(connection) });
 }

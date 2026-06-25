@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  Clock,
   DollarSign,
   Fuel,
   MapPin,
@@ -83,10 +84,10 @@ export function FleetTruckLanes({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") onSelectTruck(highlighted ? null : lane.truck_id);
                 }}
-                className={`w-56 shrink-0 cursor-pointer rounded-lg border bg-[var(--surface-default)]/70 p-2.5 transition-all duration-150 ${
+                className={`w-60 shrink-0 cursor-pointer rounded-lg border bg-[var(--surface-default)]/70 p-2.5 transition-all duration-150 ${
                   highlighted
                     ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/25"
-                    : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15 hover:shadow-sm"
+                    : "border-[var(--surface-border-subtle)] hover:-translate-y-[1px] hover:border-[var(--foreground)]/15 hover:shadow-sm"
                 }`}
               >
                 <div className="flex items-start justify-between gap-1">
@@ -111,17 +112,43 @@ export function FleetTruckLanes({
                   {status}
                 </span>
 
+                {currentJob ? (
+                  <p className="mt-1.5 line-clamp-2 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/70 px-1.5 py-1 text-[10px] font-medium leading-snug">
+                    {currentJob.title}
+                  </p>
+                ) : status === "Available" ? (
+                  <p className="mt-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    Ready for assignment
+                  </p>
+                ) : null}
+
+                <div className="mt-2 grid grid-cols-2 gap-1 text-[9px]">
+                  <span className="flex items-center gap-0.5 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
+                    <DollarSign className="size-2.5 text-emerald-600" />
+                    {formatCurrency(lane.revenue_today ?? 0)}
+                  </span>
+                  <span className="flex items-center gap-0.5 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
+                    <Clock className="size-2.5" />
+                    {hoursRemaining.toFixed(1)}h left
+                  </span>
+                  {lane.fuel_level_pct != null ? (
+                    <span className="flex items-center gap-0.5 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
+                      <Fuel className="size-2.5" />
+                      {Math.round(lane.fuel_level_pct)}% fuel
+                    </span>
+                  ) : null}
+                  <span className="flex items-center gap-0.5 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
+                    <MapPin className="size-2.5" />
+                    {lane.branch_name ?? "Branch"}
+                  </span>
+                </div>
+
                 {lane.operator_name ? (
                   <p className="mt-1.5 flex items-center gap-1 truncate text-[10px] text-[var(--muted)]">
                     <User className="size-3 shrink-0" />
                     {lane.operator_name}
                   </p>
                 ) : null}
-
-                <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-[var(--muted)]">
-                  <MapPin className="size-3 shrink-0" />
-                  {lane.branch_name ?? "Branch"}
-                </p>
 
                 <div className="mt-2">
                   <div className="flex justify-between text-[9px] font-medium text-[var(--muted)]">
@@ -139,34 +166,10 @@ export function FleetTruckLanes({
                   ) : (
                     <p className="mt-0.5 text-[9px] text-[var(--muted)]">
                       {lane.committed_hours.toFixed(1)} / {lane.available_hours.toFixed(1)}h committed
-                      · {hoursRemaining.toFixed(1)}h remaining
                       {(lane.idle_hours ?? 0) > 0.5 ? ` · ${lane.idle_hours?.toFixed(1)}h idle` : ""}
                     </p>
                   )}
                 </div>
-
-                <div className="mt-2 grid grid-cols-2 gap-1 text-[9px]">
-                  <span className="flex items-center gap-0.5 rounded-md bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
-                    <DollarSign className="size-2.5 text-emerald-600" />
-                    {formatCurrency(lane.revenue_today ?? 0)}
-                  </span>
-                  {lane.fuel_level_pct != null ? (
-                    <span className="flex items-center gap-0.5 rounded-md bg-[var(--surface-raised)] px-1.5 py-1 font-semibold">
-                      <Fuel className="size-2.5" />
-                      {Math.round(lane.fuel_level_pct)}% fuel
-                    </span>
-                  ) : null}
-                </div>
-
-                {currentJob ? (
-                  <p className="mt-2 line-clamp-2 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/70 px-1.5 py-1 text-[10px] font-medium leading-snug">
-                    {currentJob.title}
-                  </p>
-                ) : status === "Available" ? (
-                  <p className="mt-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                    Ready for assignment
-                  </p>
-                ) : null}
 
                 {lane.maintenance_note ? (
                   <p className="mt-1 flex items-center gap-0.5 text-[9px] font-medium text-amber-800">
