@@ -87,6 +87,20 @@ const integrationsGroup: NavGroup = {
   ],
 };
 
+const implementationGroup: NavGroup = {
+  id: "implementation",
+  label: "Implementation",
+  items: [
+    { label: "Overview", href: "/implementation", icon: "ListChecks" },
+    { label: "Connections", href: "/implementation/connections", icon: "Plug" },
+    { label: "Imports", href: "/implementation/imports", icon: "ClipboardList" },
+    { label: "Baseline", href: "/implementation/baseline", icon: "TrendingUp" },
+    { label: "Readiness", href: "/implementation/readiness", icon: "ListChecks" },
+    { label: "Sync History", href: "/implementation/sync-history", icon: "Activity" },
+    { label: "Settings", href: "/implementation/settings", icon: "Settings" },
+  ],
+};
+
 const fleetAnalyticsGroup: NavGroup = {
   id: "analytics",
   label: "Analytics",
@@ -202,6 +216,7 @@ function getFleetIntelligenceNavConfig(): NavGroup[] {
   return [
     fleetOperationsGroup,
     integrationsGroup,
+    implementationGroup,
     fleetAnalyticsGroup,
     { ...administrationGroup, secondary: false },
     fleetSetupGroup,
@@ -216,6 +231,7 @@ function getHybridNavConfig(): NavGroup[] {
       items: [...fleetOperationsGroup.items, ...fleetOperationsHybridExtras],
     },
     integrationsGroup,
+    implementationGroup,
     {
       ...fleetAnalyticsGroup,
       items: [{ label: "Reports", href: "/reports", icon: "BarChart2" }],
