@@ -228,7 +228,7 @@ export function ImplementationOverviewClient() {
 
     return [
       {
-        label: "Connections",
+        label: "Connected Systems",
         value: `${readiness?.counts.connectorsActive ?? 0}`,
         hint:
           warningConnectors > 0
@@ -354,7 +354,7 @@ export function ImplementationOverviewClient() {
       <PageSection>
         <SectionHeader
           title="Implementation dashboard"
-          description="Track progress across connections, imports, baseline, and readiness."
+          description="Track progress across connected systems, imports, baseline, and readiness."
         />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {focusCards.map((card) => (

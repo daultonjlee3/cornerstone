@@ -83,7 +83,7 @@ const implementationGroup: NavGroup = {
   label: "Implementation",
   items: [
     { label: "Overview", href: "/implementation", icon: "ListChecks" },
-    { label: "Connections", href: "/implementation/connections", icon: "Plug" },
+    { label: "Connected Systems", href: "/implementation/connections", icon: "Plug" },
     { label: "Imports", href: "/implementation/imports", icon: "ClipboardList" },
     { label: "Baseline", href: "/implementation/baseline", icon: "TrendingUp" },
     { label: "Readiness", href: "/implementation/readiness", icon: "ListChecks" },

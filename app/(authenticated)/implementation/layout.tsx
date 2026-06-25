@@ -16,7 +16,7 @@ export default async function ImplementationLayout({
       <PageHeader
         icon={<Rocket className="size-5" />}
         title="Implementation Center"
-        subtitle="Connect systems, import data, establish baseline, and reach operational readiness."
+        subtitle="Connect systems, import data, establish baseline, and reach operational readiness through Connected Systems."
         variant="surface"
       />
       <ImplementationNav />

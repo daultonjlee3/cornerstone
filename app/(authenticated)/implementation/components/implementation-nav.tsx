@@ -6,7 +6,7 @@ import { ListChecks, Plug, ClipboardList, TrendingUp, Activity, Settings } from 
 
 const NAV_ITEMS = [
   { href: "/implementation", label: "Overview", icon: ListChecks },
-  { href: "/implementation/connections", label: "Connections", icon: Plug },
+  { href: "/implementation/connections", label: "Connected Systems", icon: Plug },
   { href: "/implementation/imports", label: "Imports", icon: ClipboardList },
   { href: "/implementation/baseline", label: "Baseline", icon: TrendingUp },
   { href: "/implementation/readiness", label: "Readiness", icon: ListChecks },

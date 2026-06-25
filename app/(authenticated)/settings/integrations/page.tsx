@@ -1,15 +1,11 @@
-import { Suspense } from "react";
-import { Plug } from "lucide-react";
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/src/components/ui/page-header";
 import { getTenantIdForUser, getProductProfileForTenant } from "@/src/lib/auth-context";
 import { can } from "@/src/lib/permissions";
-import { IntegrationsClient } from "./integrations-client";
 
 export const metadata = {
-  title: "Integrations | Cornerstone Tech",
-  description: "Integration control plane for fleet data sources",
+  title: "Connected Systems | Cornerstone Tech",
+  description: "Connected systems registry for fleet operational intelligence",
 };
 
 export default async function IntegrationsSettingsPage() {
@@ -28,16 +24,5 @@ export default async function IntegrationsSettingsPage() {
   const canManage = (await can("integrations.manage")) || (await can("fleet.view"));
   if (!canManage) redirect("/settings");
 
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        icon={<Plug className="size-5" />}
-        title="Integration Control Plane"
-        subtitle="Monitor connections, sync runs, and fleet data imports."
-      />
-      <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading integrations…</p>}>
-        <IntegrationsClient />
-      </Suspense>
-    </div>
-  );
+  redirect("/implementation/connections");
 }

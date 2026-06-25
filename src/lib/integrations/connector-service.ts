@@ -31,7 +31,7 @@ import {
 export type ConnectorSummary = {
   connector: ConnectorDefinition;
   connection: IntegrationConnection | null;
-  connectionStatus: IntegrationConnectionStatus | "not_connected";
+  connectionStatus: IntegrationConnectionStatus | "not_connected" | "coming_soon";
   health: ConnectorHealthSummary;
   lastSyncAt: string | null;
   syncStats: {
@@ -85,8 +85,8 @@ export async function connectConnector(
   }
 ): Promise<{ connection: IntegrationConnection; credentialMetadata: Record<string, unknown> | null }> {
   const definition = getConnectorDefinitionByKey(input.key);
-  if (!definition) {
-    throw new Error("Unsupported connector.");
+  if (!definition || definition.status !== "available" || !definition.provider) {
+    throw new Error("Connector is not available for self-serve connection yet.");
   }
 
   const connection = await upsertIntegrationConnection(supabase, {
@@ -384,6 +384,8 @@ function resolveConnection(
   definition: ConnectorDefinition,
   connections: IntegrationConnection[]
 ): IntegrationConnection | null {
+  if (!definition.provider) return null;
+
   if (definition.key === "webhook") {
     const webhookConnection = connections.find((conn) =>
       conn.provider === "webhook" ||
@@ -401,6 +403,34 @@ function buildConnectorSummary(
   runs: IntegrationSyncRun[],
   tenantId: string
 ): ConnectorSummary {
+  if (definition.status === "coming_soon") {
+    return {
+      connector: definition,
+      connection: null,
+      connectionStatus: "coming_soon",
+      health: {
+        status: "not_connected",
+        label: "Coming soon",
+        lastSyncAt: null,
+        staleMinutes: null,
+        reason: "Planned connector",
+      },
+      lastSyncAt: null,
+      syncStats: {
+        totalRuns: 0,
+        successfulRuns: 0,
+        failedRuns: 0,
+        partialRuns: 0,
+        runningRuns: 0,
+      },
+      errorState: null,
+      tenantOwned: false,
+      config: {},
+      mappingMetadata: {},
+      credentialMetadata: null,
+    };
+  }
+
   const safeConnection = connection ? sanitizeIntegrationConnectionForClient(connection) : null;
   const health = computeConnectorHealth(safeConnection);
   const connectionRuns = safeConnection

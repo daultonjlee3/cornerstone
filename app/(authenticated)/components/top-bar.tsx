@@ -61,7 +61,7 @@ type TopBarProps = {
 const RECENT_SEARCHES_KEY = "cornerstone:recent-searches";
 const COMMAND_ACTIONS = [
   { label: "Open Implementation Overview", href: "/implementation" },
-  { label: "Open Implementation Connections", href: "/implementation/connections" },
+  { label: "Open Connected Systems", href: "/implementation/connections" },
   { label: "Open Implementation Imports", href: "/implementation/imports" },
   { label: "Open Dispatch Intelligence", href: "/dispatch" },
   { label: "Open Fleet Command Center", href: "/operations" },

@@ -29,8 +29,17 @@ type ConnectorSummary = {
   connector: {
     key: string;
     displayName: string;
+    category: string;
+    status: "available" | "coming_soon";
     connectorType: string;
     authType: string;
+    description: string;
+    primaryDataDomains: string[];
+    capabilities: string[];
+    syncDirection: "inbound" | "outbound" | "bidirectional";
+    connectionComplexity: "low" | "medium" | "high";
+    recommendedFor: string[];
+    version: string;
     mappingObjectTypes: string[];
   };
   connection: {
@@ -97,6 +106,13 @@ function formatDate(value: string | null) {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return "—";
   return new Date(parsed).toLocaleString();
+}
+
+function formatLabel(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function ConnectorDetailClient({
@@ -168,7 +184,7 @@ export function ConnectorDetailClient({
   }, [connectorKey]);
 
   const runAction = async (mode: "retry" | "disconnect") => {
-    if (!connector || !canManage) return;
+    if (!connector || !canManage || connector.connectionStatus === "coming_soon") return;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -215,11 +231,21 @@ export function ConnectorDetailClient({
             {connector.connector.displayName} is configured as a {connector.connector.connectorType} connector
             using {connector.connector.authType} authentication.
           </p>
+          <p className="cs-text-caption">{connector.connector.description}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <p className="cs-text-caption cs-text-muted">Status: <StatusBadge status={connector.connectionStatus} /></p>
             <p className="cs-text-caption cs-text-muted">Health: <StatusChip label={connector.health.label} tone={healthTone} /></p>
             <p className="cs-text-caption cs-text-muted">Last Sync: {formatDate(connector.health.lastSyncAt)}</p>
-            <p className="cs-text-caption cs-text-muted">Version: v1 (framework)</p>
+            <p className="cs-text-caption cs-text-muted">Version: {connector.connector.version}</p>
+            <p className="cs-text-caption cs-text-muted">Category: {formatLabel(connector.connector.category)}</p>
+            <p className="cs-text-caption cs-text-muted">Sync Direction: {formatLabel(connector.connector.syncDirection)}</p>
+            <p className="cs-text-caption cs-text-muted">Complexity: {formatLabel(connector.connector.connectionComplexity)}</p>
+            <p className="cs-text-caption cs-text-muted sm:col-span-2">
+              Primary data: {connector.connector.primaryDataDomains.join(", ")}
+            </p>
+            <p className="cs-text-caption cs-text-muted sm:col-span-2">
+              Capabilities: {connector.connector.capabilities.join(", ")}
+            </p>
           </div>
         </Panel>
       );
@@ -411,6 +437,8 @@ export function ConnectorDetailClient({
     );
   }
 
+  const canMutate = canManage && connector.connectionStatus !== "coming_soon";
+
   return (
     <PageLayout>
       <PageSection>
@@ -425,12 +453,12 @@ export function ConnectorDetailClient({
                   <ArrowLeft className="size-3.5" /> Back
                 </Link>
               </Button>
-              {canManage ? (
+              {canMutate ? (
                 <Button type="button" variant="secondary" size="sm" onClick={() => runAction("retry")} disabled={busy}>
                   <RefreshCw className="size-3.5" /> Retry Failed Sync
                 </Button>
               ) : null}
-              {canManage ? (
+              {canMutate ? (
                 <Button type="button" variant="danger" size="sm" onClick={() => runAction("disconnect")} disabled={busy}>
                   <Trash2 className="size-3.5" /> Disconnect
                 </Button>
