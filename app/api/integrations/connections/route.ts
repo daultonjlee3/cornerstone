@@ -3,6 +3,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { getAuthContext } from "@/src/lib/auth-context";
 import { can } from "@/src/lib/permissions";
 import { listIntegrationConnections } from "@/src/lib/integrations/connections";
+import type { IntegrationConnectionStatus, IntegrationProvider } from "@/src/types/fleet";
 
 export async function GET() {
   const supabase = await createClient();
@@ -82,9 +83,9 @@ export async function POST(request: Request) {
   const { upsertIntegrationConnection } = await import("@/src/lib/integrations/connections");
   const connection = await upsertIntegrationConnection(supabase, {
     tenantId: auth.tenantId,
-    provider: provider as "csv_manual" | "samsara" | "webhook_jobs" | "webhook_telematics",
+    provider: provider as IntegrationProvider,
     displayName,
-    status: status as "pending" | "active" | "error" | "disabled",
+    status: status as IntegrationConnectionStatus,
     userId: auth.userId,
     connectionId,
   });
