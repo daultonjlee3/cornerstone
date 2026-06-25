@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -322,12 +322,7 @@ function NavGroupBlock({
     return true;
   }, [canCollapse, group.id]);
 
-  const [sectionCollapsed, setSectionCollapsed] = useState(initialCollapsed);
-
-  useEffect(() => {
-    if (!canCollapse) return;
-    setSectionCollapsed(initialCollapsed);
-  }, [canCollapse, initialCollapsed]);
+  const [sectionCollapsed, setSectionCollapsed] = useState(() => initialCollapsed);
 
   const toggleSection = useCallback(() => {
     setSectionCollapsed((prev) => {

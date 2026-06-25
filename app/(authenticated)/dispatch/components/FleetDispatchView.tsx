@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import type {
@@ -100,10 +100,6 @@ export function FleetDispatchView({
       await loadRecommendations();
     }
   }, [loadRecommendations, searchParams, selectedDate]);
-
-  useEffect(() => {
-    void loadRecommendations();
-  }, [loadRecommendations]);
 
   const handleAssign = useCallback(
     (jobId: string, truckId: string) => {

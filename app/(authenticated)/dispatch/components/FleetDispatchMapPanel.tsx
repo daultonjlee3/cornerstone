@@ -75,7 +75,13 @@ export function FleetDispatchMapPanel({
 }: FleetDispatchMapPanelProps) {
   const recJobId = activeRecommendation?.rationale.entities.job_id;
   const recTopTruckId = activeRecommendation?.rationale.candidates?.[0]?.truck_id;
-  const recAltTruckIds = activeRecommendation?.rationale.candidates?.slice(1, 3).map((c) => c.truck_id) ?? [];
+  const recAltTruckIds = useMemo(
+    () =>
+      activeRecommendation?.rationale.candidates
+        ?.slice(1, 3)
+        .map((candidate) => candidate.truck_id) ?? [],
+    [activeRecommendation]
+  );
   const activeJob = recJobId ? jobs.find((j) => j.id === recJobId) : jobs.find((j) => j.id === selectedJobId);
   const activeRisk = activeJob ? operationalRiskMessage(activeJob) : null;
 

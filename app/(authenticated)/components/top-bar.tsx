@@ -121,7 +121,6 @@ export function TopBar({
     } catch (err) {
       // Network error, dev server restart, offline, etc. — don't crash the shell.
       if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
         console.debug("[top-bar] notifications fetch failed", err);
       }
     } finally {

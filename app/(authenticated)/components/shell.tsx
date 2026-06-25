@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { endImpersonation } from "@/app/platform/impersonate/actions";
 import { Sidebar } from "./sidebar";
@@ -41,12 +41,11 @@ export function Shell({
   productProfile = "cmms",
 }: ShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-
-  useEffect(() => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    setSidebarCollapsed(stored === null ? true : stored === "1");
-  }, []);
+    return stored === null ? true : stored === "1";
+  });
 
   const pathname = usePathname();
   const searchParams = useSearchParams();
