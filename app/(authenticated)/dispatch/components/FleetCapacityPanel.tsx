@@ -30,7 +30,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
   const overloadedTrucks = truckLanes.filter((lane) => lane.utilization >= 0.8);
 
   return (
-    <aside className="flex flex-col gap-3 overflow-y-auto">
+    <aside id="fleet-capacity" className="flex flex-col gap-3 overflow-y-auto">
       <WorkloadPanel title="Branch capacity" description="Committed vs available truck hours (mart).">
         <div className="space-y-1.5">
           {branchCapacity.length === 0 ? (
@@ -39,7 +39,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
             branchCapacity.map((branch) => (
               <div
                 key={branch.branch_id}
-                className="rounded border border-[var(--card-border)]/60 bg-[var(--background)]/50 p-2"
+                className="rounded-lg border border-[var(--card-border)] bg-white p-2 dark:bg-[var(--card)]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-semibold">{branch.branch_name}</p>
@@ -64,7 +64,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
           {truckLanes.slice(0, 8).map((lane) => (
             <div
               key={lane.truck_id}
-              className="rounded border border-[var(--card-border)]/60 bg-[var(--background)]/50 p-2"
+              className="rounded-lg border border-[var(--card-border)] bg-white p-2 dark:bg-[var(--card)]"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-semibold">{lane.unit_number}</p>

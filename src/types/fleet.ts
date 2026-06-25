@@ -139,6 +139,11 @@ export type FleetOperator = {
   technician_id: string | null;
   certifications: string[];
   hourly_cost: number | null;
+  overtime_rate: number | null;
+  double_time_rate: number | null;
+  shift: string | null;
+  skills: string[];
+  truck_qualifications: string[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -206,6 +211,14 @@ export type UtilizationDailyRow = {
   revenue: number;
   deadhead_miles: number;
   committed_hours: number;
+  labor_cost?: number;
+  fuel_cost?: number;
+  deadhead_cost?: number;
+  idle_cost?: number;
+  variable_cost?: number;
+  contribution?: number;
+  margin_pct?: number | null;
+  overtime_cost?: number;
   refreshed_at: string;
 };
 
@@ -227,6 +240,83 @@ export type FleetCommandCenterData = {
   utilizationPercent: number | null;
   revenuePerTruckMtd: number | null;
   truckCount: number;
+  /** Operational profitability signals (not accounting) */
+  revenueScheduledToday?: number;
+  estimatedContributionToday?: number;
+  contributionAtRisk?: number;
+  revenueAtRisk?: number;
+  overtimeCostToday?: number;
+  deadheadCostToday?: number;
+  idleCostToday?: number;
+  laborCostToday?: number;
+  recommendationOpportunity?: number;
+};
+
+export type FleetExceptionSeverity = "critical" | "warning" | "info";
+
+export type FleetOperationalException = {
+  id: string;
+  category:
+    | "unassigned_job"
+    | "capacity"
+    | "idle_truck"
+    | "telematics"
+    | "integration"
+    | "revenue"
+    | "dispatch"
+    | "gps";
+  severity: FleetExceptionSeverity;
+  title: string;
+  whyItMatters: string;
+  recommendedAction: string;
+  href: string;
+};
+
+export type FleetMetricDeltaDirection = "improved" | "declined" | "unchanged" | "unknown";
+
+export type FleetMetricDelta = {
+  key: string;
+  label: string;
+  today: number | null;
+  yesterday: number | null;
+  delta: number | null;
+  deltaPercent: number | null;
+  direction: FleetMetricDeltaDirection;
+  format: "percent" | "currency" | "count" | "hours" | "miles";
+};
+
+export type FleetIntegrationHealthItem = {
+  id: string;
+  provider: string;
+  displayName: string;
+  status: "healthy" | "warning" | "error";
+  lastSyncAt: string | null;
+  message: string | null;
+};
+
+export type FleetCapacityAlert = {
+  branch_id: string;
+  branch_name: string;
+  utilization: number;
+  committed_hours: number;
+  available_truck_hours: number;
+  href: string;
+};
+
+export type FleetTodayViewData = {
+  date: string;
+  executiveSummary: string;
+  commandCenter: FleetCommandCenterData;
+  executiveInsights?: FleetExecutiveInsights;
+  exceptions: FleetOperationalException[];
+  changesSinceYesterday: FleetMetricDelta[];
+  integrationHealth: FleetIntegrationHealthItem[];
+  upcomingCapacityIssues: FleetCapacityAlert[];
+  unusedCapacityBranches: FleetCapacityAlert[];
+  recommendations: FleetRecommendationsResponse;
+  recommendationRoi?: FleetRecommendationRoiSummary;
+  revenueAtRisk: number;
+  pendingActionCount: number;
 };
 
 export type FleetDispatchJob = {
@@ -253,6 +343,7 @@ export type FleetDispatchTruckLane = {
   unit_number: string;
   truck_type: string;
   branch_id: string;
+  branch_name?: string | null;
   status: TruckStatus;
   committed_hours: number;
   available_hours: number;
@@ -261,6 +352,11 @@ export type FleetDispatchTruckLane = {
   latitude: number | null;
   longitude: number | null;
   telematics_status: TruckTelematicsStatus;
+  operator_name?: string | null;
+  revenue_today?: number;
+  idle_hours?: number;
+  fuel_level_pct?: number | null;
+  maintenance_note?: string | null;
 };
 
 export type FleetDispatchBoardData = {
@@ -289,6 +385,15 @@ export type FleetUtilizationReportRow = {
   revenue: number;
   deadhead_miles: number;
   utilization_percent: number | null;
+  labor_cost?: number;
+  fuel_cost?: number;
+  deadhead_cost?: number;
+  idle_cost?: number;
+  contribution?: number;
+  margin_pct?: number | null;
+  overtime_cost?: number;
+  contribution_per_hour?: number | null;
+  revenue_per_hour?: number | null;
 };
 
 export type FleetUtilizationReportData = {
@@ -300,7 +405,161 @@ export type FleetUtilizationReportData = {
     totalRevenue: number;
     avgUtilizationPercent: number | null;
     totalDeadheadMiles: number;
+    totalContribution?: number;
+    marginPct?: number | null;
   };
+};
+
+export type FleetBranchPerformanceRow = {
+  branch_id: string;
+  branch_name: string;
+  revenue: number;
+  contribution: number;
+  margin_pct: number | null;
+  labor_cost: number;
+  fuel_cost: number;
+  deadhead_cost: number;
+  idle_cost: number;
+  overtime_cost: number;
+  variable_cost: number;
+  billable_hours: number;
+  total_hours: number;
+  truck_count: number;
+  revenue_per_truck: number | null;
+  contribution_per_truck: number | null;
+  contribution_per_hour: number | null;
+  utilization_percent: number | null;
+  jobs_completed: number;
+  recommendation_opportunity: number;
+  operational_risk: number;
+  rank: number;
+};
+
+export type FleetTruckPerformanceRow = {
+  truck_id: string;
+  unit_number: string;
+  branch_id: string;
+  branch_name: string;
+  revenue_today: number;
+  revenue_this_week: number;
+  revenue: number;
+  contribution: number;
+  margin_pct: number | null;
+  labor_cost: number;
+  fuel_cost: number;
+  deadhead_cost: number;
+  idle_cost: number;
+  overtime_cost: number;
+  billable_hours: number;
+  total_hours: number;
+  jobs_completed: number;
+  utilization_percent: number | null;
+  revenue_per_hour: number | null;
+  contribution_per_hour: number | null;
+  recommendation_value_generated: number;
+  operator_cost: number;
+  trend_vs_yesterday: number | null;
+  rank: number;
+};
+
+export type FleetOperatorPerformanceRow = {
+  operator_id: string;
+  operator_name: string;
+  branch_name: string;
+  revenue_generated: number;
+  contribution_generated: number;
+  labor_cost: number;
+  regular_hours: number;
+  overtime_hours: number;
+  double_time_hours: number;
+  idle_time: number;
+  travel_time: number;
+  revenue_per_hour: number | null;
+  contribution_per_hour: number | null;
+  jobs_completed: number;
+  recommendation_acceptance_rate: number | null;
+  rank: number;
+};
+
+export type FleetRecommendationRoiSummary = {
+  accepted: number;
+  dismissed: number;
+  applied: number;
+  failed: number;
+  acceptanceRate: number | null;
+  revenueProtected: number;
+  contributionImprovement: number;
+  laborSaved: number;
+  fuelSaved: number;
+  deadheadReduction: number;
+  overtimeAvoided: number;
+  travelTimeSavedMinutes: number;
+  branchAcceptanceRates: Array<{ branch_id: string; acceptance_rate: number | null }>;
+  topTypesByValue: Array<{ type: string; value: number; count: number }>;
+  topBranchesByValue: Array<{ branch_id: string; value: number; count: number }>;
+  topTrucksByImpact: Array<{ truck_id: string; unit_number: string; value: number; count: number }>;
+};
+
+export type FleetPerformanceDashboardData = {
+  from: string;
+  to: string;
+  summary: {
+    totalRevenue: number;
+    totalContribution: number;
+    totalVariableCost: number;
+    marginPct: number | null;
+    avgUtilizationPercent: number | null;
+    totalLaborCost: number;
+    totalFuelCost: number;
+    totalDeadheadCost: number;
+    totalIdleCost: number;
+    totalOvertimeCost: number;
+    contributionPerHour: number | null;
+    revenuePerHour: number | null;
+  };
+  branches: FleetBranchPerformanceRow[];
+  trucks: FleetTruckPerformanceRow[];
+  operators: FleetOperatorPerformanceRow[];
+  rankings: {
+    bestBranch: FleetBranchPerformanceRow | null;
+    worstBranch: FleetBranchPerformanceRow | null;
+    biggestImprovementOpportunity: FleetBranchPerformanceRow | null;
+    topTrucks: FleetTruckPerformanceRow[];
+    topOperators: FleetOperatorPerformanceRow[];
+    bottomTrucks: FleetTruckPerformanceRow[];
+    bottomOperators: FleetOperatorPerformanceRow[];
+  };
+  costAnalysis: {
+    deadhead: number;
+    idle: number;
+    overtime: number;
+    labor: number;
+    fuel: number;
+    revenueLeakage: number;
+    capacityCost: number;
+  };
+  recommendationRoi: FleetRecommendationRoiSummary;
+  contributionTrend: Array<{
+    date: string;
+    revenue: number;
+    contribution: number;
+    utilization_percent: number | null;
+  }>;
+  utilizationRows: FleetUtilizationReportRow[];
+};
+
+export type FleetExecutiveInsights = {
+  todaysContribution: number;
+  contributionAtRisk: number;
+  highestPerformingBranch: FleetBranchPerformanceRow | null;
+  lowestPerformingBranch: FleetBranchPerformanceRow | null;
+  mostProfitableTruck: FleetTruckPerformanceRow | null;
+  mostProfitableOperator: FleetOperatorPerformanceRow | null;
+  largestRecommendationOpportunity: number;
+  largestCostLeak: { label: string; amount: number };
+  recommendationValueThisWeek: number;
+  branchComparison: FleetBranchPerformanceRow[];
+  contributionTrend: FleetPerformanceDashboardData["contributionTrend"];
 };
 
 export type FleetRecommendationType =
@@ -312,18 +571,28 @@ export type FleetRecommendationStatus =
   | "pending"
   | "accepted"
   | "dismissed"
-  | "expired";
+  | "expired"
+  | "applied"
+  | "completed"
+  | "failed";
 
 export type FleetRecommendationOutcomeAction =
   | "accepted"
   | "dismissed"
-  | "expired";
+  | "expired"
+  | "applied"
+  | "failed";
 
 export type FleetRecommendationFactors = {
   travelImpact: number;
   utilizationImpact: number;
   capacityImpact: number;
   telematicsFreshness: number;
+  /** Operational profitability layer (fleet_rules_v2+) */
+  profitabilityImpact?: number;
+  laborCostImpact?: number;
+  overtimeRiskImpact?: number;
+  slaRiskImpact?: number;
 };
 
 export type FleetRecommendationRationale = {
@@ -341,6 +610,41 @@ export type FleetRecommendationRationale = {
     unit_number: string;
     score: number;
   }>;
+  /** Engine snapshots at generation — single source of truth for explainability */
+  candidate_snapshots?: Array<{
+    truck_id: string;
+    unit_number: string;
+    score: number;
+    factors: FleetRecommendationFactors;
+    travel_minutes: number | null;
+    deadhead_miles: number | null;
+    current_utilization_pct: number;
+    projected_utilization_pct: number;
+    branch_utilization_pct: number;
+    branch_capacity_label: string;
+    revenue_impact: number;
+    gps_freshness_pct: number;
+    gps_label: string;
+    hours_remaining: number;
+    operator_name: string | null;
+    branch_name: string | null;
+    maintenance_status: string;
+    truck_type_match: boolean;
+    estimated_contribution: number;
+    estimated_labor: number;
+    estimated_fuel: number;
+    projected_overtime_cost: number;
+    telematics_status: string;
+  }>;
+  job_snapshot?: {
+    job_id: string;
+    status: string;
+    assigned_truck_id: string | null;
+    priority: string;
+    revenue_estimate: number;
+    required_truck_type: string;
+  };
+  generated_at?: string;
 };
 
 export type FleetRecommendationInstance = {
@@ -363,7 +667,39 @@ export type FleetRecommendationOutcome = {
   acted_by: string | null;
   acted_at: string;
   estimated_impact: Record<string, unknown>;
+  measured_impact?: Record<string, unknown>;
+  application_error?: string | null;
   notes: string | null;
+};
+
+/** Stored in recommendation_outcomes.estimated_impact.decision_record on accept/dismiss */
+export type FleetRecommendationDecisionRecord = {
+  recommendation_id: string;
+  recommendation_type: FleetRecommendationType;
+  decision: "accepted" | "dismissed";
+  timestamp: string;
+  dispatcher_id: string | null;
+  recommended_truck_id: string | null;
+  recommended_unit_number: string | null;
+  job_id: string | null;
+  alternatives: Array<{ truck_id: string; unit_number: string; score: number }>;
+  winner_reasons: string[];
+  loser_reasons: Array<{ unit_number: string; reasons: string[] }>;
+  confidence: "high" | "medium" | "low";
+  confidence_explanation: string;
+  projected_outcome: {
+    travelReducedMiles: number | null;
+    arrivalImprovedMinutes: number | null;
+    projectedUtilizationPct: number | null;
+    branchCapacityLabel: string | null;
+    revenueProtected: number | null;
+    contributionImprovement?: number | null;
+    laborSaved?: number | null;
+    overtimeAvoided?: number | null;
+    fuelSaved?: number | null;
+  };
+  engine_score: number;
+  factors: FleetRecommendationFactors;
 };
 
 export type FleetRecommendationHistoryEntry = FleetRecommendationInstance & {

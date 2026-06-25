@@ -11,6 +11,9 @@ export type FleetOperator = {
   name: string;
   operator_role: string;
   is_active: boolean;
+  hourly_cost: number | null;
+  overtime_rate: number | null;
+  shift: string | null;
 };
 
 type BranchOption = { id: string; name: string };
@@ -32,6 +35,9 @@ const emptyOperator: FleetOperator = {
   name: "",
   operator_role: "driver",
   is_active: true,
+  hourly_cost: null,
+  overtime_rate: null,
+  shift: null,
 };
 
 export function OperatorFormModal({
@@ -94,6 +100,38 @@ export function OperatorFormModal({
             <option value="driver">Driver</option>
             <option value="operator">Operator</option>
             <option value="lead">Lead</option>
+          </select>
+        </FormField>
+        <FormField label="Hourly cost ($)" htmlFor="hourly_cost">
+          <input
+            id="hourly_cost"
+            name="hourly_cost"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={o.hourly_cost ?? ""}
+            className="ui-input"
+            placeholder="Uses company default if empty"
+          />
+        </FormField>
+        <FormField label="Overtime rate ($)" htmlFor="overtime_rate">
+          <input
+            id="overtime_rate"
+            name="overtime_rate"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={o.overtime_rate ?? ""}
+            className="ui-input"
+            placeholder="Optional override"
+          />
+        </FormField>
+        <FormField label="Shift" htmlFor="shift">
+          <select id="shift" name="shift" defaultValue={o.shift ?? ""} className="ui-select">
+            <option value="">Standard</option>
+            <option value="day">Day</option>
+            <option value="night">Night</option>
+            <option value="swing">Swing</option>
           </select>
         </FormField>
         <label className="flex items-center gap-2 text-sm">

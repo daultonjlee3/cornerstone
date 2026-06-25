@@ -15,6 +15,7 @@ import { GetStartedOverlay } from "./get-started/GetStartedOverlay";
 import { OperationOptimizationProvider } from "@/src/components/operation-optimization/OperationOptimizationProvider";
 import { GuidanceProvider } from "@/src/components/guidance/GuidanceProvider";
 import { DemoWelcomePanel } from "@/src/components/guidance/DemoWelcomePanel";
+import { isFleetProductProfile } from "../nav-config";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -64,6 +65,8 @@ export function Shell({
 
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
+  const isFleetUi = isFleetProductProfile(productProfile);
+
   return (
     <TooltipProvider>
       <GuidanceProvider isDemoGuest={isDemoGuest && !isScreenshotMode}>
@@ -71,7 +74,10 @@ export function Shell({
           <OperationOptimizationProvider>
             <GetStartedOverlay />
             <GetStartedChecklist />
-            <div className="flex h-screen overflow-hidden text-[var(--foreground)]">
+            <div
+              className="flex h-screen overflow-hidden text-[var(--foreground)]"
+              data-fleet-ui={isFleetUi ? "true" : undefined}
+            >
               {!isDispatchFullscreen ? (
                 <Sidebar
                   open={sidebarOpen}
@@ -115,7 +121,11 @@ export function Shell({
                   {isDispatchFullscreen ? (
                     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col px-2 py-2">{children}</div>
                   ) : (
-                    <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 lg:max-w-[1200px] lg:px-6 lg:py-6">
+                    <div
+                      className={`mx-auto flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 ${
+                        isFleetUi ? "lg:max-w-[1440px]" : "lg:max-w-[1200px]"
+                      }`}
+                    >
                       <DemoWelcomePanel
                         headerOrganizationName={isDemoGuest ? tenantName : undefined}
                       />

@@ -302,6 +302,13 @@ export async function saveFleetOperator(
     name,
     operator_role: operatorRole,
     is_active: (formData.get("is_active") as string) !== "off",
+    hourly_cost: (formData.get("hourly_cost") as string)?.trim()
+      ? parseFloat((formData.get("hourly_cost") as string).trim())
+      : null,
+    overtime_rate: (formData.get("overtime_rate") as string)?.trim()
+      ? parseFloat((formData.get("overtime_rate") as string).trim())
+      : null,
+    shift: (formData.get("shift") as string)?.trim() || null,
   };
 
   if (id) {

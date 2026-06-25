@@ -1,6 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { estimateDeadheadMiles } from "@/src/lib/fleet/marts/deadhead";
 import { loadFleetDispatchBoardData } from "@/src/lib/fleet/queries/dispatch-board";
+import {
+  buildRecommendationDecisionRecord,
+} from "@/src/lib/fleet-recommendation-engine/explainability";
+import {
+  buildJobSnapshot,
+  scoredCandidateToSnapshot,
+} from "@/src/lib/fleet-recommendation-engine/candidate-metrics";
+import {
+  buildEstimatedImpactPayload,
+  measureRecommendationOutcome,
+} from "@/src/lib/fleet-recommendation-engine/outcome-tracking";
+import { validateRecommendationAcceptance } from "@/src/lib/fleet-recommendation-engine/validate-recommendation";
+import {
+  buildProfitabilityReasons,
+  finalizeCandidateScores,
+  scoreTruckForJob,
+} from "@/src/lib/fleet-recommendation-engine/profitability-scoring";
+import { loadProfitabilityContext } from "@/src/lib/operational-profitability/queries";
+import type { ProfitabilityContext } from "@/src/lib/operational-profitability/types";
+import {
+  clamp,
+  computeCompositeScore,
+  freshnessFactor,
+  normalizeScore,
+  parseJobHours,
+  priorityWeight,
+} from "@/src/lib/fleet-recommendation-engine/scoring-utils";
 import type {
   FleetDispatchBoardData,
   FleetDispatchJob,
@@ -16,14 +43,21 @@ import type {
   FleetRecommendationType,
 } from "@/src/types/fleet";
 
-export const FLEET_RECOMMENDATION_ENGINE_VERSION = "fleet_rules_v1";
+export const FLEET_RECOMMENDATION_ENGINE_VERSION = "fleet_rules_v2";
 
 const RECOMMENDATION_TTL_MS = 60 * 60 * 1000;
 const MAX_TRUCK_ASSIGNMENT = 8;
 const MAX_IDLE_MATCH = 8;
 const MAX_CAPACITY_ALERTS = 4;
 
-type RecommendationStatus = "pending" | "accepted" | "dismissed" | "expired";
+type RecommendationStatus =
+  | "pending"
+  | "accepted"
+  | "dismissed"
+  | "expired"
+  | "applied"
+  | "completed"
+  | "failed";
 
 type RecommendationInsert = {
   tenant_id: string;
@@ -59,64 +93,12 @@ type OutcomeRow = {
   notes: string | null;
 };
 
-function clamp(value: number, min = 0, max = 100): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeScore(value: number): number {
-  return Math.round(clamp(value) * 100) / 100;
-}
-
-function parseJobHours(job: FleetDispatchJob): number {
-  const start = job.scheduled_start ? Date.parse(job.scheduled_start) : Number.NaN;
-  const end = job.scheduled_end ? Date.parse(job.scheduled_end) : Number.NaN;
-  if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
-    return Math.min(8, Math.max(0.5, (end - start) / (1000 * 60 * 60)));
-  }
-  return 2;
-}
-
-function priorityWeight(priority: FleetDispatchJob["priority"]): number {
-  switch (priority) {
-    case "urgent":
-      return 1;
-    case "high":
-      return 0.8;
-    case "medium":
-      return 0.5;
-    case "low":
-      return 0.25;
-    default:
-      return 0.5;
-  }
-}
-
-function freshnessFactor(status: FleetDispatchTruckLane["telematics_status"]): number {
-  switch (status) {
-    case "online":
-      return 100;
-    case "stale":
-      return 65;
-    default:
-      return 30;
-  }
-}
-
-function computeCompositeScore(factors: FleetRecommendationFactors): number {
-  const raw =
-    factors.travelImpact * 0.35 +
-    factors.utilizationImpact * 0.25 +
-    factors.capacityImpact * 0.25 +
-    factors.telematicsFreshness * 0.15;
-  return normalizeScore(raw);
-}
-
 function buildTruckAssignmentRecommendations(
   tenantId: string,
   board: FleetDispatchBoardData,
-  expiresAt: string
+  expiresAt: string,
+  profitCtx: ProfitabilityContext
 ): RecommendationInsert[] {
-  const branchCapacityById = new Map(board.branchCapacity.map((b) => [b.branch_id, b]));
   const recommendations: RecommendationInsert[] = [];
   const sortedJobs = [...board.unassignedJobs].sort((a, b) => {
     const byPriority = priorityWeight(b.priority) - priorityWeight(a.priority);
@@ -131,68 +113,30 @@ function buildTruckAssignmentRecommendations(
     highPriorityJobs.length > 0 ? highPriorityJobs : sortedJobs.slice(0, 3);
 
   for (const job of jobsForDirectAssignment.slice(0, MAX_TRUCK_ASSIGNMENT)) {
-    const estimatedHours = parseJobHours(job);
     const eligibleLanes = board.truckLanes.filter((lane) => {
       if (lane.status !== "active") return false;
       if (job.required_truck_type === "any") return true;
       return lane.truck_type === job.required_truck_type;
     });
 
-    const scored = eligibleLanes
-      .map((lane) => {
-        const deadhead = estimateDeadheadMiles(
-          { latitude: lane.latitude, longitude: lane.longitude },
-          { latitude: job.site_latitude, longitude: job.site_longitude }
-        );
-        const travelMinutes = deadhead?.travelMinutes ?? 90;
-        const travelImpact = clamp(100 - travelMinutes * 1.75);
-
-        const projectedTruckUtilization =
-          lane.available_hours > 0
-            ? (lane.committed_hours + estimatedHours) / lane.available_hours
-            : 1.5;
-        const utilizationImpact = clamp(100 - projectedTruckUtilization * 70);
-
-        const branchCapacity = branchCapacityById.get(job.branch_id);
-        const projectedBranchUtilization =
-          branchCapacity && branchCapacity.available_truck_hours > 0
-            ? (branchCapacity.committed_hours + estimatedHours) /
-              branchCapacity.available_truck_hours
-            : projectedTruckUtilization;
-        const capacityImpact = clamp(100 - projectedBranchUtilization * 65);
-
-        const telematicsFreshness = freshnessFactor(lane.telematics_status);
-        const factors: FleetRecommendationFactors = {
-          travelImpact: normalizeScore(travelImpact),
-          utilizationImpact: normalizeScore(utilizationImpact),
-          capacityImpact: normalizeScore(capacityImpact),
-          telematicsFreshness: normalizeScore(telematicsFreshness),
-        };
-
-        const score = computeCompositeScore(factors);
-        return { lane, factors, score, deadhead };
-      })
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        const aTravel = a.deadhead?.travelMinutes ?? Number.MAX_SAFE_INTEGER;
-        const bTravel = b.deadhead?.travelMinutes ?? Number.MAX_SAFE_INTEGER;
-        if (aTravel !== bTravel) return aTravel - bTravel;
-        return a.lane.unit_number.localeCompare(b.lane.unit_number);
-      });
+    const scored = finalizeCandidateScores(
+      eligibleLanes.map((lane) =>
+        scoreTruckForJob({ job, lane, board, profitCtx })
+      )
+    );
 
     const best = scored[0];
     if (!best) continue;
+    const alt = scored[1];
 
-    const reasons: string[] = [];
-    reasons.push(`Closest eligible truck by estimated travel and deadhead.`);
-    if (best.factors.capacityImpact >= 75) reasons.push("No branch capacity risk after assignment.");
-    else reasons.push("Branch capacity remains manageable after assignment.");
-    if (best.factors.utilizationImpact >= 70) reasons.push("Projected truck utilization remains below fleet pressure.");
-    else reasons.push("Projected truck utilization is acceptable for today.");
-    if (best.factors.telematicsFreshness >= 90) reasons.push("Telematics freshness is current.");
-    else reasons.push("Telematics freshness is usable for dispatching.");
+    const reasons = buildProfitabilityReasons(best, alt);
+    if (best.factors.capacityImpact >= 75) reasons.push("Branch capacity remains healthy after assignment.");
+    if (best.factors.telematicsFreshness >= 90) reasons.push("GPS signal is current.");
 
     const title = `Assign ${best.lane.unit_number} to ${job.title}`;
+    const candidateSnapshots = scored.slice(0, 3).map((candidate, index) =>
+      scoredCandidateToSnapshot(candidate, job, board, index + 1)
+    );
     recommendations.push({
       tenant_id: tenantId,
       branch_id: job.branch_id,
@@ -212,6 +156,9 @@ function buildTruckAssignmentRecommendations(
           unit_number: candidate.lane.unit_number,
           score: candidate.score,
         })),
+        candidate_snapshots: candidateSnapshots,
+        job_snapshot: buildJobSnapshot(job),
+        generated_at: new Date().toISOString(),
       },
       engine_version: FLEET_RECOMMENDATION_ENGINE_VERSION,
       expires_at: expiresAt,
@@ -401,9 +348,41 @@ function buildIdleTruckMatchRecommendations(
 export function buildFleetRecommendationsFromBoard(
   tenantId: string,
   board: FleetDispatchBoardData,
-  expiresAt: string
+  expiresAt: string,
+  profitCtx?: ProfitabilityContext
 ): RecommendationInsert[] {
-  const truckAssignment = buildTruckAssignmentRecommendations(tenantId, board, expiresAt);
+  const ctx =
+    profitCtx ??
+    ({
+      rules: {
+        id: "",
+        tenant_id: tenantId,
+        company_id: tenantId,
+        custom_rules: {},
+        regular_hours_per_day: 8,
+        regular_hours_per_week: 40,
+        daily_overtime_threshold: 8,
+        weekly_overtime_threshold: 40,
+        overtime_multiplier: 1.5,
+        double_time_threshold: 12,
+        double_time_multiplier: 2,
+        saturday_multiplier: 1.5,
+        sunday_multiplier: 2,
+        holiday_multiplier: 2,
+        night_shift_premium: 0.15,
+        travel_time_pay_multiplier: 1,
+        default_operator_hourly_rate: 45,
+        fuel_cost_per_mile: 0.85,
+        idle_cost_per_hour: 35,
+        truck_fixed_cost_per_hour: 28,
+      },
+      truckProfiles: new Map(),
+      typeProfiles: new Map(),
+      operatorDailyHours: new Map(),
+      operatorWeeklyHours: new Map(),
+    } satisfies ProfitabilityContext);
+
+  const truckAssignment = buildTruckAssignmentRecommendations(tenantId, board, expiresAt, ctx);
   const truckAssignmentJobIds = new Set(
     truckAssignment
       .map((rec) => rec.rationale.entities.job_id)
@@ -458,7 +437,7 @@ function mapRecommendationRow(row: RecommendationRow): FleetRecommendationInstan
   };
 }
 
-function mapOutcomeRow(row: OutcomeRow): FleetRecommendationOutcome {
+function mapOutcomeRow(row: OutcomeRow & { measured_impact?: Record<string, unknown> | null; application_error?: string | null }): FleetRecommendationOutcome {
   return {
     id: row.id,
     recommendation_id: row.recommendation_id,
@@ -466,6 +445,8 @@ function mapOutcomeRow(row: OutcomeRow): FleetRecommendationOutcome {
     acted_by: row.acted_by,
     acted_at: row.acted_at,
     estimated_impact: row.estimated_impact ?? {},
+    measured_impact: row.measured_impact ?? {},
+    application_error: row.application_error ?? null,
     notes: row.notes,
   };
 }
@@ -554,7 +535,7 @@ async function loadRecommendationHistory(
   let query = supabase
     .from("recommendation_instances")
     .select(
-      "id, tenant_id, branch_id, recommendation_type, status, score, rationale, engine_version, created_at, expires_at, recommendation_outcomes(id, recommendation_id, action, acted_by, acted_at, estimated_impact, notes)"
+      "id, tenant_id, branch_id, recommendation_type, status, score, rationale, engine_version, created_at, expires_at, recommendation_outcomes(id, recommendation_id, action, acted_by, acted_at, estimated_impact, measured_impact, application_error, notes)"
     )
     .eq("tenant_id", tenantId)
     .neq("status", "pending")
@@ -591,8 +572,9 @@ export async function getFleetRecommendations(
   let pending = await loadPendingRecommendations(supabase, tenantId, branchId);
   if (pending.length === 0 || options?.forceRefresh) {
     const board = await loadFleetDispatchBoardData(supabase, tenantId, date, branchId);
+    const profitCtx = await loadProfitabilityContext(supabase, tenantId, null, date);
     const expiresAt = new Date(Date.now() + RECOMMENDATION_TTL_MS).toISOString();
-    const generated = buildFleetRecommendationsFromBoard(tenantId, board, expiresAt);
+    const generated = buildFleetRecommendationsFromBoard(tenantId, board, expiresAt, profitCtx);
     if (generated.length > 0) {
       const { error } = await supabase
         .from("recommendation_instances")
@@ -619,7 +601,7 @@ export async function applyRecommendationOutcome(
   tenantId: string,
   input: {
     recommendationId: string;
-    action: Exclude<FleetRecommendationOutcomeAction, "expired">;
+    action: Exclude<FleetRecommendationOutcomeAction, "expired" | "applied" | "failed">;
     actedBy: string | null;
     notes?: string | null;
   }
@@ -640,10 +622,91 @@ export async function applyRecommendationOutcome(
     throw new Error("Recommendation is no longer pending.");
   }
 
+  const date = new Date().toISOString().slice(0, 10);
+  const board = await loadFleetDispatchBoardData(supabase, tenantId, date, recommendation.branch_id);
+  const profitCtx = await loadProfitabilityContext(supabase, tenantId, null, date);
+
+  if (input.action === "accepted") {
+    const validation = validateRecommendationAcceptance({ recommendation, board });
+    if (!validation.ok) {
+      await supabase
+        .from("recommendation_instances")
+        .update({ status: "failed" })
+        .eq("id", recommendation.id)
+        .eq("tenant_id", tenantId);
+
+      await supabase.from("recommendation_outcomes").insert({
+        recommendation_id: recommendation.id,
+        action: "failed",
+        acted_by: input.actedBy,
+        notes: input.notes ?? null,
+        application_error: validation.message,
+        estimated_impact: { failure_code: validation.code },
+        measured_impact: {},
+      });
+
+      throw new Error(validation.message);
+    }
+  }
+
+  const decisionRecord = buildRecommendationDecisionRecord(recommendation, board, {
+    action: input.action,
+    actedBy: input.actedBy,
+    profitCtx,
+  });
+
+  const snapshots = recommendation.rationale.candidate_snapshots ?? [];
+  const primarySnapshot = snapshots[0] ?? null;
+  const altSnapshot = snapshots[1] ?? null;
+  const explanation = decisionRecord.projected_outcome;
+
+  let assignmentApplied = false;
+  let nextStatus: RecommendationStatus =
+    input.action === "accepted" ? "accepted" : "dismissed";
+
   if (input.action === "accepted") {
     const jobId = recommendation.rationale.entities.job_id;
-    const truckId = recommendation.rationale.entities.truck_id;
-    if (jobId && truckId) {
+    const truckId =
+      recommendation.rationale.entities.truck_id ??
+      recommendation.rationale.candidates?.[0]?.truck_id;
+
+    if (
+      jobId &&
+      truckId &&
+      (recommendation.recommendation_type === "truck_assignment" ||
+        recommendation.recommendation_type === "idle_truck_match")
+    ) {
+      const { data: jobRow, error: jobFetchError } = await supabase
+        .from("fleet_jobs")
+        .select("id, assigned_truck_id, status")
+        .eq("id", jobId)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (jobFetchError) throw new Error(jobFetchError.message);
+
+      if (
+        jobRow &&
+        (jobRow as { assigned_truck_id: string | null }).assigned_truck_id &&
+        (jobRow as { assigned_truck_id: string | null }).assigned_truck_id !== truckId
+      ) {
+        const message = "Job was assigned to another truck before this recommendation could be applied.";
+        await supabase
+          .from("recommendation_instances")
+          .update({ status: "failed" })
+          .eq("id", recommendation.id)
+          .eq("tenant_id", tenantId);
+        await supabase.from("recommendation_outcomes").insert({
+          recommendation_id: recommendation.id,
+          action: "failed",
+          acted_by: input.actedBy,
+          application_error: message,
+          estimated_impact: { failure_code: "job_already_assigned" },
+          measured_impact: {},
+        });
+        throw new Error(message);
+      }
+
       const { error: assignError } = await supabase
         .from("fleet_jobs")
         .update({
@@ -651,12 +714,33 @@ export async function applyRecommendationOutcome(
           status: "scheduled",
         })
         .eq("id", jobId)
-        .eq("tenant_id", tenantId);
-      if (assignError) throw new Error(assignError.message);
+        .eq("tenant_id", tenantId)
+        .in("status", ["unassigned", "scheduled"]);
+
+      if (assignError) {
+        await supabase
+          .from("recommendation_instances")
+          .update({ status: "failed" })
+          .eq("id", recommendation.id)
+          .eq("tenant_id", tenantId);
+        await supabase.from("recommendation_outcomes").insert({
+          recommendation_id: recommendation.id,
+          action: "failed",
+          acted_by: input.actedBy,
+          application_error: assignError.message,
+          estimated_impact: {},
+          measured_impact: {},
+        });
+        throw new Error(assignError.message);
+      }
+
+      assignmentApplied = true;
+      nextStatus = "applied";
+    } else if (recommendation.recommendation_type === "capacity_overload") {
+      nextStatus = "accepted";
     }
   }
 
-  const nextStatus = input.action === "accepted" ? "accepted" : "dismissed";
   const { error: updateError } = await supabase
     .from("recommendation_instances")
     .update({ status: nextStatus })
@@ -664,18 +748,65 @@ export async function applyRecommendationOutcome(
     .eq("tenant_id", tenantId);
   if (updateError) throw new Error(updateError.message);
 
+  const job = recommendation.rationale.entities.job_id
+    ? board.jobs.find((j) => j.id === recommendation.rationale.entities.job_id)
+    : undefined;
+
+  const measuredImpact = measureRecommendationOutcome({
+    job: job
+      ? {
+          ...job,
+          assigned_truck_id:
+            assignmentApplied
+              ? recommendation.rationale.entities.truck_id ?? job.assigned_truck_id
+              : job.assigned_truck_id,
+          status: assignmentApplied ? "scheduled" : job.status,
+        }
+      : null,
+    recommendedTruckId: recommendation.rationale.entities.truck_id ?? null,
+    estimatedTravelMinutes: primarySnapshot?.travel_minutes ?? null,
+    estimatedContribution: primarySnapshot?.estimated_contribution ?? null,
+    estimatedDeadheadMiles: primarySnapshot?.deadhead_miles ?? null,
+    scheduledStart: job?.scheduled_start ?? null,
+  });
+
+  const estimatedImpactPayload = buildEstimatedImpactPayload({
+    recommendation,
+    decisionRecord: decisionRecord as unknown as Record<string, unknown>,
+    projectedOutcome: explanation,
+    primarySnapshot,
+    altSnapshot,
+    actedBy: input.actedBy,
+    assignmentApplied,
+    outcomeStatus: nextStatus,
+  });
+
   const estimatedImpact = {
-    factors: recommendation.rationale.factors,
     score: recommendation.score,
+    decision_record: decisionRecord,
+    ...estimatedImpactPayload,
   };
+
   const { error: outcomeError } = await supabase.from("recommendation_outcomes").insert({
     recommendation_id: recommendation.id,
     action: input.action,
     acted_by: input.actedBy,
     notes: input.notes ?? null,
     estimated_impact: estimatedImpact,
+    measured_impact: measuredImpact,
   });
   if (outcomeError) throw new Error(outcomeError.message);
+
+  if (assignmentApplied) {
+    await supabase.from("recommendation_outcomes").insert({
+      recommendation_id: recommendation.id,
+      action: "applied",
+      acted_by: input.actedBy,
+      notes: "Truck assignment applied to job.",
+      estimated_impact: estimatedImpact,
+      measured_impact: measuredImpact,
+    });
+  }
 
   return { ...recommendation, status: nextStatus };
 }

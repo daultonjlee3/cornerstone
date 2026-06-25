@@ -136,7 +136,13 @@ describe("buildFleetRecommendationsFromBoard", () => {
     const first = buildFleetRecommendationsFromBoard("tenant-1", sampleBoard(), expiresAt);
     const second = buildFleetRecommendationsFromBoard("tenant-1", sampleBoard(), expiresAt);
 
-    expect(first).toEqual(second);
+    const normalize = (recs: ReturnType<typeof buildFleetRecommendationsFromBoard>) =>
+      recs.map((r) => ({
+        ...r,
+        rationale: { ...r.rationale, generated_at: "fixed" },
+      }));
+
+    expect(normalize(first)).toEqual(normalize(second));
     expect(first.length).toBeGreaterThan(0);
     for (const recommendation of first) {
       expect(recommendation.score).toBeGreaterThanOrEqual(0);

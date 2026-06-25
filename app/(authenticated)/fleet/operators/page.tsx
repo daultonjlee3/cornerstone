@@ -35,7 +35,7 @@ export default async function OperatorsPage({
   const [{ data: operators, error, count }, { data: branches }] = await Promise.all([
     supabase
       .from("fleet_operators")
-      .select("id, branch_id, name, operator_role, is_active, branches(name)", { count: "exact" })
+      .select("id, branch_id, name, operator_role, is_active, hourly_cost, overtime_rate, shift, branches(name)", { count: "exact" })
       .eq("tenant_id", tenantId)
       .order("name")
       .range((page - 1) * pageSize, page * pageSize - 1),
@@ -54,6 +54,9 @@ export default async function OperatorsPage({
       name: String(record.name),
       operator_role: String(record.operator_role),
       is_active: Boolean(record.is_active),
+      hourly_cost: record.hourly_cost != null ? Number(record.hourly_cost) : null,
+      overtime_rate: record.overtime_rate != null ? Number(record.overtime_rate) : null,
+      shift: (record.shift as string | null) ?? null,
       branch_name: branchRecord?.name ?? null,
     };
   });

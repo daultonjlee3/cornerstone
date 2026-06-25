@@ -124,7 +124,7 @@ export async function loadFleetDispatchBoardData(
   let trucksQuery = supabase
     .from("trucks")
     .select(
-      "id, unit_number, truck_type, branch_id, status, capacity, home_latitude, home_longitude, last_telematics_at, branches(name, latitude, longitude)"
+      "id, unit_number, truck_type, branch_id, status, capacity, home_latitude, home_longitude, last_telematics_at, notes, branches(name, latitude, longitude)"
     )
     .eq("tenant_id", tenantId)
     .neq("status", "retired")
@@ -140,18 +140,20 @@ export async function loadFleetDispatchBoardData(
 
   const { data: martRows, error: martError } = await supabase
     .from("utilization_daily")
-    .select("truck_id, committed_hours")
+    .select("truck_id, committed_hours, revenue, idle_hours")
     .eq("tenant_id", tenantId)
     .eq("date", date);
 
   if (martError) throw new Error(martError.message);
 
   const committedByTruck = new Map<string, number>();
+  const revenueByTruck = new Map<string, number>();
+  const idleByTruck = new Map<string, number>();
   for (const row of martRows ?? []) {
-    committedByTruck.set(
-      (row as { truck_id: string }).truck_id,
-      Number((row as { committed_hours: number }).committed_hours)
-    );
+    const truckId = (row as { truck_id: string }).truck_id;
+    committedByTruck.set(truckId, Number((row as { committed_hours: number }).committed_hours));
+    revenueByTruck.set(truckId, Number((row as { revenue: number }).revenue) || 0);
+    idleByTruck.set(truckId, Number((row as { idle_hours: number }).idle_hours) || 0);
   }
 
   let capacityQuery = supabase
@@ -231,7 +233,11 @@ export async function loadFleetDispatchBoardData(
       home_latitude: number | null;
       home_longitude: number | null;
       last_telematics_at: string | null;
-      branches: { latitude?: number | null; longitude?: number | null } | Array<{ latitude?: number | null; longitude?: number | null }> | null;
+      notes: string | null;
+      branches:
+        | { name?: string; latitude?: number | null; longitude?: number | null }
+        | Array<{ name?: string; latitude?: number | null; longitude?: number | null }>
+        | null;
     };
 
     const branch = Array.isArray(t.branches) ? t.branches[0] : t.branches;
@@ -254,12 +260,23 @@ export async function loadFleetDispatchBoardData(
 
     const available = truckCapacityHours(t.capacity);
     const committed = committedByTruck.get(t.id) ?? 0;
+    const notes = t.notes ?? "";
+    const operatorMatch = notes.match(/Primary operator:\s*(.+)/i);
+    const maintenanceNote =
+      t.status === "maintenance"
+        ? notes || "In maintenance"
+        : notes.includes("Maintenance soon")
+          ? notes
+          : null;
+    const fuelLevel =
+      typeof t.capacity?.fuel_level_pct === "number" ? t.capacity.fuel_level_pct : null;
 
     return {
       truck_id: t.id,
       unit_number: t.unit_number,
       truck_type: t.truck_type,
       branch_id: t.branch_id,
+      branch_name: branch?.name ?? null,
       status: t.status,
       committed_hours: committed,
       available_hours: available,
@@ -268,6 +285,11 @@ export async function loadFleetDispatchBoardData(
       latitude: truckPoint.latitude,
       longitude: truckPoint.longitude,
       telematics_status: computeTelematicsStatus(t.last_telematics_at),
+      operator_name: operatorMatch?.[1]?.trim() ?? null,
+      revenue_today: revenueByTruck.get(t.id) ?? 0,
+      idle_hours: idleByTruck.get(t.id) ?? 0,
+      fuel_level_pct: fuelLevel,
+      maintenance_note: maintenanceNote,
     };
   });
 

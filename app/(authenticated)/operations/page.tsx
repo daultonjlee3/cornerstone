@@ -32,16 +32,16 @@ import { DashboardSectionEmpty } from "../dashboard/components/dashboard-section
 import { DashboardSetupGuidance } from "../dashboard/components/dashboard-setup-guidance";
 import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
+import { FleetNavFocusScroll } from "./components/fleet-nav-focus-scroll";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
-import { FleetCommandCenterSection } from "./components/fleet-command-center-section";
-import { FleetRecommendationsPlaceholder } from "./components/fleet-recommendations-placeholder";
-import { loadFleetCommandCenterData } from "@/src/lib/fleet/queries/command-center";
+import { FleetTodayView } from "./components/fleet-today-view";
+import { loadFleetTodayViewData } from "@/src/lib/fleet/queries/today-view";
 import { isFleetProductProfile } from "../nav-config";
 
 export const metadata = {
-  title: "Operations Center | Cornerstone Tech",
-  description: "Live operational intelligence across work orders, preventive maintenance, and technician execution.",
+  title: "Fleet Command Center | Cornerstone Fleet",
+  description: "Operational decision platform — exceptions, recommendations, and fleet health for today.",
 };
 
 const PRIORITY_URGENCY_ORDER: Record<string, number> = { emergency: 0, urgent: 1, high: 2 };
@@ -210,9 +210,7 @@ export default async function OperationsCenterPage() {
   const showFleet = isFleetProductProfile(productProfile);
   const fleetOnly = productProfile === "fleet_intelligence";
 
-  const fleetCommandCenter = showFleet
-    ? await loadFleetCommandCenterData(supabase, tenantId)
-    : null;
+  const fleetTodayView = showFleet ? await loadFleetTodayViewData(supabase, tenantId) : null;
 
   const { data: companies } = await supabase
     .from("companies")
@@ -235,27 +233,40 @@ export default async function OperationsCenterPage() {
 
   return (
     <div className="space-y-8" data-testid="operations-center-page">
+      {showFleet ? (
+        <Suspense fallback={null}>
+          <FleetNavFocusScroll
+            targets={[
+              { focusId: "fleet-recommendations", paramValue: "recommendations" },
+              { focusId: "fleet-exceptions", paramValue: "exceptions" },
+            ]}
+          />
+        </Suspense>
+      ) : null}
       <div className="space-y-8">
         <PageHeader
           icon={<LayoutGrid className="size-5" />}
           title={fleetOnly ? "Fleet Command Center" : "Operations Command Center"}
           subtitle={
             fleetOnly
-              ? "Morning briefing — fleet utilization, idle trucks, and revenue signals."
+              ? "What changed, what needs attention, and what to do next."
               : "Live operational intelligence across work orders, preventive maintenance, and technician execution."
           }
           actions={
             <div className="flex items-center gap-2">
-              <DashboardHeaderActions />
+              <DashboardHeaderActions productProfile={productProfile} />
             </div>
           }
         />
 
-        {showFleet && fleetCommandCenter ? (
-          <>
-            <FleetCommandCenterSection data={fleetCommandCenter} />
-            <FleetRecommendationsPlaceholder />
-          </>
+        {showFleet && fleetTodayView ? (
+          fleetOnly ? (
+            <FleetTodayView initialData={fleetTodayView} />
+          ) : (
+            <>
+              <FleetTodayView initialData={fleetTodayView} />
+            </>
+          )
         ) : null}
 
         {!fleetOnly ? (

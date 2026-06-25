@@ -10,8 +10,8 @@ import { FleetDispatchViewClient } from "./components/FleetDispatchViewClient";
 import { isFleetProductProfile } from "../nav-config";
 
 export const metadata = {
-  title: "Dispatch | Cornerstone Tech",
-  description: "Scheduling & routing operations",
+  title: "Dispatch Intelligence | Cornerstone Fleet",
+  description: "Fleet dispatch mission control — assignments, recommendations, and capacity",
 };
 
 
@@ -46,6 +46,7 @@ export default async function DispatchPage({
     return (
       <FleetDispatchViewClient
         initialBoard={fleetResult.board}
+        initialIntel={fleetResult.intel}
         selectedDate={filterState.selectedDate}
       />
     );

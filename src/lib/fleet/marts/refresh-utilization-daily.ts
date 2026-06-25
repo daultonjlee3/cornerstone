@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { estimateDeadheadMiles } from "@/src/lib/fleet/marts/deadhead";
+import { loadProfitabilityContext } from "@/src/lib/operational-profitability/queries";
+import { computeTruckDayProfitability } from "@/src/lib/operational-profitability/mart-profitability";
 
 const DEFAULT_TRUCK_HOURS_PER_DAY = 10;
 const DEFAULT_EVENT_INTERVAL_HOURS = 5 / 60; // 5-minute poll interval
@@ -57,10 +59,19 @@ type TruckRow = {
   branch_id: string;
   tenant_id: string;
   status: string;
+  truck_type: string;
   home_latitude: number | null;
   home_longitude: number | null;
   capacity: Record<string, unknown>;
 };
+
+function weekStartForDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  const day = d.getUTCDay();
+  const diff = day === 0 ? 6 : day - 1;
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
 
 type TelematicsRow = {
   recorded_at: string;
@@ -100,9 +111,11 @@ export async function refreshUtilizationDailyForTenant(
 ): Promise<RefreshUtilizationResult> {
   const dates = eachDateInRange(fromDate, toDate);
 
+  const profitabilityCtx = await loadProfitabilityContext(supabase, tenantId);
+
   const { data: trucks, error: trucksError } = await supabase
     .from("trucks")
-    .select("id, branch_id, tenant_id, status, home_latitude, home_longitude, capacity")
+    .select("id, branch_id, tenant_id, status, truck_type, home_latitude, home_longitude, capacity")
     .eq("tenant_id", tenantId)
     .neq("status", "retired");
 
@@ -155,11 +168,18 @@ export async function refreshUtilizationDailyForTenant(
   let utilizationRowsUpserted = 0;
   const branchCommittedByDate = new Map<string, number>();
   const branchAvailableByDate = new Map<string, number>();
+  const weeklyCommittedByTruck = new Map<string, number>();
+  let currentWeekStart: string | null = null;
 
-  for (const truck of truckRows) {
-    const dailyCapacity = truckDailyCapacityHours(truck.capacity);
+  for (const date of dates) {
+    const weekStart = weekStartForDate(date);
+    if (currentWeekStart !== weekStart) {
+      weeklyCommittedByTruck.clear();
+      currentWeekStart = weekStart;
+    }
 
-    for (const date of dates) {
+    for (const truck of truckRows) {
+      const dailyCapacity = truckDailyCapacityHours(truck.capacity);
       const eventKey = `${truck.id}:${date}`;
       const truckEvents = eventsByTruckDate.get(eventKey) ?? [];
 
@@ -223,6 +243,24 @@ export async function refreshUtilizationDailyForTenant(
       revenue = Math.round(revenue * 100) / 100;
       deadheadMiles = Math.round(deadheadMiles * 100) / 100;
 
+      const weeklyBefore = weeklyCommittedByTruck.get(truck.id) ?? 0;
+      const profitability = computeTruckDayProfitability(
+        profitabilityCtx,
+        truck.id,
+        truck.truck_type,
+        {
+          revenue,
+          billableHours,
+          committedHours,
+          idleHours,
+          deadheadMiles,
+          miles,
+          weeklyCommittedBefore: weeklyBefore,
+        }
+      );
+
+      weeklyCommittedByTruck.set(truck.id, weeklyBefore + committedHours);
+
       const { error: upsertError } = await supabase.from("utilization_daily").upsert(
         {
           tenant_id: tenantId,
@@ -236,6 +274,14 @@ export async function refreshUtilizationDailyForTenant(
           revenue,
           deadhead_miles: deadheadMiles,
           committed_hours: committedHours,
+          labor_cost: profitability.labor_cost,
+          fuel_cost: profitability.fuel_cost,
+          deadhead_cost: profitability.deadhead_cost,
+          idle_cost: profitability.idle_cost,
+          variable_cost: profitability.variable_cost,
+          contribution: profitability.contribution,
+          margin_pct: profitability.margin_pct,
+          overtime_cost: profitability.overtime_cost,
           refreshed_at: new Date().toISOString(),
         },
         { onConflict: "truck_id,date" }

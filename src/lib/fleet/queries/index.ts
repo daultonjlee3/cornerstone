@@ -10,6 +10,7 @@ export {
 
 export { loadFleetCommandCenterData } from "./command-center";
 export { loadFleetDispatchBoardData } from "./dispatch-board";
+export { loadFleetTodayViewData } from "./today-view";
 export {
   loadFleetUtilizationReport,
   utilizationReportToCsvRows,

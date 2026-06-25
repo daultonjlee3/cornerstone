@@ -14,9 +14,9 @@ import {
   type OperationsReportType,
 } from "@/src/lib/dashboard/operations-intelligence";
 import { isFleetProductProfile } from "../../nav-config";
-import { loadFleetUtilizationReport } from "@/src/lib/fleet/queries/utilization-report";
+import { loadFleetPerformanceDashboard } from "@/src/lib/operational-profitability/performance-reports";
 import { listBranchesForTenant, listTrucksForTenant } from "@/src/lib/fleet/queries";
-import { FleetUtilizationReport } from "./components/fleet-utilization-report";
+import { FleetPerformanceDashboard } from "./components/fleet-performance-dashboard";
 import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 
 function formatCurrency(value: number): string {
@@ -114,8 +114,8 @@ export default async function OperationsReportsPage({
   const truckId = typeof params?.truck_id === "string" ? params.truck_id : null;
 
   if (showFleetReport) {
-    const [utilizationData, branches, trucks] = await Promise.all([
-      loadFleetUtilizationReport(supabase, tenantId, { from, to, branchId, truckId }),
+    const [performanceData, branches, trucks] = await Promise.all([
+      loadFleetPerformanceDashboard(supabase, tenantId, { from, to, branchId, truckId }),
       listBranchesForTenant(supabase, tenantId),
       listTrucksForTenant(supabase, tenantId),
     ]);
@@ -124,26 +124,30 @@ export default async function OperationsReportsPage({
       <div className="space-y-6">
         <PageHeader
           icon={<BarChart3 className="size-5" />}
-          title="Truck Utilization & Revenue"
-          subtitle="Utilization by truck and branch with week-over-week trends from fleet marts."
+          title={fleetOnly ? "Fleet Performance" : "Truck Utilization & Revenue"}
+          subtitle={
+            fleetOnly
+              ? "Operational profit intelligence — contribution, cost leaks, and branch rankings."
+              : "Utilization, revenue, contribution, and trends from fleet marts."
+          }
           meta={
             <span>
-              Reporting window: {utilizationData.from} to {utilizationData.to}
+              Reporting window: {performanceData.from} to {performanceData.to}
             </span>
           }
           actions={
             <>
               <Link href="/operations">
-                <Button variant="secondary">Command Center</Button>
+                <Button variant="secondary">Fleet Command Center</Button>
               </Link>
               <Link href="/dispatch">
-                <Button variant="secondary">Dispatch Board</Button>
+                <Button variant="secondary">Dispatch Intelligence</Button>
               </Link>
             </>
           }
         />
-        <FleetUtilizationReport
-          data={utilizationData}
+        <FleetPerformanceDashboard
+          data={performanceData}
           branches={branches.map((b) => ({
             id: (b as { id: string }).id,
             name: (b as { name: string }).name,

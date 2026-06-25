@@ -13,7 +13,7 @@ export function CommandPanel({
 }) {
   return (
     <section
-      className={`rounded-[var(--radius-card)] border border-[var(--card-border)] bg-white/82 p-4 shadow-[var(--shadow-soft)] ${className}`}
+      className={`rounded-[var(--radius-card)] border border-[var(--card-border)] bg-[var(--card-solid)]/90 p-4 shadow-[var(--shadow-soft)] ${className}`}
     >
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>

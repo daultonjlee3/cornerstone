@@ -1,6 +1,9 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getAuthContext } from "@/src/lib/auth-context";
+import { getAuthContext, getProductProfileForTenant } from "@/src/lib/auth-context";
+import { loadCompanyOperatingRules } from "@/src/lib/operational-profitability/queries";
+import { OperatingRulesForm } from "./operating-rules-form";
+import { saveCompanyOperatingRules } from "./actions";
 
 export default async function SettingsCompanyPage() {
   const supabase = await createClient();
@@ -12,6 +15,9 @@ export default async function SettingsCompanyPage() {
     ctx.membershipRole === "owner" ||
     ctx.membershipRole === "admin";
   if (!canManageOrg) redirect("/settings/notifications");
+
+  const productProfile = await getProductProfileForTenant(tenantId, supabase);
+  const isFleet = productProfile === "fleet_intelligence" || productProfile === "hybrid";
 
   const { data: tenant } = await supabase
     .from("tenants")
@@ -33,6 +39,15 @@ export default async function SettingsCompanyPage() {
     primary_contact_name: string | null;
     primary_contact_email: string | null;
   }>;
+
+  const operatingRules = isFleet
+    ? await Promise.all(
+        companyRows.map(async (c) => ({
+          company: c,
+          rules: await loadCompanyOperatingRules(supabase, tenantId, c.id),
+        }))
+      )
+    : [];
 
   return (
     <div className="space-y-6">
@@ -57,6 +72,30 @@ export default async function SettingsCompanyPage() {
           <p className="text-sm text-[var(--muted)]">No tenant data.</p>
         )}
       </section>
+
+      {isFleet ? (
+        <section className="space-y-4 rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+              Operational profitability rules
+            </h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Configure labor overtime, fuel, and idle cost assumptions used by dispatch recommendations and
+              Command Center. This is operational decision intelligence — not payroll or accounting.
+            </p>
+          </div>
+          {operatingRules.map(({ company, rules }) => (
+            <OperatingRulesForm
+              key={company.id}
+              companyId={company.id}
+              companyName={company.name}
+              initial={rules}
+              saveAction={saveCompanyOperatingRules}
+            />
+          ))}
+        </section>
+      ) : null}
+
       <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
           Companies

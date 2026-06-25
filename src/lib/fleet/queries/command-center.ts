@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FleetCommandCenterData } from "@/src/types/fleet";
 import { computeTelematicsStatus } from "@/src/lib/fleet/queries";
+import { loadTenantProfitabilitySummary } from "@/src/lib/operational-profitability/queries";
 
 function startOfMonthIso(): string {
   const now = new Date();
@@ -107,6 +108,8 @@ export async function loadFleetCommandCenterData(
   const revenuePerTruckMtd =
     truckCount > 0 ? Math.round((totalRevenue / truckCount) * 100) / 100 : null;
 
+  const profitability = await loadTenantProfitabilitySummary(supabase, tenantId, today);
+
   return {
     activeTrucks,
     idleTrucks,
@@ -115,5 +118,14 @@ export async function loadFleetCommandCenterData(
     utilizationPercent,
     revenuePerTruckMtd,
     truckCount,
+    revenueScheduledToday: profitability.revenueScheduledToday,
+    estimatedContributionToday: profitability.estimatedContributionToday,
+    contributionAtRisk: profitability.contributionAtRisk,
+    revenueAtRisk: profitability.revenueAtRisk,
+    overtimeCostToday: profitability.overtimeCostToday,
+    deadheadCostToday: profitability.deadheadCostToday,
+    idleCostToday: profitability.idleCostToday,
+    laborCostToday: profitability.laborCostToday,
+    recommendationOpportunity: profitability.recommendationOpportunity,
   };
 }

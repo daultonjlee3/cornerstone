@@ -14,7 +14,7 @@ export function WorkloadPanel({
   children,
 }: WorkloadPanelProps) {
   return (
-    <section className="shrink-0 rounded-lg border border-[var(--card-border)]/80 bg-[var(--card)]/50 p-2">
+    <section className="shrink-0 rounded-lg border border-[var(--card-border)] bg-white p-2 shadow-sm dark:bg-[var(--card)]">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
         {title}
       </p>

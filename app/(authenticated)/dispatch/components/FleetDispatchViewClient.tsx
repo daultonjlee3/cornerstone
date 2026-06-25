@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { FleetDispatchBoardData } from "@/src/types/fleet";
+import type { FleetDispatchBoardData, FleetTodayViewData } from "@/src/types/fleet";
 
 const FleetDispatchView = dynamic(
   () => import("./FleetDispatchView").then((mod) => mod.FleetDispatchView),
@@ -17,9 +17,20 @@ const FleetDispatchView = dynamic(
 
 type FleetDispatchViewClientProps = {
   initialBoard: FleetDispatchBoardData;
+  initialIntel: FleetTodayViewData;
   selectedDate: string;
 };
 
-export function FleetDispatchViewClient({ initialBoard, selectedDate }: FleetDispatchViewClientProps) {
-  return <FleetDispatchView initialBoard={initialBoard} selectedDate={selectedDate} />;
+export function FleetDispatchViewClient({
+  initialBoard,
+  initialIntel,
+  selectedDate,
+}: FleetDispatchViewClientProps) {
+  return (
+    <FleetDispatchView
+      initialBoard={initialBoard}
+      initialIntel={initialIntel}
+      selectedDate={selectedDate}
+    />
+  );
 }

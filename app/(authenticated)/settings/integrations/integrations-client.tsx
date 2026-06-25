@@ -3,8 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Plug, RefreshCw, Webhook } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { StatusBadge } from "@/src/components/ui/status-badge";
+import {
+  FleetEmptyState,
+  FleetKpi,
+  FleetPanel,
+  FleetSectionHeader,
+  FleetStatusChip,
+} from "@/src/components/fleet/ui";
 import {
   DataTable,
   Table,
@@ -90,6 +98,16 @@ export function IntegrationsClient() {
     if (samsara === "error") setMessage("Samsara connection failed. Check credentials and try again.");
   }, [searchParams]);
 
+  useEffect(() => {
+    if (searchParams.get("focus") !== "webhooks") return;
+    const el = document.getElementById("fleet-webhooks");
+    if (!el) return;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [searchParams]);
+
   const samsaraConnection = connections.find((c) => c.provider === "samsara");
   const jobsWebhook = connections.find((c) => c.provider === "webhook_jobs");
   const telematicsWebhook = connections.find((c) => c.provider === "webhook_telematics");
@@ -130,11 +148,35 @@ export function IntegrationsClient() {
   };
 
   if (loading) {
-    return <p className="text-sm text-[var(--muted)]">Loading integrations…</p>;
+    return (
+      <div className="grid gap-3 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="fleet-panel h-32 animate-pulse bg-[var(--card-elevated)]" />
+        ))}
+      </div>
+    );
   }
+
+  const healthyCount = connections.filter((c) => connectionHealth(c) === "healthy").length;
+  const errorCount = connections.filter((c) => connectionHealth(c) === "error").length;
 
   return (
     <div className="space-y-8">
+      <FleetSectionHeader
+        eyebrow="Integration Center"
+        title="Connected systems"
+        description="Health, sync history, and webhook activity for your operational data pipeline."
+      />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <FleetKpi label="Connected" value={connections.length} icon={Plug} />
+        <FleetKpi
+          label="Healthy"
+          value={healthyCount}
+          emphasis={healthyCount === connections.length && connections.length > 0 ? "success" : "default"}
+        />
+        <FleetKpi label="Errors" value={errorCount} emphasis={errorCount > 0 ? "critical" : "default"} />
+      </div>
       {error && (
         <div className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400" role="alert">
           {error}
@@ -147,7 +189,7 @@ export function IntegrationsClient() {
       )}
 
       {webhookReveal && (
-        <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--card)] p-4 space-y-2">
+        <FleetPanel variant="accent" className="space-y-2 p-4">
           <p className="text-sm font-medium text-[var(--foreground)]">
             Webhook created — copy these values now (secret shown once):
           </p>
@@ -161,11 +203,11 @@ export function IntegrationsClient() {
           <Button type="button" variant="ghost" size="sm" onClick={() => setWebhookReveal(null)}>
             Dismiss
           </Button>
-        </div>
+        </FleetPanel>
       )}
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 space-y-3">
+      <section id="fleet-webhooks" className="grid scroll-mt-6 gap-4 lg:grid-cols-3">
+        <FleetPanel className="space-y-3 p-4">
           <h3 className="font-medium text-[var(--foreground)]">Samsara</h3>
           <p className="text-sm text-[var(--muted)]">
             OAuth connect for vehicle list and GPS polling (≤5 min lag).
@@ -191,48 +233,52 @@ export function IntegrationsClient() {
               <a href="/api/integrations/samsara/authorize">Connect Samsara</a>
             </Button>
           )}
-        </div>
+        </FleetPanel>
 
-        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 space-y-3">
-          <h3 className="font-medium text-[var(--foreground)]">Jobs webhook</h3>
+        <FleetPanel className="space-y-3 p-4">
+          <h3 className="flex items-center gap-2 font-medium text-[var(--foreground)]">
+            <Webhook className="size-4 text-[var(--muted)]" />
+            Jobs webhook
+          </h3>
           <p className="text-sm text-[var(--muted)]">Inbound fleet job upserts with revenue + site.</p>
           {jobsWebhook ? (
-            <p className="text-xs text-[var(--muted)]">Active — use Integrations table for health.</p>
+            <FleetStatusChip label="Active" severity="success" />
           ) : null}
           <Button type="button" size="sm" onClick={() => createWebhook("webhook_jobs")}>
             {jobsWebhook ? "Rotate webhook secret" : "Enable jobs webhook"}
           </Button>
-        </div>
+        </FleetPanel>
 
-        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 space-y-3">
-          <h3 className="font-medium text-[var(--foreground)]">Telematics webhook</h3>
+        <FleetPanel className="space-y-3 p-4">
+          <h3 className="flex items-center gap-2 font-medium text-[var(--foreground)]">
+            <RefreshCw className="size-4 text-[var(--muted)]" />
+            Telematics webhook
+          </h3>
           <p className="text-sm text-[var(--muted)]">Generic GPS event ingest for non-Samsara sources.</p>
           {telematicsWebhook ? (
-            <p className="text-xs text-[var(--muted)]">Active — use Integrations table for health.</p>
+            <FleetStatusChip label="Active" severity="success" />
           ) : null}
           <Button type="button" size="sm" onClick={() => createWebhook("webhook_telematics")}>
             {telematicsWebhook ? "Rotate webhook secret" : "Enable telematics webhook"}
           </Button>
-        </div>
+        </FleetPanel>
       </section>
 
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-medium text-[var(--foreground)]">Connections</h2>
-            <p className="text-sm text-[var(--muted)]">
-              Active data sources and import channels for your fleet.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/onboarding-wizard">Import data</Link>
-          </Button>
-        </div>
+        <FleetSectionHeader
+          title="All connections"
+          description="Active data sources and import channels for your fleet."
+          action={
+            <Button asChild>
+              <Link href="/onboarding-wizard">Import data</Link>
+            </Button>
+          }
+        />
 
         {connections.length === 0 ? (
-          <div className="ui-card py-10 text-center">
-            <p className="text-[var(--muted)]">No integration connections yet.</p>
-          </div>
+          <FleetPanel className="p-0">
+            <FleetEmptyState title="No integration connections yet" />
+          </FleetPanel>
         ) : (
           <DataTable>
             <Table className="min-w-[700px]">
@@ -250,17 +296,13 @@ export function IntegrationsClient() {
                     <Tr key={c.id}>
                       <Td>{PROVIDER_LABELS[c.provider] ?? c.provider}</Td>
                       <Td>
-                        <span
-                          className={
-                            health === "healthy"
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : health === "warning"
-                                ? "text-amber-600 dark:text-amber-400"
-                                : "text-red-600 dark:text-red-400"
+                        <FleetStatusChip
+                          label={HEALTH_LABELS[health]}
+                          severity={
+                            health === "healthy" ? "success" : health === "warning" ? "warning" : "critical"
                           }
-                        >
-                          {HEALTH_LABELS[health]}
-                        </span>
+                          showDot={false}
+                        />
                       </Td>
                       <Td>
                         <StatusBadge status={c.status} />
@@ -279,9 +321,11 @@ export function IntegrationsClient() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium text-[var(--foreground)]">Recent sync runs</h2>
+        <FleetSectionHeader title="Recent sync runs" />
         {runs.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No sync runs recorded yet.</p>
+          <FleetPanel className="p-0">
+            <FleetEmptyState title="No sync runs recorded yet" />
+          </FleetPanel>
         ) : (
           <DataTable>
             <Table className="min-w-[600px]">
@@ -310,10 +354,8 @@ export function IntegrationsClient() {
         )}
       </section>
 
-      <section className="rounded-xl border border-dashed border-[var(--card-border)] bg-[var(--card)] p-6 space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Webhook documentation
-        </h2>
+      <FleetPanel className="space-y-4 border-dashed p-6">
+        <p className="fleet-eyebrow">Webhook documentation</p>
         <p className="text-sm text-[var(--muted)]">
           Send authenticated POST requests with header{" "}
           <code className="text-xs">X-Webhook-Secret</code> and query{" "}
@@ -325,7 +367,7 @@ export function IntegrationsClient() {
           <p className="pt-2">POST /api/integrations/webhooks/telematics?connection=...</p>
           <p>{`{ "events": [{ "external_truck_id", "recorded_at", "latitude", "longitude" }] }`}</p>
         </div>
-      </section>
+      </FleetPanel>
     </div>
   );
 }
