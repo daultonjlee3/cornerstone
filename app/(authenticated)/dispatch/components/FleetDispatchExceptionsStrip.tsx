@@ -12,20 +12,20 @@ type FleetDispatchExceptionsStripProps = {
 function severityBorder(severity: FleetOperationalException["severity"]): string {
   switch (severity) {
     case "critical":
-      return "border-l-red-500";
+      return "border-l-[var(--status-danger)]";
     case "warning":
-      return "border-l-amber-500";
+      return "border-l-[var(--status-warning)]";
     default:
-      return "border-l-slate-300";
+      return "border-l-[var(--surface-border-subtle)]";
   }
 }
 
 function severityText(severity: FleetOperationalException["severity"]): string {
   switch (severity) {
     case "critical":
-      return "text-red-700 dark:text-red-400";
+      return "text-[var(--status-danger)]";
     case "warning":
-      return "text-amber-700 dark:text-amber-400";
+      return "text-[var(--status-warning)]";
     default:
       return "text-[var(--foreground)]";
   }
@@ -41,7 +41,7 @@ export function FleetDispatchExceptionsStrip({ exceptions }: FleetDispatchExcept
   const warningCount = exceptions.filter((e) => e.severity === "warning").length;
 
   return (
-    <div id="fleet-exceptions" className="border-b border-[var(--card-border)]">
+    <div id="fleet-exceptions" className="border-b border-[var(--surface-border-subtle)]">
       <button
         type="button"
         className="flex w-full items-center justify-between px-2 py-1.5 text-left"
@@ -51,11 +51,11 @@ export function FleetDispatchExceptionsStrip({ exceptions }: FleetDispatchExcept
           <span className="font-medium text-[var(--foreground)]">Exceptions</span>
           {" · "}
           {criticalCount > 0 ? (
-            <span className="font-semibold text-red-700 dark:text-red-400">{criticalCount} critical</span>
+            <span className="font-semibold text-[var(--status-danger)]">{criticalCount} critical</span>
           ) : null}
           {criticalCount > 0 && warningCount > 0 ? ", " : null}
           {warningCount > 0 ? (
-            <span className="text-amber-700 dark:text-amber-400">{warningCount} warning</span>
+            <span className="text-[var(--status-warning)]">{warningCount} warning</span>
           ) : null}
           {criticalCount === 0 && warningCount === 0 ? (
             <span>{exceptions.length} info</span>
@@ -67,7 +67,7 @@ export function FleetDispatchExceptionsStrip({ exceptions }: FleetDispatchExcept
       </button>
 
       {panelOpen ? (
-        <div className="space-y-1 border-t border-[var(--card-border)] px-2 pb-2 pt-1">
+        <div className="space-y-1 border-t border-[var(--surface-border-subtle)] px-2 pb-2 pt-1">
           {groups.map((group) => (
             <ExceptionGroup key={group.category} group={group} />
           ))}
@@ -87,7 +87,7 @@ function ExceptionGroup({
 
   return (
     <div
-      className={`rounded-md border border-[var(--card-border)] border-l-[3px] bg-white shadow-sm dark:bg-[var(--card)] ${severityBorder(group.severity)}`}
+      className={`rounded-md border border-[var(--surface-border-subtle)] border-l-[3px] bg-[var(--surface-default)]/72 shadow-[var(--elevation-1)] ${severityBorder(group.severity)}`}
     >
       <button
         type="button"
@@ -109,7 +109,7 @@ function ExceptionGroup({
       </button>
 
       {open ? (
-        <ul className="space-y-0.5 border-t border-[var(--card-border)] px-2 pb-1.5 pt-1">
+        <ul className="space-y-0.5 border-t border-[var(--surface-border-subtle)] px-2 pb-1.5 pt-1">
           {group.items.slice(0, 4).map((ex) => (
             <li key={ex.id}>
               <button

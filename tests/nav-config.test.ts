@@ -8,6 +8,7 @@ describe("fleet navigation config", () => {
     expect(labels[0]).toBe("fleet-operations");
     expect(labels).toContain("fleet-setup");
     expect(labels).toContain("integrations");
+    expect(labels).toContain("implementation");
     expect(labels).toContain("cmms-assets");
     expect(labels).not.toContain("cmms-operations");
 
@@ -27,6 +28,7 @@ describe("fleet navigation config", () => {
     expect(ids[0]).toBe("cmms-operations");
     expect(ids).not.toContain("fleet-setup");
     expect(ids).not.toContain("integrations");
+    expect(ids).not.toContain("implementation");
   });
 
   it("hybrid profile includes fleet and cmms sections", () => {
@@ -34,6 +36,7 @@ describe("fleet navigation config", () => {
     const ids = groups.map((g) => g.id);
     expect(ids).toContain("fleet-operations");
     expect(ids).toContain("fleet-setup");
+    expect(ids).toContain("implementation");
     expect(ids).toContain("cmms-operations");
     expect(ids).toContain("cmms-assets");
 

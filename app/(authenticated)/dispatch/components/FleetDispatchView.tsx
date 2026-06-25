@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import type {
   FleetDispatchBoardData,
   FleetDispatchJob,
@@ -22,6 +21,7 @@ import { Button } from "@/src/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { buildDispatchStatusItems, scrollToSection } from "./fleet-dispatch-utils";
+import { Skeleton } from "@/src/components/design-system";
 
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -188,21 +188,26 @@ export function FleetDispatchView({
       data-testid="fleet-dispatch-board"
     >
       {pending ? (
-        <div className="pointer-events-none absolute inset-0 z-50 flex items-start justify-center pt-24">
-          <div className="flex items-center gap-2 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-3 py-1.5 text-sm shadow-[var(--elevation-1)]">
-            <Loader2 className="size-4 animate-spin text-[var(--accent)]" />
-            Updating…
+        <div className="pointer-events-none absolute inset-0 z-50 bg-[color-mix(in_srgb,var(--surface-canvas)_66%,transparent)] px-4 py-4">
+          <div className="mx-auto grid max-w-6xl gap-3">
+            <Skeleton className="h-14 w-full rounded-[var(--radius-lg)]" />
+            <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
+              <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />
+              <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />
+              <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />
+            </div>
           </div>
         </div>
       ) : null}
 
-      {/* Compact header + ops context — above the fold, not dominant */}
       <div className="shrink-0 space-y-2 rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/80 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
           <div>
-            <p className="cs-text-micro">Dispatch board</p>
+            <p className="cs-text-micro">Fleet mission control</p>
             <h1 className="cs-text-section-title mt-1">Dispatch Intelligence</h1>
-            <p className="text-[11px] text-[var(--muted)]">Assign jobs to trucks · {selectedDate}</p>
+            <p className="text-[11px] text-[var(--muted)]">
+              Primary goal: place the right truck on the next highest-value job.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -238,13 +243,16 @@ export function FleetDispatchView({
         <FleetDispatchOpsContext board={board} intel={intel} recommendationCount={recommendations.length} />
         <FleetDispatchStatusBar items={statusItems} />
         <FleetDispatchExceptionsStrip exceptions={intel.exceptions} />
+        <p className="text-[10px] text-[var(--muted)]">
+          Operating date: <span className="font-medium text-[var(--text-muted-strong)]">{selectedDate}</span> ·
+          status chips and exception details are tertiary context.
+        </p>
       </div>
 
       {error ? (
         <p className="shrink-0 rounded-md border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-3 py-1.5 text-sm text-[var(--status-danger)]">{error}</p>
       ) : null}
 
-      {/* Dispatch workspace — primary visual focus */}
       <div className="grid min-h-0 flex-1 gap-3 pt-3 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
         <FleetJobQueue
           jobs={board.unassignedJobs}

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createNotification } from "@/src/lib/notifications/service";
 import { updateConnectionSyncStatus } from "@/src/lib/integrations/connections";
 import type { IntegrationSyncRunStatus } from "@/src/types/fleet";
+import { appendSyncLog } from "@/src/lib/integrations/sync-log-service";
 
 export async function notifyIntegrationSyncFailed(
   supabase: SupabaseClient,
@@ -88,6 +89,22 @@ export async function finalizeIngestRun(
       status: "active",
     });
   }
+
+  void appendSyncLog(supabase, {
+    tenantId: input.tenantId,
+    connectionId: input.connectionId,
+    syncRunId: input.runId,
+    provider: input.provider,
+    operation: "ingest_finalize",
+    status: status === "failed" ? "error" : status === "partial" ? "warning" : "success",
+    payloadSummary: {
+      processed: input.processed,
+      failed: input.failed,
+      status,
+    },
+    errorMessage: input.errorSummary ?? null,
+    retryable: status !== "success",
+  }).catch(() => undefined);
 
   if (status === "success" || status === "partial") {
     const { triggerMartRefreshAfterIngest } = await import(

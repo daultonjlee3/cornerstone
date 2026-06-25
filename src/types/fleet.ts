@@ -3,6 +3,12 @@ export type ProductProfile = "cmms" | "fleet_intelligence" | "hybrid";
 export type IntegrationProvider =
   | "csv_manual"
   | "samsara"
+  | "geotab"
+  | "motive"
+  | "fleetio"
+  | "quickbooks"
+  | "rest_api"
+  | "webhook"
   | "webhook_jobs"
   | "webhook_telematics";
 

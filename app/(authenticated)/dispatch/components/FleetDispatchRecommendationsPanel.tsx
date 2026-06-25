@@ -48,7 +48,7 @@ export function FleetDispatchRecommendationsPanel({
           <p className="text-[10px] text-[var(--text-muted)]">
             {recommendations.length === 0
               ? "No pending actions"
-              : `${recommendations.length} decision${recommendations.length === 1 ? "" : "s"} ready`}
+              : `${recommendations.length} decision${recommendations.length === 1 ? "" : "s"} ready for dispatch`}
           </p>
         </div>
         <Button
@@ -66,7 +66,9 @@ export function FleetDispatchRecommendationsPanel({
       {error ? <p className="text-xs text-red-700">{error}</p> : null}
 
       {panelRecommendations.length === 0 ? (
-        <p className="text-xs text-[var(--muted)]">No pending dispatch recommendations.</p>
+        <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/65 px-3 py-2 text-xs text-[var(--muted)]">
+          Queue is healthy. New recommendations appear as jobs, truck status, or capacity changes.
+        </div>
       ) : (
         <ul className="space-y-2">
           {panelRecommendations.map((recommendation) => (

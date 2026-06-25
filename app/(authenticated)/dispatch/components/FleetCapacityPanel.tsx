@@ -21,9 +21,9 @@ function barTone(utilization: number): string {
 }
 
 function textTone(utilization: number): string {
-  if (utilization >= 1) return "text-red-700";
-  if (utilization >= 0.8) return "text-amber-700";
-  return "text-emerald-700";
+  if (utilization >= 1) return "text-[var(--status-danger)]";
+  if (utilization >= 0.8) return "text-[var(--status-warning)]";
+  return "text-[var(--status-success)]";
 }
 
 export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacityPanelProps) {
@@ -39,7 +39,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
             branchCapacity.map((branch) => (
               <div
                 key={branch.branch_id}
-                className="rounded-lg border border-[var(--card-border)] bg-white p-2 dark:bg-[var(--card)]"
+                className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/65 p-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-semibold">{branch.branch_name}</p>
@@ -47,7 +47,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
                     {branch.committed_hours.toFixed(1)} / {branch.available_truck_hours.toFixed(1)}h
                   </p>
                 </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200/80">
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-border-subtle)]">
                   <div
                     className={`h-full ${barTone(branch.utilization)}`}
                     style={{ width: `${Math.min(100, Math.max(6, branch.utilization * 100))}%` }}
@@ -64,7 +64,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
           {truckLanes.slice(0, 8).map((lane) => (
             <div
               key={lane.truck_id}
-              className="rounded-lg border border-[var(--card-border)] bg-white p-2 dark:bg-[var(--card)]"
+              className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/65 p-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-semibold">{lane.unit_number}</p>
@@ -72,7 +72,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
                   {(lane.utilization * 100).toFixed(0)}%
                 </p>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200/80">
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-border-subtle)]">
                 <div
                   className={`h-full ${barTone(lane.utilization)}`}
                   style={{ width: `${Math.min(100, Math.max(6, lane.utilization * 100))}%` }}
@@ -85,7 +85,7 @@ export function FleetCapacityPanel({ branchCapacity, truckLanes }: FleetCapacity
 
       {overloadedTrucks.length > 0 ? (
         <WorkloadPanel title="Alerts" description="Trucks at or above 80% capacity.">
-          <ul className="space-y-1 text-xs text-amber-800">
+          <ul className="space-y-1 text-xs text-[var(--status-warning)]">
             {overloadedTrucks.map((lane) => (
               <li key={lane.truck_id}>
                 {lane.unit_number} at {(lane.utilization * 100).toFixed(0)}% capacity
