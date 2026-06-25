@@ -356,7 +356,7 @@ export async function retrieveSyncLogs(
 }
 
 export async function retryFailedSync(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   input: {
     tenantId: string;
     connectorId: string;
@@ -365,10 +365,10 @@ export async function retryFailedSync(
 ): Promise<{ started: boolean; message: string }> {
   if (input.provider === "samsara") {
     const { runSamsaraFullSync } = await import("@/src/lib/integrations/connectors/samsara/run-sync");
-    const result = await runSamsaraFullSync(supabase, input.connectorId, input.tenantId);
+    await runSamsaraFullSync(input.connectorId, input.tenantId);
     return {
       started: true,
-      message: `Samsara sync processed ${result.processed} records with ${result.failed} failures.`,
+      message: "Samsara sync retry has been triggered.",
     };
   }
 
