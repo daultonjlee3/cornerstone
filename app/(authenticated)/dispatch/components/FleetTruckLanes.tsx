@@ -48,12 +48,14 @@ export function FleetTruckLanes({
   return (
     <div
       id="fleet-truck-lanes"
-      className="max-h-[280px] overflow-x-auto overflow-y-hidden rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 p-2 shadow-[var(--elevation-1)]"
+      className="dispatch-mission__panel max-h-[220px] shrink-0 overflow-hidden"
     >
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-        Fleet units · {lanes.length} trucks
-      </p>
-      <div className="flex gap-2 pb-1">
+      <div className="dispatch-mission__panel-header py-3">
+        <p className="cs-text-eyebrow">Fleet units</p>
+        <p className="cs-text-caption cs-text-muted mt-1">{lanes.length} trucks on board</p>
+      </div>
+      <div className="overflow-x-auto px-4 pb-4">
+      <div className="flex gap-3">
         {lanes.length === 0 ? (
           <p className="text-xs text-[var(--muted)]">No trucks configured.</p>
         ) : (
@@ -84,10 +86,10 @@ export function FleetTruckLanes({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") onSelectTruck(highlighted ? null : lane.truck_id);
                 }}
-                className={`w-60 shrink-0 cursor-pointer rounded-lg border bg-[var(--surface-default)]/70 p-2.5 transition-all duration-150 ${
+                className={`w-64 shrink-0 cursor-pointer rounded-[var(--radius-lg)] border bg-[var(--surface-default)]/80 p-4 transition-all duration-150 ${
                   highlighted
-                    ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/25"
-                    : "border-[var(--surface-border-subtle)] hover:-translate-y-[1px] hover:border-[var(--foreground)]/15 hover:shadow-sm"
+                    ? "border-[var(--brand-operational)] ring-1 ring-[var(--brand-operational)]/25 shadow-[var(--elevation-2)]"
+                    : "border-[var(--surface-border-subtle)] hover:border-[color-mix(in_srgb,var(--brand-operational)_20%,transparent)] hover:shadow-[var(--elevation-1)]"
                 }`}
               >
                 <div className="flex items-start justify-between gap-1">
@@ -219,6 +221,7 @@ export function FleetTruckLanes({
             );
           })
         )}
+      </div>
       </div>
     </div>
   );

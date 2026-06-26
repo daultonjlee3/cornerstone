@@ -6,7 +6,6 @@ import {
   Clock,
   MapPin,
   Sparkles,
-  Truck,
 } from "lucide-react";
 import type { FleetDispatchJob, FleetDispatchTruckLane, FleetRecommendationInstance, FleetDispatchBoardData } from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
@@ -66,17 +65,13 @@ export function FleetJobQueue({
   const sorted = sortJobs(jobs);
 
   return (
-    <aside
-      id="fleet-job-queue"
-      className="flex flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 shadow-[var(--elevation-1)]"
-    >
-      <div className="border-b border-[var(--surface-border-subtle)] px-3 py-2.5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Job queue</p>
-        <p className="text-[10px] text-[var(--muted)]">
-          {jobs.length} unassigned · highest priority first
-        </p>
+    <aside id="fleet-job-queue" className="dispatch-mission__panel">
+      <div className="dispatch-mission__panel-header">
+        <p className="cs-text-eyebrow">Job queue</p>
+        <p className="cs-text-section-title mt-1">{jobs.length} unassigned</p>
+        <p className="cs-text-caption cs-text-muted mt-1">Highest priority first</p>
       </div>
-      <ul className="flex-1 space-y-2 overflow-y-auto p-2">
+      <ul className="dispatch-mission__panel-body space-y-3">
         {sorted.length === 0 ? (
           <li className="flex flex-col items-center px-4 py-8 text-center">
             <p className="text-sm font-medium text-[var(--foreground)]">Queue clear</p>
@@ -100,96 +95,91 @@ export function FleetJobQueue({
             return (
               <li
                 key={job.id}
-                className={`rounded-lg border bg-[var(--surface-default)]/72 transition-all duration-150 ${priorityUrgencyClass(job.priority)} ${
-                  selected
-                    ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30 shadow-[var(--elevation-1)]"
-                    : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15 hover:-translate-y-[1px]"
+                className={`dispatch-mission__job-card ${priorityUrgencyClass(job.priority)} ${
+                  selected ? "dispatch-mission__job-card--selected" : ""
                 }`}
               >
                 <button
                   type="button"
-                  className="w-full space-y-2.5 p-2.5 text-left"
+                  className="w-full space-y-3 p-4 text-left"
                   onClick={() => onSelectJob(selected ? null : job.id)}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{customer}</p>
-                      <p className="line-clamp-1 text-sm font-bold text-[var(--foreground)]">{jobType}</p>
+                      <p className="cs-text-micro cs-text-muted truncate">{customer}</p>
+                      <p className="cs-text-body mt-1 line-clamp-2 font-semibold">{jobType}</p>
                     </div>
                     <PriorityBadge priority={job.priority} />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <DecisionMetric value={formatCurrency(job.revenue_estimate)} label="Revenue" />
                     <DecisionMetric value={formatCurrency(estimatedProfit)} label="Contribution" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Stat icon={Clock} value={formatTime(job.scheduled_start)} label="arrival" />
-                    {duration != null ? <Stat icon={Clock} value={`${duration}h`} label="duration" /> : null}
-                    <Stat icon={Truck} value={job.required_truck_type} label="truck type" />
+                  <div className="flex flex-wrap gap-2">
+                    <Stat icon={Clock} value={formatTime(job.scheduled_start)} label="Arrival" />
+                    {duration != null ? <Stat icon={Clock} value={`${duration}h`} label="Duration" /> : null}
                     {job.estimated_deadhead_miles != null ? (
                       <Stat
                         icon={MapPin}
                         value={`${job.estimated_deadhead_miles.toFixed(1)} mi`}
-                        label="deadhead"
+                        label="Deadhead"
                       />
                     ) : null}
                   </div>
 
-                  <p className="flex items-center gap-1 text-[10px] text-[var(--muted)]">
-                    <MapPin className="size-3 shrink-0" />
+                  <p className="flex items-center gap-1.5 cs-text-caption cs-text-muted">
+                    <MapPin className="size-3.5 shrink-0" />
                     <span className="truncate">{job.site_name ?? "Site"}</span>
                   </p>
                   {job.branch_name ? (
-                    <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[var(--muted)]">
-                      <Building2 className="size-3 shrink-0" />
+                    <p className="flex items-center gap-1.5 cs-text-caption cs-text-muted">
+                      <Building2 className="size-3.5 shrink-0" />
                       {job.branch_name}
                     </p>
                   ) : null}
 
                   {job.estimated_deadhead_miles != null ? (
-                    <p className="text-[10px] font-medium text-amber-800 dark:text-amber-300">
+                    <p className="cs-text-caption font-medium text-[var(--status-warning)]">
                       {job.estimated_deadhead_miles.toFixed(1)} mi deadhead
-                      {job.estimated_travel_minutes != null ? ` · ${job.estimated_travel_minutes} min` : ""}
+                      {job.estimated_travel_minutes != null ? ` · ${job.estimated_travel_minutes} min travel` : ""}
                     </p>
                   ) : null}
 
                   {topTruck ? (
-                    <div className="space-y-1 rounded-md border border-[color-mix(in_srgb,var(--status-info)_28%,transparent)] bg-[var(--status-info-subtle)] px-2 py-1.5">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-blue-800 dark:text-blue-300">
-                          <Sparkles className="size-3" />
-                          {topTruck.unit_number}
+                    <div className="space-y-1.5 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--brand-operational)_24%,transparent)] bg-[var(--brand-operational-subtle)] px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 cs-text-caption font-semibold text-[var(--brand-operational)]">
+                          <Sparkles className="size-3.5" />
+                          Truck {topTruck.unit_number}
                         </span>
                         {confidence ? (
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${confidenceTone(confidence)}`}
+                            className={`rounded-full px-2 py-0.5 cs-text-micro font-bold uppercase ${confidenceTone(confidence)}`}
                           >
                             {confidenceLabel(confidence)}
                           </span>
                         ) : null}
                       </div>
                       {confidenceExplanation ? (
-                        <p className="text-[9px] leading-snug text-[var(--muted)]">{confidenceExplanation}</p>
+                        <p className="cs-text-micro cs-text-muted leading-snug">{confidenceExplanation}</p>
                       ) : null}
                     </div>
                   ) : null}
 
                   {ignoreRisk ? (
-                    <p className="mt-1.5 text-[10px] leading-snug text-amber-800 dark:text-amber-300">
-                      {ignoreRisk}
-                    </p>
+                    <p className="cs-text-caption leading-snug text-[var(--status-warning)]">{ignoreRisk}</p>
                   ) : null}
 
                   {risk ? (
-                    <p className="flex items-start gap-1 text-[10px] font-semibold text-red-700 dark:text-red-400">
-                      <AlertCircle className="mt-0.5 size-3 shrink-0" />
+                    <p className="flex items-start gap-1.5 cs-text-caption font-semibold text-[var(--status-danger)]">
+                      <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
                       {risk}
                     </p>
                   ) : null}
 
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {late ? (
                       <Badge tone="red" icon={AlertCircle}>
                         Late
@@ -200,10 +190,8 @@ export function FleetJobQueue({
                 </button>
 
                 {selected ? (
-                  <div className="space-y-1 border-t border-[var(--surface-border-subtle)] px-2.5 pb-2.5 pt-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                      Quick assign
-                    </p>
+                  <div className="space-y-2 border-t border-[var(--surface-border-subtle)] px-4 pb-4 pt-3">
+                    <p className="cs-text-micro cs-text-muted">Quick assign</p>
                     {(topTruck
                       ? truckLanes.filter((l) => l.truck_id === topTruck.truck_id)
                       : truckLanes.filter(
@@ -248,21 +236,19 @@ function Stat({
   label?: string;
 }) {
   return (
-    <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 px-1.5 py-1">
-      <div className="flex items-center gap-1">
-        <Icon className="size-3 text-[var(--text-muted)]" />
-        <span className="truncate text-[10px] font-semibold">{value}</span>
-      </div>
-      {label ? <p className="text-[9px] capitalize text-[var(--muted)]">{label}</p> : null}
+    <div className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5">
+      <Icon className="size-3.5 text-[var(--text-muted)]" />
+      <span className="cs-text-caption font-semibold">{value}</span>
+      {label ? <span className="cs-text-micro cs-text-muted">{label}</span> : null}
     </div>
   );
 }
 
 function DecisionMetric({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/75 px-2 py-1.5">
-      <p className="text-[9px] uppercase tracking-wide text-[var(--muted)]">{label}</p>
-      <p className="mt-0.5 text-base font-semibold tabular-nums text-[var(--foreground)]">{value}</p>
+    <div className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-3 py-2.5">
+      <p className="cs-text-micro cs-text-muted">{label}</p>
+      <p className="cs-text-body mt-1 font-semibold tabular-nums">{value}</p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, DollarSign, Gauge, MapPin, Navigation, Route, Shield, Sparkles, Truck } from "lucide-react";
+import { Clock3, DollarSign, Gauge, MapPin, Navigation, Route, Shield, Sparkles, Truck, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ComponentType } from "react";
 import { Button } from "@/src/components/ui/button";
@@ -49,44 +49,43 @@ export function FleetDispatchRecommendationCard({
     topCandidate?.truck_id ?? recommendation.rationale.entities.truck_id ?? null;
   const topSnapshot = recommendation.rationale.candidate_snapshots?.[0];
   const topReasons = recommendation.rationale.reasons.slice(0, 2);
+  const primaryCta = isCapacityOnly ? "Acknowledge" : "Review & Assign";
 
   return (
     <motion.li
       layout
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className={`rounded-lg border bg-[var(--surface-default)]/74 p-3 shadow-[var(--elevation-1)] transition-all duration-150 ${
-        active
-          ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/25"
-          : "border-[var(--surface-border-subtle)] hover:border-[var(--foreground)]/15"
-      }`}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      className={`dispatch-mission__rec-card list-none ${active ? "dispatch-mission__rec-card--active" : ""}`}
       onMouseEnter={() => onHighlight(recommendation)}
       onMouseLeave={() => onHighlight(null)}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="size-3.5 shrink-0 text-[var(--accent)]" />
-            <p className="line-clamp-2 text-xs font-bold leading-snug">{recommendation.rationale.title}</p>
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 shrink-0 text-[var(--brand-operational)]" />
+            <p className="cs-text-body line-clamp-2 font-semibold leading-snug">
+              {recommendation.rationale.title}
+            </p>
           </div>
-          <p className="mt-0.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">
+          <p className="cs-text-micro cs-text-muted mt-1.5">
             {formatRecommendationType(recommendation.recommendation_type)}
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${confidenceTone(confidence)}`}
+          className={`shrink-0 rounded-full px-2.5 py-1 cs-text-micro font-bold uppercase ${confidenceTone(confidence)}`}
         >
           {confidenceLabel(confidence)}
         </span>
       </div>
 
       {topCandidate ? (
-        <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2.5 py-2">
-          <Truck className="size-4 text-[var(--accent)]" />
+        <div className="mt-4 flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-4 py-3">
+          <Truck className="size-5 text-[var(--brand-operational)]" />
           <div>
-            <p className="text-xs font-bold">{topCandidate.unit_number}</p>
-            <p className="text-[10px] text-[var(--muted)]">
+            <p className="cs-text-body font-bold">{topCandidate.unit_number}</p>
+            <p className="cs-text-caption cs-text-muted">
               Objectively best operational choice · score {topCandidate.score.toFixed(0)}
             </p>
           </div>
@@ -94,7 +93,7 @@ export function FleetDispatchRecommendationCard({
       ) : null}
 
       {topSnapshot ? (
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <div className="dispatch-mission__impact-grid mt-4">
           <ImpactTag
             icon={DollarSign}
             label="Revenue impact"
@@ -103,6 +102,7 @@ export function FleetDispatchRecommendationCard({
               currency: "USD",
               maximumFractionDigits: 0,
             })}
+            accent
           />
           <ImpactTag
             icon={Route}
@@ -123,69 +123,83 @@ export function FleetDispatchRecommendationCard({
       ) : null}
 
       {topReasons.length > 0 ? (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-4 space-y-2">
           {topReasons.map((reason) => (
             <li
               key={reason}
-              className="flex items-start gap-1.5 text-[10px] leading-snug text-[var(--text-muted-strong)]"
+              className="flex items-start gap-2 cs-text-caption cs-text-muted leading-snug"
             >
-              <Shield className="mt-0.5 size-3 shrink-0 text-[var(--brand-operational)]" />
+              <Shield className="mt-0.5 size-3.5 shrink-0 text-[var(--brand-operational)]" />
               {reason}
             </li>
           ))}
         </ul>
       ) : null}
 
-      <details className="mt-2 rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/50 px-2 py-1.5">
-        <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+      <details className="mt-4 rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/60 px-3 py-2">
+        <summary className="cursor-pointer cs-text-micro font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           Why this truck
         </summary>
-        <div className="pt-1.5">
+        <div className="pt-2">
           <FleetRecommendationExplainability recommendation={recommendation} board={board} />
         </div>
       </details>
 
-      <div className="mt-3 flex flex-wrap gap-1">
+      <div className="mt-5 space-y-2">
         <Button
           type="button"
-          size="sm"
-          className="h-7 text-[10px]"
+          className="h-10 w-full justify-center text-sm font-semibold"
           disabled={pending}
           onClick={() => onAccept(recommendation.id)}
         >
-          {isCapacityOnly ? "Acknowledge" : "Accept"}
+          {primaryCta}
+          {!isCapacityOnly ? <ArrowRight className="ml-1.5 size-4" /> : null}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="h-7 text-[10px]"
-          disabled={pending}
-          onClick={() => onDismiss(recommendation.id)}
-        >
-          Dismiss
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => onViewMap(recommendation)}>
-          <MapPin className="mr-1 size-3" />
-          Map
-        </Button>
-        {primaryTruckId ? (
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-8 text-xs"
+            disabled={pending}
+            onClick={() => onDismiss(recommendation.id)}
+          >
+            Dismiss
+          </Button>
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="h-7 text-[10px]"
-            onClick={() => onHighlightTruck(primaryTruckId)}
+            className="h-8 text-xs"
+            onClick={() => onViewMap(recommendation)}
           >
-            <Navigation className="mr-1 size-3" />
-            Truck
+            <MapPin className="mr-1 size-3" />
+            Map
           </Button>
-        ) : null}
-        {jobId ? (
-          <Button type="button" size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => onHighlightJob(jobId)}>
-            Job
-          </Button>
-        ) : null}
+          {primaryTruckId ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => onHighlightTruck(primaryTruckId)}
+            >
+              <Navigation className="mr-1 size-3" />
+              Truck
+            </Button>
+          ) : null}
+          {jobId ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => onHighlightJob(jobId)}
+            >
+              Job
+            </Button>
+          ) : null}
+        </div>
       </div>
     </motion.li>
   );
@@ -195,18 +209,24 @@ function ImpactTag({
   icon: Icon,
   label,
   value,
+  accent = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  accent?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2 py-1">
-      <div className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-[var(--muted)]">
-        <Icon className="size-3 text-[var(--brand-operational)]" />
+    <div className="dispatch-mission__impact-cell">
+      <div className="flex items-center gap-1.5 cs-text-micro cs-text-muted uppercase tracking-wide">
+        <Icon className="size-3.5 text-[var(--brand-operational)]" />
         {label}
       </div>
-      <p className="mt-0.5 text-[11px] font-semibold tabular-nums text-[var(--foreground)]">{value}</p>
+      <p
+        className={`dispatch-mission__impact-value ${accent ? "dispatch-mission__impact-value--accent" : ""}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import type { DispatchStatusItem } from "./fleet-dispatch-utils";
 import { scrollToSection } from "./fleet-dispatch-utils";
-
 import type { FleetSeverity } from "@/src/lib/fleet/ui/severity";
 import { fleetDotClass } from "@/src/lib/fleet/ui/severity";
 
@@ -25,36 +24,39 @@ function dispatchSeverityToFleet(severity: DispatchStatusItem["severity"]): Flee
   }
 }
 
-/** Compact operational chips — fleet design tokens */
+function chipTone(severity: DispatchStatusItem["severity"]): string {
+  switch (severity) {
+    case "critical":
+      return "fleet-chip--critical";
+    case "warning":
+      return "fleet-chip--warning";
+    case "opportunity":
+      return "fleet-chip--accent";
+    case "healthy":
+      return "fleet-chip--success";
+    default:
+      return "fleet-chip--neutral";
+  }
+}
+
+/** Operational alert chips — scroll to relevant workspace section */
 export function FleetDispatchStatusBar({ items }: FleetDispatchStatusBarProps) {
   if (items.length === 0) return null;
 
-  const primary = items.find((i) => i.severity === "critical") ?? items[0];
-  const secondary = items.filter((i) => i.id !== primary.id);
-
   return (
-    <div className="flex flex-wrap items-center gap-2 px-1 py-1" data-testid="fleet-dispatch-status-bar">
-      <button
-        type="button"
-        onClick={() => scrollToSection(primary.targetId)}
-        className="fleet-chip fleet-chip--neutral flex items-center gap-2 px-3 py-1.5 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--surface-default)]"
-      >
-        <span className={fleetDotClass(dispatchSeverityToFleet(primary.severity))} />
-        <span className="text-xs font-semibold text-[var(--foreground)]">{primary.label}</span>
-        {primary.detail ? (
-          <span className="hidden text-[11px] text-[var(--muted)] sm:inline">· {primary.detail}</span>
-        ) : null}
-      </button>
-
-      {secondary.map((item) => (
+    <div className="dispatch-mission__status-row" data-testid="fleet-dispatch-status-bar">
+      {items.map((item) => (
         <button
           key={item.id}
           type="button"
           onClick={() => scrollToSection(item.targetId)}
-          className="fleet-chip fleet-chip--neutral flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium transition hover:border-[var(--accent)]/30 hover:bg-[var(--surface-default)]"
+          className={`fleet-chip ${chipTone(item.severity)} transition hover:brightness-110`}
         >
           <span className={fleetDotClass(dispatchSeverityToFleet(item.severity))} />
-          {item.label}
+          <span className="font-semibold">{item.label}</span>
+          {item.detail ? (
+            <span className="hidden text-[var(--text-muted)] sm:inline">· {item.detail}</span>
+          ) : null}
         </button>
       ))}
     </div>

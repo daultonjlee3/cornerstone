@@ -1,6 +1,7 @@
 "use client";
 
-import type { FleetDispatchBoardData, FleetTodayViewData } from "@/src/types/fleet";
+import type { FleetDispatchBoardData, FleetMetricDelta, FleetTodayViewData } from "@/src/types/fleet";
+import { KpiCard, StatusChip } from "@/src/components/design-system";
 import { formatCurrency } from "./fleet-dispatch-utils";
 
 type FleetDispatchOpsContextProps = {
@@ -9,19 +10,28 @@ type FleetDispatchOpsContextProps = {
   recommendationCount: number;
 };
 
-/** Single-line executive awareness — supports dispatch, does not compete with the workspace */
+function findDelta(intel: FleetTodayViewData, key: string): FleetMetricDelta | undefined {
+  return intel.changesSinceYesterday.find((d) => d.key === key);
+}
+
+function formatDeltaHint(delta: FleetMetricDelta | undefined): string | undefined {
+  if (!delta || delta.deltaPercent == null) return undefined;
+  const sign = delta.deltaPercent > 0 ? "+" : "";
+  return `${sign}${Math.round(delta.deltaPercent)}% vs yesterday`;
+}
+
+/** Mission control KPI strip + operational status chips */
 export function FleetDispatchOpsContext({
   board,
   intel,
   recommendationCount,
 }: FleetDispatchOpsContextProps) {
   const criticalCount = intel.exceptions.filter((e) => e.severity === "critical").length;
-  const maxBranchUtil = board.branchCapacity.reduce((max, b) => Math.max(max, b.utilization), 0);
-  const activeTrucks =
-    intel.commandCenter.activeTrucks ??
-    board.truckLanes.filter((l) => l.status === "active").length;
   const availableTrucks = board.truckLanes.filter(
     (lane) => lane.status === "active" && lane.jobs.length === 0
+  ).length;
+  const readyUnits = board.truckLanes.filter(
+    (lane) => lane.status === "active" && lane.telematics_status !== "offline"
   ).length;
   const offlineUnits = board.truckLanes.filter((lane) => lane.telematics_status === "offline").length;
   const healthyGpsCount = board.truckLanes.filter((lane) => lane.telematics_status !== "offline").length;
@@ -30,86 +40,64 @@ export function FleetDispatchOpsContext({
     : 100;
   const revenueAtRisk = intel.revenueAtRisk;
   const jobsWaiting = board.unassignedJobs.length;
+  const integrationIssues = intel.integrationHealth.filter((c) => c.status !== "healthy").length;
+
+  const unassignedDelta = findDelta(intel, "unassigned_jobs");
+  const recDelta = findDelta(intel, "recommendations");
 
   return (
-    <section
-      id="fleet-executive"
-      className="space-y-2.5"
-      data-testid="fleet-dispatch-executive"
-    >
-      <div className="grid gap-2 sm:grid-cols-3">
-        <div className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/78 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">Revenue at risk</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--status-danger)]">
-            {revenueAtRisk > 0 ? formatCurrency(revenueAtRisk) : "None"}
-          </p>
-        </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/78 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">Jobs waiting</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">
-            {jobsWaiting}
-          </p>
-        </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/78 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">Recommendations</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--status-info)]">
-            {recommendationCount}
-          </p>
-        </div>
+    <section id="fleet-executive" className="space-y-5" data-testid="fleet-dispatch-executive">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Revenue at risk"
+          value={revenueAtRisk > 0 ? formatCurrency(revenueAtRisk) : "None"}
+          hint={jobsWaiting > 0 ? "High priority unassigned revenue" : "No revenue exposure"}
+          emphasis={revenueAtRisk > 0 ? "danger" : "default"}
+        />
+        <KpiCard
+          label="Jobs waiting"
+          value={jobsWaiting}
+          hint={formatDeltaHint(unassignedDelta) ?? (jobsWaiting > 0 ? "Awaiting assignment" : "Queue clear")}
+          emphasis={jobsWaiting > 0 ? "warning" : "success"}
+        />
+        <KpiCard
+          label="Recommendations ready"
+          value={recommendationCount}
+          hint={formatDeltaHint(recDelta) ?? (recommendationCount > 0 ? "Ready to act" : "Monitoring fleet state")}
+          emphasis={recommendationCount > 0 ? "operational" : "default"}
+        />
+        <KpiCard
+          label="Available trucks"
+          value={availableTrucks}
+          hint={`${readyUnits} ready units · ${board.truckLanes.length} total`}
+          emphasis="info"
+        />
       </div>
 
-      <div className="flex flex-wrap gap-1.5 text-[11px]">
-        <MetricChip
-          label="Critical alerts"
-          value={criticalCount}
-          tone={criticalCount > 0 ? "danger" : "neutral"}
+      <div className="dispatch-mission__status-row">
+        <StatusChip
+          label={criticalCount > 0 ? `${criticalCount} critical alerts` : "No critical alerts"}
+          tone={criticalCount > 0 ? "danger" : "success"}
         />
-        <MetricChip
-          label="Offline units"
-          value={offlineUnits}
-          tone={offlineUnits > 0 ? "warning" : "neutral"}
+        <StatusChip
+          label={offlineUnits > 0 ? `${offlineUnits} offline units` : "All units online"}
+          tone={offlineUnits > 0 ? "warning" : "success"}
         />
-        <MetricChip label="Available trucks" value={availableTrucks} tone="neutral" />
-        <MetricChip
-          label="GPS health"
-          value={`${gpsHealth}%`}
+        <StatusChip
+          label={`GPS health ${gpsHealth}%`}
           tone={gpsHealth < 90 ? "warning" : "success"}
         />
-        <MetricChip
-          label="Peak branch utilization"
-          value={`${Math.round(maxBranchUtil * 100)}%`}
-          tone={maxBranchUtil >= 1 ? "danger" : maxBranchUtil >= 0.8 ? "warning" : "neutral"}
+        <StatusChip label={`${availableTrucks} available trucks`} tone="operational" />
+        <StatusChip label={`${readyUnits} ready units`} tone="info" />
+        <StatusChip
+          label={
+            integrationIssues > 0
+              ? `${integrationIssues} integration${integrationIssues === 1 ? "" : "s"} need attention`
+              : "Integrations healthy"
+          }
+          tone={integrationIssues > 0 ? "warning" : "success"}
         />
-        <MetricChip label="Active trucks" value={activeTrucks} tone="neutral" />
       </div>
     </section>
-  );
-}
-
-function MetricChip({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  tone: "neutral" | "success" | "warning" | "danger";
-}) {
-  const toneClasses =
-    tone === "danger"
-      ? "border-[color-mix(in_srgb,var(--status-danger)_35%,transparent)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)]"
-      : tone === "warning"
-        ? "border-[color-mix(in_srgb,var(--status-warning)_35%,transparent)] bg-[var(--status-warning-subtle)] text-[var(--status-warning)]"
-        : tone === "success"
-          ? "border-[color-mix(in_srgb,var(--status-success)_35%,transparent)] bg-[var(--status-success-subtle)] text-[var(--status-success)]"
-          : "border-[var(--surface-border-subtle)] bg-[var(--surface-default)] text-[var(--text-muted-strong)]";
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${toneClasses}`}
-    >
-      {label}
-      <strong className="font-semibold tabular-nums">{value}</strong>
-    </span>
   );
 }

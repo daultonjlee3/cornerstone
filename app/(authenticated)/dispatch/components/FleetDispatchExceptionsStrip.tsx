@@ -41,14 +41,14 @@ export function FleetDispatchExceptionsStrip({ exceptions }: FleetDispatchExcept
   const warningCount = exceptions.filter((e) => e.severity === "warning").length;
 
   return (
-    <div id="fleet-exceptions" className="border-b border-[var(--surface-border-subtle)]">
+    <div id="fleet-exceptions" className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/50">
       <button
         type="button"
-        className="flex w-full items-center justify-between px-2 py-1.5 text-left"
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
         onClick={() => setPanelOpen((v) => !v)}
       >
-        <p className="text-[11px] text-[var(--muted)]">
-          <span className="font-medium text-[var(--foreground)]">Exceptions</span>
+        <p className="cs-text-caption cs-text-muted">
+          <span className="font-semibold text-[var(--text-primary)]">Operational exceptions</span>
           {" · "}
           {criticalCount > 0 ? (
             <span className="font-semibold text-[var(--status-danger)]">{criticalCount} critical</span>

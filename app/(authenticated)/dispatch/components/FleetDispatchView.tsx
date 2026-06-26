@@ -18,10 +18,10 @@ import { FleetDispatchStatusBar } from "./FleetDispatchStatusBar";
 import { FleetDispatchExceptionsStrip } from "./FleetDispatchExceptionsStrip";
 import { FleetDispatchOpsContext } from "./FleetDispatchOpsContext";
 import { Button } from "@/src/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { buildDispatchStatusItems, scrollToSection } from "./fleet-dispatch-utils";
-import { Skeleton } from "@/src/components/design-system";
+import { HeroPanel, Skeleton } from "@/src/components/design-system";
 
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -183,33 +183,30 @@ export function FleetDispatchView({
   );
 
   return (
-    <div
-      className="relative flex h-[calc(100vh-11rem)] min-h-[620px] flex-col rounded-[var(--radius-xl)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/80 p-2 shadow-[var(--elevation-2)]"
-      data-testid="fleet-dispatch-board"
-    >
+    <div className="dispatch-mission" data-testid="fleet-dispatch-board">
       {pending ? (
-        <div className="pointer-events-none absolute inset-0 z-50 bg-[color-mix(in_srgb,var(--surface-canvas)_66%,transparent)] px-4 py-4">
-          <div className="mx-auto grid max-w-6xl gap-3">
-            <Skeleton className="h-14 w-full rounded-[var(--radius-lg)]" />
-            <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
-              <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />
-              <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />
-              <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />
+        <div className="pointer-events-none fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--surface-canvas)_55%,transparent)] backdrop-blur-[1px]">
+          <div className="mx-auto flex h-full max-w-7xl flex-col justify-center gap-4 p-6">
+            <Skeleton className="h-28 w-full rounded-[var(--radius-xl)]" />
+            <div className="grid gap-4 lg:grid-cols-[minmax(17.5rem,22%)_minmax(0,1fr)_minmax(18.75rem,26%)]">
+              <Skeleton className="h-[32rem] w-full rounded-[var(--radius-xl)]" />
+              <Skeleton className="h-[32rem] w-full rounded-[var(--radius-xl)]" />
+              <Skeleton className="h-[32rem] w-full rounded-[var(--radius-xl)]" />
             </div>
           </div>
         </div>
       ) : null}
 
-      <div className="shrink-0 space-y-2 rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/80 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-          <div>
-            <p className="cs-text-micro">Fleet mission control</p>
-            <h1 className="cs-text-section-title mt-1">Dispatch Intelligence</h1>
-            <p className="text-[11px] text-[var(--muted)]">
-              Primary goal: place the right truck on the next highest-value job.
+      <HeroPanel id="fleet-dispatch-hero" className="space-y-6">
+        <div className="dispatch-mission__header">
+          <div className="min-w-0">
+            <p className="cs-text-eyebrow text-[var(--brand-operational)]">Fleet Command Center</p>
+            <h1 className="dispatch-mission__title mt-2">Dispatch Intelligence</h1>
+            <p className="dispatch-mission__tagline">
+              Place the right truck on the highest-value job.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="secondary"
@@ -219,12 +216,15 @@ export function FleetDispatchView({
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => navigateDate(e.target.value)}
-              className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-sm"
-            />
+            <div className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-medium tabular-nums">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => navigateDate(e.target.value)}
+                className="border-0 bg-transparent p-0 text-sm font-medium tabular-nums text-[var(--text-primary)] outline-none"
+                aria-label="Select operating date"
+              />
+            </div>
             <Button
               type="button"
               variant="secondary"
@@ -234,26 +234,37 @@ export function FleetDispatchView({
             >
               <ChevronRight className="size-4" />
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => void refreshBoard()} disabled={pending}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void refreshBoard()}
+              disabled={pending}
+            >
+              <RefreshCw className={`mr-1.5 size-3.5 ${pending ? "animate-spin" : ""}`} />
               Refresh
             </Button>
           </div>
         </div>
 
-        <FleetDispatchOpsContext board={board} intel={intel} recommendationCount={recommendations.length} />
+        <FleetDispatchOpsContext
+          board={board}
+          intel={intel}
+          recommendationCount={recommendations.length}
+        />
+
         <FleetDispatchStatusBar items={statusItems} />
+
         <FleetDispatchExceptionsStrip exceptions={intel.exceptions} />
-        <p className="text-[10px] text-[var(--muted)]">
-          Operating date: <span className="font-medium text-[var(--text-muted-strong)]">{selectedDate}</span> ·
-          status chips and exception details are tertiary context.
-        </p>
-      </div>
+      </HeroPanel>
 
       {error ? (
-        <p className="shrink-0 rounded-md border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-3 py-1.5 text-sm text-[var(--status-danger)]">{error}</p>
+        <p className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-4 py-2.5 text-sm text-[var(--status-danger)]">
+          {error}
+        </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-3 pt-3 lg:grid-cols-[320px_minmax(0,1fr)_340px]">
+      <div className="dispatch-mission__workspace min-h-[640px] flex-1 pb-2">
         <FleetJobQueue
           jobs={board.unassignedJobs}
           board={board}
@@ -265,11 +276,8 @@ export function FleetDispatchView({
           pending={pending}
         />
 
-        <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
-          <div
-            id="fleet-dispatch-map"
-            className="min-h-[320px] flex-1 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] shadow-[var(--elevation-1)]"
-          >
+        <div className="dispatch-mission__map-column">
+          <div id="fleet-dispatch-map" className="dispatch-mission__map-shell">
             <FleetDispatchMapPanel
               jobs={board.jobs}
               truckLanes={board.truckLanes}
@@ -291,7 +299,7 @@ export function FleetDispatchView({
           />
         </div>
 
-        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
           <FleetDispatchRecommendationsPanel
             recommendations={recommendations}
             board={board}

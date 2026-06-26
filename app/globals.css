@@ -531,9 +531,81 @@ body:has([data-enterprise-ui="true"]) {
     linear-gradient(180deg, #060b11, #0b1420);
 }
 
-[data-fleet-ui="true"] .leaflet-container {
-  background: var(--surface-raised);
+[data-enterprise-ui="true"] .leaflet-container {
+  background: #0b1220;
 }
+
+[data-enterprise-ui="true"] .dispatch-map-pin-fleet {
+  display: inline-flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in srgb, var(--brand-operational) 70%, #0f172a);
+  background: color-mix(in srgb, var(--brand-operational) 22%, #0f172a);
+  color: var(--brand-operational);
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+[data-enterprise-ui="true"] .dispatch-map-pin-fleet--selected {
+  height: 40px;
+  width: 40px;
+  border-color: var(--brand-operational);
+  background: color-mix(in srgb, var(--brand-operational) 35%, #0f172a);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--brand-operational) 22%, transparent),
+    0 0 24px color-mix(in srgb, var(--brand-operational) 35%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.4);
+  animation: fleet-truck-glow 2s ease-in-out infinite;
+}
+
+[data-enterprise-ui="true"] .dispatch-map-pin-fleet--alt {
+  height: 30px;
+  width: 30px;
+  border-color: color-mix(in srgb, var(--text-muted) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 90%, #0f172a);
+  color: var(--text-muted-strong);
+}
+
+[data-enterprise-ui="true"] .dispatch-map-pin-job {
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid rgba(15, 23, 42, 0.35);
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+}
+
+[data-enterprise-ui="true"] .dispatch-map-pin-job--selected {
+  height: 34px;
+  width: 34px;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--brand-operational) 20%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes fleet-truck-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--brand-operational) 18%, transparent),
+      0 0 20px color-mix(in srgb, var(--brand-operational) 28%, transparent),
+      0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--brand-operational) 10%, transparent),
+      0 0 28px color-mix(in srgb, var(--brand-operational) 38%, transparent),
+      0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+}
+
 
 /* ===== Fleet marketing (public site) ===== */
 [data-fleet-marketing="true"] {

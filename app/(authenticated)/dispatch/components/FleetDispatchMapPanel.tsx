@@ -19,24 +19,24 @@ type FleetDispatchMapPanelProps = {
 
 const truckPinRecommended = divIcon({
   className: "dispatch-map-pin-shell",
-  html: '<span class="dispatch-map-pin dispatch-map-pin-selected dispatch-map-pin-technician">★</span>',
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
+  html: '<span class="dispatch-map-pin-fleet dispatch-map-pin-fleet--selected">T</span>',
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
 });
 
 const truckPinAlternative = divIcon({
   className: "dispatch-map-pin-shell",
-  html: '<span class="dispatch-map-pin dispatch-map-pin-hovered dispatch-map-pin-technician">T</span>',
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
+  html: '<span class="dispatch-map-pin-fleet dispatch-map-pin-fleet--alt">T</span>',
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
 });
 
 function truckPinDefault(highlighted: boolean) {
   return divIcon({
     className: "dispatch-map-pin-shell",
-    html: `<span class="dispatch-map-pin dispatch-map-pin-technician ${highlighted ? "dispatch-map-pin-selected" : ""}">T</span>`,
-    iconSize: highlighted ? [32, 32] : [28, 28],
-    iconAnchor: highlighted ? [16, 16] : [14, 14],
+    html: `<span class="dispatch-map-pin-fleet ${highlighted ? "dispatch-map-pin-fleet--selected" : ""}">T</span>`,
+    iconSize: highlighted ? [40, 40] : [36, 36],
+    iconAnchor: highlighted ? [20, 20] : [18, 18],
   });
 }
 
@@ -49,14 +49,14 @@ function jobPinIcon(priority: FleetDispatchJob["priority"], selected: boolean, r
         : priority === "medium"
           ? "dispatch-map-pin-medium"
           : "dispatch-map-pin-low";
-  const extra = [selected ? "dispatch-map-pin-selected" : "", recommended ? "dispatch-map-pin-hovered" : ""]
+  const extra = [selected ? "dispatch-map-pin-job--selected" : "", recommended ? "dispatch-map-pin-hovered" : ""]
     .filter(Boolean)
     .join(" ");
   return divIcon({
     className: "dispatch-map-pin-shell",
-    html: `<span class="dispatch-map-pin ${priorityClass} ${extra}">J</span>`,
-    iconSize: selected || recommended ? [34, 34] : [28, 28],
-    iconAnchor: selected || recommended ? [17, 17] : [14, 14],
+    html: `<span class="dispatch-map-pin-job ${priorityClass} ${extra}">J</span>`,
+    iconSize: selected || recommended ? [38, 38] : [32, 32],
+    iconAnchor: selected || recommended ? [19, 19] : [16, 16],
   });
 }
 
@@ -119,12 +119,12 @@ export function FleetDispatchMapPanel({
     };
 
     if (activeRecommendation) {
-      addRoute(recTopTruckId, recJobId, "rec-primary", "#2563eb", "Recommended route");
+      addRoute(recTopTruckId, recJobId, "rec-primary", "#2dd4bf", "Recommended route");
       for (const altId of recAltTruckIds) {
-        addRoute(altId, recJobId, `rec-alt-${altId}`, "#94a3b8", "Alternative", true);
+        addRoute(altId, recJobId, `rec-alt-${altId}`, "#64748b", "Alternative", true);
       }
     } else if (selectedJobId && highlightedTruckId) {
-      addRoute(highlightedTruckId, selectedJobId, "selection", "#0ea5e9", "Selected assignment");
+      addRoute(highlightedTruckId, selectedJobId, "selection", "#2dd4bf", "Selected assignment");
     }
 
     return lines;
@@ -173,8 +173,8 @@ export function FleetDispatchMapPanel({
         boundsOptions={{ padding: [24, 24] }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
         {routeLines.map((line) => (
@@ -243,15 +243,15 @@ export function FleetDispatchMapPanel({
         })}
       </MapContainer>
 
-      <div className="absolute left-2 top-2 z-[1000] flex items-center gap-1.5 rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/90 px-2 py-1 text-[10px] shadow-[var(--elevation-1)]">
-        <span className="font-semibold text-[var(--text-muted-strong)]">Live map</span>
-        <span className="text-[var(--muted)]">
+      <div className="dispatch-mission__map-overlay absolute left-3 top-3 z-[1000] flex items-center gap-2 px-3 py-2 text-xs">
+        <span className="font-semibold text-[var(--text-primary)]">Live</span>
+        <span className="text-[var(--text-muted)]">
           {truckLanes.length} trucks · {jobs.length} jobs
         </span>
         {selectedJobId ? (
           <button
             type="button"
-            className="pointer-events-auto rounded border border-[var(--surface-border-subtle)] px-1 py-0.5 text-[9px] font-semibold text-[var(--text-muted-strong)]"
+            className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--surface-border-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted-strong)] transition hover:border-[var(--brand-operational)]/30"
             onClick={() => onSelectJob(null)}
           >
             Clear selection
@@ -260,12 +260,12 @@ export function FleetDispatchMapPanel({
       </div>
 
       {showLegend ? (
-        <div className="pointer-events-none absolute bottom-2 left-2 z-[1000] max-w-[220px] rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 p-2 text-[10px] shadow-[var(--elevation-1)]">
-          <p className="font-bold uppercase tracking-wide text-[var(--muted)]">Map intelligence</p>
+        <div className="dispatch-mission__map-overlay pointer-events-none absolute bottom-3 left-3 z-[1000] max-w-[240px] p-3 text-xs">
+          <p className="cs-text-micro cs-text-muted font-bold uppercase tracking-wide">Map intelligence</p>
           {routeLines.map((line) => (
-            <div key={line.key} className="mt-1 flex items-center gap-1.5">
+            <div key={line.key} className="mt-2 flex items-center gap-2">
               <span
-                className="inline-block h-0.5 w-4"
+                className="inline-block h-0.5 w-5"
                 style={{
                   background: line.dashed
                     ? `repeating-linear-gradient(90deg, ${line.color} 0 4px, transparent 4px 8px)`
@@ -275,34 +275,33 @@ export function FleetDispatchMapPanel({
               {line.label}
             </div>
           ))}
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className="text-blue-600">★</span> Recommended truck
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">T</span> Alternative
+          <div className="mt-2 flex items-center gap-2 text-[var(--brand-operational)]">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[9px] font-bold">
+              T
+            </span>
+            Recommended truck
           </div>
         </div>
       ) : null}
 
       {activeRisk ? (
-        <div className="pointer-events-none absolute right-2 top-2 z-[1000] max-w-[180px] rounded-lg border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--status-danger)] shadow-[var(--elevation-1)]">
-          ⚠ {activeRisk}
+        <div className="dispatch-mission__map-overlay pointer-events-none absolute right-3 top-3 z-[1000] max-w-[220px] border-[color-mix(in_srgb,var(--status-danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--status-danger-subtle)_88%,transparent)] px-3 py-2 text-xs font-semibold text-[var(--status-danger)]">
+          {activeRisk}
         </div>
       ) : null}
 
       {!hasMapPoints ? (
-        <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center">
-          <div className="rounded-lg border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/95 px-3 py-2 text-center shadow-[var(--elevation-1)]">
-            <p className="text-xs font-semibold text-[var(--foreground)]">Map awaiting telemetry</p>
-            <p className="text-[10px] text-[var(--muted)]">
+        <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-[color-mix(in_srgb,var(--surface-canvas)_40%,transparent)]">
+          <div className="dispatch-mission__map-overlay max-w-xs px-4 py-3 text-center">
+            <p className="cs-text-body font-semibold">Map awaiting telemetry</p>
+            <p className="cs-text-caption cs-text-muted mt-1">
               Truck and job markers appear when coordinates are available.
             </p>
           </div>
         </div>
       ) : null}
 
-      {/* Future-ready: branch capacity overlays attach here via branchCapacity GeoJSON layer */}
-      <div className="pointer-events-none absolute right-2 bottom-2 z-[1000] hidden rounded border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/92 px-1.5 py-0.5 text-[9px] text-[var(--muted)] lg:block">
+      <div className="dispatch-mission__map-overlay pointer-events-none absolute bottom-3 right-3 z-[1000] hidden px-2.5 py-1.5 text-[10px] text-[var(--text-muted)] lg:block">
         Branch overlays · coming soon
       </div>
     </div>

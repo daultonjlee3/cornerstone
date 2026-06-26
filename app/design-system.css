@@ -1019,3 +1019,159 @@
 .fleet-status-dot--neutral { background: var(--text-muted); }
 
 .fleet-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-10) var(--space-6); text-align: center; color: var(--text-muted); font-size: var(--font-size-body); }
+
+/* Dispatch Mission Control */
+.dispatch-mission {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-height: calc(100vh - 11rem);
+}
+
+.dispatch-mission__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.dispatch-mission__title {
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  color: var(--text-primary);
+}
+
+.dispatch-mission__tagline {
+  margin-top: var(--space-2);
+  max-width: 36rem;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--text-muted);
+}
+
+.dispatch-mission__workspace {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .dispatch-mission__workspace {
+    grid-template-columns: minmax(17.5rem, 22%) minmax(0, 1fr) minmax(18.75rem, 26%);
+  }
+}
+
+.dispatch-mission__map-column {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dispatch-mission__map-shell {
+  min-height: 22rem;
+  flex: 1.65;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--surface-border-subtle);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-2);
+}
+
+.dispatch-mission__panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--surface-border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  box-shadow: var(--elevation-1);
+}
+
+.dispatch-mission__panel-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--surface-border-subtle);
+}
+
+.dispatch-mission__panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.dispatch-mission__job-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border-subtle);
+  background: color-mix(in srgb, var(--surface-default) 88%, transparent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.dispatch-mission__job-card:hover {
+  border-color: color-mix(in srgb, var(--brand-operational) 24%, var(--surface-border-subtle));
+  box-shadow: var(--elevation-1);
+}
+
+.dispatch-mission__job-card--selected {
+  border-color: color-mix(in srgb, var(--brand-operational) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-operational) 18%, transparent), var(--elevation-2);
+}
+
+.dispatch-mission__rec-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border-subtle);
+  background: color-mix(in srgb, var(--surface-default) 90%, transparent);
+  padding: var(--space-5);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dispatch-mission__rec-card:hover,
+.dispatch-mission__rec-card--active {
+  border-color: color-mix(in srgb, var(--brand-operational) 32%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-operational) 12%, transparent), var(--elevation-2);
+}
+
+.dispatch-mission__impact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.dispatch-mission__impact-cell {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-border-subtle);
+  background: var(--surface-raised);
+  padding: var(--space-3);
+}
+
+.dispatch-mission__impact-value {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.dispatch-mission__impact-value--accent {
+  color: var(--brand-operational);
+}
+
+.dispatch-mission__map-overlay {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--elevation-1);
+}
+
+.dispatch-mission__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
