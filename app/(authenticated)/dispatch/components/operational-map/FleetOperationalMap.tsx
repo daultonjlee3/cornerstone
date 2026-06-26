@@ -34,6 +34,8 @@ type FleetOperationalMapProps = {
   activeRecommendation: FleetRecommendationInstance | null;
   onSelectJob: (id: string | null) => void;
   onSelectTruck: (id: string | null) => void;
+  /** Brighter basemap + lighter vignette when map is the console backdrop */
+  consoleMode?: boolean;
 };
 
 type RouteLine = {
@@ -53,10 +55,12 @@ function MapViewportController({
   bounds,
   resetToken,
   onMapReady,
+  consoleMode,
 }: {
   bounds: ReturnType<typeof latLngBounds> | null;
   resetToken: number;
   onMapReady: (map: L.Map) => void;
+  consoleMode?: boolean;
 }) {
   const map = useMap();
 
@@ -66,9 +70,12 @@ function MapViewportController({
 
   useEffect(() => {
     if (bounds && bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 12 });
+      map.fitBounds(bounds, {
+        padding: [40, 48],
+        maxZoom: 12,
+      });
     }
-  }, [bounds, map, resetToken]);
+  }, [bounds, consoleMode, map, resetToken]);
 
   return null;
 }
@@ -105,6 +112,7 @@ export function FleetOperationalMap({
   activeRecommendation,
   onSelectJob,
   onSelectTruck,
+  consoleMode = false,
 }: FleetOperationalMapProps) {
   const [layers, setLayers] = useState<OperationalMapLayers>(DEFAULT_OPERATIONAL_LAYERS);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -238,7 +246,7 @@ export function FleetOperationalMap({
   const recConfidence = activeRecommendation ? recommendationConfidence(activeRecommendation) : null;
 
   return (
-    <div className="opmap-shell relative h-full w-full">
+    <div className={`opmap-shell relative h-full w-full ${consoleMode ? "opmap-shell--console" : ""}`}>
       <MapContainer
         center={center}
         zoom={bounds ? 10 : 8}
@@ -248,13 +256,26 @@ export function FleetOperationalMap({
         zoomControl={false}
         attributionControl={false}
       >
-        <MapViewportController bounds={bounds} resetToken={resetToken} onMapReady={handleMapReady} />
-
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png" />
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
-          opacity={0.22}
+        <MapViewportController
+          bounds={bounds}
+          resetToken={resetToken}
+          onMapReady={handleMapReady}
+          consoleMode={consoleMode}
         />
+
+        {consoleMode ? (
+          <>
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+          </>
+        ) : (
+          <>
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png" />
+            <TileLayer
+              url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+              opacity={0.22}
+            />
+          </>
+        )}
 
         {(layers.branches || layers.capacity) &&
           branchZones.map((zone) => (
@@ -345,7 +366,8 @@ export function FleetOperationalMap({
         ) : null}
       </MapContainer>
 
-      <div className="opmap-vignette pointer-events-none" aria-hidden />
+      {!consoleMode ? <div className="opmap-vignette pointer-events-none" aria-hidden /> : null}
+      {consoleMode ? <div className="opmap-vignette opmap-vignette--light pointer-events-none" aria-hidden /> : null}
 
       <div className="opmap-hud opmap-hud--top-left">
         <span className="dispatch-mission__live-badge">

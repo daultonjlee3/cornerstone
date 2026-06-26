@@ -70,9 +70,9 @@ export function FleetDispatchTimeline({ board, recommendations }: FleetDispatchT
   if (events.length === 0) return null;
 
   return (
-    <div className="dispatch-console__dock dispatch-console__dock--bottom" id="fleet-dispatch-timeline">
+    <div className="dispatch-console__timeline" id="fleet-dispatch-timeline">
       <span className="dispatch-console__timeline-label">Live ops</span>
-      <div className="dispatch-console__dock-body dispatch-console__dock-body--timeline">
+      <div className="dispatch-console__timeline-scroll">
         {events.map((event) => (
           <div
             key={event.id}

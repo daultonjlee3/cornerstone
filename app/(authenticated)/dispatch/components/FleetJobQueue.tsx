@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronLeft, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import type { FleetDispatchJob, FleetDispatchTruckLane, FleetRecommendationInstance, FleetDispatchBoardData } from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
@@ -23,7 +23,7 @@ import {
 import { confidenceLabel } from "../../operations/components/fleet-recommendation-utils";
 
 type FleetJobQueueProps = {
-  layout?: "panel" | "float";
+  layout?: "panel" | "float" | "cockpit";
   jobs: FleetDispatchJob[];
   board: FleetDispatchBoardData;
   selectedJobId: string | null;
@@ -32,6 +32,7 @@ type FleetJobQueueProps = {
   truckLanes: FleetDispatchTruckLane[];
   recommendations: FleetRecommendationInstance[];
   pending?: boolean;
+  onCollapse?: () => void;
 };
 
 function sortJobs(jobs: FleetDispatchJob[]): FleetDispatchJob[] {
@@ -57,31 +58,45 @@ export function FleetJobQueue({
   truckLanes,
   recommendations,
   pending,
+  onCollapse,
 }: FleetJobQueueProps) {
   const sorted = sortJobs(jobs);
-  const isFloat = layout === "float";
+  const isDock = layout === "float" || layout === "cockpit";
 
-  const shellClass = isFloat
-    ? "dispatch-console__dock dispatch-console__dock--left"
+  const shellClass = isDock
+    ? "dispatch-console__rail-panel"
     : "dispatch-mission__panel dispatch-mission__panel--inbox";
 
   return (
     <aside id="fleet-job-queue" className={shellClass}>
-      <div className={isFloat ? "dispatch-console__dock-header" : "dispatch-mission__panel-header dispatch-mission__panel-header--minimal"}>
-        <p className={isFloat ? "dispatch-console__dock-eyebrow" : "dispatch-mission__panel-eyebrow"}>
-          Dispatch inbox
-        </p>
-        <p className={isFloat ? "dispatch-console__dock-title" : "dispatch-mission__panel-title"}>
-          {jobs.length} need{jobs.length === 1 ? "s" : ""} a decision
-        </p>
-        <p className={isFloat ? "dispatch-console__dock-meta" : "dispatch-mission__panel-meta"}>
-          Priority · revenue · arrival
-        </p>
+      <div className={isDock ? "dispatch-console__rail-header" : "dispatch-mission__panel-header dispatch-mission__panel-header--minimal"}>
+        <div className="min-w-0 flex-1">
+          <p className={isDock ? "dispatch-console__dock-eyebrow" : "dispatch-mission__panel-eyebrow"}>
+            Dispatch inbox
+          </p>
+          <p className={isDock ? "dispatch-console__dock-title" : "dispatch-mission__panel-title"}>
+            {jobs.length} need{jobs.length === 1 ? "s" : ""} a decision
+          </p>
+          <p className={isDock ? "dispatch-console__dock-meta" : "dispatch-mission__panel-meta"}>
+            Priority · revenue · arrival
+          </p>
+        </div>
+        {layout === "cockpit" && onCollapse ? (
+          <button
+            type="button"
+            className="dispatch-console__rail-collapse"
+            onClick={onCollapse}
+            aria-label="Collapse dispatch inbox"
+            title="Collapse inbox"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+        ) : null}
       </div>
 
-      <ul className={isFloat ? "dispatch-console__dock-body" : "dispatch-mission__panel-body dispatch-mission__inbox-list"}>
+      <ul className={isDock ? "dispatch-console__rail-body" : "dispatch-mission__panel-body dispatch-mission__inbox-list"}>
         {sorted.length === 0 ? (
-          <li className={isFloat ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
+          <li className={isDock ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
             <p className="font-medium">Inbox clear</p>
             <p className="mt-1 text-xs">All jobs assigned</p>
           </li>
@@ -100,7 +115,7 @@ export function FleetJobQueue({
             const jobType = extractJobType(job.title);
             const risk = operationalRiskMessage(job);
 
-            if (isFloat) {
+            if (isDock) {
               return (
                 <motion.li
                   key={job.id}

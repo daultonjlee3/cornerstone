@@ -22,6 +22,25 @@
     linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.25) 100%);
 }
 
+/* Console backdrop — readable geography under floating panels */
+.opmap-shell--console {
+  background: #0c1218;
+}
+
+.opmap-shell--console .opmap-leaflet.leaflet-container {
+  background: #0c1218;
+}
+
+.opmap-shell--console .opmap-leaflet .leaflet-tile-pane {
+  filter: brightness(0.95) contrast(1.08) saturate(0.55);
+}
+
+.opmap-vignette--light {
+  background:
+    radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, 0.18) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, transparent 14%, transparent 86%, rgba(0, 0, 0, 0.1) 100%);
+}
+
 .opmap-marker-shell {
   background: transparent !important;
   border: none !important;

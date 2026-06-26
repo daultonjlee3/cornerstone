@@ -18,8 +18,9 @@ type FleetDispatchMapPanelProps = {
   activeRecommendation: FleetRecommendationInstance | null;
   onSelectJob: (id: string | null) => void;
   onSelectTruck: (id: string | null) => void;
+  consoleMode?: boolean;
 };
 
-export function FleetDispatchMapPanel(props: FleetDispatchMapPanelProps) {
-  return <FleetOperationalMap {...props} />;
+export function FleetDispatchMapPanel({ consoleMode = true, ...props }: FleetDispatchMapPanelProps) {
+  return <FleetOperationalMap {...props} consoleMode={consoleMode} />;
 }

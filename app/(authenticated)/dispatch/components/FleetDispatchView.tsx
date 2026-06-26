@@ -13,6 +13,7 @@ import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { FleetDispatchRecommendationsPanel } from "./FleetDispatchRecommendationsPanel";
 import { FleetDispatchMissionBriefing } from "./FleetDispatchMissionBriefing";
 import { FleetDispatchTimeline } from "./FleetDispatchTimeline";
+import { CockpitCollapsedRail } from "./CockpitCollapsedRail";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { scrollToSection } from "./fleet-dispatch-utils";
 import { Skeleton } from "@/src/components/design-system";
@@ -50,6 +51,8 @@ export function FleetDispatchView({
   const [activeRecommendation, setActiveRecommendation] = useState<FleetRecommendationInstance | null>(null);
   const [recError, setRecError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inboxOpen, setInboxOpen] = useState(true);
+  const [recommendOpen, setRecommendOpen] = useState(true);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -186,53 +189,83 @@ export function FleetDispatchView({
         onRefresh={() => void refreshBoard()}
       />
 
-      <div className="dispatch-console__stage">
-        <div
-          id="fleet-dispatch-map"
-          className={`dispatch-console__map ${activeRecommendation ? "dispatch-console__map--active" : ""}`}
-        >
-          <FleetDispatchMapPanel
-            jobs={board.jobs}
-            truckLanes={board.truckLanes}
-            branchCapacity={board.branchCapacity}
-            recommendations={recommendations}
-            selectedJobId={selectedJobId}
-            highlightedTruckId={highlightedTruckId}
-            activeRecommendation={activeRecommendation}
-            onSelectJob={setSelectedJobId}
-            onSelectTruck={setHighlightedTruckId}
-          />
+      <div
+        className="dispatch-console__cockpit"
+        data-inbox-open={inboxOpen}
+        data-recommend-open={recommendOpen}
+      >
+        <div className="dispatch-console__rail-slot dispatch-console__rail-slot--left">
+          {inboxOpen ? (
+            <FleetJobQueue
+              layout="cockpit"
+              jobs={board.unassignedJobs}
+              board={board}
+              selectedJobId={selectedJobId}
+              onSelectJob={setSelectedJobId}
+              onAssignToTruck={handleAssign}
+              truckLanes={board.truckLanes}
+              recommendations={recommendations}
+              pending={pending}
+              onCollapse={() => setInboxOpen(false)}
+            />
+          ) : (
+            <CockpitCollapsedRail
+              side="left"
+              label="Inbox"
+              count={board.unassignedJobs.length}
+              onExpand={() => setInboxOpen(true)}
+            />
+          )}
         </div>
 
-        <FleetJobQueue
-          layout="float"
-          jobs={board.unassignedJobs}
-          board={board}
-          selectedJobId={selectedJobId}
-          onSelectJob={setSelectedJobId}
-          onAssignToTruck={handleAssign}
-          truckLanes={board.truckLanes}
-          recommendations={recommendations}
-          pending={pending}
-        />
+        <main className="dispatch-console__major">
+          <div
+            id="fleet-dispatch-map"
+            className={`dispatch-console__map-cell ${activeRecommendation ? "dispatch-console__map-cell--active" : ""}`}
+          >
+            <FleetDispatchMapPanel
+              jobs={board.jobs}
+              truckLanes={board.truckLanes}
+              branchCapacity={board.branchCapacity}
+              recommendations={recommendations}
+              selectedJobId={selectedJobId}
+              highlightedTruckId={highlightedTruckId}
+              activeRecommendation={activeRecommendation}
+              onSelectJob={setSelectedJobId}
+              onSelectTruck={setHighlightedTruckId}
+            />
+          </div>
+          <FleetDispatchTimeline board={board} recommendations={recommendations} />
+        </main>
 
-        <FleetDispatchRecommendationsPanel
-          layout="float"
-          recommendations={recommendations}
-          board={board}
-          activeRecommendationId={activeRecommendation?.id ?? null}
-          pending={pending}
-          error={recError}
-          onRefresh={() => void loadRecommendations(true)}
-          onAccept={(id) => onRecommendationAction(id, "accept")}
-          onDismiss={(id) => onRecommendationAction(id, "dismiss")}
-          onHighlight={handleHighlightRecommendation}
-          onViewMap={handleViewMap}
-          onHighlightTruck={setHighlightedTruckId}
-          onHighlightJob={setSelectedJobId}
-        />
-
-        <FleetDispatchTimeline board={board} recommendations={recommendations} />
+        <div className="dispatch-console__rail-slot dispatch-console__rail-slot--right">
+          {recommendOpen ? (
+            <FleetDispatchRecommendationsPanel
+              layout="cockpit"
+              recommendations={recommendations}
+              board={board}
+              activeRecommendationId={activeRecommendation?.id ?? null}
+              pending={pending}
+              error={recError}
+              onRefresh={() => void loadRecommendations(true)}
+              onAccept={(id) => onRecommendationAction(id, "accept")}
+              onDismiss={(id) => onRecommendationAction(id, "dismiss")}
+              onHighlight={handleHighlightRecommendation}
+              onViewMap={handleViewMap}
+              onHighlightTruck={setHighlightedTruckId}
+              onHighlightJob={setSelectedJobId}
+              onCollapse={() => setRecommendOpen(false)}
+            />
+          ) : (
+            <CockpitCollapsedRail
+              side="right"
+              label="AI"
+              count={recommendations.length}
+              accent
+              onExpand={() => setRecommendOpen(true)}
+            />
+          )}
+        </div>
       </div>
 
       {error ? <p className="dispatch-console__error">{error}</p> : null}

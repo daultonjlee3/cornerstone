@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Sparkles, Truck } from "lucide-react";
+import { ArrowRight, ChevronRight, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import type { FleetDispatchBoardData, FleetRecommendationInstance } from "@/src/types/fleet";
 import {
@@ -15,7 +15,7 @@ import {
 import { FleetDispatchRecommendationCard } from "./FleetDispatchRecommendationCard";
 
 type FleetDispatchRecommendationsPanelProps = {
-  layout?: "panel" | "float";
+  layout?: "panel" | "float" | "cockpit";
   recommendations: FleetRecommendationInstance[];
   board: FleetDispatchBoardData;
   activeRecommendationId: string | null;
@@ -28,6 +28,7 @@ type FleetDispatchRecommendationsPanelProps = {
   onViewMap: (rec: FleetRecommendationInstance) => void;
   onHighlightTruck: (truckId: string | null) => void;
   onHighlightJob: (jobId: string | null) => void;
+  onCollapse?: () => void;
 };
 
 export function FleetDispatchRecommendationsPanel({
@@ -44,24 +45,25 @@ export function FleetDispatchRecommendationsPanel({
   onViewMap,
   onHighlightTruck,
   onHighlightJob,
+  onCollapse,
 }: FleetDispatchRecommendationsPanelProps) {
-  const isFloat = layout === "float";
+  const isDock = layout === "float" || layout === "cockpit";
   const [heroRec, ...moreRecs] = recommendations;
   const topSnapshot = heroRec?.rationale.candidate_snapshots?.[0];
   const topCandidate = heroRec?.rationale.candidates?.[0];
   const isCapacityOnly = heroRec?.recommendation_type === "capacity_overload";
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const shellClass = isFloat
-    ? "dispatch-console__dock dispatch-console__dock--right"
+  const shellClass = isDock
+    ? "dispatch-console__rail-panel"
     : "dispatch-mission__panel dispatch-mission__panel--intel";
 
-  if (isFloat) {
+  if (isDock) {
     return (
       <section id="fleet-recommendations" className={shellClass}>
-        <div className="dispatch-console__dock-header">
-          <div className="flex items-start justify-between gap-2">
-            <div>
+        <div className="dispatch-console__rail-header">
+          <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+            <div className="min-w-0">
               <p className="dispatch-console__dock-eyebrow dispatch-console__dock-eyebrow--accent">
                 AI recommendation center
               </p>
@@ -70,13 +72,26 @@ export function FleetDispatchRecommendationsPanel({
               </p>
               <p className="dispatch-console__dock-meta">Why · confidence · assign</p>
             </div>
-            <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={onRefresh} disabled={pending}>
-              Refresh
-            </Button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={onRefresh} disabled={pending}>
+                Refresh
+              </Button>
+              {layout === "cockpit" && onCollapse ? (
+                <button
+                  type="button"
+                  className="dispatch-console__rail-collapse"
+                  onClick={onCollapse}
+                  aria-label="Collapse recommendations"
+                  title="Collapse recommendations"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        <div className="dispatch-console__dock-body">
+        <div className="dispatch-console__rail-body">
           {error ? <p className="mb-2 text-xs text-[var(--status-danger)]">{error}</p> : null}
 
           {!heroRec ? (
