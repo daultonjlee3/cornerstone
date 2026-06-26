@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ChevronRight, Sparkles, Truck } from "lucide-react";
+import { ArrowRight, ChevronRight, Clock, MapPin, Sparkles, TrendingUp, Truck } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import type { FleetDispatchBoardData, FleetRecommendationInstance } from "@/src/types/fleet";
 import {
@@ -53,6 +53,8 @@ export function FleetDispatchRecommendationsPanel({
   const topCandidate = heroRec?.rationale.candidates?.[0];
   const isCapacityOnly = heroRec?.recommendation_type === "capacity_overload";
   const [moreOpen, setMoreOpen] = useState(false);
+  const heroConfidence = heroRec ? recommendationConfidence(heroRec) : null;
+  const confidenceScore = topCandidate?.score ?? 0;
 
   const shellClass = isDock
     ? "dispatch-console__rail-panel"
@@ -101,26 +103,39 @@ export function FleetDispatchRecommendationsPanel({
             </div>
           ) : (
             <div
-              className="dispatch-console__rec-hero"
+              className={`dispatch-console__rec-hero ${activeRecommendationId === heroRec.id ? "dispatch-console__rec-hero--active" : ""}`}
               onMouseEnter={() => onHighlight(heroRec)}
               onMouseLeave={() => onHighlight(null)}
             >
-              <div className="flex items-start justify-between gap-2">
-                <Sparkles className="size-4 shrink-0 text-[var(--brand-operational)]" />
-                <span className={`dispatch-mission__confidence-pill ${confidenceTone(recommendationConfidence(heroRec))}`}>
-                  {confidenceLabel(recommendationConfidence(heroRec))}
+              <div className="dispatch-console__rec-hero-header">
+                <div className="dispatch-console__rec-hero-badge">
+                  <Sparkles className="size-3.5" aria-hidden />
+                  <span>Top decision</span>
+                </div>
+                <span className={`dispatch-mission__confidence-pill ${heroConfidence ? confidenceTone(heroConfidence) : ""}`}>
+                  {heroConfidence ? confidenceLabel(heroConfidence) : "—"}
                 </span>
               </div>
-              <p className="dispatch-console__rec-hero-title mt-2">{heroRec.rationale.title}</p>
-              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+
+              {heroConfidence ? (
+                <div className="dispatch-console__rec-confidence" aria-hidden>
+                  <div
+                    className="dispatch-console__rec-confidence-fill"
+                    style={{ width: `${Math.min(100, Math.max(12, confidenceScore))}%` }}
+                  />
+                </div>
+              ) : null}
+
+              <p className="dispatch-console__rec-hero-title">{heroRec.rationale.title}</p>
+              <p className="dispatch-console__rec-hero-type">
                 {formatRecommendationType(heroRec.recommendation_type)}
               </p>
 
               {topCandidate ? (
-                <div className="mt-3 flex items-center gap-2 text-sm">
-                  <Truck className="size-4 text-[var(--brand-operational)]" />
-                  <span className="font-bold">{topCandidate.unit_number}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">score {topCandidate.score.toFixed(0)}</span>
+                <div className="dispatch-console__rec-truck-row">
+                  <Truck className="size-4" aria-hidden />
+                  <span className="dispatch-console__rec-truck-unit">{topCandidate.unit_number}</span>
+                  <span className="dispatch-console__rec-truck-score">Score {topCandidate.score.toFixed(0)}</span>
                 </div>
               ) : null}
 
@@ -131,25 +146,54 @@ export function FleetDispatchRecommendationsPanel({
                     currency: "USD",
                     maximumFractionDigits: 0,
                   })}
-                </p>
-              ) : null}
-
-              {heroRec.rationale.reasons[0] ? (
-                <p className="mt-2 text-[11px] leading-snug text-[var(--text-muted-strong)]">
-                  {heroRec.rationale.reasons[0]}
+                  <span className="dispatch-console__rec-hero-impact-label">expected contribution</span>
                 </p>
               ) : null}
 
               {topSnapshot ? (
-                <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-[var(--text-muted)]">
+                <div className="dispatch-console__rec-metrics">
+                  {topSnapshot.revenue_impact > 0 ? (
+                    <div className="dispatch-console__rec-metric">
+                      <TrendingUp className="size-3 opacity-50" aria-hidden />
+                      <span className="dispatch-console__rec-metric-label">Revenue</span>
+                      <span className="dispatch-console__rec-metric-value">
+                        {topSnapshot.revenue_impact.toLocaleString(undefined, {
+                          style: "currency",
+                          currency: "USD",
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
+                    </div>
+                  ) : null}
                   {topSnapshot.deadhead_miles != null ? (
-                    <span>{topSnapshot.deadhead_miles.toFixed(1)} mi deadhead</span>
+                    <div className="dispatch-console__rec-metric">
+                      <MapPin className="size-3 opacity-50" aria-hidden />
+                      <span className="dispatch-console__rec-metric-label">Deadhead</span>
+                      <span className="dispatch-console__rec-metric-value">
+                        {topSnapshot.deadhead_miles.toFixed(1)} mi
+                      </span>
+                    </div>
                   ) : null}
                   {topSnapshot.travel_minutes != null ? (
-                    <span>{Math.round(topSnapshot.travel_minutes)} min travel</span>
+                    <div className="dispatch-console__rec-metric">
+                      <Clock className="size-3 opacity-50" aria-hidden />
+                      <span className="dispatch-console__rec-metric-label">Travel</span>
+                      <span className="dispatch-console__rec-metric-value">
+                        {Math.round(topSnapshot.travel_minutes)} min
+                      </span>
+                    </div>
                   ) : null}
-                  <span>{Math.round(topSnapshot.projected_utilization_pct)}% util</span>
+                  <div className="dispatch-console__rec-metric">
+                    <span className="dispatch-console__rec-metric-label">Utilization</span>
+                    <span className="dispatch-console__rec-metric-value">
+                      {Math.round(topSnapshot.projected_utilization_pct)}%
+                    </span>
+                  </div>
                 </div>
+              ) : null}
+
+              {heroRec.rationale.reasons[0] ? (
+                <p className="dispatch-console__rec-reasoning">{heroRec.rationale.reasons[0]}</p>
               ) : null}
 
               <Button
@@ -162,12 +206,12 @@ export function FleetDispatchRecommendationsPanel({
                 {!isCapacityOnly ? <ArrowRight className="ml-2 size-4" /> : null}
               </Button>
 
-              <div className="mt-2 flex gap-1">
+              <div className="dispatch-console__rec-hero-actions">
                 <Button type="button" size="sm" variant="ghost" className="h-7 text-[10px]" disabled={pending} onClick={() => onDismiss(heroRec.id)}>
                   Dismiss
                 </Button>
                 <Button type="button" size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => onViewMap(heroRec)}>
-                  Map
+                  View on map
                 </Button>
               </div>
             </div>

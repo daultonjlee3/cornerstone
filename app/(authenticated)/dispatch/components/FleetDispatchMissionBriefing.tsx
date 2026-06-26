@@ -92,7 +92,7 @@ export function FleetDispatchMissionBriefing({
       </div>
 
       <div className="dispatch-console__mission-stats" data-testid="fleet-dispatch-kpi-strip">
-        <div className="dispatch-console__stat">
+        <div className="dispatch-console__stat dispatch-console__stat--p1">
           <p className="dispatch-console__stat-label">Revenue at risk</p>
           {revenueAtRisk > 0 ? (
             <AnimatedMetric
@@ -108,7 +108,7 @@ export function FleetDispatchMissionBriefing({
           </p>
         </div>
 
-        <div className="dispatch-console__stat">
+        <div className="dispatch-console__stat dispatch-console__stat--p2">
           <p className="dispatch-console__stat-label">Jobs waiting</p>
           <p
             className={`dispatch-console__stat-value ${jobsWaiting > 0 ? "dispatch-console__stat-value--warn" : ""}`}
@@ -118,13 +118,13 @@ export function FleetDispatchMissionBriefing({
           <p className="dispatch-console__stat-hint">Dispatch inbox</p>
         </div>
 
-        <div className="dispatch-console__stat">
+        <div className="dispatch-console__stat dispatch-console__stat--p2">
           <p className="dispatch-console__stat-label">Available trucks</p>
           <p className="dispatch-console__stat-value dispatch-console__stat-value--teal">{availableTrucks}</p>
           <p className="dispatch-console__stat-hint">Ready now</p>
         </div>
 
-        <div className="dispatch-console__stat">
+        <div className="dispatch-console__stat dispatch-console__stat--p1">
           <p className="dispatch-console__stat-label">AI recommendations</p>
           <p
             className={`dispatch-console__stat-value ${recommendationCount > 0 ? "dispatch-console__stat-value--teal" : ""}`}
@@ -136,7 +136,7 @@ export function FleetDispatchMissionBriefing({
           </p>
         </div>
 
-        <div className="dispatch-console__stat">
+        <div className="dispatch-console__stat dispatch-console__stat--p3">
           <p className="dispatch-console__stat-label">AI confidence</p>
           <p className="dispatch-console__stat-value">
             {aiConfidence ? confidenceLabel(aiConfidence) : "—"}
@@ -144,7 +144,7 @@ export function FleetDispatchMissionBriefing({
           <p className="dispatch-console__stat-hint">Top recommendation</p>
         </div>
 
-        <div className="dispatch-console__stat">
+        <div className="dispatch-console__stat dispatch-console__stat--p3">
           <p className="dispatch-console__stat-label">Critical alerts</p>
           <p
             className={`dispatch-console__stat-value ${criticalCount > 0 ? "dispatch-console__stat-value--danger" : ""}`}

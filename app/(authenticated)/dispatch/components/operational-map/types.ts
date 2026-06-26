@@ -24,9 +24,12 @@ export const DEFAULT_OPERATIONAL_LAYERS: OperationalMapLayers = {
 
 export type TruckVisualState =
   | "available"
+  | "driving"
+  | "working"
   | "busy"
   | "offline"
   | "critical"
+  | "highRevenue"
   | "recommended"
   | "selected";
 

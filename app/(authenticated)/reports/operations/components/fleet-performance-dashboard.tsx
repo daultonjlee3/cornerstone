@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   BarChart3,
@@ -205,13 +207,11 @@ export function FleetPerformanceDashboard({
             <DataTable>
               <Table>
                 <TableHead>
-                  <tr>
-                    <Th>Branch</Th>
-                    <Th>Revenue</Th>
-                    <Th>Contribution</Th>
-                    <Th>Margin</Th>
-                    <Th>Util</Th>
-                  </tr>
+                  <Th>Branch</Th>
+                  <Th>Revenue</Th>
+                  <Th>Contribution</Th>
+                  <Th>Margin</Th>
+                  <Th>Util</Th>
                 </TableHead>
                 <TBody>
                   {data.branches.length === 0 ? (
@@ -257,12 +257,10 @@ export function FleetPerformanceDashboard({
             <DataTable>
               <Table>
                 <TableHead>
-                  <tr>
-                    <Th>Truck</Th>
-                    <Th>Branch</Th>
-                    <Th>Contribution</Th>
-                    <Th>$/hr</Th>
-                  </tr>
+                  <Th>Truck</Th>
+                  <Th>Branch</Th>
+                  <Th>Contribution</Th>
+                  <Th>$/hr</Th>
                 </TableHead>
                 <TBody>
                   {rankings.topTrucks.length === 0 ? (
@@ -308,12 +306,10 @@ export function FleetPerformanceDashboard({
             <DataTable>
               <Table>
                 <TableHead>
-                  <tr>
-                    <Th>Operator</Th>
-                    <Th>Revenue</Th>
-                    <Th>Contribution</Th>
-                    <Th>OT hrs</Th>
-                  </tr>
+                  <Th>Operator</Th>
+                  <Th>Revenue</Th>
+                  <Th>Contribution</Th>
+                  <Th>OT hrs</Th>
                 </TableHead>
                 <TBody>
                   {rankings.topOperators.length === 0 ? (
@@ -393,16 +389,14 @@ export function FleetPerformanceDashboard({
           <DataTable>
             <Table>
               <TableHead>
-                <tr>
-                  <Th>Date</Th>
-                  <Th>Truck</Th>
-                  <Th>Branch</Th>
-                  <Th>Revenue</Th>
-                  <Th>Contribution</Th>
-                  <Th>Margin</Th>
-                  <Th>Deadhead</Th>
-                  <Th>Idle</Th>
-                </tr>
+                <Th>Date</Th>
+                <Th>Truck</Th>
+                <Th>Branch</Th>
+                <Th>Revenue</Th>
+                <Th>Contribution</Th>
+                <Th>Margin</Th>
+                <Th>Deadhead</Th>
+                <Th>Idle</Th>
               </TableHead>
               <TBody>
                 {data.utilizationRows.slice(0, 50).map((row) => (

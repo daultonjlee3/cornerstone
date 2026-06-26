@@ -5,16 +5,21 @@ import type { JobVisualState, TruckVisualState } from "./types";
 export function truckVisualState(
   lane: FleetDispatchTruckLane,
   highlightedTruckId: string | null,
-  recTopTruckId: string | undefined
+  recTopTruckId: string | undefined,
+  highRevenueThreshold = Infinity
 ): TruckVisualState {
   if (highlightedTruckId === lane.truck_id) return "selected";
   if (recTopTruckId === lane.truck_id) return "recommended";
   if (lane.telematics_status === "offline") return "offline";
   if (lane.status === "maintenance" || lane.maintenance_note) return "critical";
   const inProgress = lane.jobs.some((j) => j.status === "in_progress");
-  if (inProgress || lane.utilization >= 0.75 || lane.jobs.length > 0) return "busy";
-  if (lane.status === "active" && lane.jobs.length === 0) return "available";
-  return "busy";
+  if (inProgress) return "working";
+  if (lane.jobs.length > 0 || lane.utilization >= 0.75) return "driving";
+  if (lane.status === "active" && lane.jobs.length === 0) {
+    if ((lane.revenue_today ?? 0) >= highRevenueThreshold) return "highRevenue";
+    return "available";
+  }
+  return "driving";
 }
 
 export function jobVisualState(

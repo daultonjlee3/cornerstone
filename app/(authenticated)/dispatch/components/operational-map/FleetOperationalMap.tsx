@@ -1,28 +1,35 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
-import "leaflet.markercluster/dist/MarkerCluster.css";
 import "./operational-map.css";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
-import L, { latLngBounds } from "leaflet";
 import type {
   FleetDispatchBoardData,
   FleetDispatchJob,
   FleetDispatchTruckLane,
   FleetRecommendationInstance,
 } from "@/src/types/fleet";
+import {
+  BranchZonesLayer,
+  boundsFromPoints,
+  ClusteredHtmlMarkers,
+  FleetMap,
+  FLEET_MAP_FIT_PADDING,
+  FLEET_MAP_MAX_FIT_ZOOM,
+  jobMarkerHtml,
+  RoutesLayer,
+  truckMarkerHtml,
+  type FleetMapHandle,
+  type FleetMapRouteFeature,
+} from "@/src/components/fleet-map";
 import { hasCoordinate } from "../../dispatch-map-utils";
 import { formatCurrency, operationalRiskMessage, recommendationConfidence } from "../fleet-dispatch-utils";
 import { confidenceLabel } from "../../../operations/components/fleet-recommendation-utils";
 import { computeBranchZones } from "./branch-zones";
-import { MarkerClusterGroup } from "./MarkerClusterGroup";
-import { createClusterMarkerIcon, createJobMarkerIcon, createTruckMarkerIcon } from "./marker-icons";
 import { jobVisualState, truckVisualState } from "./marker-status";
 import { OperationalMapControls } from "./OperationalMapControls";
 import { TruckIntelPanel } from "./TruckIntelPanel";
-import { DEFAULT_OPERATIONAL_LAYERS, type OperationalMapLayers } from "./types";
+import { DEFAULT_OPERATIONAL_LAYERS, type JobVisualState, type OperationalMapLayers, type TruckVisualState } from "./types";
 
 type FleetOperationalMapProps = {
   jobs: FleetDispatchJob[];
@@ -34,71 +41,38 @@ type FleetOperationalMapProps = {
   activeRecommendation: FleetRecommendationInstance | null;
   onSelectJob: (id: string | null) => void;
   onSelectTruck: (id: string | null) => void;
-  /** Brighter basemap + lighter vignette when map is the console backdrop */
   consoleMode?: boolean;
 };
 
-type RouteLine = {
-  key: string;
-  positions: [number, number][];
-  dashed?: boolean;
-  primary?: boolean;
-  label: string;
+type TruckMarkerProps = {
+  state: TruckVisualState;
+  unitNumber: string;
 };
 
-function laneById(lanes: FleetDispatchTruckLane[], id: string | undefined): FleetDispatchTruckLane | undefined {
-  if (!id) return undefined;
-  return lanes.find((l) => l.truck_id === id);
-}
+type JobMarkerProps = {
+  state: JobVisualState;
+  priority: string;
+};
 
-function MapViewportController({
-  bounds,
-  resetToken,
-  onMapReady,
-  consoleMode,
-}: {
-  bounds: ReturnType<typeof latLngBounds> | null;
-  resetToken: number;
-  onMapReady: (map: L.Map) => void;
-  consoleMode?: boolean;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    onMapReady(map);
-  }, [map, onMapReady]);
-
-  useEffect(() => {
-    if (bounds && bounds.isValid()) {
-      map.fitBounds(bounds, {
-        padding: [40, 48],
-        maxZoom: 12,
-      });
-    }
-  }, [bounds, consoleMode, map, resetToken]);
-
-  return null;
-}
-
-function useFleetBounds(jobs: FleetDispatchJob[], truckLanes: FleetDispatchTruckLane[]) {
+function useFleetViewport(jobs: FleetDispatchJob[], truckLanes: FleetDispatchTruckLane[]) {
   return useMemo(() => {
-    const points: Array<[number, number]> = [];
+    const points: Array<{ latitude: number; longitude: number }> = [];
     for (const lane of truckLanes) {
       if (hasCoordinate(lane.latitude, lane.longitude)) {
-        points.push([lane.latitude as number, lane.longitude as number]);
+        points.push({ latitude: lane.latitude as number, longitude: lane.longitude as number });
       }
     }
     for (const job of jobs) {
       if (hasCoordinate(job.site_latitude, job.site_longitude)) {
-        points.push([job.site_latitude as number, job.site_longitude as number]);
+        points.push({ latitude: job.site_latitude as number, longitude: job.site_longitude as number });
       }
     }
-    if (points.length === 0) {
-      return { center: [33.95, -84.55] as [number, number], bounds: null };
+    const bounds = boundsFromPoints(points);
+    if (!bounds) {
+      return { center: [-84.55, 33.95] as [number, number], bounds: null };
     }
-    const b = latLngBounds(points);
-    const c = b.getCenter();
-    return { center: [c.lat, c.lng] as [number, number], bounds: b };
+    const center: [number, number] = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+    return { center, bounds };
   }, [jobs, truckLanes]);
 }
 
@@ -117,10 +91,7 @@ export function FleetOperationalMap({
   const [layers, setLayers] = useState<OperationalMapLayers>(DEFAULT_OPERATIONAL_LAYERS);
   const [legendOpen, setLegendOpen] = useState(true);
   const [resetToken, setResetToken] = useState(0);
-  const mapRef = useRef<L.Map | null>(null);
-  const handleMapReady = useCallback((map: L.Map) => {
-    mapRef.current = map;
-  }, []);
+  const mapRef = useRef<FleetMapHandle | null>(null);
 
   const recJobId = activeRecommendation?.rationale.entities.job_id;
   const recTopTruckId = activeRecommendation?.rationale.candidates?.[0]?.truck_id;
@@ -131,7 +102,7 @@ export function FleetOperationalMap({
   );
   const topSnapshot = activeRecommendation?.rationale.candidate_snapshots?.[0];
 
-  const { center, bounds } = useFleetBounds(jobs, truckLanes);
+  const { center, bounds } = useFleetViewport(jobs, truckLanes);
   const branchZones = useMemo(
     () => (layers.branches || layers.capacity ? computeBranchZones(truckLanes, branchCapacity) : []),
     [branchCapacity, layers.branches, layers.capacity, truckLanes]
@@ -142,18 +113,18 @@ export function FleetOperationalMap({
     [highlightedTruckId, truckLanes]
   );
 
-  const routeLines = useMemo(() => {
-    if (!layers.routes) return [] as RouteLine[];
-    const lines: RouteLine[] = [];
+  const routeLines = useMemo((): FleetMapRouteFeature[] => {
+    if (!layers.routes) return [];
+
+    const lines: FleetMapRouteFeature[] = [];
 
     const addRoute = (
       truckId: string | undefined,
       jobId: string | undefined,
-      key: string,
-      label: string,
+      id: string,
       opts?: { dashed?: boolean; primary?: boolean }
     ) => {
-      const truck = laneById(truckLanes, truckId);
+      const truck = truckId ? truckLanes.find((l) => l.truck_id === truckId) : undefined;
       const job = jobs.find((j) => j.id === jobId);
       if (
         !truck ||
@@ -164,28 +135,27 @@ export function FleetOperationalMap({
         return;
       }
       lines.push({
-        key,
-        label,
-        dashed: opts?.dashed,
+        id,
         primary: opts?.primary,
-        positions: [
-          [truck.latitude as number, truck.longitude as number],
-          [job.site_latitude as number, job.site_longitude as number],
+        dashed: opts?.dashed,
+        coordinates: [
+          [truck.longitude as number, truck.latitude as number],
+          [job.site_longitude as number, job.site_latitude as number],
         ],
       });
     };
 
     if (layers.recommendations && activeRecommendation) {
-      addRoute(recTopTruckId, recJobId, "rec-primary", "Recommended route", { primary: true });
+      addRoute(recTopTruckId, recJobId, "rec-primary", { primary: true });
       for (const altId of recAltTruckIds) {
-        addRoute(altId, recJobId, `rec-alt-${altId}`, "Alternative route", { dashed: true });
+        addRoute(altId, recJobId, `rec-alt-${altId}`, { dashed: true });
       }
     } else if (selectedJobId && highlightedTruckId) {
-      addRoute(highlightedTruckId, selectedJobId, "selection", "Selected assignment", { primary: true });
+      addRoute(highlightedTruckId, selectedJobId, "selection", { primary: true });
     }
 
     if (layers.deadhead && activeRecommendation && recTopTruckId && recJobId) {
-      addRoute(recTopTruckId, recJobId, "deadhead", "Deadhead reduction path", { dashed: true, primary: true });
+      addRoute(recTopTruckId, recJobId, "deadhead", { dashed: true, primary: true });
     }
 
     return lines;
@@ -213,6 +183,13 @@ export function FleetOperationalMap({
     });
   }, [layers.gpsHealth, layers.trucks, truckLanes]);
 
+  const highRevenueThreshold = useMemo(() => {
+    const revenues = truckLanes.map((lane) => lane.revenue_today ?? 0).filter((r) => r > 0);
+    if (revenues.length < 3) return Infinity;
+    const sorted = [...revenues].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length * 0.75)] ?? Infinity;
+  }, [truckLanes]);
+
   const visibleJobs = useMemo(() => {
     if (!layers.jobs && !layers.revenueAtRisk) return [];
     return jobs.filter((job) => {
@@ -224,6 +201,66 @@ export function FleetOperationalMap({
     });
   }, [jobs, layers.jobs, layers.revenueAtRisk]);
 
+  const truckClusterPoints = useMemo(
+    () =>
+      visibleTrucks.map((lane) => {
+        const state = truckVisualState(lane, highlightedTruckId, recTopTruckId, highRevenueThreshold);
+        const dimmed =
+          layers.recommendations &&
+          activeRecommendation &&
+          recTopTruckId &&
+          lane.truck_id !== recTopTruckId &&
+          !recAltTruckIds.includes(lane.truck_id);
+        return {
+          id: lane.truck_id,
+          longitude: lane.longitude as number,
+          latitude: lane.latitude as number,
+          properties: {
+            state,
+            unitNumber: lane.unit_number,
+            dimmed: dimmed ? 1 : 0,
+          } satisfies TruckMarkerProps & { dimmed: number },
+        };
+      }),
+    [
+      activeRecommendation,
+      highlightedTruckId,
+      layers.recommendations,
+      recAltTruckIds,
+      recTopTruckId,
+      visibleTrucks,
+      highRevenueThreshold,
+    ]
+  );
+
+  const jobClusterPoints = useMemo(
+    () =>
+      visibleJobs.map((job) => ({
+        id: job.id,
+        longitude: job.site_longitude as number,
+        latitude: job.site_latitude as number,
+        properties: {
+          state: jobVisualState(job, selectedJobId, recJobId),
+          priority: job.priority,
+        } satisfies JobMarkerProps,
+      })),
+    [recJobId, selectedJobId, visibleJobs]
+  );
+
+  const branchZoneFeatures = useMemo(
+    () =>
+      branchZones.map((zone) => ({
+        id: zone.branch_id,
+        name: zone.branch_name,
+        latitude: zone.latitude,
+        longitude: zone.longitude,
+        radiusMeters: zone.radiusMeters,
+        utilization: zone.utilization,
+        truckCount: zone.truckCount,
+      })),
+    [branchZones]
+  );
+
   const activeJob = recJobId ? jobs.find((j) => j.id === recJobId) : jobs.find((j) => j.id === selectedJobId);
   const activeRisk = activeJob ? operationalRiskMessage(activeJob) : null;
   const hasMapPoints =
@@ -234,132 +271,106 @@ export function FleetOperationalMap({
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  const fitFleetBounds = useCallback(() => {
+    if (!bounds) return;
+    mapRef.current?.fitBounds(
+      [
+        [bounds[0], bounds[1]],
+        [bounds[2], bounds[3]],
+      ],
+      { padding: FLEET_MAP_FIT_PADDING, maxZoom: FLEET_MAP_MAX_FIT_ZOOM, duration: 600 }
+    );
+  }, [bounds]);
+
   const handleZoomIn = useCallback(() => mapRef.current?.zoomIn(), []);
   const handleZoomOut = useCallback(() => mapRef.current?.zoomOut(), []);
-  const handleCenterFleet = useCallback(() => {
-    if (bounds?.isValid()) {
-      mapRef.current?.fitBounds(bounds, { padding: [32, 32], maxZoom: 12 });
-    }
-  }, [bounds]);
+  const handleCenterFleet = useCallback(() => fitFleetBounds(), [fitFleetBounds]);
   const handleResetView = useCallback(() => setResetToken((t) => t + 1), []);
+
+  const handleClusterZoom = useCallback((longitude: number, latitude: number) => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    mapRef.current?.flyTo({
+      center: [longitude, latitude],
+      zoom: Math.min(map.getZoom() + 2, FLEET_MAP_MAX_FIT_ZOOM),
+      duration: 500,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!bounds) return;
+    fitFleetBounds();
+  }, [bounds, consoleMode, fitFleetBounds, resetToken]);
+
+  const selectionKey = `${highlightedTruckId ?? ""}:${selectedJobId ?? ""}:${recJobId ?? ""}`;
+  const prevSelectionKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!selectionKey || selectionKey === ":") return;
+    if (prevSelectionKey.current === selectionKey) return;
+    prevSelectionKey.current = selectionKey;
+
+    const truck = highlightedTruckId
+      ? truckLanes.find((lane) => lane.truck_id === highlightedTruckId)
+      : null;
+    const jobId = selectedJobId ?? recJobId;
+    const job = jobId ? jobs.find((item) => item.id === jobId) : null;
+
+    const latitude = truck?.latitude ?? job?.site_latitude;
+    const longitude = truck?.longitude ?? job?.site_longitude;
+    if (!hasCoordinate(latitude, longitude)) return;
+
+    const map = mapRef.current?.getMap();
+    mapRef.current?.flyTo({
+      center: [longitude as number, latitude as number],
+      zoom: Math.min(FLEET_MAP_MAX_FIT_ZOOM, Math.max((map?.getZoom() ?? 10) + 0.5, 12)),
+      duration: 720,
+      essential: true,
+    });
+  }, [highlightedTruckId, jobs, recJobId, selectedJobId, selectionKey, truckLanes]);
 
   const recConfidence = activeRecommendation ? recommendationConfidence(activeRecommendation) : null;
 
+  const renderTruckHtml = useCallback((props: TruckMarkerProps) => {
+    return truckMarkerHtml(props.state, props.unitNumber);
+  }, []);
+
+  const renderJobHtml = useCallback((props: JobMarkerProps) => {
+    return jobMarkerHtml(props.state, props.priority);
+  }, []);
+
   return (
     <div className={`opmap-shell relative h-full w-full ${consoleMode ? "opmap-shell--console" : ""}`}>
-      <MapContainer
-        center={center}
-        zoom={bounds ? 10 : 8}
-        className="opmap-leaflet h-full w-full"
-        bounds={bounds ?? undefined}
-        boundsOptions={{ padding: [32, 32] }}
-        zoomControl={false}
-        attributionControl={false}
-      >
-        <MapViewportController
-          bounds={bounds}
-          resetToken={resetToken}
-          onMapReady={handleMapReady}
-          consoleMode={consoleMode}
+      <FleetMap ref={mapRef} className="opmap-mapbox h-full w-full" initialCenter={center} initialZoom={bounds ? 10 : 8}>
+        <BranchZonesLayer
+          zones={branchZoneFeatures}
+          showCapacity={layers.capacity}
+          visible={layers.branches || layers.capacity}
         />
-
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-          className="opmap-tile-terrain"
-        />
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-          className="opmap-tile-labels"
-        />
-
-        {(layers.branches || layers.capacity) &&
-          branchZones.map((zone) => (
-            <Circle
-              key={`branch-${zone.branch_id}`}
-              center={[zone.latitude, zone.longitude]}
-              radius={zone.radiusMeters}
-              pathOptions={{
-                className: `opmap-branch-zone ${zone.utilization >= 0.85 ? "opmap-branch-zone--hot" : ""}`,
-                color: "rgba(45, 212, 191, 0.28)",
-                fillColor: "rgba(45, 212, 191, 0.05)",
-                weight: 1,
-                fillOpacity: layers.capacity ? 0.35 : 0.2,
-              }}
-            />
-          ))}
-
-        {routeLines.map((line) => (
-          <Polyline
-            key={line.key}
-            positions={line.positions}
-            pathOptions={{
-              className: line.primary
-                ? "opmap-route opmap-route--primary"
-                : line.dashed
-                  ? "opmap-route opmap-route--alt"
-                  : "opmap-route",
-              color: line.primary ? "#2dd4bf" : "#64748b",
-              weight: line.primary ? 4 : 3,
-              opacity: line.primary ? 0.9 : 0.55,
-              dashArray: line.dashed ? "6 10" : undefined,
-            }}
-          />
-        ))}
+        <RoutesLayer routes={routeLines} visible={layers.routes} />
 
         {layers.trucks || layers.gpsHealth ? (
-          <MarkerClusterGroup
-            iconCreateFunction={(cluster) => {
-              const count = cluster.getChildCount();
-              return createClusterMarkerIcon(count, "truck");
-            }}
-          >
-            {visibleTrucks.map((lane) => {
-              const state = truckVisualState(lane, highlightedTruckId, recTopTruckId);
-              const dimmed =
-                layers.recommendations &&
-                activeRecommendation &&
-                recTopTruckId &&
-                lane.truck_id !== recTopTruckId &&
-                !recAltTruckIds.includes(lane.truck_id);
-              return (
-                <Marker
-                  key={`truck-${lane.truck_id}`}
-                  position={[lane.latitude as number, lane.longitude as number]}
-                  icon={createTruckMarkerIcon(state, lane.unit_number)}
-                  opacity={dimmed ? 0.45 : 1}
-                  eventHandlers={{
-                    click: () => onSelectTruck(highlightedTruckId === lane.truck_id ? null : lane.truck_id),
-                  }}
-                />
-              );
-            })}
-          </MarkerClusterGroup>
+          <ClusteredHtmlMarkers<TruckMarkerProps & { dimmed: number }>
+            points={truckClusterPoints}
+            kind="truck"
+            renderPointHtml={renderTruckHtml}
+            onPointClick={(id) => onSelectTruck(highlightedTruckId === id ? null : id)}
+            onClusterClick={handleClusterZoom}
+            getOpacity={(props) => (props.dimmed ? 0.45 : 1)}
+          />
         ) : null}
 
-        {(layers.jobs || layers.revenueAtRisk) && visibleJobs.length > 0 ? (
-          <MarkerClusterGroup
-            maxClusterRadius={48}
-            iconCreateFunction={(cluster) => {
-              const count = cluster.getChildCount();
-              return createClusterMarkerIcon(count, "job");
-            }}
-          >
-            {visibleJobs.map((job) => {
-              const state = jobVisualState(job, selectedJobId, recJobId);
-              return (
-                <Marker
-                  key={`job-${job.id}`}
-                  position={[job.site_latitude as number, job.site_longitude as number]}
-                  icon={createJobMarkerIcon(state, job.priority)}
-                  eventHandlers={{
-                    click: () => onSelectJob(selectedJobId === job.id ? null : job.id),
-                  }}
-                />
-              );
-            })}
-          </MarkerClusterGroup>
+        {(layers.jobs || layers.revenueAtRisk) && jobClusterPoints.length > 0 ? (
+          <ClusteredHtmlMarkers<JobMarkerProps>
+            points={jobClusterPoints}
+            kind="job"
+            clusterRadius={48}
+            renderPointHtml={renderJobHtml}
+            onPointClick={(id) => onSelectJob(selectedJobId === id ? null : id)}
+            onClusterClick={handleClusterZoom}
+          />
         ) : null}
-      </MapContainer>
+      </FleetMap>
 
       {consoleMode ? (
         <div className="opmap-vignette opmap-vignette--canvas pointer-events-none" aria-hidden />
