@@ -168,7 +168,7 @@ export function FleetDispatchMapPanel({
       <MapContainer
         center={center}
         zoom={bounds ? 10 : 8}
-        className="h-full w-full"
+        className="h-full w-full dispatch-mission__leaflet-map"
         bounds={bounds ?? undefined}
         boundsOptions={{ padding: [24, 24] }}
       >
@@ -243,8 +243,11 @@ export function FleetDispatchMapPanel({
         })}
       </MapContainer>
 
-      <div className="dispatch-mission__map-overlay absolute left-3 top-3 z-[1000] flex items-center gap-2 px-3 py-2 text-xs">
-        <span className="font-semibold text-[var(--text-primary)]">Live</span>
+      <div className="dispatch-mission__map-overlay absolute left-3 top-3 z-[1000] flex items-center gap-2.5 px-3 py-2 text-xs">
+        <span className="dispatch-mission__live-badge">
+          <span className="dispatch-mission__live-dot" aria-hidden />
+          Live
+        </span>
         <span className="text-[var(--text-muted)]">
           {truckLanes.length} trucks · {jobs.length} jobs
         </span>

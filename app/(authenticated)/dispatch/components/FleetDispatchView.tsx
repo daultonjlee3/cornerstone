@@ -4,29 +4,34 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   FleetDispatchBoardData,
-  FleetDispatchJob,
   FleetRecommendationInstance,
   FleetTodayViewData,
 } from "@/src/types/fleet";
 import { assignTruckToJob } from "../../fleet/actions";
 import { FleetJobQueue } from "./FleetJobQueue";
-import { FleetTruckLanes } from "./FleetTruckLanes";
-import { FleetCapacityPanel } from "./FleetCapacityPanel";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { FleetDispatchRecommendationsPanel } from "./FleetDispatchRecommendationsPanel";
 import { FleetDispatchStatusBar } from "./FleetDispatchStatusBar";
 import { FleetDispatchExceptionsStrip } from "./FleetDispatchExceptionsStrip";
-import { FleetDispatchOpsContext } from "./FleetDispatchOpsContext";
+import {
+  FleetDispatchKpiStrip,
+  FleetDispatchOperationalChips,
+} from "./FleetDispatchOpsContext";
 import { Button } from "@/src/components/ui/button";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { buildDispatchStatusItems, scrollToSection } from "./fleet-dispatch-utils";
-import { HeroPanel, Skeleton } from "@/src/components/design-system";
+import { Skeleton } from "@/src/components/design-system";
 
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T12:00:00`);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function formatDisplayDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 type FleetDispatchViewProps = {
@@ -119,21 +124,6 @@ export function FleetDispatchView({
     [refreshBoard]
   );
 
-  const handleUnassign = useCallback(
-    (jobId: string) => {
-      setError(null);
-      startTransition(async () => {
-        const result = await assignTruckToJob(jobId, null);
-        if (result.error) {
-          setError(result.error);
-          return;
-        }
-        await refreshBoard();
-      });
-    },
-    [refreshBoard]
-  );
-
   const onRecommendationAction = useCallback(
     (id: string, action: "accept" | "dismiss") => {
       startTransition(async () => {
@@ -153,9 +143,6 @@ export function FleetDispatchView({
     },
     [loadRecommendations, refreshBoard]
   );
-
-  const selectedJob: FleetDispatchJob | null =
-    board.jobs.find((j) => j.id === selectedJobId) ?? null;
 
   const statusItems = useMemo(
     () => buildDispatchStatusItems(board, intel, recommendations),
@@ -185,59 +172,68 @@ export function FleetDispatchView({
   return (
     <div className="dispatch-mission" data-testid="fleet-dispatch-board">
       {pending ? (
-        <div className="pointer-events-none fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--surface-canvas)_55%,transparent)] backdrop-blur-[1px]">
-          <div className="mx-auto flex h-full max-w-7xl flex-col justify-center gap-4 p-6">
-            <Skeleton className="h-28 w-full rounded-[var(--radius-xl)]" />
-            <div className="grid gap-4 lg:grid-cols-[minmax(17.5rem,22%)_minmax(0,1fr)_minmax(18.75rem,26%)]">
-              <Skeleton className="h-[32rem] w-full rounded-[var(--radius-xl)]" />
-              <Skeleton className="h-[32rem] w-full rounded-[var(--radius-xl)]" />
-              <Skeleton className="h-[32rem] w-full rounded-[var(--radius-xl)]" />
+        <div className="pointer-events-none absolute inset-0 z-50 bg-[color-mix(in_srgb,var(--surface-canvas)_50%,transparent)]">
+          <div className="flex h-full flex-col gap-3 p-1">
+            <Skeleton className="h-36 shrink-0 rounded-[var(--radius-xl)]" />
+            <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(17rem,24%)_minmax(0,1fr)_minmax(18rem,28%)]">
+              <Skeleton className="h-full rounded-[var(--radius-xl)]" />
+              <Skeleton className="h-full rounded-[var(--radius-xl)]" />
+              <Skeleton className="h-full rounded-[var(--radius-xl)]" />
             </div>
           </div>
         </div>
       ) : null}
 
-      <HeroPanel id="fleet-dispatch-hero" className="space-y-6">
-        <div className="dispatch-mission__header">
-          <div className="min-w-0">
+      <section className="dispatch-mission__command-band" id="fleet-dispatch-hero">
+        <div className="dispatch-mission__command-row">
+          <div className="dispatch-mission__title-block">
             <p className="cs-text-eyebrow text-[var(--brand-operational)]">Fleet Command Center</p>
-            <h1 className="dispatch-mission__title mt-2">Dispatch Intelligence</h1>
+            <h1 className="dispatch-mission__title">Dispatch Intelligence</h1>
             <p className="dispatch-mission__tagline">
-              Place the right truck on the highest-value job.
+              Place the right truck on the next highest-value job.
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              aria-label="Previous day"
-              onClick={() => navigateDate(shiftDate(selectedDate, -1))}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <div className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-medium tabular-nums">
+
+          <FleetDispatchKpiStrip
+            board={board}
+            intel={intel}
+            recommendationCount={recommendations.length}
+          />
+
+          <div className="dispatch-mission__controls">
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                aria-label="Previous day"
+                onClick={() => navigateDate(shiftDate(selectedDate, -1))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="dispatch-mission__date-display">{formatDisplayDate(selectedDate)}</span>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => navigateDate(e.target.value)}
-                className="border-0 bg-transparent p-0 text-sm font-medium tabular-nums text-[var(--text-primary)] outline-none"
+                className="sr-only"
                 aria-label="Select operating date"
               />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                aria-label="Next day"
+                onClick={() => navigateDate(shiftDate(selectedDate, 1))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
             </div>
             <Button
               type="button"
               variant="secondary"
               size="sm"
-              aria-label="Next day"
-              onClick={() => navigateDate(shiftDate(selectedDate, 1))}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
+              className="w-full"
               onClick={() => void refreshBoard()}
               disabled={pending}
             >
@@ -247,24 +243,18 @@ export function FleetDispatchView({
           </div>
         </div>
 
-        <FleetDispatchOpsContext
-          board={board}
-          intel={intel}
-          recommendationCount={recommendations.length}
-        />
-
+        <FleetDispatchOperationalChips board={board} intel={intel} />
         <FleetDispatchStatusBar items={statusItems} />
-
         <FleetDispatchExceptionsStrip exceptions={intel.exceptions} />
-      </HeroPanel>
+      </section>
 
       {error ? (
-        <p className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-4 py-2.5 text-sm text-[var(--status-danger)]">
+        <p className="shrink-0 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-4 py-2 text-sm text-[var(--status-danger)]">
           {error}
         </p>
       ) : null}
 
-      <div className="dispatch-mission__workspace min-h-[640px] flex-1 pb-2">
+      <div className="dispatch-mission__cockpit">
         <FleetJobQueue
           jobs={board.unassignedJobs}
           board={board}
@@ -276,46 +266,31 @@ export function FleetDispatchView({
           pending={pending}
         />
 
-        <div className="dispatch-mission__map-column">
-          <div id="fleet-dispatch-map" className="dispatch-mission__map-shell">
-            <FleetDispatchMapPanel
-              jobs={board.jobs}
-              truckLanes={board.truckLanes}
-              selectedJobId={selectedJobId}
-              highlightedTruckId={highlightedTruckId}
-              activeRecommendation={activeRecommendation}
-              onSelectJob={setSelectedJobId}
-            />
-          </div>
-          <FleetTruckLanes
-            lanes={board.truckLanes}
-            selectedJob={selectedJob}
+        <div id="fleet-dispatch-map" className="dispatch-mission__cockpit-map">
+          <FleetDispatchMapPanel
+            jobs={board.jobs}
+            truckLanes={board.truckLanes}
+            selectedJobId={selectedJobId}
             highlightedTruckId={highlightedTruckId}
-            recommendations={recommendations}
-            onSelectTruck={setHighlightedTruckId}
-            onAssign={handleAssign}
-            onUnassign={handleUnassign}
-            pending={pending}
+            activeRecommendation={activeRecommendation}
+            onSelectJob={setSelectedJobId}
           />
         </div>
 
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
-          <FleetDispatchRecommendationsPanel
-            recommendations={recommendations}
-            board={board}
-            activeRecommendationId={activeRecommendation?.id ?? null}
-            pending={pending}
-            error={recError}
-            onRefresh={() => void loadRecommendations(true)}
-            onAccept={(id) => onRecommendationAction(id, "accept")}
-            onDismiss={(id) => onRecommendationAction(id, "dismiss")}
-            onHighlight={handleHighlightRecommendation}
-            onViewMap={handleViewMap}
-            onHighlightTruck={setHighlightedTruckId}
-            onHighlightJob={setSelectedJobId}
-          />
-          <FleetCapacityPanel branchCapacity={board.branchCapacity} truckLanes={board.truckLanes} />
-        </div>
+        <FleetDispatchRecommendationsPanel
+          recommendations={recommendations}
+          board={board}
+          activeRecommendationId={activeRecommendation?.id ?? null}
+          pending={pending}
+          error={recError}
+          onRefresh={() => void loadRecommendations(true)}
+          onAccept={(id) => onRecommendationAction(id, "accept")}
+          onDismiss={(id) => onRecommendationAction(id, "dismiss")}
+          onHighlight={handleHighlightRecommendation}
+          onViewMap={handleViewMap}
+          onHighlightTruck={setHighlightedTruckId}
+          onHighlightJob={setSelectedJobId}
+        />
       </div>
     </div>
   );

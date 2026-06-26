@@ -179,15 +179,16 @@ export function FleetJobQueue({
                     </p>
                   ) : null}
 
-                  <div className="flex flex-wrap gap-1.5">
-                    {late ? (
-                      <Badge tone="red" icon={AlertCircle}>
-                        Late
-                      </Badge>
-                    ) : null}
-                    <Badge tone="muted">{job.status.replace("_", " ")}</Badge>
-                  </div>
+                  {late ? (
+                    <Badge tone="red" icon={AlertCircle}>
+                      Late
+                    </Badge>
+                  ) : null}
                 </button>
+
+                <div className="dispatch-mission__job-status">
+                  {job.status.replace("_", " ")}
+                </div>
 
                 {selected ? (
                   <div className="space-y-2 border-t border-[var(--surface-border-subtle)] px-4 pb-4 pt-3">

@@ -365,7 +365,7 @@ export function buildDispatchStatusItems(
       label: `${offlineTrucks.length} Offline`,
       detail: "GPS unavailable",
       severity: "warning",
-      targetId: "fleet-truck-lanes",
+      targetId: "fleet-dispatch-map",
       priority: 3,
     });
   }
@@ -433,7 +433,7 @@ export function buildDispatchStatusItems(
     id: "gps",
     label: `GPS ${gpsPct}%`,
     severity: gpsPct >= 90 ? "healthy" : gpsPct >= 70 ? "information" : "warning",
-    targetId: "fleet-truck-lanes",
+    targetId: "fleet-dispatch-map",
     priority: 9,
   });
 
@@ -445,7 +445,7 @@ export function buildDispatchStatusItems(
       id: "available",
       label: `${availableTrucks} Available`,
       severity: "healthy",
-      targetId: "fleet-truck-lanes",
+      targetId: "fleet-dispatch-map",
       priority: 10,
     });
   }
