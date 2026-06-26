@@ -270,10 +270,13 @@ export function FleetDispatchView({
           <FleetDispatchMapPanel
             jobs={board.jobs}
             truckLanes={board.truckLanes}
+            branchCapacity={board.branchCapacity}
+            recommendations={recommendations}
             selectedJobId={selectedJobId}
             highlightedTruckId={highlightedTruckId}
             activeRecommendation={activeRecommendation}
             onSelectJob={setSelectedJobId}
+            onSelectTruck={setHighlightedTruckId}
           />
         </div>
 
