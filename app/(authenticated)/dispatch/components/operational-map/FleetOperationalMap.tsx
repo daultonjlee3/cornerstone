@@ -263,19 +263,14 @@ export function FleetOperationalMap({
           consoleMode={consoleMode}
         />
 
-        {consoleMode ? (
-          <>
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-          </>
-        ) : (
-          <>
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png" />
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
-              opacity={0.22}
-            />
-          </>
-        )}
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+          className="opmap-tile-terrain"
+        />
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+          className="opmap-tile-labels"
+        />
 
         {(layers.branches || layers.capacity) &&
           branchZones.map((zone) => (
@@ -366,8 +361,11 @@ export function FleetOperationalMap({
         ) : null}
       </MapContainer>
 
-      {!consoleMode ? <div className="opmap-vignette pointer-events-none" aria-hidden /> : null}
-      {consoleMode ? <div className="opmap-vignette opmap-vignette--light pointer-events-none" aria-hidden /> : null}
+      {consoleMode ? (
+        <div className="opmap-vignette opmap-vignette--canvas pointer-events-none" aria-hidden />
+      ) : (
+        <div className="opmap-vignette pointer-events-none" aria-hidden />
+      )}
 
       <div className="opmap-hud opmap-hud--top-left">
         <span className="dispatch-mission__live-badge">

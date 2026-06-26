@@ -313,7 +313,7 @@
 }
 
 .dispatch-console__map-cell--active {
-  box-shadow: inset 0 0 60px color-mix(in srgb, var(--brand-operational) 8%, transparent);
+  box-shadow: inset 0 0 48px color-mix(in srgb, var(--brand-operational) 4%, transparent);
 }
 
 .dispatch-console__timeline {

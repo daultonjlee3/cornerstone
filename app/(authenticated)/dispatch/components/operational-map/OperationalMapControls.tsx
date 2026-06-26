@@ -97,7 +97,7 @@ export function OperationalMapControls({
         <span className="opmap-legend-dot opmap-legend-dot--teal" />
         Available
         <span className="opmap-legend-dot opmap-legend-dot--amber" />
-        Busy
+        Recommendation
         <span className="opmap-legend-dot opmap-legend-dot--red" />
         Critical
         <Target className="size-3 opacity-60" />
