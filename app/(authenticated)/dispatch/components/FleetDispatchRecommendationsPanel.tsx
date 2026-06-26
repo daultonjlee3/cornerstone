@@ -36,19 +36,21 @@ export function FleetDispatchRecommendationsPanel({
   const panelRecommendations = recommendations.slice(0, 6);
 
   return (
-    <section id="fleet-recommendations" className="dispatch-mission__panel">
-      <div className="dispatch-mission__panel-header">
+    <section id="fleet-recommendations" className="dispatch-mission__panel dispatch-mission__panel--intel">
+      <div className="dispatch-mission__panel-header dispatch-mission__panel-header--minimal">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="cs-text-eyebrow text-[var(--brand-operational)]">Cornerstone Recommendations</p>
-            <p className="cs-text-section-title mt-1">
-              {recommendations.length === 0 ? "Monitoring" : `${recommendations.length} ready`}
+            <p className="dispatch-mission__panel-eyebrow dispatch-mission__panel-eyebrow--accent">
+              Cornerstone Recommendations
             </p>
-            <p className="cs-text-caption cs-text-muted mt-1">
-              {recommendations.length === 0
-                ? "New recommendations appear as fleet conditions change"
-                : "Review impact, then assign with confidence"}
-            </p>
+            <div className="dispatch-mission__panel-title-row">
+              <p className="dispatch-mission__panel-title">
+                {recommendations.length === 0 ? "Monitoring" : `${recommendations.length} ready`}
+              </p>
+              <span className="dispatch-mission__panel-meta">
+                {recommendations.length === 0 ? "Watching fleet signals" : "Highest impact first"}
+              </span>
+            </div>
           </div>
           <Button
             type="button"
@@ -63,7 +65,7 @@ export function FleetDispatchRecommendationsPanel({
         </div>
       </div>
 
-      <div className="dispatch-mission__panel-body">
+      <div className="dispatch-mission__panel-body dispatch-mission__rec-list">
         {error ? <p className="mb-3 cs-text-caption text-[var(--status-danger)]">{error}</p> : null}
 
         {panelRecommendations.length === 0 ? (

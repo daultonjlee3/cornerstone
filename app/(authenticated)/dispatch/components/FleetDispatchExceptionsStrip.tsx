@@ -41,7 +41,7 @@ export function FleetDispatchExceptionsStrip({ exceptions }: FleetDispatchExcept
   const warningCount = exceptions.filter((e) => e.severity === "warning").length;
 
   return (
-    <div id="fleet-exceptions" className="rounded-[var(--radius-md)] border border-[var(--surface-border-subtle)] bg-[var(--surface-default)]/50">
+    <div id="fleet-exceptions" className="dispatch-mission__exceptions">
       <button
         type="button"
         className="flex w-full items-center justify-between px-4 py-3 text-left"

@@ -15,7 +15,6 @@ import { FleetDispatchStatusBar } from "./FleetDispatchStatusBar";
 import { FleetDispatchExceptionsStrip } from "./FleetDispatchExceptionsStrip";
 import {
   FleetDispatchKpiStrip,
-  FleetDispatchOperationalChips,
 } from "./FleetDispatchOpsContext";
 import { Button } from "@/src/components/ui/button";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
@@ -185,23 +184,17 @@ export function FleetDispatchView({
       ) : null}
 
       <section className="dispatch-mission__command-band" id="fleet-dispatch-hero">
-        <div className="dispatch-mission__command-row">
+        <div className="dispatch-mission__command-top">
           <div className="dispatch-mission__title-block">
-            <p className="cs-text-eyebrow text-[var(--brand-operational)]">Fleet Command Center</p>
+            <p className="dispatch-mission__eyebrow">Fleet Command Center</p>
             <h1 className="dispatch-mission__title">Dispatch Intelligence</h1>
             <p className="dispatch-mission__tagline">
               Place the right truck on the next highest-value job.
             </p>
           </div>
 
-          <FleetDispatchKpiStrip
-            board={board}
-            intel={intel}
-            recommendationCount={recommendations.length}
-          />
-
           <div className="dispatch-mission__controls">
-            <div className="flex items-center gap-1">
+            <div className="dispatch-mission__date-nav">
               <Button
                 type="button"
                 variant="secondary"
@@ -233,7 +226,6 @@ export function FleetDispatchView({
               type="button"
               variant="secondary"
               size="sm"
-              className="w-full"
               onClick={() => void refreshBoard()}
               disabled={pending}
             >
@@ -243,7 +235,12 @@ export function FleetDispatchView({
           </div>
         </div>
 
-        <FleetDispatchOperationalChips board={board} intel={intel} />
+        <FleetDispatchKpiStrip
+          board={board}
+          intel={intel}
+          recommendationCount={recommendations.length}
+        />
+
         <FleetDispatchStatusBar items={statusItems} />
         <FleetDispatchExceptionsStrip exceptions={intel.exceptions} />
       </section>
@@ -266,7 +263,10 @@ export function FleetDispatchView({
           pending={pending}
         />
 
-        <div id="fleet-dispatch-map" className="dispatch-mission__cockpit-map">
+        <div
+          id="fleet-dispatch-map"
+          className={`dispatch-mission__cockpit-map ${activeRecommendation ? "dispatch-mission__cockpit-map--live" : ""}`}
+        >
           <FleetDispatchMapPanel
             jobs={board.jobs}
             truckLanes={board.truckLanes}

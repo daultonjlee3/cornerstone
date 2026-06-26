@@ -44,7 +44,7 @@ export function FleetDispatchStatusBar({ items }: FleetDispatchStatusBarProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="dispatch-mission__status-row" data-testid="fleet-dispatch-status-bar">
+    <div className="dispatch-mission__status-bar" data-testid="fleet-dispatch-status-bar">
       {items.map((item) => (
         <button
           key={item.id}
