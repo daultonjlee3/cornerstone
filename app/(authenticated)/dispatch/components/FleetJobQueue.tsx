@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  AlertCircle,
-  ArrowRight,
-  Clock,
-  MapPin,
-  Sparkles,
-} from "lucide-react";
+import { AlertCircle, ArrowRight, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import type { FleetDispatchJob, FleetDispatchTruckLane, FleetRecommendationInstance, FleetDispatchBoardData } from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
@@ -21,7 +15,6 @@ import {
   jobDurationHours,
   jobEstimatedProfit,
   operationalRiskMessage,
-  priorityUrgencyClass,
   recommendationConfidence,
   recommendationConfidenceExplanation,
   recommendationForJob,
@@ -30,6 +23,7 @@ import {
 import { confidenceLabel } from "../../operations/components/fleet-recommendation-utils";
 
 type FleetJobQueueProps = {
+  layout?: "panel" | "float";
   jobs: FleetDispatchJob[];
   board: FleetDispatchBoardData;
   selectedJobId: string | null;
@@ -54,6 +48,7 @@ function sortJobs(jobs: FleetDispatchJob[]): FleetDispatchJob[] {
 }
 
 export function FleetJobQueue({
+  layout = "panel",
   jobs,
   board,
   selectedJobId,
@@ -64,21 +59,31 @@ export function FleetJobQueue({
   pending,
 }: FleetJobQueueProps) {
   const sorted = sortJobs(jobs);
+  const isFloat = layout === "float";
+
+  const shellClass = isFloat
+    ? "dispatch-console__dock dispatch-console__dock--left"
+    : "dispatch-mission__panel dispatch-mission__panel--inbox";
 
   return (
-    <aside id="fleet-job-queue" className="dispatch-mission__panel dispatch-mission__panel--inbox">
-      <div className="dispatch-mission__panel-header dispatch-mission__panel-header--minimal">
-        <p className="dispatch-mission__panel-eyebrow">Job queue</p>
-        <div className="dispatch-mission__panel-title-row">
-          <p className="dispatch-mission__panel-title">{jobs.length} unassigned</p>
-          <span className="dispatch-mission__panel-meta">Priority sorted</span>
-        </div>
+    <aside id="fleet-job-queue" className={shellClass}>
+      <div className={isFloat ? "dispatch-console__dock-header" : "dispatch-mission__panel-header dispatch-mission__panel-header--minimal"}>
+        <p className={isFloat ? "dispatch-console__dock-eyebrow" : "dispatch-mission__panel-eyebrow"}>
+          Dispatch inbox
+        </p>
+        <p className={isFloat ? "dispatch-console__dock-title" : "dispatch-mission__panel-title"}>
+          {jobs.length} need{jobs.length === 1 ? "s" : ""} a decision
+        </p>
+        <p className={isFloat ? "dispatch-console__dock-meta" : "dispatch-mission__panel-meta"}>
+          Priority · revenue · arrival
+        </p>
       </div>
-      <ul className="dispatch-mission__panel-body dispatch-mission__inbox-list">
+
+      <ul className={isFloat ? "dispatch-console__dock-body" : "dispatch-mission__panel-body dispatch-mission__inbox-list"}>
         {sorted.length === 0 ? (
-          <li className="dispatch-mission__inbox-empty">
-            <p className="font-medium">Queue clear</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">All jobs assigned for this date</p>
+          <li className={isFloat ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
+            <p className="font-medium">Inbox clear</p>
+            <p className="mt-1 text-xs">All jobs assigned</p>
           </li>
         ) : (
           sorted.map((job, index) => {
@@ -95,129 +100,89 @@ export function FleetJobQueue({
             const jobType = extractJobType(job.title);
             const risk = operationalRiskMessage(job);
 
-            return (
-              <motion.li
-                key={job.id}
-                layout
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: index * 0.03 }}
-                className={`dispatch-mission__job-card ${priorityUrgencyClass(job.priority)} ${
-                  selected ? "dispatch-mission__job-card--selected" : ""
-                } ${late || risk ? "dispatch-mission__job-card--urgent" : ""}`}
-              >
-                <button
-                  type="button"
-                  className="dispatch-mission__job-card-body"
-                  onClick={() => onSelectJob(selected ? null : job.id)}
+            if (isFloat) {
+              return (
+                <motion.li
+                  key={job.id}
+                  layout
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.18, delay: index * 0.025 }}
+                  className={`dispatch-console__inbox-item ${selected ? "dispatch-console__inbox-item--selected" : ""} ${late || risk ? "dispatch-console__inbox-item--urgent" : ""}`}
                 >
-                  <div className="dispatch-mission__job-card-head">
-                    <div className="min-w-0">
-                      <p className="dispatch-mission__job-customer">{customer}</p>
-                      <p className="dispatch-mission__job-title">{jobType}</p>
+                  <button type="button" className="dispatch-console__inbox-btn" onClick={() => onSelectJob(selected ? null : job.id)}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="dispatch-console__inbox-revenue">{formatCurrency(job.revenue_estimate)}</span>
+                      <PriorityBadge priority={job.priority} />
                     </div>
-                    <PriorityBadge priority={job.priority} />
-                  </div>
-
-                  <div className="dispatch-mission__job-revenue">
-                    <span className="dispatch-mission__job-revenue-value">
-                      {formatCurrency(job.revenue_estimate)}
-                    </span>
-                    <span className="dispatch-mission__job-revenue-label">
-                      {formatCurrency(estimatedProfit)} contribution
-                    </span>
-                  </div>
-
-                  <div className="dispatch-mission__job-facts">
-                    <span>{formatTime(job.scheduled_start)} arrival</span>
-                    {duration != null ? <span>{duration}h window</span> : null}
-                    {job.estimated_deadhead_miles != null ? (
-                      <span className="dispatch-mission__job-fact--warn">
-                        {job.estimated_deadhead_miles.toFixed(1)} mi deadhead
-                        {job.estimated_travel_minutes != null ? ` · ${job.estimated_travel_minutes} min` : ""}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <p className="dispatch-mission__job-location">
-                    <MapPin className="size-3 shrink-0" />
-                    <span className="truncate">{job.site_name ?? "Site"}</span>
-                  </p>
-
-                  {topTruck ? (
-                    <div className="dispatch-mission__job-rec">
-                      <div className="dispatch-mission__job-rec-head">
-                        <span className="flex items-center gap-1.5 font-semibold text-[var(--brand-operational)]">
-                          <Sparkles className="size-3.5" />
-                          Truck {topTruck.unit_number}
-                        </span>
-                        {confidence ? (
-                          <span
-                            className={`dispatch-mission__confidence-pill ${confidenceTone(confidence)}`}
-                          >
-                            {confidenceLabel(confidence)}
-                          </span>
-                        ) : null}
-                      </div>
-                      {confidenceExplanation ? (
-                        <p className="dispatch-mission__job-rec-detail">{confidenceExplanation}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">{customer}</p>
+                    <p className="dispatch-console__inbox-title">{jobType}</p>
+                    <div className="dispatch-console__inbox-facts">
+                      <span>{formatCurrency(estimatedProfit)} contrib</span>
+                      <span>{formatTime(job.scheduled_start)}</span>
+                      {duration != null ? <span>{duration}h</span> : null}
+                      {job.estimated_deadhead_miles != null ? (
+                        <span>{job.estimated_deadhead_miles.toFixed(1)} mi deadhead</span>
                       ) : null}
                     </div>
+                    {topTruck ? (
+                      <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--brand-operational)]">
+                        <Sparkles className="size-3" />
+                        Truck {topTruck.unit_number}
+                        {confidence ? ` · ${confidenceLabel(confidence)}` : ""}
+                      </p>
+                    ) : null}
+                    {ignoreRisk ? <p className="mt-1 text-[10px] text-[var(--status-warning)]">{ignoreRisk}</p> : null}
+                    {risk ? (
+                      <p className="dispatch-console__inbox-warn">
+                        <AlertCircle className="size-3" />
+                        {risk}
+                      </p>
+                    ) : null}
+                  </button>
+                  {selected ? (
+                    <div className="dispatch-console__inbox-assign">
+                      {(topTruck
+                        ? truckLanes.filter((l) => l.truck_id === topTruck.truck_id)
+                        : truckLanes.filter(
+                            (lane) =>
+                              lane.truck_type === job.required_truck_type || job.required_truck_type === "any"
+                          )
+                      )
+                        .slice(0, 4)
+                        .map((lane) => (
+                          <Button
+                            key={lane.truck_id}
+                            type="button"
+                            size="sm"
+                            variant={topTruck?.truck_id === lane.truck_id ? "primary" : "secondary"}
+                            className="mb-1 w-full justify-between text-[11px]"
+                            disabled={pending}
+                            onClick={() => onAssignToTruck(job.id, lane.truck_id)}
+                          >
+                            {lane.unit_number}
+                            {topTruck?.truck_id === lane.truck_id ? (
+                              <ArrowRight className="size-3" />
+                            ) : null}
+                          </Button>
+                        ))}
+                    </div>
                   ) : null}
+                </motion.li>
+              );
+            }
 
-                  {ignoreRisk ? (
-                    <p className="dispatch-mission__job-warning dispatch-mission__job-warning--amber">
-                      {ignoreRisk}
-                    </p>
-                  ) : null}
-
-                  {risk ? (
-                    <p className="dispatch-mission__job-warning">
-                      <AlertCircle className="size-3.5 shrink-0" />
-                      {risk}
-                    </p>
-                  ) : null}
-
-                  {late ? (
-                    <span className="dispatch-mission__job-late-badge">Late</span>
-                  ) : null}
+            return (
+              <li
+                key={job.id}
+                className={`dispatch-mission__job-card ${selected ? "dispatch-mission__job-card--selected" : ""}`}
+              >
+                <button type="button" className="dispatch-mission__job-card-body w-full text-left" onClick={() => onSelectJob(selected ? null : job.id)}>
+                  <p className="dispatch-mission__job-revenue-value">{formatCurrency(job.revenue_estimate)}</p>
+                  <p className="dispatch-mission__job-title">{jobType}</p>
+                  {confidenceExplanation ? <p className="text-xs text-[var(--text-muted)]">{confidenceExplanation}</p> : null}
                 </button>
-
-                <div className="dispatch-mission__job-status">{job.status.replace("_", " ")}</div>
-
-                {selected ? (
-                  <div className="dispatch-mission__job-assign">
-                    <p className="dispatch-mission__job-assign-label">Quick assign</p>
-                    {(topTruck
-                      ? truckLanes.filter((l) => l.truck_id === topTruck.truck_id)
-                      : truckLanes.filter(
-                          (lane) =>
-                            lane.truck_type === job.required_truck_type ||
-                            job.required_truck_type === "any"
-                        )
-                    )
-                      .slice(0, 6)
-                      .map((lane) => (
-                        <Button
-                          key={lane.truck_id}
-                          type="button"
-                          size="sm"
-                          variant={topTruck?.truck_id === lane.truck_id ? "primary" : "secondary"}
-                          className="w-full justify-between text-[11px]"
-                          disabled={pending}
-                          onClick={() => onAssignToTruck(job.id, lane.truck_id)}
-                        >
-                          <span>{lane.unit_number}</span>
-                          {topTruck?.truck_id === lane.truck_id ? (
-                            <span className="flex items-center gap-1 opacity-90">
-                              Recommended <ArrowRight className="size-3" />
-                            </span>
-                          ) : null}
-                        </Button>
-                      ))}
-                  </div>
-                ) : null}
-              </motion.li>
+              </li>
             );
           })
         )}

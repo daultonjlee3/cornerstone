@@ -11,16 +11,12 @@ import { assignTruckToJob } from "../../fleet/actions";
 import { FleetJobQueue } from "./FleetJobQueue";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { FleetDispatchRecommendationsPanel } from "./FleetDispatchRecommendationsPanel";
-import { FleetDispatchStatusBar } from "./FleetDispatchStatusBar";
-import { FleetDispatchExceptionsStrip } from "./FleetDispatchExceptionsStrip";
-import {
-  FleetDispatchKpiStrip,
-} from "./FleetDispatchOpsContext";
-import { Button } from "@/src/components/ui/button";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { FleetDispatchMissionBriefing } from "./FleetDispatchMissionBriefing";
+import { FleetDispatchTimeline } from "./FleetDispatchTimeline";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
-import { buildDispatchStatusItems, scrollToSection } from "./fleet-dispatch-utils";
+import { scrollToSection } from "./fleet-dispatch-utils";
 import { Skeleton } from "@/src/components/design-system";
+import "./dispatch-console.css";
 
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -30,7 +26,7 @@ function shiftDate(dateStr: string, days: number): string {
 
 function formatDisplayDate(dateStr: string): string {
   const d = new Date(`${dateStr}T12:00:00`);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
 type FleetDispatchViewProps = {
@@ -57,6 +53,8 @@ export function FleetDispatchView({
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const displayDate = useMemo(() => formatDisplayDate(selectedDate), [selectedDate]);
 
   const navigateDate = useCallback(
     (date: string) => {
@@ -143,11 +141,6 @@ export function FleetDispatchView({
     [loadRecommendations, refreshBoard]
   );
 
-  const statusItems = useMemo(
-    () => buildDispatchStatusItems(board, intel, recommendations),
-    [board, intel, recommendations]
-  );
-
   const handleHighlightRecommendation = useCallback((rec: FleetRecommendationInstance | null) => {
     setActiveRecommendation(rec);
     if (rec) {
@@ -169,103 +162,34 @@ export function FleetDispatchView({
   );
 
   return (
-    <div className="dispatch-mission" data-testid="fleet-dispatch-board">
+    <div className="dispatch-console" data-testid="fleet-dispatch-board">
       {pending ? (
-        <div className="pointer-events-none absolute inset-0 z-50 bg-[color-mix(in_srgb,var(--surface-canvas)_50%,transparent)]">
-          <div className="flex h-full flex-col gap-3 p-1">
-            <Skeleton className="h-36 shrink-0 rounded-[var(--radius-xl)]" />
-            <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(17rem,24%)_minmax(0,1fr)_minmax(18rem,28%)]">
-              <Skeleton className="h-full rounded-[var(--radius-xl)]" />
-              <Skeleton className="h-full rounded-[var(--radius-xl)]" />
-              <Skeleton className="h-full rounded-[var(--radius-xl)]" />
-            </div>
+        <div className="dispatch-console__loading">
+          <div className="flex h-full flex-col gap-2 p-2">
+            <Skeleton className="h-28 shrink-0 rounded-xl" />
+            <Skeleton className="min-h-0 flex-1 rounded-xl" />
           </div>
         </div>
       ) : null}
 
-      <section className="dispatch-mission__command-band" id="fleet-dispatch-hero">
-        <div className="dispatch-mission__command-top">
-          <div className="dispatch-mission__title-block">
-            <p className="dispatch-mission__eyebrow">Fleet Command Center</p>
-            <h1 className="dispatch-mission__title">Dispatch Intelligence</h1>
-            <p className="dispatch-mission__tagline">
-              Place the right truck on the next highest-value job.
-            </p>
-          </div>
+      <FleetDispatchMissionBriefing
+        board={board}
+        intel={intel}
+        recommendationCount={recommendations.length}
+        recommendations={recommendations}
+        selectedDate={selectedDate}
+        displayDate={displayDate}
+        pending={pending}
+        onPrevDay={() => navigateDate(shiftDate(selectedDate, -1))}
+        onNextDay={() => navigateDate(shiftDate(selectedDate, 1))}
+        onDateChange={navigateDate}
+        onRefresh={() => void refreshBoard()}
+      />
 
-          <div className="dispatch-mission__controls">
-            <div className="dispatch-mission__date-nav">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                aria-label="Previous day"
-                onClick={() => navigateDate(shiftDate(selectedDate, -1))}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <span className="dispatch-mission__date-display">{formatDisplayDate(selectedDate)}</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => navigateDate(e.target.value)}
-                className="sr-only"
-                aria-label="Select operating date"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                aria-label="Next day"
-                onClick={() => navigateDate(shiftDate(selectedDate, 1))}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void refreshBoard()}
-              disabled={pending}
-            >
-              <RefreshCw className={`mr-1.5 size-3.5 ${pending ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
-
-        <FleetDispatchKpiStrip
-          board={board}
-          intel={intel}
-          recommendationCount={recommendations.length}
-        />
-
-        <FleetDispatchStatusBar items={statusItems} />
-        <FleetDispatchExceptionsStrip exceptions={intel.exceptions} />
-      </section>
-
-      {error ? (
-        <p className="shrink-0 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--status-danger)_30%,transparent)] bg-[var(--status-danger-subtle)] px-4 py-2 text-sm text-[var(--status-danger)]">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="dispatch-mission__cockpit">
-        <FleetJobQueue
-          jobs={board.unassignedJobs}
-          board={board}
-          selectedJobId={selectedJobId}
-          onSelectJob={setSelectedJobId}
-          onAssignToTruck={handleAssign}
-          truckLanes={board.truckLanes}
-          recommendations={recommendations}
-          pending={pending}
-        />
-
+      <div className="dispatch-console__stage">
         <div
           id="fleet-dispatch-map"
-          className={`dispatch-mission__cockpit-map ${activeRecommendation ? "dispatch-mission__cockpit-map--live" : ""}`}
+          className={`dispatch-console__map ${activeRecommendation ? "dispatch-console__map--active" : ""}`}
         >
           <FleetDispatchMapPanel
             jobs={board.jobs}
@@ -280,7 +204,20 @@ export function FleetDispatchView({
           />
         </div>
 
+        <FleetJobQueue
+          layout="float"
+          jobs={board.unassignedJobs}
+          board={board}
+          selectedJobId={selectedJobId}
+          onSelectJob={setSelectedJobId}
+          onAssignToTruck={handleAssign}
+          truckLanes={board.truckLanes}
+          recommendations={recommendations}
+          pending={pending}
+        />
+
         <FleetDispatchRecommendationsPanel
+          layout="float"
           recommendations={recommendations}
           board={board}
           activeRecommendationId={activeRecommendation?.id ?? null}
@@ -294,7 +231,11 @@ export function FleetDispatchView({
           onHighlightTruck={setHighlightedTruckId}
           onHighlightJob={setSelectedJobId}
         />
+
+        <FleetDispatchTimeline board={board} recommendations={recommendations} />
       </div>
+
+      {error ? <p className="dispatch-console__error">{error}</p> : null}
     </div>
   );
 }
