@@ -12,3 +12,4 @@ export { PricingCard } from "./pricing-card";
 export { ScreenshotContainer, ScreenshotPlaceholder } from "./screenshot-container";
 export { Section } from "./section";
 export { WorkflowSection } from "./workflow-section";
+export * from "./fleet";

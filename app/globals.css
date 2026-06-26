@@ -534,3 +534,89 @@ body:has([data-enterprise-ui="true"]) {
 [data-fleet-ui="true"] .leaflet-container {
   background: var(--surface-raised);
 }
+
+/* ===== Fleet marketing (public site) ===== */
+[data-fleet-marketing="true"] {
+  --background: #060a12;
+  --foreground: #f1f5f9;
+  --card: rgba(15, 23, 42, 0.75);
+  --card-solid: #0f172a;
+  --card-elevated: #1e293b;
+  --card-border: rgba(45, 212, 191, 0.14);
+  --muted: #94a3b8;
+  --muted-strong: #cbd5e1;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-glow: rgba(45, 212, 191, 0.22);
+  --shadow-card: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 8px 32px rgba(45, 212, 191, 0.18);
+  --mk-pattern-opacity: 0.035;
+}
+
+[data-fleet-marketing="true"] .mk-section-alt {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.55) 0%,
+    rgba(6, 10, 18, 0.85) 100%
+  );
+  border-top: 1px solid var(--card-border);
+}
+
+[data-fleet-marketing="true"] .mk-section-pattern {
+  background-image:
+    linear-gradient(rgba(45, 212, 191, var(--mk-pattern-opacity)) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, var(--mk-pattern-opacity)) 1px, transparent 1px);
+}
+
+body:has([data-fleet-marketing="true"]) {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(45, 212, 191, 0.08), transparent 55%),
+    radial-gradient(circle at 90% 20%, rgba(6, 182, 212, 0.05), transparent 40%),
+    linear-gradient(180deg, #060a12, #0b1220);
+}
+
+[data-fleet-marketing="true"] .fm-card {
+  backdrop-filter: blur(8px);
+}
+
+[data-fleet-marketing="true"] .fm-btn-primary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  background: var(--accent);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  box-shadow: var(--shadow-glow);
+  transition: background-color 0.15s ease;
+}
+
+[data-fleet-marketing="true"] .fm-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+[data-fleet-marketing="true"] .fm-btn-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--card-border);
+  background: rgba(15, 23, 42, 0.5);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+[data-fleet-marketing="true"] .fm-btn-secondary:hover {
+  border-color: rgba(45, 212, 191, 0.35);
+  background: rgba(15, 23, 42, 0.8);
+}

@@ -219,9 +219,9 @@ export const SEO_TITLE_TEMPLATE = "%s | Cornerstone OS";
 /** SEO metadata by route (for static pages). Keyword-optimized for CMMS and maintenance software. */
 export const SEO: Record<string, { title: string; description: string }> = {
   [ROUTES.home]: {
-    title: "CMMS & Maintenance Management Software | Cornerstone OS",
+    title: "Fleet Intelligence Platform for Industrial Fleets | Cornerstone",
     description:
-      "Maintenance management software and CMMS for teams that need speed, visibility, and control. Work orders, preventive maintenance, assets, dispatch, inventory management, vendor management, purchase orders, maintenance procurement, and reporting in one facility maintenance platform.",
+      "Cornerstone Fleet Intelligence connects telematics, ERP, dispatch, and payroll to deliver AI-powered recommendations that improve utilization, contribution margin, and fleet performance. One-week implementation.",
   },
   [ROUTES.product]: {
     title: "Product Overview | CMMS Software & Maintenance Management",
