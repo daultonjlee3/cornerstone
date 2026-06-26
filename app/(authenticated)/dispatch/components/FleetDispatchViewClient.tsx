@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Suspense } from "react";
+import { FleetMissionControlLoader } from "@/src/components/fleet-intelligence/FleetMissionControlLoader";
 import type { FleetDispatchBoardData, FleetTodayViewData } from "@/src/types/fleet";
 
 const FleetDispatchView = dynamic(
@@ -8,9 +10,11 @@ const FleetDispatchView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-[var(--muted)]">
-        Loading fleet dispatch board…
-      </div>
+      <FleetMissionControlLoader
+        variant="page"
+        className="min-h-[400px]"
+        testId="fleet-dispatch-client-loading"
+      />
     ),
   }
 );
@@ -27,10 +31,20 @@ export function FleetDispatchViewClient({
   selectedDate,
 }: FleetDispatchViewClientProps) {
   return (
-    <FleetDispatchView
-      initialBoard={initialBoard}
-      initialIntel={initialIntel}
-      selectedDate={selectedDate}
-    />
+    <Suspense
+      fallback={
+        <FleetMissionControlLoader
+          variant="page"
+          className="min-h-[400px]"
+          testId="fleet-dispatch-suspense-loading"
+        />
+      }
+    >
+      <FleetDispatchView
+        initialBoard={initialBoard}
+        initialIntel={initialIntel}
+        selectedDate={selectedDate}
+      />
+    </Suspense>
   );
 }

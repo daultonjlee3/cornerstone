@@ -1,59 +1,58 @@
 import Link from "next/link";
 import { ReactNode } from "react";
+import {
+  FLEET_ROUTES,
+  FLEET_SITE_NAME,
+} from "@/lib/fleet-marketing-site";
+import { FleetMarketingFooter } from "./marketing/fleet/fleet-marketing-footer";
+import { FleetMarketingHeader } from "./marketing/fleet/fleet-marketing-header";
 
 type LegalPageLayoutProps = {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   lastUpdated: string;
   children: ReactNode;
 };
 
 export function LegalPageLayout({
   title,
-  subtitle,
+  subtitle = FLEET_SITE_NAME,
   lastUpdated,
   children,
 }: LegalPageLayoutProps) {
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      {/* Top branding + back link */}
-      <header className="sticky top-0 z-10 border-b border-[var(--card-border)] bg-[var(--card-solid)]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[900px] items-center justify-between px-4 py-4 sm:px-6">
-          <Link
-            href="/login"
-            className="text-sm font-medium text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 rounded"
-          >
-            ← Back to sign in
-          </Link>
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-tight text-[var(--foreground)] transition-colors hover:text-[var(--accent)]"
-          >
-            Cornerstone OS
-          </Link>
+    <div
+      data-fleet-marketing="true"
+      className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]"
+    >
+      <FleetMarketingHeader />
+      <main className="relative min-w-0 flex-1">
+        <div className="pointer-events-none absolute inset-0 mk-section-pattern opacity-30" aria-hidden />
+        <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+          <article className="fm-card rounded-2xl border border-[var(--card-border)] bg-[var(--card-solid)]/80 p-8 sm:p-10 lg:p-12">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-400">
+              Legal
+            </p>
+            <h1 className="mk-section-headline mt-3">{title}</h1>
+            <p className="mt-2 text-lg text-[var(--muted)]">{subtitle}</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">Last updated: {lastUpdated}</p>
+            <div className="mt-10 space-y-10 border-t border-[var(--card-border)] pt-10">
+              {children}
+            </div>
+          </article>
+          <p className="mt-8 text-center text-sm text-[var(--muted)]">
+            Questions?{" "}
+            <a href="mailto:support@cornerstonecmms.com" className="font-medium text-teal-400 hover:text-teal-300">
+              support@cornerstonecmms.com
+            </a>
+            {" · "}
+            <Link href={FLEET_ROUTES.contact} className="font-medium text-teal-400 hover:text-teal-300">
+              Contact us
+            </Link>
+          </p>
         </div>
-      </header>
-
-      {/* Main content */}
-      <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-10">
-        <article className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-solid)] p-6 shadow-[var(--shadow-card)] sm:p-8 md:p-10">
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
-            {title}
-          </h1>
-          <p className="mt-2 text-lg font-medium text-[var(--muted)]">{subtitle}</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">Last updated: {lastUpdated}</p>
-          <div className="mt-10 space-y-10 border-t border-[var(--card-border)] pt-10">
-            {children}
-          </div>
-        </article>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-[var(--card-border)] bg-[var(--card-solid)]/80 py-6">
-        <div className="mx-auto max-w-[900px] px-4 text-center text-sm text-[var(--muted)] sm:px-6">
-          © 2026 Cornerstone OS. All rights reserved.
-        </div>
-      </footer>
+      <FleetMarketingFooter />
     </div>
   );
 }
@@ -67,10 +66,8 @@ export function LegalSection({
 }) {
   return (
     <section>
-      <h2 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">
-        {title}
-      </h2>
-      <div className="mt-3 text-[15px] leading-relaxed text-[var(--foreground)] [&>ul]:mt-3 [&>ul]:space-y-1 [&>ul]:pl-5 [&>ul]:list-disc [&>p]:mt-2">
+      <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">{title}</h2>
+      <div className="mt-3 text-[15px] leading-relaxed text-[var(--muted)] [&>ul]:mt-3 [&>ul]:list-disc [&>ul]:space-y-1.5 [&>ul]:pl-5 [&>p+p]:mt-3 [&>a]:font-medium [&>a]:text-teal-400 [&>a]:hover:text-teal-300">
         {children}
       </div>
     </section>

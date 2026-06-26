@@ -1,5 +1,7 @@
 "use client";
 
+import "@/src/components/fleet/icons/fleet-icons.css";
+
 import "./operational-map.css";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,15 +12,23 @@ import type {
   FleetRecommendationInstance,
 } from "@/src/types/fleet";
 import {
+  truckBadgeFromLane,
+  type FleetBadgeType,
+} from "@/src/components/fleet/icons";
+import {
   BranchZonesLayer,
   boundsFromPoints,
-  ClusteredHtmlMarkers,
+  ClusteredMarkers,
   FleetMap,
   FLEET_MAP_FIT_PADDING,
   FLEET_MAP_MAX_FIT_ZOOM,
-  jobMarkerHtml,
+  FLEET_MAP_STYLE_DARK,
+  FLEET_MAP_STYLE_SATELLITE,
+  JobMarker,
   RoutesLayer,
-  truckMarkerHtml,
+  TrafficLayer,
+  TruckMarker,
+  useAnimatedPositions,
   type FleetMapHandle,
   type FleetMapRouteFeature,
 } from "@/src/components/fleet-map";
@@ -47,6 +57,8 @@ type FleetOperationalMapProps = {
 type TruckMarkerProps = {
   state: TruckVisualState;
   unitNumber: string;
+  dimmed?: number;
+  badge?: FleetBadgeType;
 };
 
 type JobMarkerProps = {
@@ -91,6 +103,8 @@ export function FleetOperationalMap({
   const [layers, setLayers] = useState<OperationalMapLayers>(DEFAULT_OPERATIONAL_LAYERS);
   const [legendOpen, setLegendOpen] = useState(true);
   const [resetToken, setResetToken] = useState(0);
+  const [basemap, setBasemap] = useState<"dark" | "satellite">("dark");
+  const [trafficOn, setTrafficOn] = useState(false);
   const mapRef = useRef<FleetMapHandle | null>(null);
 
   const recJobId = activeRecommendation?.rationale.entities.job_id;
@@ -122,7 +136,13 @@ export function FleetOperationalMap({
       truckId: string | undefined,
       jobId: string | undefined,
       id: string,
-      opts?: { dashed?: boolean; primary?: boolean }
+      opts?: {
+        dashed?: boolean;
+        primary?: boolean;
+        recommendation?: boolean;
+        animated?: boolean;
+        label?: string;
+      }
     ) => {
       const truck = truckId ? truckLanes.find((l) => l.truck_id === truckId) : undefined;
       const job = jobs.find((j) => j.id === jobId);
@@ -138,6 +158,9 @@ export function FleetOperationalMap({
         id,
         primary: opts?.primary,
         dashed: opts?.dashed,
+        recommendation: opts?.recommendation,
+        animated: opts?.animated,
+        label: opts?.label,
         coordinates: [
           [truck.longitude as number, truck.latitude as number],
           [job.site_longitude as number, job.site_latitude as number],
@@ -146,7 +169,16 @@ export function FleetOperationalMap({
     };
 
     if (layers.recommendations && activeRecommendation) {
-      addRoute(recTopTruckId, recJobId, "rec-primary", { primary: true });
+      const deadheadLabel =
+        topSnapshot?.deadhead_miles != null
+          ? `${topSnapshot.deadhead_miles.toFixed(1)} mi deadhead`
+          : undefined;
+      addRoute(recTopTruckId, recJobId, "rec-primary", {
+        primary: true,
+        recommendation: true,
+        animated: true,
+        label: deadheadLabel,
+      });
       for (const altId of recAltTruckIds) {
         addRoute(altId, recJobId, `rec-alt-${altId}`, { dashed: true });
       }
@@ -154,8 +186,16 @@ export function FleetOperationalMap({
       addRoute(highlightedTruckId, selectedJobId, "selection", { primary: true });
     }
 
-    if (layers.deadhead && activeRecommendation && recTopTruckId && recJobId) {
-      addRoute(recTopTruckId, recJobId, "deadhead", { dashed: true, primary: true });
+    if (layers.deadhead && activeRecommendation && recTopTruckId && recJobId && !layers.recommendations) {
+      const deadheadLabel =
+        topSnapshot?.deadhead_miles != null
+          ? `${topSnapshot.deadhead_miles.toFixed(1)} mi`
+          : undefined;
+      addRoute(recTopTruckId, recJobId, "deadhead", {
+        dashed: true,
+        primary: true,
+        label: deadheadLabel,
+      });
     }
 
     return lines;
@@ -170,6 +210,7 @@ export function FleetOperationalMap({
     recJobId,
     recTopTruckId,
     selectedJobId,
+    topSnapshot,
     truckLanes,
   ]);
 
@@ -201,6 +242,18 @@ export function FleetOperationalMap({
     });
   }, [jobs, layers.jobs, layers.revenueAtRisk]);
 
+  const truckAnimSource = useMemo(
+    () =>
+      visibleTrucks.map((lane) => ({
+        id: lane.truck_id,
+        latitude: lane.latitude as number,
+        longitude: lane.longitude as number,
+      })),
+    [visibleTrucks]
+  );
+
+  const animatedTruckPositions = useAnimatedPositions(truckAnimSource);
+
   const truckClusterPoints = useMemo(
     () =>
       visibleTrucks.map((lane) => {
@@ -219,7 +272,8 @@ export function FleetOperationalMap({
             state,
             unitNumber: lane.unit_number,
             dimmed: dimmed ? 1 : 0,
-          } satisfies TruckMarkerProps & { dimmed: number },
+            badge: truckBadgeFromLane(lane),
+          } satisfies TruckMarkerProps,
         };
       }),
     [
@@ -271,6 +325,29 @@ export function FleetOperationalMap({
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  const layerCounts = useMemo(
+    (): Partial<Record<keyof OperationalMapLayers, number>> => ({
+      trucks: visibleTrucks.length,
+      jobs: visibleJobs.length,
+      recommendations: recommendations.length,
+      routes: routeLines.length,
+      branches: branchZones.length,
+      capacity: branchZones.length,
+      deadhead:
+        layers.deadhead && activeRecommendation && topSnapshot?.deadhead_miles != null ? 1 : 0,
+    }),
+    [
+      activeRecommendation,
+      branchZones.length,
+      layers.deadhead,
+      recommendations.length,
+      routeLines.length,
+      topSnapshot?.deadhead_miles,
+      visibleJobs.length,
+      visibleTrucks.length,
+    ]
+  );
+
   const fitFleetBounds = useCallback(() => {
     if (!bounds) return;
     mapRef.current?.fitBounds(
@@ -316,32 +393,87 @@ export function FleetOperationalMap({
     const jobId = selectedJobId ?? recJobId;
     const job = jobId ? jobs.find((item) => item.id === jobId) : null;
 
-    const latitude = truck?.latitude ?? job?.site_latitude;
-    const longitude = truck?.longitude ?? job?.site_longitude;
-    if (!hasCoordinate(latitude, longitude)) return;
+    const truckCoord =
+      truck && hasCoordinate(truck.latitude, truck.longitude)
+        ? ([truck.longitude as number, truck.latitude as number] as [number, number])
+        : null;
+    const jobCoord =
+      job && hasCoordinate(job.site_latitude, job.site_longitude)
+        ? ([job.site_longitude as number, job.site_latitude as number] as [number, number])
+        : null;
+
+    if (truckCoord && jobCoord) {
+      const minLng = Math.min(truckCoord[0], jobCoord[0]);
+      const maxLng = Math.max(truckCoord[0], jobCoord[0]);
+      const minLat = Math.min(truckCoord[1], jobCoord[1]);
+      const maxLat = Math.max(truckCoord[1], jobCoord[1]);
+      const lngPad = Math.max(0.018, (maxLng - minLng) * 0.4);
+      const latPad = Math.max(0.014, (maxLat - minLat) * 0.4);
+      mapRef.current?.fitBounds(
+        [
+          [minLng - lngPad, minLat - latPad],
+          [maxLng + lngPad, maxLat + latPad],
+        ],
+        {
+          padding: { top: 72, bottom: 100, left: 56, right: consoleMode ? 240 : 56 },
+          duration: 880,
+          maxZoom: 14,
+        }
+      );
+      return;
+    }
+
+    const coord = truckCoord ?? jobCoord;
+    if (!coord) return;
 
     const map = mapRef.current?.getMap();
+    const currentZoom = map?.getZoom() ?? 10;
     mapRef.current?.flyTo({
-      center: [longitude as number, latitude as number],
-      zoom: Math.min(FLEET_MAP_MAX_FIT_ZOOM, Math.max((map?.getZoom() ?? 10) + 0.5, 12)),
-      duration: 720,
+      center: coord,
+      zoom: Math.min(FLEET_MAP_MAX_FIT_ZOOM, Math.max(currentZoom, 12.5)),
+      duration: 780,
       essential: true,
     });
-  }, [highlightedTruckId, jobs, recJobId, selectedJobId, selectionKey, truckLanes]);
+  }, [
+    consoleMode,
+    highlightedTruckId,
+    jobs,
+    recJobId,
+    selectedJobId,
+    selectionKey,
+    truckLanes,
+  ]);
 
   const recConfidence = activeRecommendation ? recommendationConfidence(activeRecommendation) : null;
 
-  const renderTruckHtml = useCallback((props: TruckMarkerProps) => {
-    return truckMarkerHtml(props.state, props.unitNumber);
-  }, []);
+  const renderTruck = useCallback(
+    (props: TruckMarkerProps, meta?: { bearing: number | null }) => (
+      <TruckMarker
+        state={props.state}
+        unitNumber={props.unitNumber}
+        headingDeg={meta?.bearing ?? null}
+        dimmed={props.dimmed === 1}
+        badge={props.badge}
+      />
+    ),
+    []
+  );
 
-  const renderJobHtml = useCallback((props: JobMarkerProps) => {
-    return jobMarkerHtml(props.state, props.priority);
-  }, []);
+  const renderJob = useCallback(
+    (props: JobMarkerProps) => <JobMarker state={props.state} priority={props.priority} />,
+    []
+  );
 
   return (
     <div className={`opmap-shell relative h-full w-full ${consoleMode ? "opmap-shell--console" : ""}`}>
-      <FleetMap ref={mapRef} className="opmap-mapbox h-full w-full" initialCenter={center} initialZoom={bounds ? 10 : 8}>
+      <FleetMap
+        ref={mapRef}
+        className="opmap-mapbox h-full w-full"
+        initialCenter={center}
+        initialZoom={bounds ? 10 : 8}
+        mapStyle={basemap === "satellite" ? FLEET_MAP_STYLE_SATELLITE : FLEET_MAP_STYLE_DARK}
+      >
+        <TrafficLayer visible={trafficOn} />
         <BranchZonesLayer
           zones={branchZoneFeatures}
           showCapacity={layers.capacity}
@@ -350,22 +482,23 @@ export function FleetOperationalMap({
         <RoutesLayer routes={routeLines} visible={layers.routes} />
 
         {layers.trucks || layers.gpsHealth ? (
-          <ClusteredHtmlMarkers<TruckMarkerProps & { dimmed: number }>
+          <ClusteredMarkers<TruckMarkerProps>
             points={truckClusterPoints}
             kind="truck"
-            renderPointHtml={renderTruckHtml}
+            renderPoint={renderTruck}
             onPointClick={(id) => onSelectTruck(highlightedTruckId === id ? null : id)}
             onClusterClick={handleClusterZoom}
-            getOpacity={(props) => (props.dimmed ? 0.45 : 1)}
+            getOpacity={(props) => (props.dimmed === 1 ? 0.45 : 1)}
+            animatedPositions={animatedTruckPositions}
           />
         ) : null}
 
         {(layers.jobs || layers.revenueAtRisk) && jobClusterPoints.length > 0 ? (
-          <ClusteredHtmlMarkers<JobMarkerProps>
+          <ClusteredMarkers<JobMarkerProps>
             points={jobClusterPoints}
             kind="job"
             clusterRadius={48}
-            renderPointHtml={renderJobHtml}
+            renderPoint={renderJob}
             onPointClick={(id) => onSelectJob(selectedJobId === id ? null : id)}
             onClusterClick={handleClusterZoom}
           />
@@ -377,6 +510,38 @@ export function FleetOperationalMap({
       ) : (
         <div className="opmap-vignette pointer-events-none" aria-hidden />
       )}
+
+      {consoleMode ? (
+        <div className="opmap-map-chrome">
+          <button
+            type="button"
+            className={`opmap-map-chrome__chip ${basemap === "dark" ? "opmap-map-chrome__chip--active" : "opmap-map-chrome__chip--muted"}`}
+            aria-pressed={basemap === "dark"}
+            onClick={() => setBasemap("dark")}
+          >
+            Map
+          </button>
+          <button
+            type="button"
+            className={`opmap-map-chrome__chip ${basemap === "satellite" ? "opmap-map-chrome__chip--active" : "opmap-map-chrome__chip--muted"}`}
+            aria-pressed={basemap === "satellite"}
+            onClick={() => setBasemap("satellite")}
+          >
+            Satellite
+          </button>
+          <button
+            type="button"
+            className={`opmap-map-chrome__chip ${trafficOn ? "opmap-map-chrome__chip--active" : "opmap-map-chrome__chip--muted"}`}
+            aria-pressed={trafficOn}
+            onClick={() => setTrafficOn((on) => !on)}
+          >
+            Traffic
+          </button>
+          <button type="button" className="opmap-map-chrome__fit" onClick={handleCenterFleet}>
+            Fit view
+          </button>
+        </div>
+      ) : null}
 
       <div className="opmap-hud opmap-hud--top-left">
         <span className="dispatch-mission__live-badge">
@@ -403,9 +568,10 @@ export function FleetOperationalMap({
         onResetView={handleResetView}
         legendOpen={legendOpen}
         onToggleLegend={() => setLegendOpen((v) => !v)}
+        layerCounts={layerCounts}
       />
 
-      {layers.recommendations && activeRecommendation && topSnapshot ? (
+      {layers.recommendations && activeRecommendation && topSnapshot && !consoleMode ? (
         <div className="opmap-rec-intel">
           <p className="opmap-rec-intel__eyebrow">Recommendation intelligence</p>
           <p className="opmap-rec-intel__title">{activeRecommendation.rationale.title}</p>
@@ -440,7 +606,7 @@ export function FleetOperationalMap({
 
       {activeRisk ? <div className="opmap-risk-banner">{activeRisk}</div> : null}
 
-      {(layers.branches || layers.capacity) && branchZones.length > 0 ? (
+      {(layers.branches || layers.capacity) && branchZones.length > 0 && !consoleMode ? (
         <div className="opmap-branch-legend">
           {branchZones.slice(0, 4).map((zone) => (
             <div key={zone.branch_id} className="opmap-branch-legend__row">

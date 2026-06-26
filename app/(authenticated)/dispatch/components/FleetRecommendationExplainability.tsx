@@ -17,6 +17,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { AppIcon } from "@/src/components/design-system/icons";
 import type { FleetDispatchBoardData, FleetRecommendationInstance } from "@/src/types/fleet";
 import {
   buildRecommendationExplanation,
@@ -201,7 +202,7 @@ function ExplainWhyPanel({ explanation }: { explanation: RecommendationExplanati
       <ul className="mt-1 space-y-0.5">
         {explanation.winnerReasons.map((reason) => (
           <li key={reason} className="flex items-start gap-1.5 text-[10px] leading-snug">
-            <Check className="mt-0.5 size-3 shrink-0 text-emerald-600" />
+            <AppIcon icon={Check} size="xs" intent="success" className="mt-0.5 shrink-0" />
             {reason}
           </li>
         ))}
@@ -217,7 +218,7 @@ function ExplainWhyPanel({ explanation }: { explanation: RecommendationExplanati
                 <ul className="mt-0.5 space-y-0.5">
                   {loser.reasons.map((reason) => (
                     <li key={reason} className="flex items-start gap-1.5 text-[10px] text-[var(--muted)]">
-                      <X className="mt-0.5 size-3 shrink-0 text-red-500" />
+                      <AppIcon icon={X} size="xs" intent="danger" className="mt-0.5 shrink-0" />
                       {reason}
                     </li>
                   ))}
@@ -273,7 +274,7 @@ function FactorScoresGrid({
               key={factor.key}
               className={`flex items-center gap-1.5 rounded-md border px-2 py-1.5 ${qualityColor(factor.quality)}`}
             >
-              <Icon className="size-3 shrink-0" />
+              <AppIcon icon={Icon} size="xs" intent="muted" className="shrink-0" />
               <div className="min-w-0">
                 <p className="truncate text-[9px] font-semibold uppercase opacity-80">{factor.label}</p>
                 <p className="text-[10px] font-bold">{factor.detail}</p>
@@ -370,7 +371,7 @@ function DecisionImpactPanel({
             className="rounded-md border border-[var(--surface-border-subtle)] bg-[var(--surface-raised)]/60 px-2 py-1.5"
           >
             <div className="flex items-center gap-1">
-              <item.icon className="size-3 text-[var(--accent)]" />
+              <AppIcon icon={item.icon} size="xs" intent="operational" />
               <span className="text-[9px] font-semibold uppercase text-[var(--muted)]">{item.label}</span>
             </div>
             <p className="mt-0.5 text-[11px] font-bold tabular-nums">{item.value}</p>
@@ -384,7 +385,7 @@ function DecisionImpactPanel({
 function IgnoreRiskBanner({ message }: { message: string }) {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-[var(--status-danger-subtle)] px-2.5 py-2">
-      <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
+      <AppIcon icon={AlertTriangle} size="xs" intent="danger" className="mt-0.5 shrink-0" />
       <div>
         <p className="text-[10px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400">
           If ignored

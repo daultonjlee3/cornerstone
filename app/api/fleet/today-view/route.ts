@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import { getAuthContext } from "@/src/lib/auth-context";
 import { can } from "@/src/lib/permissions";
 import { loadFleetTodayViewData } from "@/src/lib/fleet/queries/today-view";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
   let auth;
@@ -22,6 +22,12 @@ export async function GET() {
     return NextResponse.json({ error: "No tenant" }, { status: 400 });
   }
 
-  const data = await loadFleetTodayViewData(supabase, auth.tenantId);
+  const dateParam = request.nextUrl.searchParams.get("date")?.trim();
+  const date =
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+      ? dateParam
+      : undefined;
+
+  const data = await loadFleetTodayViewData(supabase, auth.tenantId, date ? { date } : undefined);
   return NextResponse.json(data);
 }

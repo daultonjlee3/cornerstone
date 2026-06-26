@@ -10,6 +10,7 @@ import {
 } from "@/lib/security/rateLimit";
 import { getRequestIp } from "@/lib/security/getRequestIp";
 import { redirect } from "next/navigation";
+import { getDefaultLandingPathForProfile, getProductProfileForTenant, getTenantIdForUser } from "@/src/lib/auth-context";
 
 export type LoginState = { error?: string; needsVerification?: boolean };
 
@@ -73,5 +74,16 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   }
 
   const next = formData.get("next") as string | null;
-  redirect(next && next.startsWith("/") ? next : "/operations");
+  if (next && next.startsWith("/")) {
+    redirect(next);
+  }
+
+  const supabase = await createClient();
+  const tenantId = await getTenantIdForUser(supabase);
+  if (tenantId) {
+    const profile = await getProductProfileForTenant(tenantId, supabase);
+    redirect(getDefaultLandingPathForProfile(profile));
+  }
+
+  redirect("/operations");
 }

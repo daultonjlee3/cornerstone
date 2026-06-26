@@ -1,0 +1,278 @@
+.fleet-mcl {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.fleet-mcl--page {
+  min-height: min(72vh, 42rem);
+  width: 100%;
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--brand-operational) 14%, transparent);
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 40%,
+      color-mix(in srgb, var(--brand-operational) 8%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-default) 98%, transparent),
+      color-mix(in srgb, var(--surface-raised) 92%, transparent)
+    );
+  box-shadow: var(--elevation-1);
+}
+
+.fleet-mcl--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: color-mix(in srgb, #050608 52%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.fleet-mcl__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--brand-operational) 10%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--brand-operational) 10%, transparent) 1px, transparent 1px);
+  background-size: 2.5rem 2.5rem;
+  mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, black 20%, transparent 75%);
+  pointer-events: none;
+}
+
+.fleet-mcl__scanline {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--brand-operational) 4%, transparent) 48%,
+    transparent 52%
+  );
+  animation: fleet-mcl-scan 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.fleet-mcl__core {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+}
+
+.fleet-mcl__radar {
+  position: relative;
+  width: 7.5rem;
+  height: 7.5rem;
+  margin-bottom: var(--space-2);
+}
+
+.fleet-mcl__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--brand-operational) 35%, transparent);
+}
+
+.fleet-mcl__ring--2 {
+  inset: 0.85rem;
+  border-color: color-mix(in srgb, var(--brand-operational) 25%, transparent);
+}
+
+.fleet-mcl__ring--3 {
+  inset: 1.7rem;
+  border-color: color-mix(in srgb, var(--brand-operational) 18%, transparent);
+}
+
+.fleet-mcl__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--brand-operational) 55%, transparent);
+  animation: fleet-mcl-pulse 2.8s ease-out infinite;
+}
+
+.fleet-mcl__sweep {
+  position: absolute;
+  inset: 0.35rem;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.fleet-mcl__sweep::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 50%;
+  height: 50%;
+  transform-origin: 0 0;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--brand-operational) 45%, transparent) 28deg,
+    transparent 56deg
+  );
+  animation: fleet-mcl-sweep 2.4s linear infinite;
+}
+
+.fleet-mcl__core-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.55rem;
+  height: 0.55rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--brand-operational);
+  box-shadow: 0 0 1rem color-mix(in srgb, var(--brand-operational) 70%, transparent);
+}
+
+.fleet-mcl__eyebrow {
+  margin: 0;
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--brand-operational);
+}
+
+.fleet-mcl__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.fleet-mcl__messages {
+  position: relative;
+  min-height: 1.25rem;
+  width: min(22rem, 80vw);
+}
+
+.fleet-mcl__message {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  color: var(--text-muted);
+  opacity: 0;
+  animation: fleet-mcl-message 7.2s ease-in-out infinite;
+}
+
+.fleet-mcl__message:nth-child(2) {
+  animation-delay: 2.4s;
+}
+
+.fleet-mcl__message:nth-child(3) {
+  animation-delay: 4.8s;
+}
+
+.fleet-mcl__progress {
+  width: min(14rem, 70vw);
+  height: 0.2rem;
+  margin-top: var(--space-1);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--brand-operational) 12%, transparent);
+  overflow: hidden;
+}
+
+.fleet-mcl__progress-bar {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--brand-operational),
+    transparent
+  );
+  animation: fleet-mcl-progress 1.6s ease-in-out infinite;
+}
+
+@keyframes fleet-mcl-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fleet-mcl-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes fleet-mcl-scan {
+  0%,
+  100% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.65;
+  }
+  50% {
+    transform: translateY(120%);
+    opacity: 0.35;
+  }
+}
+
+@keyframes fleet-mcl-message {
+  0%,
+  6%,
+  28%,
+  100% {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  10%,
+  24% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fleet-mcl-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleet-mcl__sweep::before,
+  .fleet-mcl__pulse,
+  .fleet-mcl__scanline,
+  .fleet-mcl__progress-bar,
+  .fleet-mcl__message {
+    animation: none;
+  }
+
+  .fleet-mcl__message:first-child {
+    opacity: 1;
+    position: static;
+  }
+
+  .fleet-mcl__message:not(:first-child) {
+    display: none;
+  }
+}

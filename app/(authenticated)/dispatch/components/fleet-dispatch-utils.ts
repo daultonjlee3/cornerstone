@@ -25,6 +25,28 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Sum expected contribution from pending recommendations (dispatch AI opportunity). */
+export function sumRecommendationContribution(
+  recommendations: FleetRecommendationInstance[]
+): number {
+  return Math.round(
+    recommendations.reduce(
+      (sum, rec) => sum + (rec.rationale.candidate_snapshots?.[0]?.estimated_contribution ?? 0),
+      0
+    ) * 100
+  ) / 100;
+}
+
+/** Fleet-wide utilization from branch capacity snapshots (0–100+). */
+export function branchCapacityUtilizationPercent(board: FleetDispatchBoardData): number | null {
+  const branches = board.branchCapacity.filter((b) => b.available_truck_hours > 0);
+  if (branches.length === 0) return null;
+  const available = branches.reduce((s, b) => s + b.available_truck_hours, 0);
+  const committed = branches.reduce((s, b) => s + b.committed_hours, 0);
+  if (available <= 0) return null;
+  return Math.round((committed / available) * 10000) / 100;
+}
+
 export function formatTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);

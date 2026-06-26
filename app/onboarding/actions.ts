@@ -2,6 +2,7 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { SIGNUP_PRODUCT_PROFILE, type ProductProfile } from "@/src/types/fleet";
 
 export type OnboardingState = { error?: string };
 
@@ -33,9 +34,12 @@ export async function onboardingAction(
   }
 
   // Step 1: Create tenant
+  const productProfile: ProductProfile =
+    source === "demo" ? "cmms" : SIGNUP_PRODUCT_PROFILE;
+
   const { data: tenant, error: tenantError } = await supabase
     .from("tenants")
-    .insert({ name: tenantName })
+    .insert({ name: tenantName, product_profile: productProfile })
     .select("id")
     .single();
 
@@ -78,5 +82,5 @@ export async function onboardingAction(
   if (source === "demo") {
     redirect("/operations?onboarding=1&guide=create-asset&source=demo");
   }
-  redirect("/onboarding-wizard");
+  redirect("/operations");
 }

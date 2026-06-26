@@ -56,6 +56,7 @@ type TopBarProps = {
   onOpenAiPanel?: () => void;
   isImpersonating?: boolean;
   onReturnToProfile?: () => void;
+  productProfile?: import("@/src/types/fleet").ProductProfile;
 };
 
 const RECENT_SEARCHES_KEY = "cornerstone:recent-searches";
@@ -88,9 +89,12 @@ export function TopBar({
   onOpenAiPanel,
   isImpersonating = false,
   onReturnToProfile,
+  productProfile = "cmms",
 }: TopBarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const isFleetUi =
+    productProfile === "fleet_intelligence" || productProfile === "hybrid";
   const searchParams = useSearchParams();
   const { isLiveDemoMode } = useGuidance();
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -500,7 +504,7 @@ export function TopBar({
               className="hidden h-9 items-center gap-1.5 rounded-lg border border-[var(--brand-operational)]/35 bg-[var(--brand-operational-subtle)] px-3 text-xs font-semibold text-[var(--brand-operational)] transition-colors hover:brightness-110 sm:inline-flex"
             >
               <Sparkles className="size-3.5" />
-              AI Copilot
+              {isFleetUi ? "Fleet Copilot" : "AI Copilot"}
             </button>
           ) : null}
         {isLiveDemoMode ? (

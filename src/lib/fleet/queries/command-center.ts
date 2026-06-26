@@ -80,7 +80,10 @@ export async function loadFleetCommandCenterData(
       0
     );
     if (totalHours > 0) {
-      utilizationPercent = Math.round((totalBillable / totalHours) * 10000) / 100;
+      utilizationPercent = Math.min(
+        100,
+        Math.round((totalBillable / totalHours) * 10000) / 100
+      );
     }
   }
 

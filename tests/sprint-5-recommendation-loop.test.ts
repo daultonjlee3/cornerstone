@@ -221,6 +221,51 @@ describe("validateRecommendationAcceptance", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("job_already_assigned");
   });
+
+  it("allows accept when job is already scheduled to the recommended truck", () => {
+    const board = sampleBoard();
+    board.jobs[0].assigned_truck_id = "truck-1";
+    board.jobs[0].status = "scheduled";
+    board.unassignedJobs = [];
+
+    const rec: FleetRecommendationInstance = {
+      id: "r1",
+      tenant_id: "t1",
+      branch_id: "branch-a",
+      recommendation_type: "truck_assignment",
+      status: "pending",
+      score: 80,
+      engine_version: "fleet_rules_v2",
+      created_at: "2026-06-24T12:00:00.000Z",
+      expires_at: "2026-06-24T23:00:00.000Z",
+      rationale: {
+        title: "Test",
+        reasons: [],
+        factors: {
+          travelImpact: 80,
+          utilizationImpact: 70,
+          capacityImpact: 70,
+          telematicsFreshness: 90,
+        },
+        entities: { job_id: "job-1", truck_id: "truck-1" },
+        job_snapshot: {
+          job_id: "job-1",
+          status: "unassigned",
+          assigned_truck_id: null,
+          priority: "urgent",
+          revenue_estimate: 6900,
+          required_truck_type: "hydrovac",
+        },
+      },
+    };
+
+    const result = validateRecommendationAcceptance({
+      recommendation: rec,
+      board,
+      now: new Date("2026-06-24T12:00:00.000Z"),
+    });
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("measureRecommendationOutcome", () => {

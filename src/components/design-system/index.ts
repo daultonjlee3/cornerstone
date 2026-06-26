@@ -26,3 +26,19 @@ export {
   PRIORITY_CHIP_MAP,
   STATUS_CHIP_MAP,
 } from "./chip-maps";
+export {
+  AppIcon,
+  IconChip,
+  StatusIcon,
+  MapLayerIcon,
+  MetricIcon,
+  truckStatusToOperational,
+} from "./icons";
+export type {
+  AppIconSize,
+  AppIconIntent,
+  IconChipVariant,
+  IconChipSize,
+  OperationalStatus,
+  MapLayerName,
+} from "./icons";

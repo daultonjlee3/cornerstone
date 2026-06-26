@@ -1,21 +1,29 @@
 import Link from "next/link";
 import {
   FLEET_ANCHORS,
-  FLEET_INTEGRATIONS,
   FLEET_ROUTES,
   FLEET_SITE_NAME,
   FLEET_TAGLINE,
+  fleetHomeSection,
 } from "@/lib/fleet-marketing-site";
 import { FleetLogo } from "./fleet-logo";
 
 const linkClass = "text-sm text-[var(--muted)] transition-colors hover:text-[var(--accent)]";
 
 const platformLinks = [
-  { label: "AI Recommendations", href: FLEET_ANCHORS.recommendations },
-  { label: "Fleet Command Center", href: FLEET_ANCHORS.commandCenter },
-  { label: "Implementation Center", href: FLEET_ANCHORS.implementation },
-  { label: "Operational Impact", href: FLEET_ANCHORS.impact },
-  { label: "Security & Trust", href: FLEET_ANCHORS.security },
+  { label: "Business Outcomes", href: fleetHomeSection(FLEET_ANCHORS.outcomes) },
+  { label: "The Operational Loop", href: fleetHomeSection(FLEET_ANCHORS.operationalLoop) },
+  { label: "Fleet Command Center", href: fleetHomeSection(FLEET_ANCHORS.commandCenter) },
+  { label: "Operational Impact", href: fleetHomeSection(FLEET_ANCHORS.impact) },
+  { label: "Security & Trust", href: fleetHomeSection(FLEET_ANCHORS.security) },
+];
+
+const solutionLinks = [
+  { label: "Integrations", href: FLEET_ROUTES.integrations },
+  { label: "Implementation", href: FLEET_ROUTES.implementation },
+  { label: "Launch Estimator", href: FLEET_ROUTES.launchEstimator },
+  { label: "About", href: FLEET_ROUTES.about },
+  { label: "Contact", href: FLEET_ROUTES.contact },
 ];
 
 export function FleetMarketingFooter() {
@@ -25,10 +33,10 @@ export function FleetMarketingFooter() {
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <FleetLogo showText />
-            <p className="mt-3 text-sm text-[var(--muted)]">{FLEET_TAGLINE}</p>
-            <p className="mt-4 text-xs leading-relaxed text-[var(--muted)]/80">
-              Operational intelligence for industrial fleets. Connect your systems, establish a
-              baseline, and act on recommendations that protect margin and performance.
+            <p className="mt-3 text-sm font-medium text-[var(--foreground)]">{FLEET_TAGLINE}</p>
+            <p className="mt-4 text-xs leading-relaxed text-[var(--muted)]">
+              The operational intelligence layer for industrial fleets. Connect your systems,
+              recommend the next best action, and protect margin with every dispatch decision.
             </p>
           </div>
 
@@ -49,13 +57,13 @@ export function FleetMarketingFooter() {
 
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--foreground)]">
-              Integrations
+              Solutions
             </h3>
             <ul className="mt-4 space-y-3">
-              {FLEET_INTEGRATIONS.slice(0, 5).map((item) => (
-                <li key={item.name}>
-                  <Link href={FLEET_ANCHORS.integrations} className={linkClass}>
-                    {item.name}
+              {solutionLinks.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className={linkClass}>
+                    {item.label}
                   </Link>
                 </li>
               ))}
@@ -64,19 +72,9 @@ export function FleetMarketingFooter() {
 
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--foreground)]">
-              Company
+              Legal
             </h3>
             <ul className="mt-4 space-y-3">
-              <li>
-                <Link href={FLEET_ROUTES.about} className={linkClass}>
-                  About
-                </Link>
-              </li>
-              <li>
-                <Link href={FLEET_ROUTES.contact} className={linkClass}>
-                  Contact
-                </Link>
-              </li>
               <li>
                 <Link href={FLEET_ROUTES.privacy} className={linkClass}>
                   Privacy Policy

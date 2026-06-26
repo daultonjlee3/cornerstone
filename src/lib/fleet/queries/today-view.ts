@@ -9,6 +9,7 @@ import type {
   FleetMetricDelta,
   FleetMetricDeltaDirection,
   FleetOperationalException,
+  FleetRecommendationsResponse,
   FleetTodayViewData,
   IntegrationConnection,
 } from "@/src/types/fleet";
@@ -461,22 +462,40 @@ async function loadDayOverDayMetrics(
   ];
 }
 
+export type LoadFleetTodayViewOptions = {
+  /** Board date for metrics (defaults to UTC today) */
+  date?: string;
+  /** Preloaded dispatch board — avoids duplicate query on /dispatch */
+  board?: FleetDispatchBoardData;
+  /** Preloaded recommendations — avoids duplicate generation on /dispatch */
+  recommendations?: FleetRecommendationsResponse;
+};
+
 export async function loadFleetTodayViewData(
   supabase: SupabaseClient,
-  tenantId: string
+  tenantId: string,
+  options?: LoadFleetTodayViewOptions
 ): Promise<FleetTodayViewData> {
-  const date = todayDateOnly();
+  const date = options?.date ?? todayDateOnly();
   const yesterday = yesterdayDateOnly();
 
   const weekStart = new Date(`${date}T12:00:00.000Z`);
   weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
   const weekStartStr = weekStart.toISOString().slice(0, 10);
 
+  const boardPromise = options?.board
+    ? Promise.resolve(options.board)
+    : loadFleetDispatchBoardData(supabase, tenantId, date);
+
+  const recommendationsPromise = options?.recommendations
+    ? Promise.resolve(options.recommendations)
+    : getFleetRecommendations(supabase, tenantId, { date });
+
   const [commandCenter, board, recommendations, connectionsResult, executiveInsights, recommendationRoi] =
     await Promise.all([
     loadFleetCommandCenterData(supabase, tenantId),
-    loadFleetDispatchBoardData(supabase, tenantId, date),
-    getFleetRecommendations(supabase, tenantId, { date }),
+    boardPromise,
+    recommendationsPromise,
     supabase
       .from("integration_connections")
       .select("id, provider, display_name, status, config, last_sync_at, last_error")

@@ -1,0 +1,266 @@
+/* Fleet Intelligence Copilot — docked dark glass panel */
+
+.fleet-copilot {
+  --fleet-copilot-width: 20rem;
+  --fleet-copilot-collapsed-width: 2.75rem;
+  z-index: 40;
+}
+
+.fleet-copilot--docked {
+  position: fixed;
+  top: var(--shell-topbar-height, 3.5rem);
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: row;
+  pointer-events: none;
+}
+
+.fleet-copilot--docked .fleet-copilot__panel,
+.fleet-copilot--docked .fleet-copilot__collapse-rail {
+  pointer-events: auto;
+}
+
+.fleet-copilot--floating {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 40;
+  width: min(100vw - 2rem, 22rem);
+  max-height: min(26rem, calc(100vh - var(--shell-topbar-height, 3.5rem) - 2rem));
+}
+
+.fleet-copilot__collapse-rail {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: var(--fleet-copilot-collapsed-width);
+  padding: var(--space-3) var(--space-1);
+  border-left: 1px solid color-mix(in srgb, white 6%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-default) 88%, #050608) 0%,
+    color-mix(in srgb, var(--surface-raised) 72%, transparent) 100%
+  );
+  backdrop-filter: blur(12px);
+}
+
+@media (min-width: 1024px) {
+  .fleet-copilot--docked .fleet-copilot__collapse-rail {
+    display: flex;
+  }
+}
+
+.fleet-copilot__collapse-btn {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--brand-operational) 35%, transparent);
+  background: color-mix(in srgb, var(--brand-operational-subtle) 80%, transparent);
+  color: var(--brand-operational);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fleet-copilot__collapse-btn:hover {
+  background: color-mix(in srgb, var(--brand-operational-subtle) 100%, transparent);
+  border-color: color-mix(in srgb, var(--brand-operational) 55%, transparent);
+}
+
+.fleet-copilot__panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid color-mix(in srgb, white 6%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-default) 94%, #050608) 0%,
+    color-mix(in srgb, var(--surface-raised) 78%, transparent) 100%
+  );
+  backdrop-filter: blur(16px);
+  box-shadow: -8px 0 32px color-mix(in srgb, black 35%, transparent);
+}
+
+.fleet-copilot--docked .fleet-copilot__panel {
+  width: var(--fleet-copilot-width);
+  height: 100%;
+}
+
+.fleet-copilot--floating .fleet-copilot__panel {
+  max-height: min(26rem, calc(100vh - var(--shell-topbar-height, 3.5rem) - 2rem));
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, white 8%, transparent);
+  box-shadow: -4px 8px 32px color-mix(in srgb, black 40%, transparent);
+}
+
+.fleet-copilot__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, white 5%, transparent);
+}
+
+.fleet-copilot__title-block {
+  min-width: 0;
+}
+
+.fleet-copilot__eyebrow {
+  font-size: var(--font-size-micro);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-operational);
+}
+
+.fleet-copilot__title {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.fleet-copilot__subtitle {
+  margin-top: 2px;
+  font-size: var(--font-size-caption);
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.fleet-copilot__body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.fleet-copilot__body::-webkit-scrollbar {
+  width: var(--scrollbar-size, 6px);
+}
+
+.fleet-copilot__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fleet-copilot__body::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full, 999px);
+  background: var(--scrollbar-thumb);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.fleet-copilot__body::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.fleet-copilot__category {
+  margin-bottom: var(--space-3);
+}
+
+.fleet-copilot__category-label {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.fleet-copilot__prompt {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, white 6%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: var(--font-size-caption);
+  color: var(--foreground);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.fleet-copilot__prompt:hover {
+  border-color: color-mix(in srgb, var(--brand-operational) 35%, transparent);
+  background: color-mix(in srgb, var(--brand-operational-subtle) 45%, transparent);
+}
+
+.fleet-copilot__input-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid color-mix(in srgb, white 5%, transparent);
+  background: color-mix(in srgb, var(--surface-default) 60%, transparent);
+}
+
+.fleet-copilot__input {
+  min-width: 0;
+  flex: 1;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, white 8%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-caption);
+  color: var(--foreground);
+}
+
+.fleet-copilot__input::placeholder {
+  color: var(--text-muted);
+}
+
+.fleet-copilot__input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brand-operational) 45%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-operational) 18%, transparent);
+}
+
+.fleet-copilot__message {
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, white 6%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 50%, transparent);
+  padding: var(--space-3);
+}
+
+.fleet-copilot__message-label {
+  font-size: var(--font-size-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.fleet-copilot__message-text {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-caption);
+  line-height: 1.45;
+  color: var(--foreground);
+}
+
+.fleet-copilot__loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-muted);
+}
+
+.fleet-copilot--collapsed.fleet-copilot--docked .fleet-copilot__panel {
+  display: none;
+}
+
+.fleet-copilot--collapsed.fleet-copilot--docked {
+  width: var(--fleet-copilot-collapsed-width);
+}

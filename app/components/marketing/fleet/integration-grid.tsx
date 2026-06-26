@@ -17,6 +17,7 @@ const ICONS: Record<string, LucideIcon> = {
   Motive: Truck,
   Fleetio: Wrench,
   QuickBooks: Wallet,
+  ServiceTitan: Wrench,
   "REST API": Cable,
   Webhooks: Link2,
   "CSV Import": FileSpreadsheet,

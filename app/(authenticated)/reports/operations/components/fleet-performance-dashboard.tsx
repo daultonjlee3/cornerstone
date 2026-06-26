@@ -18,6 +18,7 @@ import { MetricCard } from "@/src/components/ui/metric-card";
 import { DataTable, Table, TableHead, Th, TBody, Tr, Td } from "@/src/components/ui/data-table";
 import type { FleetPerformanceDashboardData } from "@/src/types/fleet";
 import { FleetUtilizationFilters } from "./fleet-utilization-filters";
+import { FleetPerformanceCopilotBridge } from "./FleetPerformanceCopilotBridge";
 
 type FleetPerformanceDashboardProps = {
   data: FleetPerformanceDashboardData;
@@ -57,6 +58,7 @@ export function FleetPerformanceDashboard({
 
   return (
     <div className="space-y-6" data-testid="fleet-performance-dashboard">
+      <FleetPerformanceCopilotBridge data={data} branchId={branchId} truckId={truckId} />
       <FleetUtilizationFilters
         from={data.from}
         to={data.to}

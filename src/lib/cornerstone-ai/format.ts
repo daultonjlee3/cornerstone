@@ -17,6 +17,8 @@ export function formatAiResponse(
     sources?: { title: string; moduleKey?: string; path?: string }[];
     quotaStatus?: { remainingBudgetUsd: number; remainingCredits: number };
     warnings?: string[];
+    followUpSuggestions?: string[];
+    bulletHighlights?: string[];
   } = {}
 ): CornerstoneAiResponse {
   let answer = rawContent.trim();
@@ -43,9 +45,9 @@ export function formatAiResponse(
   return {
     intent,
     answer: answer || "I couldn’t generate a response. Try rephrasing or ask for help.",
-    bulletHighlights,
+    bulletHighlights: options.bulletHighlights ?? bulletHighlights,
     sources: options.sources ?? [],
-    followUpSuggestions,
+    followUpSuggestions: options.followUpSuggestions ?? followUpSuggestions,
     mode,
     quotaStatus: options.quotaStatus,
     warnings: options.warnings ?? [],

@@ -26,6 +26,7 @@ export type TruckVisualState =
   | "available"
   | "driving"
   | "working"
+  | "idle"
   | "busy"
   | "offline"
   | "critical"

@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  getDefaultLandingPathForProfile,
+  getProductProfileForTenant,
+} from "@/src/lib/auth-context";
 import { createClient } from "@/src/lib/supabase/server";
 import { fetchPexelsImage } from "@/src/lib/images/pexels";
 import { getPexelsQueryForAssetType } from "@/src/lib/images/assetImageQueries";
@@ -974,5 +978,6 @@ export async function completeOnboardingWizardAction(): Promise<void> {
     .update({ onboarding_completed_at: new Date().toISOString() })
     .eq("id", scope.companyId);
 
-  redirect("/dashboard");
+  const profile = await getProductProfileForTenant(scope.tenantId, scope.supabase);
+  redirect(getDefaultLandingPathForProfile(profile));
 }

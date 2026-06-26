@@ -30,7 +30,7 @@ export async function POST(
   }
 
   const { id } = await params;
-  const body = (await request.json().catch(() => ({}))) as { notes?: string };
+  const body = (await request.json().catch(() => ({}))) as { notes?: string; date?: string };
 
   try {
     const recommendation = await applyRecommendationOutcome(supabase, auth.tenantId, {
@@ -38,6 +38,7 @@ export async function POST(
       action: "accepted",
       actedBy: auth.userId ?? null,
       notes: body.notes ?? null,
+      boardDate: body.date ?? null,
     });
     return NextResponse.json({ recommendation });
   } catch (error) {

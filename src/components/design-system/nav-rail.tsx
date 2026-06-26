@@ -1,6 +1,7 @@
-import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { AppIcon } from "./icons";
 
 type NavRailProps = {
   children: ReactNode;
@@ -101,7 +102,9 @@ export function NavRailItem({
         title={collapsed ? label : undefined}
         className={`cs-nav-rail__item ${active ? "cs-nav-rail__item--active" : ""} ${collapsed ? "cs-nav-rail__item--collapsed" : ""}`}
       >
-        {Icon ? <Icon className="cs-nav-rail__item-icon" strokeWidth={1.75} aria-hidden /> : null}
+        {Icon ? (
+          <AppIcon icon={Icon} size="sm" intent={active ? "operational" : "muted"} className="cs-nav-rail__item-icon" />
+        ) : null}
         {!collapsed ? <span className="cs-nav-rail__item-label">{label}</span> : null}
         {active && !collapsed ? <span className="cs-nav-rail__item-indicator" aria-hidden /> : null}
       </Link>
@@ -126,7 +129,7 @@ export function NavRailBrand({
     <Link href={href} className={`cs-nav-rail__brand ${collapsed ? "cs-nav-rail__brand--collapsed" : ""}`}>
       {Icon ? (
         <span className="cs-nav-rail__brand-icon">
-          <Icon className="cs-icon cs-icon--md" strokeWidth={2} aria-hidden />
+          <AppIcon icon={Icon} size="md" intent="operational" />
         </span>
       ) : null}
       {!collapsed ? (

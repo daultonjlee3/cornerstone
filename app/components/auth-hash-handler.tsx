@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/client";
 
 /**
@@ -12,8 +11,6 @@ import { createClient } from "@/src/lib/supabase/client";
  * Does nothing when there is no auth hash. Safe to mount in the root layout.
  */
 export function AuthHashHandler() {
-  const router = useRouter();
-  const pathname = usePathname();
   const handled = useRef(false);
 
   useEffect(() => {
@@ -50,12 +47,14 @@ export function AuthHashHandler() {
           /* keep default */
         }
         window.history.replaceState(null, "", next);
-        router.replace(next);
+        // Full navigation avoids "Router action dispatched before initialization"
+        // when the App Router action queue is not ready yet (common on hash redirects).
+        window.location.replace(next);
       })
       .catch(() => {
         handled.current = false;
       });
-  }, [router, pathname]);
+  }, []);
 
   return null;
 }

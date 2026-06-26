@@ -4,6 +4,12 @@ import { getAuthContext, getProductProfileForTenant } from "@/src/lib/auth-conte
 import { loadCompanyOperatingRules } from "@/src/lib/operational-profitability/queries";
 import { OperatingRulesForm } from "./operating-rules-form";
 import { saveCompanyOperatingRules } from "./actions";
+import { PeachtreeDemoResetPanel } from "./peachtree-demo-reset-panel";
+import { canManagePeachtreeDemoReset } from "@/src/lib/fleet/demo/peachtree-demo-auth";
+import {
+  DEMO_DAY_UNASSIGNED_TARGET,
+  TOTAL_TRUCKS,
+} from "@/scripts/seed-fleet-demo/constants";
 
 export default async function SettingsCompanyPage() {
   const supabase = await createClient();
@@ -49,8 +55,16 @@ export default async function SettingsCompanyPage() {
       )
     : [];
 
+  const showPeachtreeDemoReset = canManagePeachtreeDemoReset(ctx, t?.slug ?? null);
+
   return (
     <div className="space-y-6">
+      {showPeachtreeDemoReset ? (
+        <PeachtreeDemoResetPanel
+          truckTarget={TOTAL_TRUCKS}
+          unassignedTarget={DEMO_DAY_UNASSIGNED_TARGET}
+        />
+      ) : null}
       <section className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
           Organization (tenant)

@@ -1,5 +1,8 @@
 export type ProductProfile = "cmms" | "fleet_intelligence" | "hybrid";
 
+/** Default product profile for self-serve signups (not live-demo visitors). */
+export const SIGNUP_PRODUCT_PROFILE: ProductProfile = "fleet_intelligence";
+
 export type IntegrationProvider =
   | "csv_manual"
   | "samsara"
@@ -359,6 +362,12 @@ export type FleetDispatchTruckLane = {
   longitude: number | null;
   telematics_status: TruckTelematicsStatus;
   operator_name?: string | null;
+  operator_id?: string | null;
+  operator_certifications?: string[];
+  operator_truck_qualifications?: string[];
+  operator_daily_hours?: number;
+  operator_weekly_hours?: number;
+  operator_on_pto?: boolean;
   revenue_today?: number;
   idle_hours?: number;
   fuel_level_pct?: number | null;
@@ -651,6 +660,65 @@ export type FleetRecommendationRationale = {
     required_truck_type: string;
   };
   generated_at?: string;
+  /** Dispatch board date (YYYY-MM-DD) used when this recommendation was generated */
+  board_date?: string;
+  /** SHA-256 digest of operational snapshot at generation time */
+  snapshot_hash?: string;
+  replaced_recommendation_id?: string;
+  replacement_reason?: string;
+  /** Read-time validation metadata — attached before DISPLAYED */
+  validation_health?: FleetRecommendationValidationHealth;
+};
+
+export type RecommendationLifecyclePhase =
+  | "draft"
+  | "validating"
+  | "ready"
+  | "displayed"
+  | "accepted"
+  | "rejected"
+  | "expired"
+  | "failed"
+  | "invalid";
+
+export type FleetRecommendationValidationHealth = {
+  status: "valid" | "invalid";
+  lifecycle: RecommendationLifecyclePhase;
+  validated_at: string;
+  snapshot_version: string;
+  snapshot_hash?: string;
+  generated_at: string;
+  constraint_violations: Array<{ code: string; message: string }>;
+  /** Calibrated trust score — separate from ranking score */
+  confidence: number;
+  ranking_score: number;
+  constraint_count: number;
+  freshness: "current" | "stale";
+  validation_ms?: number;
+  board_date?: string;
+};
+
+export type FleetRecommendationRecalculationReplacement = {
+  job_id?: string;
+  previous_unit_number?: string;
+  previous_truck_id?: string;
+  new_unit_number?: string;
+  new_truck_id?: string;
+  reason: string;
+  contribution_delta?: number | null;
+  confidence?: number | null;
+  expected_contribution?: number | null;
+};
+
+export type FleetRecommendationRecalculationNotice = {
+  message: string;
+  invalidated_count: number;
+  replaced_count: number;
+  replacements?: FleetRecommendationRecalculationReplacement[];
+  details?: Array<{
+    previous_unit_number?: string;
+    reason: string;
+  }>;
 };
 
 export type FleetRecommendationInstance = {
@@ -659,6 +727,7 @@ export type FleetRecommendationInstance = {
   branch_id: string;
   recommendation_type: FleetRecommendationType;
   status: FleetRecommendationStatus;
+  lifecycle?: RecommendationLifecyclePhase;
   score: number;
   rationale: FleetRecommendationRationale;
   engine_version: string;
@@ -727,4 +796,5 @@ export type FleetRecommendationsResponse = {
   pending: FleetRecommendationInstance[];
   history: FleetRecommendationHistoryEntry[];
   summary: FleetRecommendationSummary;
+  recalculationNotice?: FleetRecommendationRecalculationNotice;
 };

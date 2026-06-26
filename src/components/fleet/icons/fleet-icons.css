@@ -1,0 +1,329 @@
+/* Cornerstone Fleet Intelligence — proprietary icon system */
+
+.cs-icon__stroke {
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+}
+
+.cs-icon__fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ── Marker shell ── */
+
+.cs-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cs-marker-size, 24px);
+  height: var(--cs-marker-size, 24px);
+  transition: transform 0.22s ease, filter 0.22s ease, opacity 0.22s ease;
+}
+
+.cs-marker--animated:hover {
+  transform: scale(1.1) translateY(-2px);
+  z-index: 900;
+}
+
+.cs-marker--dimmed {
+  opacity: 0.45;
+  filter: grayscale(0.35);
+}
+
+.cs-marker__shadow {
+  position: absolute;
+  bottom: -2px;
+  width: 72%;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.38);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.cs-marker__body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cs-marker__body--headed {
+  transform-origin: center 58%;
+}
+
+.cs-marker--selected .cs-marker__body {
+  filter: drop-shadow(0 0 10px rgba(45, 212, 191, 0.55));
+}
+
+.cs-marker--recommended .cs-marker__body {
+  animation: cs-pulse 2.4s ease-in-out infinite;
+}
+
+/* ── Status ring ── */
+
+.cs-status-ring {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cs-status-ring--selected {
+  border: 1.5px solid rgba(45, 212, 191, 0.75);
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.35);
+}
+
+.cs-status-ring--recommended {
+  border: 1.5px solid rgba(249, 115, 22, 0.65);
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.28);
+}
+
+.cs-status-ring--alert {
+  border: 1.5px solid rgba(248, 113, 113, 0.7);
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.3);
+}
+
+.cs-status-ring--pulse {
+  animation: cs-ring-pulse 2.4s ease-in-out infinite;
+}
+
+/* ── Cornerstone truck ── */
+
+.cs-truck-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+}
+
+.cs-truck-marker__icon {
+  display: flex;
+  width: calc(var(--cs-marker-size, 24px) * 0.78);
+  height: calc(var(--cs-marker-size, 24px) * 0.95);
+}
+
+.cs-truck-marker__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cs-truck__needle {
+  stroke: currentColor;
+  stroke-width: 1.75;
+  opacity: 0.9;
+}
+
+.cs-truck__cab,
+.cs-truck__body {
+  fill: rgba(8, 12, 16, 0.94);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.cs-truck__wheel {
+  fill: rgba(0, 0, 0, 0.55);
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.cs-truck-marker--driving .cs-truck__needle {
+  opacity: 1;
+  stroke-width: 2;
+}
+
+.cs-truck-marker--recommended {
+  color: #ffffff !important;
+}
+
+.cs-truck-marker--offline {
+  opacity: 0.72;
+}
+
+.cs-truck-marker__label {
+  margin-top: 1px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #e8ecf1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.cs-truck-marker__badge-slot {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  z-index: 5;
+}
+
+/* ── Job site marker ── */
+
+.cs-job-marker {
+  position: relative;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.42));
+}
+
+.cs-job-marker__icon {
+  display: flex;
+  width: calc(var(--cs-marker-size, 24px) * 0.72);
+  height: calc(var(--cs-marker-size, 24px) * 0.84);
+}
+
+.cs-job-marker__svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cs-job-marker__shell {
+  fill: rgba(8, 12, 16, 0.92);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.cs-job-marker__core {
+  fill: currentColor;
+  opacity: 0.85;
+}
+
+.cs-job-marker--emergency .cs-job-marker__shell,
+.cs-job-marker--delayed .cs-job-marker__shell {
+  animation: cs-pulse-risk 2s ease-in-out infinite;
+}
+
+.cs-job-marker--waiting .cs-job-marker__core {
+  opacity: 0.35;
+}
+
+/* ── Badges ── */
+
+.cs-badges {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.cs-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0b0e14;
+  background: var(--cs-badge-color, #fbbf24);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.cs-badge--md {
+  min-width: 18px;
+  height: 18px;
+  font-size: 8px;
+  border-radius: 5px;
+}
+
+/* ── Cluster ── */
+
+.cs-cluster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cs-cluster-size, 32px);
+  height: var(--cs-cluster-size, 32px);
+  cursor: pointer;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+  transition: transform 0.18s ease;
+}
+
+.cs-cluster:hover {
+  transform: scale(1.08);
+}
+
+.cs-cluster__ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+}
+
+.cs-cluster__ring--outer {
+  inset: 0;
+  background: rgba(8, 12, 16, 0.55);
+}
+
+.cs-cluster__ring--inner {
+  inset: 3px;
+  background: rgba(8, 12, 16, 0.82);
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+.cs-cluster--job .cs-cluster__ring--inner {
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+.cs-cluster__core {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cs-cluster__count {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #e8ecf1;
+  letter-spacing: -0.02em;
+}
+
+/* ── Animations ── */
+
+@keyframes cs-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.92; }
+}
+
+@keyframes cs-pulse-risk {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+@keyframes cs-ring-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-marker--recommended .cs-marker__body,
+  .cs-status-ring--pulse,
+  .cs-job-marker--emergency .cs-job-marker__shell,
+  .cs-job-marker--delayed .cs-job-marker__shell {
+    animation: none;
+  }
+
+  .cs-marker,
+  .cs-marker__body,
+  .cs-cluster {
+    transition: none;
+  }
+}
+
+/* Size scale helpers for map zoom tiers */
+.cs-marker--xs { --cs-marker-size: 16px; }
+.cs-marker--sm { --cs-marker-size: 24px; }
+.cs-marker--md { --cs-marker-size: 32px; }
+.cs-marker--lg { --cs-marker-size: 48px; }

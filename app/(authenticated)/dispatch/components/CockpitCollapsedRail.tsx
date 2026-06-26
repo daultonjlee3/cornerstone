@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Inbox, Sparkles } from "lucide-react";
+import { AppIcon, IconChip } from "@/src/components/design-system/icons";
 
 type CockpitCollapsedRailProps = {
   side: "left" | "right";
@@ -17,7 +18,7 @@ export function CockpitCollapsedRail({
   accent,
   onExpand,
 }: CockpitCollapsedRailProps) {
-  const Icon = side === "left" ? Inbox : Sparkles;
+  const panelIcon = side === "left" ? Inbox : Sparkles;
 
   return (
     <button
@@ -28,11 +29,15 @@ export function CockpitCollapsedRail({
       title={`Expand ${label}`}
     >
       {side === "left" ? (
-        <ChevronRight className="dispatch-console__rail-collapsed-chevron" />
+        <AppIcon icon={ChevronRight} size="sm" intent="muted" className="dispatch-console__rail-collapsed-chevron" />
       ) : (
-        <ChevronLeft className="dispatch-console__rail-collapsed-chevron" />
+        <AppIcon icon={ChevronLeft} size="sm" intent="muted" className="dispatch-console__rail-collapsed-chevron" />
       )}
-      <Icon className={`size-4 ${accent ? "text-[var(--brand-operational)]" : "text-[var(--text-muted)]"}`} />
+      {side === "right" && accent ? (
+        <IconChip icon={Sparkles} variant="ai" size="sm" label={label} />
+      ) : (
+        <AppIcon icon={panelIcon} size="sm" intent={accent ? "operational" : "muted"} />
+      )}
       <span className="dispatch-console__rail-collapsed-label">{label}</span>
       {count > 0 ? <span className="dispatch-console__rail-collapsed-badge">{count}</span> : null}
     </button>

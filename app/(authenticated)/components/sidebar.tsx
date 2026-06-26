@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -55,6 +55,7 @@ import { SidebarTooltip } from "@/src/components/ui/tooltip";
 import { getNavConfig, isNavItemActive, type NavGroup, type NavItem } from "../nav-config";
 import type { ProductProfile } from "@/src/types/fleet";
 import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
+import { AppIcon } from "@/src/components/design-system/icons";
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -150,12 +151,7 @@ export function Sidebar({
         />
       )}
       <div
-        className={`
-          fixed left-0 top-0 z-50 h-screen shrink-0 transition-[width] duration-[var(--duration-fast)] ease-[var(--ease-standard)]
-          lg:translate-x-0
-          ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-          ${collapsed ? "w-[var(--nav-rail-width-collapsed)]" : "w-[var(--nav-rail-width)]"}
-        `}
+        className={`fixed left-0 top-0 z-50 h-screen shrink-0 transition-[width] duration-[var(--duration-fast)] ease-[var(--ease-standard)] lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} ${collapsed ? "w-[var(--nav-rail-width-collapsed)]" : "w-[var(--nav-rail-width)]"}`}
       >
         <NavRail collapsed={collapsed} embedded>
           <NavRailHeader>
@@ -261,7 +257,7 @@ export function Sidebar({
                       onClick={onClose}
                       className="cs-nav-rail__item cs-nav-rail__item--collapsed"
                     >
-                      <Settings className="cs-nav-rail__item-icon" />
+                      <AppIcon icon={Settings} size="sm" intent="muted" className="cs-nav-rail__item-icon" />
                     </Link>
                   </SidebarTooltip>
                   <SidebarTooltip label="Switch tenant" side="right">
@@ -270,14 +266,14 @@ export function Sidebar({
                       onClick={onClose}
                       className="cs-nav-rail__item cs-nav-rail__item--collapsed mt-1"
                     >
-                      <Building2 className="cs-nav-rail__item-icon" />
+                      <AppIcon icon={Building2} size="sm" intent="muted" className="cs-nav-rail__item-icon" />
                     </Link>
                   </SidebarTooltip>
                 </>
               ) : (
                 <>
                   <Link href="/platform" onClick={onClose} className="cs-nav-rail__item">
-                    <Settings className="cs-nav-rail__item-icon" />
+                    <AppIcon icon={Settings} size="sm" intent="muted" className="cs-nav-rail__item-icon" />
                     <span className="cs-nav-rail__item-label">Platform Admin</span>
                   </Link>
                   <Link
@@ -285,7 +281,7 @@ export function Sidebar({
                     onClick={onClose}
                     className="cs-nav-rail__item mt-1"
                   >
-                    <Building2 className="cs-nav-rail__item-icon" />
+                    <AppIcon icon={Building2} size="sm" intent="muted" className="cs-nav-rail__item-icon" />
                     <span className="cs-nav-rail__item-label">Switch tenant</span>
                   </Link>
                 </>
@@ -313,16 +309,18 @@ function NavGroupBlock({
 }) {
   const canCollapse = group.defaultCollapsed ?? false;
 
-  const initialCollapsed = useMemo(() => {
-    if (!canCollapse) return false;
-    if (typeof window === "undefined") return true;
-    const stored = window.localStorage.getItem(collapseStorageKey(group.id));
-    if (stored === "expanded") return false;
-    if (stored === "collapsed") return true;
-    return true;
-  }, [canCollapse, group.id]);
+  const [sectionCollapsed, setSectionCollapsed] = useState(true);
 
-  const [sectionCollapsed, setSectionCollapsed] = useState(() => initialCollapsed);
+  useEffect(() => {
+    if (!canCollapse) {
+      setSectionCollapsed(false);
+      return;
+    }
+    const stored = window.localStorage.getItem(collapseStorageKey(group.id));
+    if (stored === "expanded") setSectionCollapsed(false);
+    else if (stored === "collapsed") setSectionCollapsed(true);
+    else setSectionCollapsed(true);
+  }, [canCollapse, group.id]);
 
   const toggleSection = useCallback(() => {
     setSectionCollapsed((prev) => {

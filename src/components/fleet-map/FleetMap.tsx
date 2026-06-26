@@ -5,6 +5,7 @@ import {
   forwardRef,
   useCallback,
   useContext,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -53,6 +54,7 @@ export const FleetMap = forwardRef<FleetMapHandle, FleetMapProps>(function Fleet
   ref
 ) {
   const mapRef = useRef<MapRef | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const { token, loading, error } = useMapboxAccessToken();
   const [viewport, setViewport] = useState<FleetMapViewport>({
     bounds: null,
@@ -70,6 +72,50 @@ export const FleetMap = forwardRef<FleetMapHandle, FleetMapProps>(function Fleet
     });
   }, []);
 
+  const resizeMap = useCallback(() => {
+    try {
+      mapRef.current?.getMap()?.resize();
+    } catch {
+      // Map may be torn down during navigation
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !token || typeof ResizeObserver === "undefined") return;
+
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+    let rafId: number | null = null;
+
+    const scheduleResize = () => {
+      if (debounceId != null) clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        debounceId = null;
+        if (rafId != null) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          resizeMap();
+        });
+      }, 60);
+    };
+
+    scheduleResize();
+    const settleId = setTimeout(scheduleResize, 320);
+
+    const ro = new ResizeObserver(scheduleResize);
+    ro.observe(el);
+
+    window.addEventListener("resize", scheduleResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", scheduleResize);
+      clearTimeout(settleId);
+      if (debounceId != null) clearTimeout(debounceId);
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
+  }, [resizeMap, token]);
+
   useImperativeHandle(
     ref,
     (): FleetMapHandle => ({
@@ -79,8 +125,9 @@ export const FleetMap = forwardRef<FleetMapHandle, FleetMapProps>(function Fleet
       fitBounds: (bounds, options) => mapRef.current?.fitBounds(bounds, options),
       flyTo: (options) => mapRef.current?.flyTo(options),
       resetNorth: () => mapRef.current?.resetNorthPitch(),
+      resize: resizeMap,
     }),
-    []
+    [resizeMap]
   );
 
   const viewportValue = useMemo(() => viewport, [viewport]);
@@ -103,7 +150,7 @@ export const FleetMap = forwardRef<FleetMapHandle, FleetMapProps>(function Fleet
 
   return (
     <FleetMapViewportContext.Provider value={viewportValue}>
-      <div className={`fleet-map ${className}`}>
+      <div ref={containerRef} className={`fleet-map ${className}`}>
         <Map
           ref={mapRef}
           mapboxAccessToken={token}
@@ -117,6 +164,7 @@ export const FleetMap = forwardRef<FleetMapHandle, FleetMapProps>(function Fleet
           attributionControl={false}
           logoPosition="bottom-left"
           onLoad={() => {
+            resizeMap();
             syncViewport();
             onLoad?.();
           }}

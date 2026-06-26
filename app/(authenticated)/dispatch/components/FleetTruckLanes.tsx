@@ -11,6 +11,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { AppIcon } from "@/src/components/design-system/icons";
 import type { FleetDispatchJob, FleetDispatchTruckLane, FleetRecommendationInstance } from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -147,7 +148,7 @@ export function FleetTruckLanes({
 
                 {lane.operator_name ? (
                   <p className="mt-1.5 flex items-center gap-1 truncate text-[10px] text-[var(--muted)]">
-                    <User className="size-3 shrink-0" />
+                    <AppIcon icon={User} size="xs" intent="muted" className="shrink-0" />
                     {lane.operator_name}
                   </p>
                 ) : null}
@@ -175,14 +176,14 @@ export function FleetTruckLanes({
 
                 {lane.maintenance_note ? (
                   <p className="mt-1 flex items-center gap-0.5 text-[9px] font-medium text-amber-800">
-                    <AlertTriangle className="size-3" />
+                    <AppIcon icon={AlertTriangle} size="xs" intent="warning" />
                     {lane.status === "maintenance" ? "In maintenance" : "Service due soon"}
                   </p>
                 ) : null}
 
                 {rec ? (
                   <p className="mt-1.5 flex items-center gap-1 rounded-md border border-[color-mix(in_srgb,var(--status-info)_28%,transparent)] bg-[var(--status-info-subtle)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--status-info)]">
-                    <Sparkles className="size-3" />
+                    <AppIcon icon={Sparkles} size="xs" intent="ai" />
                     Cornerstone recommends this truck
                   </p>
                 ) : null}

@@ -62,7 +62,18 @@ export function FleetMarketingHeader() {
           >
             {FLEET_NAV.integrations.label}
           </Link>
-          <NavDropdown label={FLEET_NAV.resources.label} children={FLEET_NAV.resources.children} />
+          <Link
+            href={FLEET_NAV.implementation.href}
+            className="rounded-md px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-white/5 hover:text-[var(--accent)]"
+          >
+            {FLEET_NAV.implementation.label}
+          </Link>
+          <Link
+            href={FLEET_NAV.launchEstimator.href}
+            className="rounded-md px-3 py-2 text-sm font-medium text-teal-400/90 hover:bg-white/5 hover:text-teal-300"
+          >
+            {FLEET_NAV.launchEstimator.label}
+          </Link>
           <NavDropdown label={FLEET_NAV.company.label} children={FLEET_NAV.company.children} />
         </nav>
 
@@ -77,7 +88,7 @@ export function FleetMarketingHeader() {
             href={FLEET_ROUTES.contact}
             className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-[var(--shadow-glow)] transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Book a Demo
+            Request Demo
           </Link>
         </div>
 
@@ -111,6 +122,20 @@ export function FleetMarketingHeader() {
               >
                 Integrations
               </Link>
+              <Link
+                href={FLEET_NAV.implementation.href}
+                className={touchLinkClass}
+                onClick={closeMobile}
+              >
+                Implementation
+              </Link>
+              <Link
+                href={FLEET_NAV.launchEstimator.href}
+                className={touchLinkClass}
+                onClick={closeMobile}
+              >
+                Launch Estimator
+              </Link>
               <span className="mt-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
                 Company
               </span>
@@ -132,7 +157,7 @@ export function FleetMarketingHeader() {
                   className="flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--accent)] font-semibold text-slate-950"
                   onClick={closeMobile}
                 >
-                  Book a Demo
+                  Request Demo
                 </Link>
               </div>
             </div>

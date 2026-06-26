@@ -95,6 +95,7 @@ function sampleBoard(): FleetDispatchBoardData {
         latitude: 29.76,
         longitude: -95.36,
         telematics_status: "online",
+        operator_name: "Driver 14",
       },
       {
         truck_id: "truck-2",
@@ -109,6 +110,7 @@ function sampleBoard(): FleetDispatchBoardData {
         latitude: 29.9,
         longitude: -95.5,
         telematics_status: "stale",
+        operator_name: "Driver 22",
       },
     ],
     branchCapacity: [

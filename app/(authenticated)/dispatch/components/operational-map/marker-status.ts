@@ -16,6 +16,7 @@ export function truckVisualState(
   if (inProgress) return "working";
   if (lane.jobs.length > 0 || lane.utilization >= 0.75) return "driving";
   if (lane.status === "active" && lane.jobs.length === 0) {
+    if ((lane.idle_hours ?? 0) >= 1.5) return "idle";
     if ((lane.revenue_today ?? 0) >= highRevenueThreshold) return "highRevenue";
     return "available";
   }

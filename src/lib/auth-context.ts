@@ -327,3 +327,11 @@ export async function getProductProfileForTenant(
   }
   return "cmms";
 }
+
+/** Primary landing route after auth/onboarding, based on tenant product profile. */
+export function getDefaultLandingPathForProfile(profile: ProductProfile): string {
+  if (profile === "fleet_intelligence" || profile === "hybrid") {
+    return "/operations";
+  }
+  return "/dashboard";
+}

@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
-import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/marketing-site";
+import { FLEET_SITE_NAME, FLEET_SEO, FLEET_TAGLINE } from "@/lib/fleet-marketing-site";
+import { SITE_URL } from "@/lib/marketing-site";
 import { AuthHashHandler } from "./components/auth-hash-handler";
 import "./globals.css";
 
@@ -21,19 +22,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const defaultTitle = `${SITE_NAME} | CMMS & Maintenance Management Software`;
-const defaultDescription =
-  "CMMS and maintenance management software for work orders, preventive maintenance, assets, dispatch, and reporting. Facility maintenance software built for operations teams.";
+const defaultTitle = FLEET_SEO.home.title;
+const defaultDescription = FLEET_SEO.home.description;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: defaultTitle,
-    template: `%s | ${SITE_NAME}`,
+    template: `%s | ${FLEET_SITE_NAME}`,
   },
   description: defaultDescription,
   openGraph: {
-    siteName: SITE_NAME,
+    siteName: FLEET_SITE_NAME,
     type: "website",
     locale: "en_US",
     title: defaultTitle,
@@ -49,29 +49,18 @@ export const metadata: Metadata = {
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: SITE_NAME,
-  description: SITE_TAGLINE,
+  name: FLEET_SITE_NAME,
+  description: FLEET_TAGLINE,
   url: SITE_URL,
 };
 
 const softwareSchema = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: SITE_NAME,
+  name: FLEET_SITE_NAME,
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description: defaultDescription,
-  offers: {
-    "@type": "Offer",
-    price: "850",
-    priceCurrency: "USD",
-    priceSpecification: {
-      "@type": "UnitPriceSpecification",
-      price: "850",
-      priceCurrency: "USD",
-      unitText: "per month",
-    },
-  },
 };
 
 export default function RootLayout({

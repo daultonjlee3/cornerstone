@@ -6,6 +6,8 @@
 import type { AiIntent } from "./types";
 import type { HelpSection } from "./help";
 import type { WorkOrderSummaryRow } from "./retrieval";
+import type { RetrievedFleetOpsContext } from "./fleet-retrieval";
+import type { FleetCopilotRecommendationSnapshot } from "./types";
 
 const SYSTEM_PREFIX = `You are Cornerstone AI, the operations copilot for Cornerstone OS. You help users with workflow questions, read-only operational questions, and concise summaries. Rules:
 - Be concise: one short paragraph plus up to 5 bullet highlights when useful.
@@ -26,6 +28,15 @@ const OPS_SYSTEM = `${SYSTEM_PREFIX}
 - Your job is to identify risks, bottlenecks, and patterns in the tenant's workload.
 - Do not simply restate the data; explain what it means and what deserves attention.
 - Prefer concrete, high-signal insights over long summaries. Focus on overdue work, high priority items, assignment gaps, and overloaded technicians.`;
+
+const FLEET_OPS_SYSTEM = `${SYSTEM_PREFIX}
+- You are Fleet Intelligence Copilot — an operational analyst for industrial fleet dispatch.
+- Explain dispatch decisions, fleet status, revenue at risk, utilization, deadhead, branch capacity, integration health, and operational exceptions.
+- Use ONLY the structured operational data provided. Never invent truck IDs, revenue figures, or recommendation details.
+- If data is missing or insufficient, say: "I don't have enough data to answer that reliably." and explain what data would be needed.
+- Do not mention CMMS, work orders, assets, or preventive maintenance unless explicitly present in the context.
+- For recommendations: explain confidence, tradeoffs, projected impact, and what happens if rejected — grounded in rationale and snapshots.
+- Be concise: one short paragraph plus up to 5 bullet highlights when useful.`;
 
 const SUMMARY_SYSTEM = `${SYSTEM_PREFIX}
 - Summarize only what is in the provided record or list data.
@@ -207,4 +218,165 @@ export function buildAiPrompt(
       };
     }
   }
+}
+
+function stringifyFleetOps(fleet: RetrievedFleetOpsContext): string {
+  const parts: string[] = [];
+
+  if (fleet.dataGaps.length) {
+    parts.push(`Data gaps (could not load): ${fleet.dataGaps.join(", ")}`);
+  }
+
+  if (fleet.selectedRecommendation) {
+    const r: FleetCopilotRecommendationSnapshot = fleet.selectedRecommendation;
+    parts.push(
+      `Selected recommendation:\n` +
+        `- id=${r.id} | ${r.title}\n` +
+        `- type=${r.recommendation_type} | status=${r.status} | score=${r.score}\n` +
+        `- confidence=${r.confidence} | ${r.confidence_explanation}\n` +
+        `- recommended_truck=${r.recommended_unit_number ?? r.recommended_truck_id ?? "—"}\n` +
+        `- job_id=${r.job_id ?? "—"} | expires=${r.expires_at}\n` +
+        `- deadhead_miles=${r.deadhead_miles ?? "—"} | travel_minutes=${r.travel_minutes ?? "—"}\n` +
+        `- reasons: ${r.winner_reasons.join("; ") || "—"}`
+    );
+  }
+
+  const cc = fleet.commandCenter;
+  if (cc) {
+    parts.push(
+      `Command center KPIs:\n` +
+        `- active_trucks=${cc.activeTrucks} | idle_trucks=${cc.idleTrucks}\n` +
+        `- jobs_today=${cc.jobsToday} | unassigned_jobs=${cc.unassignedJobs}\n` +
+        `- utilization_pct=${cc.utilizationPercent ?? "—"}\n` +
+        `- revenue_at_risk=${cc.revenueAtRisk} | contribution_at_risk=${cc.contributionAtRisk}\n` +
+        `- estimated_contribution_today=${cc.estimatedContributionToday}\n` +
+        `- deadhead_cost_today=${cc.deadheadCostToday} | idle_cost_today=${cc.idleCostToday}\n` +
+        `- recommendation_opportunity=${cc.recommendationOpportunity}`
+    );
+  }
+
+  const tv = fleet.todayView;
+  if (tv) {
+    if (tv.executiveSummary) {
+      parts.push(`Executive summary: ${tv.executiveSummary}`);
+    }
+    if (tv.exceptions?.length) {
+      parts.push(
+        `Operational exceptions (${tv.exceptions.length}):\n` +
+          tv.exceptions
+            .slice(0, 12)
+            .map((e) => `- [${e.severity}] ${e.title} — ${e.whyItMatters}`)
+            .join("\n")
+      );
+    }
+    if (tv.integrationHealth?.length) {
+      parts.push(
+        `Integration health:\n` +
+          tv.integrationHealth
+            .map(
+              (i) =>
+                `- ${i.displayName} (${i.provider}): ${i.status}${i.lastSyncAt ? ` | last_sync=${i.lastSyncAt}` : ""}${i.message ? ` | ${i.message}` : ""}`
+            )
+            .join("\n")
+      );
+    }
+    if (tv.recommendations?.pending?.length != null) {
+      parts.push(`Pending recommendations: ${tv.recommendations.pending.length}`);
+    }
+  }
+
+  const board = fleet.dispatchBoard;
+  if (board) {
+    parts.push(
+      `Dispatch board (${board.date}):\n` +
+        `- total_jobs=${board.jobs.length} | unassigned=${board.unassignedJobs.length}`
+    );
+    if (board.unassignedJobs.length) {
+      parts.push(
+        `Unassigned jobs:\n` +
+          board.unassignedJobs
+            .slice(0, 10)
+            .map(
+              (j) =>
+                `- ${j.title} | priority=${j.priority} | revenue=$${Math.round(j.revenue_estimate)} | branch=${j.branch_name ?? "—"}`
+            )
+            .join("\n")
+      );
+    }
+    const offline = board.truckLanes.filter((l) => l.telematics_status === "offline");
+    const stale = board.truckLanes.filter((l) => l.telematics_status === "stale");
+    const idle = board.truckLanes.filter(
+      (l) => l.status === "active" && l.utilization <= 0.2 && l.committed_hours <= 0.5
+    );
+    if (offline.length) {
+      parts.push(`Offline trucks: ${offline.map((l) => l.unit_number).join(", ")}`);
+    }
+    if (stale.length) {
+      parts.push(`Stale GPS trucks: ${stale.map((l) => l.unit_number).join(", ")}`);
+    }
+    if (idle.length) {
+      parts.push(`Idle trucks: ${idle.map((l) => l.unit_number).join(", ")}`);
+    }
+    if (board.branchCapacity?.length) {
+      parts.push(
+        `Branch capacity:\n` +
+          board.branchCapacity
+            .map(
+              (b) =>
+                `- ${b.branch_name}: ${Math.round(b.utilization * 100)}% (${b.committed_hours.toFixed(1)}h / ${b.available_truck_hours.toFixed(1)}h)`
+            )
+            .join("\n")
+      );
+    }
+    const highDeadhead = [...board.jobs]
+      .filter((j) => j.estimated_deadhead_miles != null)
+      .sort((a, b) => (b.estimated_deadhead_miles ?? 0) - (a.estimated_deadhead_miles ?? 0))
+      .slice(0, 5);
+    if (highDeadhead.length) {
+      parts.push(
+        `Highest deadhead jobs:\n` +
+          highDeadhead
+            .map((j) => `- ${j.title}: ${j.estimated_deadhead_miles?.toFixed(1)} mi`)
+            .join("\n")
+      );
+    }
+  }
+
+  const recs = fleet.recommendations?.pending;
+  if (recs?.length) {
+    parts.push(
+      `Top recommendations by score:\n` +
+        [...recs]
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+          .map((r) => {
+            const truck = r.rationale.candidates?.[0]?.unit_number ?? "—";
+            return `- score=${r.score.toFixed(2)} | ${r.rationale.title} | truck=${truck} | status=${r.status}`;
+          })
+          .join("\n")
+    );
+    const expired = recs.filter((r) => Date.parse(r.expires_at) < Date.now());
+    if (expired.length) {
+      parts.push(`Expired recommendations: ${expired.length}`);
+    }
+  }
+
+  return parts.length ? parts.join("\n\n") : "No fleet operational data retrieved.";
+}
+
+export function buildFleetAiPrompt(
+  userQuery: string,
+  fleet: RetrievedFleetOpsContext
+): { system: string; user: string } {
+  const dataBlock = stringifyFleetOps(fleet);
+  return {
+    system: FLEET_OPS_SYSTEM,
+    user:
+      `Structured fleet operational data (tenant-scoped):\n${dataBlock}\n\n` +
+      `User question: ${userQuery.trim()}\n\n` +
+      `Respond as an operational intelligence analyst for fleet dispatch.\n` +
+      `Explain recommendations, confidence, tradeoffs, exceptions, and operational summaries using ONLY the data above.\n` +
+      `If the data block is empty or missing fields needed for the question, say you don't have enough data to answer reliably.\n\n` +
+      `End with a JSON block on a single line: {"bulletHighlights":["...","..."],"followUpSuggestions":["...","..."]}. Use empty arrays if none.`,
+  };
 }

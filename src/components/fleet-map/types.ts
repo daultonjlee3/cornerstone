@@ -32,6 +32,7 @@ export type FleetMapHandle = {
   fitBounds: (bounds: LngLatBoundsLike, options?: MapboxFitBoundsOptions) => void;
   flyTo: (options: MapboxFlyToOptions) => void;
   resetNorth: () => void;
+  resize: () => void;
 };
 
 export type FleetMapRouteFeature = {
@@ -39,6 +40,11 @@ export type FleetMapRouteFeature = {
   coordinates: [number, number][];
   primary?: boolean;
   dashed?: boolean;
+  /** Recommendation route — orange styling with animated dash */
+  recommendation?: boolean;
+  animated?: boolean;
+  /** Midpoint label (e.g. deadhead distance) */
+  label?: string;
 };
 
 export type FleetMapBranchZone = {

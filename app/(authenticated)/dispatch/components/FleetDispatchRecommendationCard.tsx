@@ -1,8 +1,9 @@
 "use client";
 
 import { Clock3, DollarSign, Gauge, MapPin, Navigation, Route, Sparkles, Truck, ArrowRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { IconChip, AppIcon } from "@/src/components/design-system/icons";
 import { motion } from "framer-motion";
-import type { ComponentType } from "react";
 import { Button } from "@/src/components/ui/button";
 import type { FleetDispatchBoardData, FleetRecommendationInstance } from "@/src/types/fleet";
 import {
@@ -71,7 +72,7 @@ export function FleetDispatchRecommendationCard({
       <div className="dispatch-mission__rec-card-head">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-[var(--brand-operational)]" />
+            <IconChip icon={Sparkles} variant="ai" size="sm" glow className="mt-0.5 shrink-0" label="AI recommendation" />
             <div className="min-w-0">
               <p className="dispatch-mission__rec-action">{recommendation.rationale.title}</p>
               <p className="dispatch-mission__rec-type">{formatRecommendationType(recommendation.recommendation_type)}</p>
@@ -139,7 +140,7 @@ export function FleetDispatchRecommendationCard({
         onClick={() => onAccept(recommendation.id)}
       >
         {primaryCta}
-        {!isCapacityOnly ? <ArrowRight className="ml-2 size-4" /> : null}
+        {!isCapacityOnly ? <AppIcon icon={ArrowRight} size="sm" intent="operational" className="ml-2" /> : null}
       </Button>
 
       <details className="dispatch-mission__rec-details">
@@ -161,7 +162,7 @@ export function FleetDispatchRecommendationCard({
           Dismiss
         </Button>
         <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => onViewMap(recommendation)}>
-          <MapPin className="mr-1 size-3" />
+          <AppIcon icon={MapPin} size="xs" intent="muted" className="mr-1" />
           Map
         </Button>
         {primaryTruckId ? (
@@ -172,7 +173,7 @@ export function FleetDispatchRecommendationCard({
             className="h-8 text-xs"
             onClick={() => onHighlightTruck(primaryTruckId)}
           >
-            <Navigation className="mr-1 size-3" />
+            <AppIcon icon={Navigation} size="xs" intent="muted" className="mr-1" />
             Truck
           </Button>
         ) : null}
@@ -187,12 +188,12 @@ export function FleetDispatchRecommendationCard({
 }
 
 function ImpactTag({
-  icon: Icon,
+  icon,
   label,
   value,
   accent = false,
 }: {
-  icon: ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   label: string;
   value: string;
   accent?: boolean;
@@ -200,7 +201,7 @@ function ImpactTag({
   return (
     <div className={`dispatch-mission__impact-cell ${accent ? "dispatch-mission__impact-cell--accent" : ""}`}>
       <div className="dispatch-mission__impact-label">
-        <Icon className="size-3.5" />
+        <AppIcon icon={icon} size="xs" intent={accent ? "operational" : "muted"} />
         {label}
       </div>
       <p className={`dispatch-mission__impact-value ${accent ? "dispatch-mission__impact-value--accent" : ""}`}>

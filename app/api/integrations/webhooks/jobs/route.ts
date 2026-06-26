@@ -18,6 +18,7 @@ import {
   logWebhookEvent,
   recordWebhookDeliveryAttempt,
 } from "@/src/lib/integrations/webhook-framework";
+import { invalidatePendingRecommendationsForOperationalChange } from "@/src/lib/fleet-recommendation-engine/recommendation-invalidation";
 
 export async function POST(request: Request) {
   const url = new URL(request.url);
@@ -112,6 +113,16 @@ export async function POST(request: Request) {
   });
 
   const httpStatus = status === "failed" ? 422 : 200;
+
+  if (httpStatus === 200) {
+    await invalidatePendingRecommendationsForOperationalChange(admin, {
+      tenantId: connection.tenant_id,
+      reason: "Jobs webhook updated dispatch queue.",
+      invalidateAllPending: true,
+      signalType: "jobs_updated",
+      boardDate: result.affectedDates[0],
+    });
+  }
 
   await recordWebhookDeliveryAttempt(admin, {
     tenantId: connection.tenant_id,

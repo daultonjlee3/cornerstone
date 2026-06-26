@@ -30,12 +30,14 @@ import type { ChipTone } from "@/src/components/design-system/types";
 import {
   EmptyState,
   HeroPanel,
+  IconChip,
   KpiCard,
   PageLayout,
   PageSection,
   Panel,
   SectionHeader,
   StatusChip,
+  AppIcon,
 } from "@/src/components/design-system";
 import { fleetLegacySeverityToTone } from "@/src/components/design-system/chip-maps";
 import type {
@@ -148,14 +150,17 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
       {/* Briefing header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1 space-y-2">
-          <p className="cs-text-eyebrow">Operational briefing</p>
+          <div className="flex items-center gap-3">
+            <IconChip icon={ClipboardList} variant="fleet" size="md" glow label="Operational briefing" />
+            <p className="cs-text-eyebrow">Operational briefing</p>
+          </div>
           <h1 className="cs-text-display">{shiftGreeting()}</h1>
           <p className="cs-text-body cs-text-muted max-w-3xl">{data.executiveSummary}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <span className="cs-text-caption cs-text-muted">{data.date}</span>
           <span className="inline-flex items-center gap-1.5 cs-text-caption cs-text-muted">
-            <Radio className="size-3.5 text-[var(--brand-operational)]" strokeWidth={2} aria-hidden />
+            <AppIcon icon={Radio} size="sm" intent="operational" />
             Data {formatDataFreshness(data.recommendations.generatedAt)}
           </span>
           <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()} disabled={pending}>
@@ -283,7 +288,7 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
       {/* Supporting KPI strip */}
       <PageSection>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <KpiCard label="Active trucks" value={cc.activeTrucks} hint="Live on GPS" icon={Truck} emphasis="operational" />
+          <KpiCard label="Active trucks" value={cc.activeTrucks} hint="Live on GPS" icon={Truck} emphasis="operational" iconProminent />
           <KpiCard
             label="Idle / offline"
             value={cc.idleTrucks}
@@ -314,6 +319,7 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
             hint="Operational margin"
             icon={DollarSign}
             emphasis="success"
+            iconProminent
           />
           <KpiCard
             label="Deadhead cost"
@@ -343,6 +349,7 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
             hint={`${data.recommendations.pending.length} pending`}
             icon={Sparkles}
             emphasis={data.recommendations.pending.length > 0 ? "info" : "default"}
+            iconProminent
           />
         </div>
       </PageSection>

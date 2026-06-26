@@ -1,22 +1,24 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   FleetDispatchBoardData,
   FleetRecommendationInstance,
+  FleetRecommendationRecalculationNotice,
   FleetTodayViewData,
 } from "@/src/types/fleet";
 import { assignTruckToJob } from "../../fleet/actions";
-import { FleetJobQueue } from "./FleetJobQueue";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { FleetDispatchRecommendationsPanel } from "./FleetDispatchRecommendationsPanel";
+import { FleetDispatchDecisionQueuePanel } from "./FleetDispatchDecisionQueuePanel";
 import { FleetDispatchMissionBriefing } from "./FleetDispatchMissionBriefing";
-import { FleetDispatchTimeline } from "./FleetDispatchTimeline";
+import { FleetDispatchOutlookStrip } from "./FleetDispatchOutlookStrip";
 import { CockpitCollapsedRail } from "./CockpitCollapsedRail";
+import { FleetDispatchCopilotBridge } from "./FleetDispatchCopilotBridge";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { scrollToSection } from "./fleet-dispatch-utils";
-import { Skeleton } from "@/src/components/design-system";
+import { FleetMissionControlLoader } from "@/src/components/fleet-intelligence/FleetMissionControlLoader";
 import "./dispatch-console.css";
 
 function shiftDate(dateStr: string, days: number): string {
@@ -50,9 +52,11 @@ export function FleetDispatchView({
   const [highlightedTruckId, setHighlightedTruckId] = useState<string | null>(null);
   const [activeRecommendation, setActiveRecommendation] = useState<FleetRecommendationInstance | null>(null);
   const [recError, setRecError] = useState<string | null>(null);
+  const [recalculationNotice, setRecalculationNotice] =
+    useState<FleetRecommendationRecalculationNotice | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [inboxOpen, setInboxOpen] = useState(true);
-  const [recommendOpen, setRecommendOpen] = useState(true);
+  const [queueOpen, setQueueOpen] = useState(true);
+  const [decisionOpen, setDecisionOpen] = useState(true);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,6 +86,7 @@ export function FleetDispatchView({
       }
       const payload = await res.json();
       setRecommendations(payload.pending ?? []);
+      setRecalculationNotice(payload.recalculationNotice ?? null);
       setRecError(null);
     },
     [searchParams, selectedDate]
@@ -92,7 +97,7 @@ export function FleetDispatchView({
     const query = buildFleetDispatchBoardQuery(selectedDate, branchId);
     const [boardRes, intelRes] = await Promise.all([
       fetch(`/api/fleet/dispatch-board?${query}`),
-      fetch("/api/fleet/today-view"),
+      fetch(`/api/fleet/today-view?date=${encodeURIComponent(selectedDate)}`),
     ]);
     if (boardRes.ok) {
       setBoard((await boardRes.json()) as FleetDispatchBoardData);
@@ -127,21 +132,34 @@ export function FleetDispatchView({
   const onRecommendationAction = useCallback(
     (id: string, action: "accept" | "dismiss") => {
       startTransition(async () => {
+        setRecError(null);
         const res = await fetch(`/api/fleet/recommendations/${id}/${action}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ date: selectedDate }),
         });
         if (!res.ok) {
-          setRecError(action === "accept" ? "Unable to accept recommendation." : "Unable to dismiss.");
+          let message =
+            action === "accept" ? "Unable to accept recommendation." : "Unable to dismiss.";
+          try {
+            const payload = (await res.json()) as { error?: string };
+            if (payload.error) message = payload.error;
+          } catch {
+            // keep default message
+          }
+          if (res.status === 403) {
+            message = "You do not have permission to manage fleet recommendations.";
+          }
+          setRecError(message);
           return;
         }
         await refreshBoard();
         await loadRecommendations(true);
         setActiveRecommendation(null);
+        setRecError(null);
       });
     },
-    [loadRecommendations, refreshBoard]
+    [loadRecommendations, refreshBoard, selectedDate]
   );
 
   const handleHighlightRecommendation = useCallback((rec: FleetRecommendationInstance | null) => {
@@ -164,14 +182,39 @@ export function FleetDispatchView({
     [handleHighlightRecommendation]
   );
 
+  useEffect(() => {
+    const source = new EventSource("/api/fleet/dispatch-board/stream");
+    const refreshOnSignal = () => {
+      void refreshBoard();
+      void loadRecommendations(true);
+    };
+
+    source.addEventListener("recommendations_invalidated", refreshOnSignal);
+    source.addEventListener("telematics_updated", refreshOnSignal);
+    source.addEventListener("jobs_updated", refreshOnSignal);
+
+    return () => {
+      source.close();
+    };
+  }, [loadRecommendations, refreshBoard]);
+
   return (
     <div className="dispatch-console" data-testid="fleet-dispatch-board">
+      <FleetDispatchCopilotBridge
+        activeRecommendation={activeRecommendation}
+        branchId={searchParams.get("branch_id")}
+      />
       {pending ? (
         <div className="dispatch-console__loading">
-          <div className="flex h-full flex-col gap-2 p-2">
-            <Skeleton className="h-28 shrink-0 rounded-xl" />
-            <Skeleton className="min-h-0 flex-1 rounded-xl" />
-          </div>
+          <FleetMissionControlLoader
+            variant="overlay"
+            testId="fleet-dispatch-refresh-loading"
+            messages={[
+              "Refreshing dispatch board…",
+              "Updating recommendations…",
+              "Syncing telematics…",
+            ]}
+          />
         </div>
       ) : null}
 
@@ -191,29 +234,35 @@ export function FleetDispatchView({
 
       <div
         className="dispatch-console__cockpit"
-        data-inbox-open={inboxOpen}
-        data-recommend-open={recommendOpen}
+        data-decision-open={decisionOpen}
+        data-queue-open={queueOpen}
       >
         <div className="dispatch-console__rail-slot dispatch-console__rail-slot--left">
-          {inboxOpen ? (
-            <FleetJobQueue
+          {decisionOpen ? (
+            <FleetDispatchRecommendationsPanel
               layout="cockpit"
-              jobs={board.unassignedJobs}
-              board={board}
-              selectedJobId={selectedJobId}
-              onSelectJob={setSelectedJobId}
-              onAssignToTruck={handleAssign}
-              truckLanes={board.truckLanes}
               recommendations={recommendations}
+              board={board}
+              activeRecommendationId={activeRecommendation?.id ?? null}
               pending={pending}
-              onCollapse={() => setInboxOpen(false)}
+              error={recError}
+              recalculationNotice={recalculationNotice}
+              onRefresh={() => void loadRecommendations(true)}
+              onAccept={(id) => onRecommendationAction(id, "accept")}
+              onDismiss={(id) => onRecommendationAction(id, "dismiss")}
+              onHighlight={handleHighlightRecommendation}
+              onViewMap={handleViewMap}
+              onHighlightTruck={setHighlightedTruckId}
+              onHighlightJob={setSelectedJobId}
+              onCollapse={() => setDecisionOpen(false)}
             />
           ) : (
             <CockpitCollapsedRail
               side="left"
-              label="Inbox"
-              count={board.unassignedJobs.length}
-              onExpand={() => setInboxOpen(true)}
+              label="Decision"
+              count={recommendations.length}
+              accent
+              onExpand={() => setDecisionOpen(true)}
             />
           )}
         </div>
@@ -235,34 +284,31 @@ export function FleetDispatchView({
               onSelectTruck={setHighlightedTruckId}
             />
           </div>
-          <FleetDispatchTimeline board={board} recommendations={recommendations} />
+          <FleetDispatchOutlookStrip board={board} intel={intel} recommendations={recommendations} />
         </main>
 
         <div className="dispatch-console__rail-slot dispatch-console__rail-slot--right">
-          {recommendOpen ? (
-            <FleetDispatchRecommendationsPanel
-              layout="cockpit"
+          {queueOpen ? (
+            <FleetDispatchDecisionQueuePanel
               recommendations={recommendations}
+              exceptions={intel.exceptions}
+              jobs={board.unassignedJobs}
               board={board}
+              selectedJobId={selectedJobId}
               activeRecommendationId={activeRecommendation?.id ?? null}
               pending={pending}
-              error={recError}
-              onRefresh={() => void loadRecommendations(true)}
-              onAccept={(id) => onRecommendationAction(id, "accept")}
-              onDismiss={(id) => onRecommendationAction(id, "dismiss")}
-              onHighlight={handleHighlightRecommendation}
-              onViewMap={handleViewMap}
-              onHighlightTruck={setHighlightedTruckId}
-              onHighlightJob={setSelectedJobId}
-              onCollapse={() => setRecommendOpen(false)}
+              onSelectJob={setSelectedJobId}
+              onAssignToTruck={handleAssign}
+              truckLanes={board.truckLanes}
+              onHighlightRecommendation={handleHighlightRecommendation}
+              onCollapse={() => setQueueOpen(false)}
             />
           ) : (
             <CockpitCollapsedRail
               side="right"
-              label="AI"
-              count={recommendations.length}
-              accent
-              onExpand={() => setRecommendOpen(true)}
+              label="Queue"
+              count={board.unassignedJobs.length + recommendations.length}
+              onExpand={() => setQueueOpen(true)}
             />
           )}
         </div>

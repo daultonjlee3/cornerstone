@@ -69,7 +69,7 @@ export function scoreTruckForJob(args: {
     operatorHourlyRate: operatorRate,
     deadheadMiles: deadhead?.miles ?? null,
     travelMinutes,
-    operatorId: lane.truck_id,
+    operatorId: lane.operator_id ?? lane.truck_id,
   });
 
   const factors: FleetRecommendationFactors = {

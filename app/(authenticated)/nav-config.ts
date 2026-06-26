@@ -213,14 +213,19 @@ const hybridCmmsOperationsGroup: NavGroup = {
 };
 
 function getFleetIntelligenceNavConfig(): NavGroup[] {
+  const fleetAdministration: NavGroup = {
+    ...administrationGroup,
+    secondary: false,
+    items: administrationGroup.items.filter((item) => item.href !== "/onboarding-wizard"),
+  };
+
   return [
     fleetOperationsGroup,
     integrationsGroup,
     implementationGroup,
     fleetAnalyticsGroup,
-    { ...administrationGroup, secondary: false },
     fleetSetupGroup,
-    cmmsAssetsGroup,
+    fleetAdministration,
   ];
 }
 
@@ -236,10 +241,10 @@ function getHybridNavConfig(): NavGroup[] {
       ...fleetAnalyticsGroup,
       items: [{ label: "Reports", href: "/reports", icon: "BarChart2" }],
     },
-    { ...administrationGroup, secondary: false },
     fleetSetupGroup,
     hybridCmmsOperationsGroup,
     cmmsAssetsGroup,
+    { ...administrationGroup, secondary: false },
   ];
 }
 
@@ -269,6 +274,11 @@ export const navConfig: NavGroup[] = getCmmsNavConfig();
 
 export function isFleetProductProfile(productProfile: ProductProfile): boolean {
   return productProfile === "fleet_intelligence" || productProfile === "hybrid";
+}
+
+/** CMMS onboarding wizard / get-started — not shown for pure Fleet Intelligence tenants. */
+export function usesCmmsOnboarding(productProfile: ProductProfile): boolean {
+  return productProfile !== "fleet_intelligence";
 }
 
 /** Determines whether a nav item should render as active. */

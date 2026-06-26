@@ -62,6 +62,10 @@ export type CornerstoneAiContext = {
   entityId?: string;
   listFilters?: Record<string, string>;
   route?: string;
+  /** Product profile for copilot mode selection */
+  productProfile?: import("@/src/types/fleet").ProductProfile;
+  /** Fleet Intelligence Copilot screen context */
+  fleet?: FleetCopilotContextPayload;
   /**
    * Optional UI-provided record payload for summaries.
    * When present, the AI should summarize this record WITHOUT re-fetching from the backend.
@@ -129,6 +133,73 @@ export type CornerstoneAiContext = {
   };
 };
 
+export type FleetCopilotScreen =
+  | "dispatch"
+  | "command_center"
+  | "operations"
+  | "performance"
+  | "integrations"
+  | "implementation"
+  | "default";
+
+export type FleetCopilotPageBranchRow = {
+  branch_name: string;
+  contribution: number;
+  revenue?: number;
+  rank?: number;
+};
+
+export type FleetCopilotPageTruckRow = {
+  unit_number: string;
+  contribution: number;
+  branch_name?: string;
+  rank?: number;
+};
+
+export type FleetCopilotPageContext = {
+  dateRange?: { from: string; to: string };
+  filters?: Record<string, string>;
+  branchPerformance?: FleetCopilotPageBranchRow[];
+  truckPerformance?: FleetCopilotPageTruckRow[];
+  summaryLine?: string;
+};
+
+export type FleetCopilotRecommendationSnapshot = {
+  id: string;
+  title: string;
+  recommendation_type: string;
+  status: string;
+  score: number;
+  confidence: "high" | "medium" | "low";
+  confidence_explanation: string;
+  job_id: string | null;
+  job_title: string | null;
+  recommended_truck_id: string | null;
+  recommended_unit_number: string | null;
+  winner_reasons: string[];
+  loser_reasons: Array<{ unit_number: string; reasons: string[] }>;
+  projected_outcome?: Record<string, unknown>;
+  expires_at: string;
+  factors?: Record<string, unknown>;
+  deadhead_miles: number | null;
+  travel_minutes: number | null;
+};
+
+export type FleetCopilotContextPayload = {
+  screen?: FleetCopilotScreen;
+  branchId?: string | null;
+  selectedRecommendation?: FleetCopilotRecommendationSnapshot;
+  pageContext?: FleetCopilotPageContext;
+};
+
+export type FleetCopilotAnswerMeta = {
+  sourcesUsed: Array<{ title: string; layer: "page" | "database" | "product_knowledge" }>;
+  confidence: "high" | "medium" | "low";
+  dataFreshness?: string;
+  missingData: string[];
+  answerMethod: "deterministic" | "llm" | "product_knowledge";
+};
+
 export type CornerstoneAiResponse = {
   intent: AiIntent;
   answer: string;
@@ -139,4 +210,6 @@ export type CornerstoneAiResponse = {
   quotaStatus?: { remainingBudgetUsd: number; remainingCredits: number };
   warnings: string[];
   proposedAction?: AiProposedAction;
+  /** Fleet Intelligence Copilot grounding metadata */
+  fleetCopilot?: FleetCopilotAnswerMeta;
 };

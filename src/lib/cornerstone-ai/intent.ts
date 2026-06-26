@@ -36,6 +36,21 @@ const OPS_PATTERNS = [
   /biggest\s+(maintenance\s+)?issues/i,
 ];
 
+const FLEET_OPS_PATTERNS = [
+  /\b(recommend|recommendation|unassigned|dispatch|confidence|reject|accept)\b/i,
+  /\b(truck|fleet|idle|offline|stale|gps|operator|branch|capacity)\b/i,
+  /\b(revenue|contribution|margin|profit|at risk|opportunity)\b/i,
+  /\b(deadhead|route|routing|travel|mile|inefficient)\b/i,
+  /\b(exception|blocker|integration|sync|samsara|telematics)\b/i,
+  /\bwhy is\b/i,
+  /\bwhat happens if\b/i,
+  /\bwhich jobs\b/i,
+  /\btoday'?s?\s+(plan|operation|contribution)\b/i,
+  /\bexpired\b/i,
+  /\bunhealthy\b/i,
+  /\bunavailable\b/i,
+];
+
 const ACTION_ASSIGN_PATTERNS = [
   /assign\s+(work\s+orders?|jobs)\b/i,
   /\bdispatch\b.*\bassign\b/i,
@@ -75,12 +90,15 @@ const LIST_SUMMARY_PATTERNS = [
   /summary\s+of\s+(current\s+)?(open\s+)?(work\s+orders?|queue)/i,
 ];
 
-export function classifyAiIntent(query: string, context?: { entityType?: string; entityId?: string }): AiIntent {
+export function classifyAiIntent(query: string, context?: { entityType?: string; entityId?: string; fleetMode?: boolean }): AiIntent {
   const q = query.trim();
   if (!q) return "UNKNOWN";
 
-  if (ACTION_ASSIGN_PATTERNS.some((p) => p.test(q))) return "ACTION_ASSIGN_WORK_ORDERS";
-  if (ACTION_CREATE_PATTERNS.some((p) => p.test(q))) return "ACTION_CREATE_WORK_ORDER";
+  if (!context?.fleetMode) {
+    if (ACTION_ASSIGN_PATTERNS.some((p) => p.test(q))) return "ACTION_ASSIGN_WORK_ORDERS";
+    if (ACTION_CREATE_PATTERNS.some((p) => p.test(q))) return "ACTION_CREATE_WORK_ORDER";
+  }
+
   if (ACTION_SUMMARIZE_OPERATIONS_PATTERNS.some((p) => p.test(q))) return "ACTION_SUMMARIZE_OPERATIONS";
 
   // Prefer Help for instructional queries like "How do I ...".
@@ -94,6 +112,7 @@ export function classifyAiIntent(query: string, context?: { entityType?: string;
   }
 
   if (LIST_SUMMARY_PATTERNS.some((p) => p.test(q))) return "LIST_SUMMARY";
+  if (context?.fleetMode && FLEET_OPS_PATTERNS.some((p) => p.test(q))) return "OPS_QUERY";
   if (OPS_PATTERNS.some((p) => p.test(q))) return "OPS_QUERY";
   if (HELP_PATTERNS.some((p) => p.test(q))) return "HELP";
 

@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/src/lib/supabase/server";
 import { createAdminClient } from "@/src/lib/supabase/admin";
+import {
+  getDefaultLandingPathForProfile,
+  getProductProfileForTenant,
+} from "@/src/lib/auth-context";
 
 export type OnboardingWizardStep =
   | "properties"
@@ -343,7 +347,8 @@ export async function completeOnboardingWizardAction(): Promise<void> {
     .update({ onboarding_completed_at: new Date().toISOString() })
     .eq("id", scope.companyId);
 
-  redirect("/dashboard");
+  const profile = await getProductProfileForTenant(scope.tenantId, scope.supabase);
+  redirect(getDefaultLandingPathForProfile(profile));
 }
 
 type CsvRow = Record<string, string>;

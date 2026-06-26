@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { AppIcon } from "@/src/components/design-system/icons";
 
 export type PaginationProps = {
   /** 1-based current page */
@@ -56,7 +57,7 @@ export function Pagination({
           aria-label="Previous page"
           className="rounded border border-[var(--card-border)] bg-[var(--background)] p-2 text-[var(--foreground)] hover:bg-[var(--background)]/80 disabled:pointer-events-none disabled:opacity-50"
         >
-          <ChevronLeft className="size-4" />
+          <AppIcon icon={ChevronLeft} size="sm" intent="muted" />
         </button>
         <span className="min-w-[100px] px-3 py-1 text-center text-sm text-[var(--muted)]">
           Page {page} of {totalPages}
@@ -68,7 +69,7 @@ export function Pagination({
           aria-label="Next page"
           className="rounded border border-[var(--card-border)] bg-[var(--background)] p-2 text-[var(--foreground)] hover:bg-[var(--background)]/80 disabled:pointer-events-none disabled:opacity-50"
         >
-          <ChevronRight className="size-4" />
+          <AppIcon icon={ChevronRight} size="sm" intent="muted" />
         </button>
       </div>
     </div>

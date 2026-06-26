@@ -1,28 +1,35 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { refreshUtilizationDailyForTenant } from "../../src/lib/fleet/marts/refresh-utilization-daily";
 import { getFleetRecommendations } from "../../src/lib/fleet-recommendation-engine/service";
+import { buildDemoJobs } from "./build-demo-jobs";
 import {
   BRANCHES,
   CUSTOMERS,
-  JOB_TYPES,
+  MART_HISTORY_DAYS,
   OPERATOR_FIRST,
   OPERATOR_LAST,
   PEACHTREE_COMPANY,
   PEACHTREE_TENANT,
   SITE_LOCATIONS,
+  TOTAL_OPERATORS,
+  TOTAL_TRUCKS,
   TRUCK_TYPES,
   type BranchDef,
 } from "./constants";
 import {
+  DEMO_UNIT_PREFIX,
+  STAGED_GPS_OFFLINE_UNITS,
+  STAGED_GPS_STALE_UNITS,
+  STAGED_PM_UNITS,
+} from "./scenarios";
+import {
   addDays,
-  etSlotIso,
+  demoBoardDate,
   hoursAgoIso,
   insertBatches,
   intBetween,
-  jobDescription,
   lerp,
   minutesAgoIso,
-  moneyBetween,
   mulberry32,
   pick,
   pickWeighted,
@@ -34,8 +41,11 @@ export type PeachtreeSeedResult = {
   companyId: string;
   branchIds: Record<string, string>;
   truckCount: number;
+  operatorCount: number;
   jobCount: number;
   telematicsCount: number;
+  recommendationCount: number;
+  demoBoardDate: string;
 };
 
 type BranchRecord = { id: string; code: string; def: BranchDef };
@@ -218,14 +228,22 @@ async function seedOperators(
   branches: BranchRecord[]
 ): Promise<OperatorRecord[]> {
   const operators: OperatorRecord[] = [];
-  const perBranch = [11, 10, 9]; // 30 total
   let idx = 0;
-  for (let b = 0; b < branches.length; b++) {
-    const branch = branches[b];
-    for (let i = 0; i < perBranch[b]; i++) {
+  for (const branch of branches) {
+    for (let i = 0; i < branch.def.operatorCount; i++) {
       const name = `${OPERATOR_FIRST[idx]} ${OPERATOR_LAST[idx]}`;
-      const role = i === 0 ? "lead" : i % 3 === 0 ? "operator" : "driver";
-      const hourly = 42 + (idx % 8) * 3;
+      const role = i === 0 ? "lead" : i % 4 === 0 ? "operator" : "driver";
+      const hourly = 44 + (idx % 10) * 2.5;
+      const certs = ["CDL-A"];
+      if (idx % 5 === 0) certs.push("Confined Space");
+      if (idx % 7 === 0) certs.push("HAZMAT");
+      if (idx % 9 === 0) certs.push("OSHA 30");
+      const quals =
+        idx % 6 === 0
+          ? ["hydrovac", "vacuum", "combo", "jet_vac"]
+          : idx % 3 === 0
+            ? ["hydrovac", "vacuum"]
+            : ["hydrovac", "combo"];
       const { data, error } = await supabase
         .from("fleet_operators")
         .insert({
@@ -233,13 +251,16 @@ async function seedOperators(
           name,
           operator_role: role,
           hourly_cost: hourly,
-          shift: idx % 7 === 0 ? "night" : "day",
+          shift: idx % 8 === 0 ? "night" : "day",
           overtime_rate: hourly * 1.5,
           double_time_rate: hourly * 2,
-          skills: idx % 4 === 0 ? ["hydrovac", "confined_space"] : ["hydrovac"],
-          truck_qualifications: ["hydrovac", "vacuum", "combo"],
-          certifications: idx % 5 === 0 ? ["CDL-A", "Confined Space"] : ["CDL-A"],
-          is_active: true,
+          skills:
+            idx % 4 === 0
+              ? ["hydrovac", "confined_space", "environmental"]
+              : ["hydrovac", "utility_support"],
+          truck_qualifications: quals,
+          certifications: certs,
+          is_active: idx !== 31,
         })
         .select("id")
         .single();
@@ -248,7 +269,14 @@ async function seedOperators(
       idx++;
     }
   }
+  if (operators.length !== TOTAL_OPERATORS) {
+    throw new Error(`Expected ${TOTAL_OPERATORS} operators, got ${operators.length}`);
+  }
   return operators;
+}
+
+function unitSuffix(unitNumber: string): string {
+  return unitNumber.replace(DEMO_UNIT_PREFIX, "");
 }
 
 async function seedTrucks(
@@ -264,33 +292,38 @@ async function seedTrucks(
     for (let i = 0; i < branch.def.truckCount; i++) {
       const truckType = pickWeighted(rng, TRUCK_TYPES).type;
       const gallons =
-        truckType === "support"
+        truckType === "support" || truckType === "service_pickup"
           ? 0
           : TRUCK_TYPES.find((t) => t.type === truckType)?.gallons ?? 3000;
       const fuelPct = intBetween(rng, 28, 96);
       const odometer = intBetween(rng, 42000, 198000);
-      const offsetLat = (rng() - 0.5) * 0.02;
-      const offsetLng = (rng() - 0.5) * 0.02;
+      const offsetLat = (rng() - 0.5) * 0.018;
+      const offsetLng = (rng() - 0.5) * 0.018;
       const homeLat = branch.def.latitude + offsetLat;
       const homeLng = branch.def.longitude + offsetLng;
-      const operator = operators[opIdx % operators.length];
+      const branchOps = operators.filter((o) => o.branchId === branch.id);
+      const operator = branchOps[i % branchOps.length] ?? operators[opIdx % operators.length];
       opIdx++;
 
-      const statusRoll = rng();
+      const unitNumber = `${DEMO_UNIT_PREFIX}${unit}`;
+      const suffix = String(unit);
       let status = "active";
-      let notes: string | null = null;
-      if (statusRoll > 0.94) {
-        status = "maintenance";
-        notes = "Scheduled PM — brake inspection";
-      } else if (statusRoll > 0.88) {
-        notes = "Maintenance soon — 500 mi to service interval";
+      let notes = `Primary operator: ${operator.name}`;
+
+      if (STAGED_PM_UNITS.includes(suffix as (typeof STAGED_PM_UNITS)[number])) {
+        if (suffix === "1021") {
+          status = "maintenance";
+          notes = "Scheduled PM — hydraulic pump service | Primary operator: " + operator.name;
+        } else {
+          notes = `Maintenance soon — PM due within 48h (${intBetween(rng, 120, 480)} mi) | Primary operator: ${operator.name}`;
+        }
       }
 
       const { data, error } = await supabase
         .from("trucks")
         .insert({
           branch_id: branch.id,
-          unit_number: String(unit),
+          unit_number: unitNumber,
           truck_type: truckType,
           capacity: {
             daily_hours: 10,
@@ -304,17 +337,17 @@ async function seedTrucks(
           home_latitude: homeLat,
           home_longitude: homeLng,
           external_asset_id: `PIS-TRK-${unit}`,
-          notes: notes ?? `Primary operator: ${operator.name}`,
+          notes,
         })
         .select("id")
         .single();
-      if (error || !data?.id) throw new Error(`Truck ${unit} failed: ${error?.message}`);
+      if (error || !data?.id) throw new Error(`Truck ${unitNumber} failed: ${error?.message}`);
 
       trucks.push({
         id: data.id as string,
         branchCode: branch.code,
         branchId: branch.id,
-        unitNumber: String(unit),
+        unitNumber,
         truckType,
         homeLat,
         homeLng,
@@ -322,292 +355,43 @@ async function seedTrucks(
       unit++;
     }
   }
+  if (trucks.length !== TOTAL_TRUCKS) {
+    throw new Error(`Expected ${TOTAL_TRUCKS} trucks, got ${trucks.length}`);
+  }
   return trucks;
 }
 
-type JobRow = {
-  branch_id: string;
-  customer_site_id: string;
-  status: string;
-  priority: string;
-  scheduled_start: string;
-  scheduled_end: string;
-  revenue_estimate: number;
-  required_truck_type: string;
-  assigned_truck_id: string | null;
-  external_source_id: string;
-  title: string;
-  description: string;
-};
-
-function trucksForBranch(trucks: TruckRecord[], branchId: string, type?: string): TruckRecord[] {
-  return trucks.filter(
-    (t) => t.branchId === branchId && (!type || t.truckType === type || t.truckType === "combo")
-  );
-}
-
-function buildJobs(
-  branches: BranchRecord[],
-  sites: SiteRecord[],
-  trucks: TruckRecord[]
-): JobRow[] {
-  const jobs: JobRow[] = [];
-  let seq = 1;
+async function seedOperatorAvailability(
+  supabase: SupabaseClient,
+  tenantId: string,
+  operators: OperatorRecord[]
+): Promise<void> {
+  const boardDate = demoBoardDate();
   const today = todayDateOnly();
+  const ptoIndices = [3, 17, 28];
+  const ptoRows = ptoIndices.map((idx) => ({
+    tenant_id: tenantId,
+    operator_id: operators[idx].id,
+    start_date: boardDate,
+    end_date: boardDate,
+    reason: pick(rng, ["PTO", "Family leave", "Training day", "Medical appointment"]),
+  }));
+  await insertBatches(supabase, "fleet_operator_time_off", ptoRows);
 
-  const makeJob = (opts: {
-    branchId: string;
-    site: SiteRecord;
-    status: string;
-    priority: string;
-    start: string;
-    end: string;
-    revenue: number;
-    truckType: string;
-    truckId: string | null;
-    title: string;
-    jobType: string;
-    estHours: number;
-    actHours: number | null;
-    emergency?: boolean;
-  }): JobRow => {
-    const id = `PIS-JOB-${String(seq).padStart(4, "0")}`;
-    seq++;
-    const prefix = opts.emergency ? "Emergency: " : "";
-    return {
-      branch_id: opts.branchId,
-      customer_site_id: opts.site.id,
-      status: opts.status,
-      priority: opts.priority,
-      scheduled_start: opts.start,
-      scheduled_end: opts.end,
-      revenue_estimate: opts.revenue,
-      required_truck_type: opts.truckType,
-      assigned_truck_id: opts.truckId,
-      external_source_id: id,
-      title: `${prefix}${opts.title}`,
-      description: jobDescription(opts.jobType, opts.estHours, opts.actHours, opts.revenue),
-    };
-  };
-
-  const siteFor = (i: number) => sites[i % sites.length];
-  const branchByCode = Object.fromEntries(branches.map((b) => [b.code, b]));
-
-  // 150 completed jobs over last 45 days
-  for (let i = 0; i < 150; i++) {
-    const dayOffset = -intBetween(rng, 1, 45);
-    const hour = intBetween(rng, 6, 16);
-    const estHours = pick(rng, [3, 4, 5, 6, 7, 8]);
-    const start = etSlotIso(dayOffset, hour);
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const branch = pick(rng, branches);
-    const branchTrucks = trucksForBranch(trucks, branch.id);
-    const truck = branchTrucks.length ? pick(rng, branchTrucks) : null;
-    const jobType = pick(rng, JOB_TYPES);
-    const isLarge = rng() < 0.08;
-    const revenue = isLarge
-      ? moneyBetween(rng, 20000, 40000)
-      : moneyBetween(rng, 1500, 12000);
-    const actHours = estHours * (0.85 + rng() * 0.25);
-    jobs.push(
-      makeJob({
-        branchId: branch.id,
-        site: siteFor(i),
-        status: "completed",
-        priority: pick(rng, ["low", "medium", "medium", "high"]),
-        start,
-        end,
-        revenue,
-        truckType: truck?.truckType ?? pick(rng, TRUCK_TYPES).type,
-        truckId: truck?.id ?? null,
-        title: `${jobType} — ${siteFor(i).customerName}`,
-        jobType,
-        estHours,
-        actHours,
-      })
-    );
+  const hourRows: Array<Record<string, unknown>> = [];
+  for (let d = -6; d <= 0; d++) {
+    const date = addDays(today, d);
+    for (let i = 0; i < operators.length; i++) {
+      if (ptoIndices.includes(i) && date === boardDate) continue;
+      hourRows.push({
+        tenant_id: tenantId,
+        operator_id: operators[i].id,
+        date,
+        committed_hours: intBetween(rng, 3, 6),
+      });
+    }
   }
-
-  // 25 in-progress (today)
-  for (let i = 0; i < 25; i++) {
-    const estHours = pick(rng, [4, 5, 6, 7, 8]);
-    const startedHoursAgo = rng() * (estHours - 0.5);
-    const start = hoursAgoIso(startedHoursAgo);
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const branch =
-      i < 14 ? branchByCode.MAR : i < 20 ? branchByCode.GVL : branchByCode.MAC;
-    const branchTrucks = trucksForBranch(trucks, branch.id);
-    const truck = branchTrucks[i % branchTrucks.length];
-    const jobType = pick(rng, JOB_TYPES);
-    const revenue = moneyBetween(rng, 2200, 14000);
-    const urgent = i < 5;
-    jobs.push(
-      makeJob({
-        branchId: branch.id,
-        site: siteFor(150 + i),
-        status: "in_progress",
-        priority: urgent ? "urgent" : pick(rng, ["medium", "high"]),
-        start,
-        end,
-        revenue,
-        truckType: truck.truckType,
-        truckId: truck.id,
-        title: `${jobType} — ${siteFor(150 + i).name}`,
-        jobType,
-        estHours,
-        actHours: startedHoursAgo,
-        emergency: i < 2,
-      })
-    );
-  }
-
-  // 18 scheduled today (future slots)
-  for (let i = 0; i < 18; i++) {
-    const hour = intBetween(rng, 13, 20);
-    const estHours = pick(rng, [3, 4, 5, 6]);
-    const start = etSlotIso(0, hour, intBetween(rng, 0, 45));
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const branch =
-      i < 10 ? branchByCode.MAR : i < 15 ? branchByCode.GVL : branchByCode.MAC;
-    const branchTrucks = trucksForBranch(trucks, branch.id);
-    const truck = branchTrucks[(i + 3) % branchTrucks.length];
-    const jobType = pick(rng, JOB_TYPES);
-    const revenue = moneyBetween(rng, 1800, 11000);
-    jobs.push(
-      makeJob({
-        branchId: branch.id,
-        site: siteFor(175 + i),
-        status: "scheduled",
-        priority: pick(rng, ["low", "medium", "high"]),
-        start,
-        end,
-        revenue,
-        truckType: truck.truckType,
-        truckId: truck.id,
-        title: `${jobType} — ${siteFor(175 + i).name}`,
-        jobType,
-        estHours,
-        actHours: null,
-      })
-    );
-  }
-
-  // 3 late jobs (scheduled start in past, still scheduled)
-  for (let i = 0; i < 3; i++) {
-    const estHours = pick(rng, [4, 5, 6]);
-    const start = hoursAgoIso(2.5 + i * 0.5);
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const branch = branchByCode.MAR;
-    const branchTrucks = trucksForBranch(trucks, branch.id);
-    const truck = branchTrucks[i];
-    const jobType = pick(rng, JOB_TYPES);
-    jobs.push(
-      makeJob({
-        branchId: branch.id,
-        site: siteFor(193 + i),
-        status: "scheduled",
-        priority: "high",
-        start,
-        end,
-        revenue: moneyBetween(rng, 3500, 9000),
-        truckType: truck.truckType,
-        truckId: truck.id,
-        title: `Late: ${jobType} — ${siteFor(193 + i).name}`,
-        jobType,
-        estHours,
-        actHours: null,
-      })
-    );
-  }
-
-  // 6 unassigned (urgent/high mix) — Marietta heavy for overload demo
-  for (let i = 0; i < 6; i++) {
-    const hour = intBetween(rng, 9, 17);
-    const estHours = pick(rng, [4, 5, 6, 7]);
-    const start = etSlotIso(0, hour);
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const branch = i < 4 ? branchByCode.MAR : branchByCode.GVL;
-    const jobType = pick(rng, JOB_TYPES);
-    const isUrgent = i < 4;
-    jobs.push(
-      makeJob({
-        branchId: branch.id,
-        site: siteFor(196 + i),
-        status: "unassigned",
-        priority: isUrgent ? "urgent" : "high",
-        start,
-        end,
-        revenue: moneyBetween(rng, isUrgent ? 4500 : 2500, isUrgent ? 12000 : 8000),
-        truckType: pick(rng, ["hydrovac", "vacuum", "combo"]),
-        truckId: null,
-        title: `${jobType} — ${siteFor(196 + i).customerName}`,
-        jobType,
-        estHours,
-        actHours: null,
-        emergency: i === 0 || i === 1,
-      })
-    );
-  }
-
-  // Extra Marietta today jobs to push utilization ~94%
-  const marTrucks = trucksForBranch(trucks, branchByCode.MAR.id);
-  for (let i = 0; i < 8; i++) {
-    const hour = intBetween(rng, 7, 11);
-    const estHours = pick(rng, [6, 7, 8, 9]);
-    const start = etSlotIso(0, hour);
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const truck = marTrucks[i % marTrucks.length];
-    const jobType = pick(rng, JOB_TYPES);
-    jobs.push(
-      makeJob({
-        branchId: branchByCode.MAR.id,
-        site: siteFor(202 + i),
-        status: i < 4 ? "in_progress" : "scheduled",
-        priority: pick(rng, ["medium", "high"]),
-        start,
-        end,
-        revenue: moneyBetween(rng, 3000, 9500),
-        truckType: truck.truckType,
-        truckId: truck.id,
-        title: `${jobType} — ${siteFor(202 + i).name}`,
-        jobType,
-        estHours,
-        actHours: i < 4 ? estHours * 0.4 : null,
-      })
-    );
-  }
-
-  // Future scheduled filler
-  for (let i = 0; i < 12; i++) {
-    const dayOffset = intBetween(rng, 1, 7);
-    const hour = intBetween(rng, 7, 15);
-    const estHours = pick(rng, [3, 4, 5]);
-    const start = etSlotIso(dayOffset, hour);
-    const end = new Date(Date.parse(start) + estHours * 3600000).toISOString();
-    const branch = pick(rng, branches);
-    const branchTrucks = trucksForBranch(trucks, branch.id);
-    const truck = branchTrucks[i % branchTrucks.length];
-    jobs.push(
-      makeJob({
-        branchId: branch.id,
-        site: siteFor(210 + i),
-        status: "scheduled",
-        priority: "medium",
-        start,
-        end,
-        revenue: moneyBetween(rng, 2000, 8000),
-        truckType: truck.truckType,
-        truckId: truck.id,
-        title: `${pick(rng, JOB_TYPES)} — ${siteFor(210 + i).name}`,
-        jobType: pick(rng, JOB_TYPES),
-        estHours,
-        actHours: null,
-      })
-    );
-  }
-
-  void today; // anchor demo date context
-  return jobs;
+  await insertBatches(supabase, "fleet_operator_hours_daily", hourRows);
 }
 
 async function seedJobs(
@@ -618,7 +402,7 @@ async function seedJobs(
   sites: SiteRecord[],
   trucks: TruckRecord[]
 ): Promise<number> {
-  const rows = buildJobs(branches, sites, trucks).map((j) => ({
+  const rows = buildDemoJobs(rng, branches, sites, trucks).map((j) => ({
     ...j,
     tenant_id: tenantId,
     company_id: companyId,
@@ -640,8 +424,32 @@ async function seedIntegrations(
       provider: "csv_manual",
       display_name: "CSV Job Import",
       status: "active",
-      config: { poll_interval_sec: 300 },
+      config: { poll_interval_sec: 300, mode: "import" },
       last_sync_at: minutesAgoIso(4),
+    },
+    {
+      tenant_id: tenantId,
+      provider: "samsara",
+      display_name: "Samsara Fleet",
+      status: "active",
+      config: { poll_interval_sec: 300 },
+      last_sync_at: minutesAgoIso(3),
+    },
+    {
+      tenant_id: tenantId,
+      provider: "fleetio",
+      display_name: "Fleetio Maintenance",
+      status: "active",
+      config: { poll_interval_sec: 600 },
+      last_sync_at: minutesAgoIso(22),
+    },
+    {
+      tenant_id: tenantId,
+      provider: "quickbooks",
+      display_name: "QuickBooks Online",
+      status: "active",
+      config: { poll_interval_sec: 3600, mode: "read_only" },
+      last_sync_at: minutesAgoIso(45),
     },
     {
       tenant_id: tenantId,
@@ -650,14 +458,6 @@ async function seedIntegrations(
       status: "active",
       config: { poll_interval_sec: 120 },
       last_sync_at: minutesAgoIso(2),
-    },
-    {
-      tenant_id: tenantId,
-      provider: "samsara",
-      display_name: "Samsara Fleet",
-      status: "active",
-      config: { poll_interval_sec: 300 },
-      last_sync_at: minutesAgoIso(8),
     },
     {
       tenant_id: tenantId,
@@ -671,13 +471,20 @@ async function seedIntegrations(
   ];
 
   const ids: Record<string, string> = {};
+  const skipped: string[] = [];
   for (const conn of connections) {
     const { data, error } = await supabase
       .from("integration_connections")
       .insert(conn)
       .select("id, provider")
       .single();
-    if (error || !data?.id) throw new Error(`Integration failed: ${error?.message}`);
+    if (error || !data?.id) {
+      if (error?.message.includes("provider_check") && ["fleetio", "quickbooks"].includes(conn.provider)) {
+        skipped.push(conn.provider);
+        continue;
+      }
+      throw new Error(`Integration failed: ${error?.message}`);
+    }
     ids[data.provider as string] = data.id as string;
 
     await supabase.from("integration_sync_runs").insert({
@@ -688,6 +495,9 @@ async function seedIntegrations(
       records_failed: conn.status === "error" ? 3 : 0,
       error_summary: conn.status === "error" ? conn.last_error : null,
     });
+  }
+  if (skipped.length > 0) {
+    console.log(`    Skipped optional integrations (apply enterprise migration): ${skipped.join(", ")}`);
   }
   return ids;
 }
@@ -705,15 +515,20 @@ async function seedTelematics(
   for (let ti = 0; ti < trucks.length; ti++) {
     const truck = trucks[ti];
     const dest = sites[ti % sites.length];
-    const profile =
-      ti >= trucks.length - 2 ? "offline" : ti >= trucks.length - 5 ? "stale" : "online";
+    const suffix = unitSuffix(truck.unitNumber);
+    const profile = STAGED_GPS_OFFLINE_UNITS.includes(suffix as (typeof STAGED_GPS_OFFLINE_UNITS)[number])
+      ? "offline"
+      : STAGED_GPS_STALE_UNITS.includes(suffix as (typeof STAGED_GPS_STALE_UNITS)[number])
+        ? "stale"
+        : "online";
 
     const tripPoints = 8;
     for (let p = 0; p < tripPoints; p++) {
       const t = p / (tripPoints - 1);
       const lat = lerp(truck.homeLat, dest.latitude, t);
       const lng = lerp(truck.homeLng, dest.longitude, t);
-      const hoursBack = profile === "offline" ? 4 + p * 0.1 : profile === "stale" ? 0.35 : p * 0.02;
+      const hoursBack =
+        profile === "offline" ? 4 + p * 0.1 : profile === "stale" ? 0.35 : p * 0.02;
       const recordedAt =
         profile === "online" && p === tripPoints - 1
           ? minutesAgoIso(2 + (ti % 5))
@@ -724,7 +539,7 @@ async function seedTelematics(
       const speed = p === 0 || p === tripPoints - 1 ? 0 : 25 + rng() * 35;
       const idle = speed < 3;
       const odometer =
-        Number(truck.unitNumber) * 10 + p * 1.2 + (profile === "offline" ? 0 : ti);
+        Number(suffix) * 10 + p * 1.2 + (profile === "offline" ? 0 : ti);
 
       events.push({
         tenant_id: tenantId,
@@ -739,7 +554,7 @@ async function seedTelematics(
         idle,
         heading_deg: intBetween(rng, 0, 359),
         source: "backfill",
-        external_event_id: `PIS-TEL-${truck.unitNumber}-${eventSeq++}`,
+        external_event_id: `PIS-TEL-${suffix}-${eventSeq++}`,
         raw_payload: { demo: true, profile },
       });
     }
@@ -847,6 +662,9 @@ export async function seedPeachtreeFleetDemo(
   console.log("  Seeding operators…");
   const operators = await seedOperators(supabase, branches);
 
+  console.log("  Seeding operator PTO & hours…");
+  await seedOperatorAvailability(supabase, tenantId, operators);
+
   console.log("  Seeding trucks…");
   const trucks = await seedTrucks(supabase, branches, operators);
 
@@ -868,8 +686,8 @@ export async function seedPeachtreeFleetDemo(
     connectionIds.webhook_telematics
   );
 
-  const fromDate = addDays(todayDateOnly(), -45);
-  const toDate = todayDateOnly();
+  const fromDate = addDays(todayDateOnly(), -MART_HISTORY_DAYS);
+  const toDate = demoBoardDate();
   console.log(`  Refreshing utilization marts (${fromDate} → ${toDate})…`);
   const martResult = await refreshUtilizationDailyForTenant(
     supabase,
@@ -881,8 +699,12 @@ export async function seedPeachtreeFleetDemo(
     `    ${martResult.utilizationRowsUpserted} utilization rows, ${martResult.capacityRowsUpserted} capacity snapshots`
   );
 
-  console.log("  Generating recommendations…");
-  const recs = await getFleetRecommendations(supabase, tenantId, { forceRefresh: true });
+  const boardDate = demoBoardDate();
+  console.log(`  Generating recommendations for demo board (${boardDate})…`);
+  const recs = await getFleetRecommendations(supabase, tenantId, {
+    date: boardDate,
+    forceRefresh: true,
+  });
   console.log(`    ${recs.pending.length} recommendations generated`);
 
   return {
@@ -890,7 +712,10 @@ export async function seedPeachtreeFleetDemo(
     companyId,
     branchIds: Object.fromEntries(branches.map((b) => [b.code, b.id])),
     truckCount: trucks.length,
+    operatorCount: operators.length,
     jobCount,
     telematicsCount,
+    recommendationCount: recs.pending.length,
+    demoBoardDate: boardDate,
   };
 }

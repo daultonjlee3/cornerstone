@@ -31,6 +31,23 @@ export default async function DispatchPage({
 
   const productProfile = await getProductProfileForTenant(tenantId, supabase);
   const params = await resolveSearchParams(searchParams);
+  const hasDateParam =
+    typeof params?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date.trim());
+
+  if (isFleetProductProfile(productProfile) && !hasDateParam) {
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("slug")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (tenant?.slug === "peachtree-industrial") {
+      const tomorrow = new Date();
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+      redirect(`/dispatch?date=${tomorrowStr}`);
+    }
+  }
+
   const filterState = parseFilterStateFromParams(params ?? {});
 
   if (isFleetProductProfile(productProfile)) {

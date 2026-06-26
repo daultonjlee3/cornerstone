@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getNavConfig, isNavItemActive, isFleetProductProfile } from "../app/(authenticated)/nav-config";
+import { getNavConfig, isNavItemActive, isFleetProductProfile, usesCmmsOnboarding } from "../app/(authenticated)/nav-config";
 
 describe("fleet navigation config", () => {
   it("fleet_intelligence profile leads with fleet operations and hides cmms operations group", () => {
@@ -9,7 +9,7 @@ describe("fleet navigation config", () => {
     expect(labels).toContain("fleet-setup");
     expect(labels).toContain("integrations");
     expect(labels).toContain("implementation");
-    expect(labels).toContain("cmms-assets");
+    expect(labels).not.toContain("cmms-assets");
     expect(labels).not.toContain("cmms-operations");
 
     const operations = groups.find((g) => g.id === "fleet-operations");
@@ -20,6 +20,17 @@ describe("fleet navigation config", () => {
       "Fleet Performance",
       "Exceptions",
     ]);
+
+    const admin = groups.find((g) => g.id === "administration");
+    expect(admin?.items.some((i) => i.href === "/onboarding-wizard")).toBe(false);
+    expect(labels[labels.length - 1]).toBe("administration");
+    expect(labels[labels.length - 2]).toBe("fleet-setup");
+  });
+
+  it("usesCmmsOnboarding is false only for fleet_intelligence", () => {
+    expect(usesCmmsOnboarding("fleet_intelligence")).toBe(false);
+    expect(usesCmmsOnboarding("hybrid")).toBe(true);
+    expect(usesCmmsOnboarding("cmms")).toBe(true);
   });
 
   it("cmms profile keeps cmms operations and excludes fleet modules", () => {
@@ -31,7 +42,7 @@ describe("fleet navigation config", () => {
     expect(ids).not.toContain("implementation");
   });
 
-  it("hybrid profile includes fleet and cmms sections", () => {
+  it("hybrid profile includes fleet and cmms sections with admin last", () => {
     const groups = getNavConfig("hybrid");
     const ids = groups.map((g) => g.id);
     expect(ids).toContain("fleet-operations");
@@ -39,14 +50,17 @@ describe("fleet navigation config", () => {
     expect(ids).toContain("implementation");
     expect(ids).toContain("cmms-operations");
     expect(ids).toContain("cmms-assets");
+    expect(ids[ids.length - 1]).toBe("administration");
+    expect(ids.indexOf("fleet-setup")).toBeLessThan(ids.indexOf("cmms-assets"));
+    expect(ids.indexOf("cmms-assets")).toBeLessThan(ids.indexOf("administration"));
 
     const fleetOps = groups.find((g) => g.id === "fleet-operations");
     expect(fleetOps?.items.some((i) => i.label === "Operations Intelligence")).toBe(true);
     expect(fleetOps?.items.some((i) => i.label === "Exceptions")).toBe(true);
   });
 
-  it("cmms assets group is collapsed by default for fleet profiles", () => {
-    const fleetAssets = getNavConfig("fleet_intelligence").find((g) => g.id === "cmms-assets");
+  it("hybrid cmms assets group is collapsed by default", () => {
+    const fleetAssets = getNavConfig("hybrid").find((g) => g.id === "cmms-assets");
     expect(fleetAssets?.defaultCollapsed).toBe(true);
     expect(fleetAssets?.items.some((i) => i.href === "/work-orders")).toBe(true);
   });

@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, CircleDashed, Sparkles } from 
 import {
   EmptyState,
   HeroPanel,
+  IconChip,
   KpiCard,
   PageLayout,
   PageSection,
@@ -307,7 +308,10 @@ export function ImplementationOverviewClient() {
         <HeroPanel>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
-              <p className="cs-text-eyebrow">Enterprise onboarding progress</p>
+              <div className="flex items-center gap-3">
+                <IconChip icon={Sparkles} variant="fleet" size="md" glow label="Implementation" />
+                <p className="cs-text-eyebrow">Enterprise onboarding progress</p>
+              </div>
               <h2 className="cs-text-display">
                 Implementation Progress {readiness.implementationProgressPct}%
               </h2>
@@ -339,6 +343,20 @@ export function ImplementationOverviewClient() {
                 value={card.value}
                 hint={card.hint}
                 emphasis={card.emphasis}
+                icon={
+                  card.label === "Fleet Health"
+                    ? CheckCircle2
+                    : card.label === "Recommendations Ready"
+                      ? Sparkles
+                      : card.label === "Connections"
+                        ? CheckCircle2
+                        : undefined
+                }
+                iconProminent={
+                  card.label === "Fleet Health" ||
+                  card.label === "Recommendations Ready" ||
+                  card.label === "Connections"
+                }
                 className="cursor-pointer"
               />
             </Link>

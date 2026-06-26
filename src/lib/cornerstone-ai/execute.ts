@@ -13,6 +13,8 @@ import type { RetrievedHelpContext, RetrievedOpsContext, RetrievedSummaryContext
 import { callCornerstoneLlm } from "./llm";
 import { formatAiResponse, sourcesFromHelpSections } from "./format";
 import { planCornerstoneAiAction } from "./action-engine";
+import { isFleetCopilotMode } from "./fleet-copilot-mode";
+import { executeFleetCopilotRequest } from "./fleet/execute-fleet-copilot";
 import {
   checkAiQuotaBeforeRequest,
   recordAiUsage,
@@ -37,6 +39,7 @@ export type ExecuteAiRequestParams = {
   context?: CornerstoneAiContext;
   /** Platform super admins bypass tenant quota but still record usage. */
   isPlatformSuperAdmin?: boolean;
+  productProfile?: import("@/src/types/fleet").ProductProfile;
 };
 
 /**
@@ -46,21 +49,43 @@ export type ExecuteAiRequestParams = {
 export async function executeCornerstoneAiRequest(
   params: ExecuteAiRequestParams
 ): Promise<CornerstoneAiResponse> {
-  const { supabase, tenantId, userId, companyIds, query, context, isPlatformSuperAdmin } = params;
+  const { supabase, tenantId, userId, companyIds, query, context, isPlatformSuperAdmin, productProfile } =
+    params;
   const trimmed = query?.trim() || "";
   if (!trimmed) {
     return formatAiResponse(
-      "Please ask a question or request a summary.",
+      "Please ask a question about today's fleet operation.",
       "UNKNOWN",
       "LIGHT",
       { warnings: ["No query provided."] }
     );
   }
 
+  const fleetMode = isFleetCopilotMode(productProfile ?? context?.productProfile, context?.route);
+
   const intent = classifyAiIntent(trimmed, {
     entityType: context?.entityType,
     entityId: context?.entityId,
+    fleetMode,
   });
+
+  if (
+    fleetMode &&
+    (intent === "ACTION_ASSIGN_WORK_ORDERS" || intent === "ACTION_CREATE_WORK_ORDER")
+  ) {
+    return formatAiResponse(
+      "Dispatch assignments are handled on the Dispatch Intelligence board. Select a recommendation there to accept or dismiss — I can explain why a recommendation was made and what changes if you reject it.",
+      intent,
+      "LIGHT",
+      {
+        followUpSuggestions: [
+          "Why is this recommendation suggested?",
+          "Which jobs are still unassigned?",
+          "What happens if I reject this recommendation?",
+        ],
+      }
+    );
+  }
 
   if (
     intent === "ACTION_ASSIGN_WORK_ORDERS" ||
@@ -82,6 +107,17 @@ export async function executeCornerstoneAiRequest(
   let user = "";
   let sources: { title: string; moduleKey?: string; path?: string }[] = [];
 
+  if (intent === "HELP" && fleetMode) {
+    return executeFleetCopilotRequest({
+      supabase,
+      tenantId,
+      userId,
+      query: trimmed,
+      context,
+      isPlatformSuperAdmin,
+    });
+  }
+
   if (intent === "HELP") {
     const sections = help.searchHelpDocs(trimmed).length
       ? help.searchHelpDocs(trimmed)
@@ -91,6 +127,15 @@ export async function executeCornerstoneAiRequest(
     system = built.system;
     user = built.user;
     sources = sourcesFromHelpSections(sections);
+  } else if (intent === "OPS_QUERY" && fleetMode) {
+    return executeFleetCopilotRequest({
+      supabase,
+      tenantId,
+      userId,
+      query: trimmed,
+      context,
+      isPlatformSuperAdmin,
+    });
   } else if (intent === "OPS_QUERY") {
     const opsIntent: AiIntent = "OPS_QUERY";
     const q = trimmed.toLowerCase();
@@ -265,9 +310,20 @@ export async function executeCornerstoneAiRequest(
     system = built.system;
     user = built.user;
   } else {
-    const built = buildAiPrompt(intent, trimmed, { sections: [] } as RetrievedHelpContext);
-    system = built.system;
-    user = built.user;
+    if (fleetMode) {
+      return executeFleetCopilotRequest({
+        supabase,
+        tenantId,
+        userId,
+        query: trimmed,
+        context,
+        isPlatformSuperAdmin,
+      });
+    } else {
+      const built = buildAiPrompt(intent, trimmed, { sections: [] } as RetrievedHelpContext);
+      system = built.system;
+      user = built.user;
+    }
   }
 
   const inputEstimate = estimateTokens(system + user);

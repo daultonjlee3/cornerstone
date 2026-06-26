@@ -31,7 +31,7 @@ export async function submitCornerstoneAiQuery(
     auth = await getAuthContext(supabase);
   } catch (err) {
     console.error("[Cornerstone AI] Failed to resolve auth context", err);
-    return { ok: false, error: "You must be signed in to use Cornerstone AI." };
+    return { ok: false, error: "You must be signed in to use Fleet Intelligence Copilot." };
   }
 
   if (!auth.tenantId || !auth.companyIds?.length) {
@@ -47,6 +47,7 @@ export async function submitCornerstoneAiQuery(
       query,
       context,
       isPlatformSuperAdmin: auth.isPlatformSuperAdmin,
+      productProfile: auth.productProfile,
     });
     return { ok: true, data };
   } catch (e) {
@@ -90,7 +91,7 @@ export async function executeCornerstoneAiActionRequest(
     auth = await getAuthContext(supabase);
   } catch (err) {
     console.error("[Cornerstone AI] Failed to resolve auth context", err);
-    return { ok: false, error: "You must be signed in to use Cornerstone AI." };
+    return { ok: false, error: "You must be signed in to use Fleet Intelligence Copilot." };
   }
 
   if (!auth.tenantId || !auth.companyIds?.length) {
@@ -142,7 +143,7 @@ export async function previewCornerstoneAiActionRequest(
     auth = await getAuthContext(supabase);
   } catch (err) {
     console.error("[Cornerstone AI] Failed to resolve auth context", err);
-    return { ok: false, error: "You must be signed in to use Cornerstone AI." };
+    return { ok: false, error: "You must be signed in to use Fleet Intelligence Copilot." };
   }
 
   if (!auth.tenantId || !auth.companyIds?.length) {

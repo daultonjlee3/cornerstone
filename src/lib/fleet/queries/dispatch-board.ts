@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FleetDispatchBoardData, FleetDispatchJob, FleetDispatchTruckLane } from "@/src/types/fleet";
 import { computeTelematicsStatus, listTruckLatestPositions } from "@/src/lib/fleet/queries";
 import { estimateDeadheadMiles } from "@/src/lib/fleet/marts/deadhead";
+import {
+  enrichTruckLaneWithOperator,
+  loadOperatorContextMaps,
+} from "@/src/lib/fleet/queries/operator-context";
 
 const DEFAULT_TRUCK_HOURS = 10;
 
@@ -167,6 +171,8 @@ export async function loadFleetDispatchBoardData(
   const { data: capacityData, error: capacityError } = await capacityQuery;
   if (capacityError) throw new Error(capacityError.message);
 
+  const operatorContext = await loadOperatorContextMaps(supabase, tenantId, date);
+
   const truckPoints = (truckData ?? []).map((truck) => {
     const t = truck as {
       id: string;
@@ -271,26 +277,29 @@ export async function loadFleetDispatchBoardData(
     const fuelLevel =
       typeof t.capacity?.fuel_level_pct === "number" ? t.capacity.fuel_level_pct : null;
 
-    return {
-      truck_id: t.id,
-      unit_number: t.unit_number,
-      truck_type: t.truck_type,
-      branch_id: t.branch_id,
-      branch_name: branch?.name ?? null,
-      status: t.status,
-      committed_hours: committed,
-      available_hours: available,
-      utilization: available > 0 ? committed / available : 0,
-      jobs: assignedJobs,
-      latitude: truckPoint.latitude,
-      longitude: truckPoint.longitude,
-      telematics_status: computeTelematicsStatus(t.last_telematics_at),
-      operator_name: operatorMatch?.[1]?.trim() ?? null,
-      revenue_today: revenueByTruck.get(t.id) ?? 0,
-      idle_hours: idleByTruck.get(t.id) ?? 0,
-      fuel_level_pct: fuelLevel,
-      maintenance_note: maintenanceNote,
-    };
+    return enrichTruckLaneWithOperator(
+      {
+        truck_id: t.id,
+        unit_number: t.unit_number,
+        truck_type: t.truck_type,
+        branch_id: t.branch_id,
+        branch_name: branch?.name ?? null,
+        status: t.status,
+        committed_hours: committed,
+        available_hours: available,
+        utilization: available > 0 ? committed / available : 0,
+        jobs: assignedJobs,
+        latitude: truckPoint.latitude,
+        longitude: truckPoint.longitude,
+        telematics_status: computeTelematicsStatus(t.last_telematics_at),
+        operator_name: operatorMatch?.[1]?.trim() ?? null,
+        revenue_today: revenueByTruck.get(t.id) ?? 0,
+        idle_hours: idleByTruck.get(t.id) ?? 0,
+        fuel_level_pct: fuelLevel,
+        maintenance_note: maintenanceNote,
+      },
+      operatorContext
+    );
   });
 
   const branchCapacity = (capacityData ?? []).map((row) => {

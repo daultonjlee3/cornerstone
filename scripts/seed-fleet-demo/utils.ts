@@ -38,6 +38,10 @@ export function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function demoBoardDate(): string {
+  return addDays(todayDateOnly(), 1);
+}
+
 export function addDays(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T12:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + days);

@@ -14,10 +14,22 @@ import {
 } from "@/src/lib/fleet-recommendation-engine/outcome-tracking";
 import { validateRecommendationAcceptance } from "@/src/lib/fleet-recommendation-engine/validate-recommendation";
 import {
-  buildProfitabilityReasons,
-  finalizeCandidateScores,
-  scoreTruckForJob,
-} from "@/src/lib/fleet-recommendation-engine/profitability-scoring";
+  attachValidationHealth,
+  validateRecommendationInstance,
+  type InvalidationSummary,
+} from "@/src/lib/fleet-recommendation-engine/validation-engine";
+import { evaluateTruckJobHardConstraints } from "@/src/lib/fleet-recommendation-engine/constraints";
+import {
+  dedupeRecommendationsByJobAndType,
+  rankTruckCandidatesForJob,
+} from "@/src/lib/fleet-recommendation-engine/pipeline";
+import { buildCascadeReplacementForJob, insertCascadeReplacement } from "@/src/lib/fleet-recommendation-engine/cascade";
+import {
+  FLEET_RECOMMENDATION_ENGINE_VERSION,
+  RECOMMENDATION_TTL_MS,
+} from "@/src/lib/fleet-recommendation-engine/constants";
+import { hashOperationalSnapshot } from "@/src/lib/fleet-recommendation-engine/snapshot-hash";
+import { buildProfitabilityReasons } from "@/src/lib/fleet-recommendation-engine/profitability-scoring";
 import { loadProfitabilityContext } from "@/src/lib/operational-profitability/queries";
 import type { ProfitabilityContext } from "@/src/lib/operational-profitability/types";
 import {
@@ -39,13 +51,14 @@ import type {
   FleetRecommendationOutcomeAction,
   FleetRecommendationRationale,
   FleetRecommendationSummary,
+  FleetRecommendationRecalculationNotice,
+  FleetRecommendationRecalculationReplacement,
   FleetRecommendationsResponse,
   FleetRecommendationType,
+  RecommendationLifecyclePhase,
 } from "@/src/types/fleet";
 
-export const FLEET_RECOMMENDATION_ENGINE_VERSION = "fleet_rules_v2";
-
-const RECOMMENDATION_TTL_MS = 60 * 60 * 1000;
+export { FLEET_RECOMMENDATION_ENGINE_VERSION } from "@/src/lib/fleet-recommendation-engine/constants";
 const MAX_TRUCK_ASSIGNMENT = 8;
 const MAX_IDLE_MATCH = 8;
 const MAX_CAPACITY_ALERTS = 4;
@@ -64,6 +77,7 @@ type RecommendationInsert = {
   branch_id: string;
   recommendation_type: FleetRecommendationType;
   status: RecommendationStatus;
+  lifecycle: RecommendationLifecyclePhase;
   score: number;
   rationale: FleetRecommendationRationale;
   engine_version: string;
@@ -76,6 +90,7 @@ type RecommendationRow = {
   branch_id: string;
   recommendation_type: FleetRecommendationType;
   status: RecommendationStatus;
+  lifecycle?: RecommendationLifecyclePhase;
   score: number;
   rationale: unknown;
   engine_version: string;
@@ -111,19 +126,10 @@ function buildTruckAssignmentRecommendations(
   });
   const jobsForDirectAssignment =
     highPriorityJobs.length > 0 ? highPriorityJobs : sortedJobs.slice(0, 3);
+  const snapshotHash = hashOperationalSnapshot(board);
 
   for (const job of jobsForDirectAssignment.slice(0, MAX_TRUCK_ASSIGNMENT)) {
-    const eligibleLanes = board.truckLanes.filter((lane) => {
-      if (lane.status !== "active") return false;
-      if (job.required_truck_type === "any") return true;
-      return lane.truck_type === job.required_truck_type;
-    });
-
-    const scored = finalizeCandidateScores(
-      eligibleLanes.map((lane) =>
-        scoreTruckForJob({ job, lane, board, profitCtx })
-      )
-    );
+    const scored = rankTruckCandidatesForJob({ job, board, profitCtx });
 
     const best = scored[0];
     if (!best) continue;
@@ -142,6 +148,7 @@ function buildTruckAssignmentRecommendations(
       branch_id: job.branch_id,
       recommendation_type: "truck_assignment",
       status: "pending",
+      lifecycle: "ready",
       score: best.score,
       rationale: {
         title,
@@ -159,6 +166,8 @@ function buildTruckAssignmentRecommendations(
         candidate_snapshots: candidateSnapshots,
         job_snapshot: buildJobSnapshot(job),
         generated_at: new Date().toISOString(),
+        board_date: board.date,
+        snapshot_hash: snapshotHash,
       },
       engine_version: FLEET_RECOMMENDATION_ENGINE_VERSION,
       expires_at: expiresAt,
@@ -220,6 +229,7 @@ function buildCapacityOverloadRecommendations(
       branch_id: source.branch_id,
       recommendation_type: "capacity_overload" as const,
       status: "pending" as const,
+      lifecycle: "ready" as const,
       score: computeCompositeScore(factors),
       rationale: {
         title: target
@@ -231,6 +241,8 @@ function buildCapacityOverloadRecommendations(
           source_branch_id: source.branch_id,
           target_branch_id: target?.branch_id,
         },
+        board_date: board.date,
+        snapshot_hash: hashOperationalSnapshot(board),
       },
       engine_version: FLEET_RECOMMENDATION_ENGINE_VERSION,
       expires_at: expiresAt,
@@ -266,8 +278,7 @@ function buildIdleTruckMatchRecommendations(
 
   for (const lane of idleTrucks.slice(0, MAX_IDLE_MATCH)) {
     const eligibleJobs = availableJobs.filter((job) => {
-      if (job.required_truck_type === "any") return true;
-      return job.required_truck_type === lane.truck_type;
+      return evaluateTruckJobHardConstraints({ job, lane, board }).ok;
     });
 
     const scored = eligibleJobs
@@ -323,6 +334,7 @@ function buildIdleTruckMatchRecommendations(
       branch_id: best.job.branch_id,
       recommendation_type: "idle_truck_match",
       status: "pending",
+      lifecycle: "ready",
       score: best.score,
       rationale: {
         title: `Match idle truck ${lane.unit_number} with ${best.job.title}`,
@@ -336,6 +348,8 @@ function buildIdleTruckMatchRecommendations(
           job_id: best.job.id,
           truck_id: lane.truck_id,
         },
+        board_date: board.date,
+        snapshot_hash: hashOperationalSnapshot(board),
       },
       engine_version: FLEET_RECOMMENDATION_ENGINE_VERSION,
       expires_at: expiresAt,
@@ -429,6 +443,7 @@ function mapRecommendationRow(row: RecommendationRow): FleetRecommendationInstan
     branch_id: row.branch_id,
     recommendation_type: row.recommendation_type,
     status: row.status,
+    lifecycle: row.lifecycle,
     score: Number(row.score),
     rationale: normalizeRationale(row.rationale),
     engine_version: row.engine_version,
@@ -489,7 +504,7 @@ async function expireStalePendingRecommendations(
 
   await supabase
     .from("recommendation_instances")
-    .update({ status: "expired" })
+    .update({ status: "expired", lifecycle: "expired" })
     .in("id", ids)
     .eq("tenant_id", tenantId);
 
@@ -512,7 +527,7 @@ async function loadPendingRecommendations(
   let query = supabase
     .from("recommendation_instances")
     .select(
-      "id, tenant_id, branch_id, recommendation_type, status, score, rationale, engine_version, created_at, expires_at"
+      "id, tenant_id, branch_id, recommendation_type, status, lifecycle, score, rationale, engine_version, created_at, expires_at"
     )
     .eq("tenant_id", tenantId)
     .eq("status", "pending")
@@ -555,6 +570,215 @@ async function loadRecommendationHistory(
   });
 }
 
+async function expirePendingForRegeneration(
+  supabase: SupabaseClient,
+  tenantId: string,
+  branchId?: string | null
+): Promise<void> {
+  let query = supabase
+    .from("recommendation_instances")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "pending");
+  if (branchId) query = query.eq("branch_id", branchId);
+
+  const { data } = await query;
+  const ids = (data ?? []).map((row) => (row as { id: string }).id);
+  if (ids.length === 0) return;
+
+  await supabase
+    .from("recommendation_instances")
+    .update({ status: "expired", lifecycle: "expired" })
+    .in("id", ids)
+    .eq("tenant_id", tenantId);
+}
+
+async function markRecommendationInvalid(
+  supabase: SupabaseClient,
+  tenantId: string,
+  recommendation: FleetRecommendationInstance,
+  code: string,
+  message: string
+): Promise<void> {
+  await supabase
+    .from("recommendation_instances")
+    .update({ status: "failed", lifecycle: "failed" })
+    .eq("id", recommendation.id)
+    .eq("tenant_id", tenantId);
+
+  await supabase.from("recommendation_outcomes").insert({
+    recommendation_id: recommendation.id,
+    action: "failed",
+    acted_by: null,
+    notes: "Invalidated by read-time validation pipeline.",
+    application_error: message,
+    estimated_impact: { failure_code: code, phase: "pre_display" },
+    measured_impact: {},
+  });
+}
+
+async function partitionValidatedPending(
+  supabase: SupabaseClient,
+  tenantId: string,
+  pending: FleetRecommendationInstance[],
+  board: FleetDispatchBoardData,
+  profitCtx: ProfitabilityContext,
+  expiresAt: string
+): Promise<{
+  valid: FleetRecommendationInstance[];
+  invalidated: InvalidationSummary[];
+  replacements: FleetRecommendationRecalculationReplacement[];
+}> {
+  const valid: FleetRecommendationInstance[] = [];
+  const invalidated: InvalidationSummary[] = [];
+  const replacements: FleetRecommendationRecalculationReplacement[] = [];
+
+  for (const rec of pending) {
+    const result = validateRecommendationInstance({
+      recommendation: rec,
+      board,
+      lifecycle: "validating",
+    });
+    if (result.ok) {
+      valid.push(attachValidationHealth(rec, board));
+      continue;
+    }
+
+    const truckId =
+      rec.rationale.entities.truck_id ?? rec.rationale.candidates?.[0]?.truck_id;
+    const lane = truckId ? board.truckLanes.find((l) => l.truck_id === truckId) : undefined;
+    const jobId = rec.rationale.entities.job_id;
+    const previousContribution =
+      rec.rationale.candidate_snapshots?.[0]?.estimated_contribution ?? null;
+
+    const summary: InvalidationSummary = {
+      id: rec.id,
+      code: result.code,
+      message: result.message,
+      previousTruckId: truckId,
+      previousUnitNumber: lane?.unit_number ?? rec.rationale.candidates?.[0]?.unit_number,
+      previousContributionEstimate: previousContribution,
+      jobId,
+    };
+    invalidated.push(summary);
+    await markRecommendationInvalid(supabase, tenantId, rec, result.code, result.message);
+
+    if (
+      rec.recommendation_type === "truck_assignment" &&
+      jobId &&
+      truckId
+    ) {
+      const job = board.jobs.find((j) => j.id === jobId);
+      if (job) {
+        const cascade = buildCascadeReplacementForJob({
+          tenantId,
+          job,
+          board,
+          profitCtx,
+          excludeTruckIds: [truckId],
+          invalidated: summary,
+          expiresAt,
+        });
+        if (cascade) {
+          const newId = await insertCascadeReplacement(supabase, cascade.insert);
+          if (newId) {
+            replacements.push(cascade.replacement);
+            const replacementInstance: FleetRecommendationInstance = {
+              id: newId,
+              tenant_id: tenantId,
+              branch_id: cascade.insert.branch_id,
+              recommendation_type: "truck_assignment",
+              status: "pending",
+              lifecycle: "ready",
+              score: cascade.insert.score,
+              rationale: cascade.insert.rationale,
+              engine_version: cascade.insert.engine_version,
+              created_at: new Date().toISOString(),
+              expires_at: cascade.insert.expires_at,
+            };
+            valid.push(attachValidationHealth(replacementInstance, board));
+          }
+        }
+      }
+    }
+  }
+
+  return { valid, invalidated, replacements };
+}
+
+function buildRecalculationNotice(
+  invalidated: InvalidationSummary[],
+  replacedCount: number,
+  replacements: FleetRecommendationRecalculationReplacement[] = []
+): FleetRecommendationRecalculationNotice | undefined {
+  if (invalidated.length === 0) return undefined;
+  const first = invalidated[0];
+  const firstReplacement = replacements[0];
+  const unit = first.previousUnitNumber ?? "Recommended truck";
+  return {
+    message:
+      replacements.length === 1 && firstReplacement?.new_unit_number
+        ? `${unit} became unavailable after recommendations were generated. Cornerstone recalculated automatically.`
+        : invalidated.length === 1
+          ? `${unit} became unavailable after recommendations were generated. Cornerstone recalculated automatically.`
+          : `${invalidated.length} recommendations were outdated. Cornerstone recalculated from the latest operational snapshot.`,
+    invalidated_count: invalidated.length,
+    replaced_count: replacedCount,
+    replacements,
+    details: invalidated.slice(0, 3).map((item) => ({
+      previous_unit_number: item.previousUnitNumber,
+      reason: item.message,
+    })),
+  };
+}
+
+async function markDisplayed(
+  supabase: SupabaseClient,
+  tenantId: string,
+  recommendations: FleetRecommendationInstance[]
+): Promise<FleetRecommendationInstance[]> {
+  const ids = recommendations.map((rec) => rec.id);
+  if (ids.length > 0) {
+    await supabase
+      .from("recommendation_instances")
+      .update({ lifecycle: "displayed" })
+      .in("id", ids)
+      .eq("tenant_id", tenantId);
+  }
+
+  return recommendations.map((rec) => ({
+    ...rec,
+    lifecycle: "displayed" as const,
+    rationale: {
+      ...rec.rationale,
+      validation_health: rec.rationale.validation_health
+        ? { ...rec.rationale.validation_health, lifecycle: "displayed" as const }
+        : undefined,
+    },
+  }));
+}
+
+async function generateAndLoadPending(
+  supabase: SupabaseClient,
+  tenantId: string,
+  board: FleetDispatchBoardData,
+  branchId: string | null,
+  date: string,
+  profitCtx: ProfitabilityContext,
+  expiresAt: string
+): Promise<FleetRecommendationInstance[]> {
+  const generated = buildFleetRecommendationsFromBoard(tenantId, board, expiresAt, profitCtx);
+  if (generated.length > 0) {
+    const { error } = await supabase.from("recommendation_instances").insert(generated);
+    if (error) {
+      const existing = await loadPendingRecommendations(supabase, tenantId, branchId);
+      if (existing.length > 0) return existing;
+      throw new Error(error.message);
+    }
+  }
+  return loadPendingRecommendations(supabase, tenantId, branchId);
+}
+
 export async function getFleetRecommendations(
   supabase: SupabaseClient,
   tenantId: string,
@@ -569,20 +793,83 @@ export async function getFleetRecommendations(
 
   await expireStalePendingRecommendations(supabase, tenantId, branchId);
 
-  let pending = await loadPendingRecommendations(supabase, tenantId, branchId);
-  if (pending.length === 0 || options?.forceRefresh) {
-    const board = await loadFleetDispatchBoardData(supabase, tenantId, date, branchId);
-    const profitCtx = await loadProfitabilityContext(supabase, tenantId, null, date);
-    const expiresAt = new Date(Date.now() + RECOMMENDATION_TTL_MS).toISOString();
-    const generated = buildFleetRecommendationsFromBoard(tenantId, board, expiresAt, profitCtx);
-    if (generated.length > 0) {
-      const { error } = await supabase
-        .from("recommendation_instances")
-        .insert(generated);
-      if (error) throw new Error(error.message);
-    }
-    pending = await loadPendingRecommendations(supabase, tenantId, branchId);
+  const board = await loadFleetDispatchBoardData(supabase, tenantId, date, branchId);
+  const profitCtx = await loadProfitabilityContext(supabase, tenantId, null, date);
+  const expiresAt = new Date(Date.now() + RECOMMENDATION_TTL_MS).toISOString();
+
+  if (options?.forceRefresh) {
+    await expirePendingForRegeneration(supabase, tenantId, branchId);
   }
+
+  let pending = await loadPendingRecommendations(supabase, tenantId, branchId);
+  const wrongBoardDate = pending.filter(
+    (rec) => rec.rationale.board_date && rec.rationale.board_date !== date
+  );
+  for (const rec of wrongBoardDate) {
+    await markRecommendationInvalid(
+      supabase,
+      tenantId,
+      rec,
+      "board_date_mismatch",
+      `Recommendation was generated for ${rec.rationale.board_date} but the board date is ${date}.`
+    );
+  }
+  pending = pending.filter(
+    (rec) => !rec.rationale.board_date || rec.rationale.board_date === date
+  );
+  let invalidated: InvalidationSummary[] = wrongBoardDate.map((rec) => ({
+    id: rec.id,
+    code: "board_date_mismatch",
+    message: `Recommendation was generated for ${rec.rationale.board_date} but the board date is ${date}.`,
+    previousTruckId: rec.rationale.entities.truck_id,
+    previousUnitNumber: rec.rationale.candidates?.[0]?.unit_number,
+    previousContributionEstimate:
+      rec.rationale.candidate_snapshots?.[0]?.estimated_contribution ?? null,
+    jobId: rec.rationale.entities.job_id,
+  }));
+  let replacements: FleetRecommendationRecalculationReplacement[] = [];
+
+  if (pending.length > 0) {
+    const partition = await partitionValidatedPending(
+      supabase,
+      tenantId,
+      pending,
+      board,
+      profitCtx,
+      expiresAt
+    );
+    pending = dedupeRecommendationsByJobAndType(partition.valid);
+    invalidated = partition.invalidated;
+    replacements = partition.replacements;
+  }
+
+  const needsRegeneration = pending.length === 0;
+  if (needsRegeneration) {
+    pending = await generateAndLoadPending(
+      supabase,
+      tenantId,
+      board,
+      branchId,
+      date,
+      profitCtx,
+      expiresAt
+    );
+    const partition = await partitionValidatedPending(
+      supabase,
+      tenantId,
+      pending,
+      board,
+      profitCtx,
+      expiresAt
+    );
+    pending = dedupeRecommendationsByJobAndType(partition.valid);
+    invalidated = [...invalidated, ...partition.invalidated];
+    replacements = [...replacements, ...partition.replacements];
+  }
+
+  const replacedCount = replacements.length;
+  const recalculationNotice = buildRecalculationNotice(invalidated, replacedCount, replacements);
+  pending = await markDisplayed(supabase, tenantId, pending);
 
   const history = await loadRecommendationHistory(supabase, tenantId, branchId);
   const summary = summarizeRecommendations(pending, history);
@@ -593,6 +880,7 @@ export async function getFleetRecommendations(
     pending,
     history,
     summary,
+    recalculationNotice,
   };
 }
 
@@ -604,12 +892,14 @@ export async function applyRecommendationOutcome(
     action: Exclude<FleetRecommendationOutcomeAction, "expired" | "applied" | "failed">;
     actedBy: string | null;
     notes?: string | null;
+    /** Dispatch board date (YYYY-MM-DD) — must match the date shown on the dispatch console */
+    boardDate?: string | null;
   }
 ): Promise<FleetRecommendationInstance> {
   const { data: row, error } = await supabase
     .from("recommendation_instances")
     .select(
-      "id, tenant_id, branch_id, recommendation_type, status, score, rationale, engine_version, created_at, expires_at"
+      "id, tenant_id, branch_id, recommendation_type, status, lifecycle, score, rationale, engine_version, created_at, expires_at"
     )
     .eq("tenant_id", tenantId)
     .eq("id", input.recommendationId)
@@ -622,7 +912,10 @@ export async function applyRecommendationOutcome(
     throw new Error("Recommendation is no longer pending.");
   }
 
-  const date = new Date().toISOString().slice(0, 10);
+  const date =
+    input.boardDate?.trim() ||
+    recommendation.rationale.board_date ||
+    new Date().toISOString().slice(0, 10);
   const board = await loadFleetDispatchBoardData(supabase, tenantId, date, recommendation.branch_id);
   const profitCtx = await loadProfitabilityContext(supabase, tenantId, null, date);
 
@@ -743,7 +1036,10 @@ export async function applyRecommendationOutcome(
 
   const { error: updateError } = await supabase
     .from("recommendation_instances")
-    .update({ status: nextStatus })
+    .update({
+      status: nextStatus,
+      lifecycle: input.action === "accepted" ? "accepted" : "rejected",
+    })
     .eq("id", recommendation.id)
     .eq("tenant_id", tenantId);
   if (updateError) throw new Error(updateError.message);

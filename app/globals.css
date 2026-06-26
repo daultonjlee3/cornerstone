@@ -692,3 +692,152 @@ body:has([data-fleet-marketing="true"]) {
   border-color: rgba(45, 212, 191, 0.35);
   background: rgba(15, 23, 42, 0.8);
 }
+
+/* Launch estimator range sliders */
+[data-fleet-marketing="true"] .le-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(45, 212, 191, 0.15);
+  outline: none;
+}
+
+[data-fleet-marketing="true"] .le-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(45, 212, 191);
+  cursor: pointer;
+  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.2);
+  transition: box-shadow 0.15s ease;
+}
+
+[data-fleet-marketing="true"] .le-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 6px rgba(45, 212, 191, 0.25);
+}
+
+[data-fleet-marketing="true"] .le-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgb(45, 212, 191);
+  cursor: pointer;
+  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.2);
+}
+
+/* Operational loop animations */
+@keyframes fm-loop-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fm-loop-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(45, 212, 191, 0);
+  }
+}
+
+.fm-operational-loop__step {
+  animation: fm-loop-fade-in 0.6s ease forwards;
+  opacity: 0;
+}
+
+.fm-operational-loop__node {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.fm-operational-loop__index {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgba(45, 212, 191, 0.7);
+}
+
+.fm-operational-loop__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.fm-operational-loop__description {
+  margin-top: 0.75rem;
+  padding-left: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.fm-operational-loop__connector {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
+.fm-operational-loop__loop-back {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0 0;
+}
+
+.fm-operational-loop__desktop-step {
+  animation: fm-loop-fade-in 0.7s ease forwards;
+  opacity: 0;
+}
+
+.fm-operational-loop__desktop-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 4rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  background: rgba(15, 23, 42, 0.8);
+  text-align: center;
+  animation: fm-loop-pulse 3s ease-in-out infinite;
+}
+
+@media (max-width: 1023px) {
+  .fm-operational-loop__desktop {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fm-operational-loop > .mx-auto.max-w-2xl {
+    display: none;
+  }
+}
+
+.fm-implementation-week {
+  animation: fm-loop-fade-in 0.6s ease forwards;
+  opacity: 0;
+}
+
+.fm-custom-connector {
+  animation: fm-loop-fade-in 0.8s ease forwards;
+}
+
+.fm-integration-logo {
+  animation: fm-loop-fade-in 0.5s ease forwards;
+}

@@ -243,6 +243,11 @@ export async function refreshUtilizationDailyForTenant(
       revenue = Math.round(revenue * 100) / 100;
       deadheadMiles = Math.round(deadheadMiles * 100) / 100;
 
+      // Keep total_hours >= billable so utilization never exceeds 100% from sparse telematics
+      totalHours = Math.round(
+        Math.min(24, Math.max(totalHours, billableHours, committedHours, idleHours)) * 100
+      ) / 100;
+
       const weeklyBefore = weeklyCommittedByTruck.get(truck.id) ?? 0;
       const profitability = computeTruckDayProfitability(
         profitabilityCtx,

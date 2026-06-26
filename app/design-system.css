@@ -77,9 +77,30 @@
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ─── Icon sizes ─── */
+  --icon-xs: 0.75rem;
   --icon-sm: 1rem;
   --icon-md: 1.25rem;
   --icon-lg: 1.5rem;
+  --icon-stroke: 1.75;
+  --icon-chip-sm: 2rem;
+  --icon-chip-md: 2.5rem;
+  --icon-chip-lg: 3rem;
+  --icon-chip-radius: var(--radius-lg);
+  --icon-chip-ring: 1px solid transparent;
+  --icon-chip-glow: 0 0 20px rgba(34, 211, 238, 0.12);
+  --icon-color-muted: var(--text-muted);
+  --icon-color-operational: var(--brand-operational);
+  --icon-color-success: var(--status-success);
+  --icon-color-warning: var(--status-warning);
+  --icon-color-danger: var(--status-danger);
+  --icon-color-info: var(--status-info);
+  --icon-color-ai: #a78bfa;
+
+  /* Scrollbar (enterprise surfaces) */
+  --scrollbar-size: 6px;
+  --scrollbar-thumb: color-mix(in srgb, var(--text-muted) 35%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--brand-operational) 45%, transparent);
+  --scrollbar-track: transparent;
 
   /* ─── Layout ─── */
   --page-gap: var(--space-8);
@@ -683,6 +704,175 @@
   height: var(--icon-lg);
 }
 
+/* App icon system */
+.cs-app-icon {
+  flex-shrink: 0;
+  color: var(--text-primary);
+}
+
+.cs-app-icon--xs {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+
+.cs-app-icon--sm {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.cs-app-icon--md {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.cs-app-icon--lg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+.cs-app-icon--default {
+  color: var(--text-primary);
+}
+
+.cs-app-icon--muted {
+  color: var(--icon-color-muted);
+}
+
+.cs-app-icon--operational {
+  color: var(--icon-color-operational);
+}
+
+.cs-app-icon--success {
+  color: var(--icon-color-success);
+}
+
+.cs-app-icon--warning {
+  color: var(--icon-color-warning);
+}
+
+.cs-app-icon--danger {
+  color: var(--icon-color-danger);
+}
+
+.cs-app-icon--info {
+  color: var(--icon-color-info);
+}
+
+.cs-app-icon--ai {
+  color: var(--icon-color-ai);
+}
+
+/* Icon chip — marketing-aligned container */
+.cs-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--icon-chip-radius);
+  border: var(--icon-chip-ring);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.cs-icon-chip--sm {
+  width: var(--icon-chip-sm);
+  height: var(--icon-chip-sm);
+}
+
+.cs-icon-chip--md {
+  width: var(--icon-chip-md);
+  height: var(--icon-chip-md);
+}
+
+.cs-icon-chip--lg {
+  width: var(--icon-chip-lg);
+  height: var(--icon-chip-lg);
+}
+
+.cs-icon-chip--default {
+  background: var(--status-neutral-subtle);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.cs-icon-chip--active,
+.cs-icon-chip--fleet {
+  background: var(--brand-operational-subtle);
+  border-color: rgba(34, 211, 238, 0.2);
+}
+
+.cs-icon-chip--muted {
+  background: var(--status-neutral-subtle);
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+.cs-icon-chip--success {
+  background: var(--status-success-subtle);
+  border-color: rgba(34, 197, 94, 0.22);
+}
+
+.cs-icon-chip--warning {
+  background: var(--status-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.cs-icon-chip--danger {
+  background: var(--status-danger-subtle);
+  border-color: rgba(248, 113, 113, 0.22);
+}
+
+.cs-icon-chip--ai {
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.22);
+}
+
+.cs-icon-chip--glow:hover,
+a:hover .cs-icon-chip--glow,
+button:hover .cs-icon-chip--glow {
+  box-shadow: var(--icon-chip-glow);
+}
+
+.cs-kpi-card__metric-icon {
+  flex-shrink: 0;
+}
+
+/* ─── Enterprise scrollbar ─── */
+.cs-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.cs-scrollbar::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+.cs-scrollbar::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.cs-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: var(--scrollbar-thumb);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.cs-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.cs-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.cs-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ─── Navigation rail ─── */
 .cs-nav-rail {
   position: fixed;
@@ -734,7 +924,38 @@
   min-height: 0;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-3) var(--space-2);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.cs-nav-rail__body::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+}
+
+.cs-nav-rail__body::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  margin: var(--space-1) 0;
+}
+
+.cs-nav-rail__body::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: var(--scrollbar-thumb);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.cs-nav-rail__body::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.cs-nav-rail__body::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
 }
 
 .cs-nav-rail__footer {
@@ -887,11 +1108,16 @@
   width: var(--icon-sm);
   height: var(--icon-sm);
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--icon-color-muted);
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.cs-nav-rail__item:hover .cs-nav-rail__item-icon {
+  color: var(--icon-color-operational);
 }
 
 .cs-nav-rail__item--active .cs-nav-rail__item-icon {
-  color: var(--brand-operational);
+  color: var(--icon-color-operational);
 }
 
 .cs-nav-rail__item-label {

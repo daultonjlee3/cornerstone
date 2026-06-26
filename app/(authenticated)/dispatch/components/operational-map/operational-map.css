@@ -464,6 +464,11 @@
   transform: scale(0.97);
 }
 
+.opmap-controls__btn--active {
+  color: #e8ecf1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .opmap-controls__group .opmap-controls__btn + .opmap-controls__btn {
   border-top: 1px solid rgba(110, 118, 132, 0.12);
 }
@@ -1010,3 +1015,561 @@
   background: transparent !important;
   border: none !important;
 }
+
+/* ── Fleet asset markers (Mapbox) ── */
+
+.fleet-map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  cursor: pointer;
+}
+
+.opmap-fleet-truck {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 2.25rem;
+  transition: transform 0.22s ease, filter 0.22s ease;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+}
+
+.opmap-fleet-truck:hover {
+  transform: scale(1.1) translateY(-2px);
+  z-index: 900;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
+}
+
+.opmap-fleet-truck--dimmed {
+  opacity: 0.45;
+  filter: grayscale(0.35) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+}
+
+.opmap-fleet-truck__shadow {
+  position: absolute;
+  bottom: 0;
+  width: 70%;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  filter: blur(2px);
+}
+
+.opmap-fleet-truck__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 2.125rem;
+  transition: transform 0.35s ease;
+}
+
+.opmap-fleet-truck__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.opmap-fleet-truck__body,
+.opmap-fleet-truck__cab {
+  fill: rgba(8, 12, 16, 0.94);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.opmap-fleet-truck__heading {
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.opmap-fleet-truck__wheel {
+  fill: rgba(0, 0, 0, 0.55);
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.opmap-fleet-truck__label {
+  margin-top: 1px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #e8ecf1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.opmap-fleet-truck--available { color: #4ade80; }
+.opmap-fleet-truck--idle { color: #a3b4c7; }
+.opmap-fleet-truck--driving { color: #94a3b8; }
+.opmap-fleet-truck--working { color: #60a5fa; }
+.opmap-fleet-truck--offline { color: #64748b; opacity: 0.7; }
+.opmap-fleet-truck--critical { color: #f87171; }
+.opmap-fleet-truck--highRevenue { color: #86efac; }
+.opmap-fleet-truck--recommended { color: #fb923c; }
+.opmap-fleet-truck--selected { color: #5eead4; }
+
+.opmap-fleet-truck--recommended .opmap-fleet-truck__icon {
+  animation: opmap-fleet-pulse 2.4s ease-in-out infinite;
+}
+
+.opmap-fleet-truck--selected .opmap-fleet-truck__icon {
+  filter: drop-shadow(0 0 10px rgba(45, 212, 191, 0.55));
+}
+
+.opmap-fleet-job {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 1.5rem;
+  height: 2rem;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.4));
+}
+
+.opmap-fleet-job:hover {
+  transform: scale(1.12) translateY(-2px);
+  z-index: 850;
+}
+
+.opmap-fleet-job__shadow {
+  position: absolute;
+  bottom: 0;
+  width: 0.65rem;
+  height: 0.25rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  filter: blur(1px);
+}
+
+.opmap-fleet-job__pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.opmap-fleet-job__head {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: rgba(8, 12, 16, 0.92);
+  border: 1.5px solid #6e7684;
+}
+
+.opmap-fleet-job__stem {
+  width: 2px;
+  height: 0.375rem;
+  margin-top: -2px;
+  background: #6e7684;
+  border-radius: 1px;
+}
+
+.opmap-fleet-job--pri-urgent .opmap-fleet-job__head {
+  border-color: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
+}
+
+.opmap-fleet-job--pri-urgent .opmap-fleet-job__stem {
+  background: #f87171;
+}
+
+.opmap-fleet-job--late .opmap-fleet-job__head,
+.opmap-fleet-job--risk .opmap-fleet-job__head {
+  border-color: #f87171;
+  animation: opmap-fleet-pulse-risk 2s ease-in-out infinite;
+}
+
+.opmap-fleet-job--recommended .opmap-fleet-job__head {
+  border-color: #fb923c;
+  box-shadow: 0 0 10px rgba(251, 146, 60, 0.4);
+  animation: opmap-fleet-pulse 2.4s ease-in-out infinite;
+}
+
+.opmap-fleet-job--selected .opmap-fleet-job__head {
+  border-color: #5eead4;
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.45);
+}
+
+.opmap-fleet-job--waiting .opmap-fleet-job__head {
+  border-color: #d7dce4;
+}
+
+.opmap-route-label {
+  display: inline-block;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  background: rgba(8, 10, 14, 0.88);
+  backdrop-filter: blur(8px);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fbbf24;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.opmap-route-label--rec {
+  border-color: rgba(45, 212, 191, 0.45);
+  color: #5eead4;
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.2);
+}
+
+@keyframes opmap-fleet-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.92; }
+}
+
+@keyframes opmap-fleet-pulse-risk {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+/* Layers panel — enterprise floating control */
+.opmap-controls--layers {
+  gap: 0.625rem;
+}
+
+.layers-panel {
+  width: min(20rem, calc(100vw - 2rem));
+  max-width: 20rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 14, 20, 0.82);
+  backdrop-filter: blur(20px) saturate(1.25);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.25);
+  animation: layers-panel-in 0.22s ease;
+  overflow: hidden;
+}
+
+@keyframes layers-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.layers-panel__header {
+  padding: 0.75rem 1rem 0.625rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.layers-panel__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #e8ecf1;
+}
+
+.layers-panel__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.layers-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  min-height: 2.625rem;
+  padding: 0 1rem;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.layers-panel__row:last-of-type {
+  border-bottom: none;
+}
+
+.layers-panel__row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.layers-panel__row--on {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.layers-panel__row--on:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.layers-panel__row--future {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  min-height: 2.625rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: default;
+  opacity: 0.45;
+}
+
+.layers-panel__row--future:hover {
+  background: transparent;
+}
+
+.layers-panel__row-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  color: #8b95a5;
+  transition: color 0.16s ease;
+}
+
+.layers-panel__row:hover .layers-panel__row-icon,
+.layers-panel__row--on .layers-panel__row-icon {
+  color: #c5cdd8;
+}
+
+.layers-panel__row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #d7dce4;
+  letter-spacing: -0.01em;
+}
+
+.layers-panel__row-future {
+  margin-left: 0.375rem;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6e7684;
+  text-transform: lowercase;
+}
+
+.layers-panel__row-badge {
+  flex-shrink: 0;
+  min-width: 1.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #9aa4b2;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.layers-panel__switch {
+  position: relative;
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 2.125rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.layers-panel__switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #f1f5f9;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.layers-panel__switch--on {
+  background: #f97316;
+}
+
+.layers-panel__switch--on .layers-panel__switch-thumb {
+  transform: translateX(0.875rem);
+}
+
+.layers-panel__legend {
+  padding: 0.75rem 1rem 0.875rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.layers-panel__legend-title {
+  margin: 0 0 0.5rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6e7684;
+}
+
+.layers-panel__legend-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.layers-panel__legend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #9aa4b2;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.layers-panel__legend-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.layers-panel__legend-dot--green { background: #4ade80; }
+.layers-panel__legend-dot--blue { background: #60a5fa; }
+.layers-panel__legend-dot--amber { background: #fbbf24; }
+.layers-panel__legend-dot--grey { background: #64748b; }
+
+@media (prefers-reduced-motion: reduce) {
+  .layers-panel {
+    animation: none;
+  }
+
+  .layers-panel__switch,
+  .layers-panel__switch-thumb,
+  .layers-panel__row {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .layers-panel {
+    width: min(18rem, calc(100vw - 1.5rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opmap-fleet-truck--recommended .opmap-fleet-truck__icon,
+  .opmap-fleet-job--recommended .opmap-fleet-job__head,
+  .opmap-fleet-job--late .opmap-fleet-job__head,
+  .opmap-fleet-job--risk .opmap-fleet-job__head {
+    animation: none;
+  }
+
+  .opmap-fleet-truck,
+  .opmap-fleet-job,
+  .opmap-fleet-truck__icon {
+    transition: none;
+  }
+}
+
+/* Map chrome — command center */
+.opmap-map-chrome {
+  position: absolute;
+  top: 0.625rem;
+  left: 50%;
+  z-index: 1000;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 10, 14, 0.78);
+  backdrop-filter: blur(14px);
+}
+
+.opmap-map-chrome__chip {
+  padding: 0.3125rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 10px;
+  font-weight: 600;
+  color: #9aa4b2;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.opmap-map-chrome__chip:hover {
+  color: #e8ecf1;
+}
+
+.opmap-map-chrome__chip--active {
+  color: #e8ecf1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.opmap-map-chrome__chip--muted {
+  opacity: 0.55;
+}
+
+.opmap-map-chrome__fit {
+  margin-left: 0.25rem;
+  padding: 0.3125rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 10px;
+  font-weight: 600;
+  color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.1);
+  cursor: pointer;
+}
+
+.opmap-map-legend--status {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  max-width: 14rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 10, 14, 0.82);
+  backdrop-filter: blur(12px);
+  font-size: 9px;
+  color: #9aa4b2;
+}
+
+.opmap-map-legend--status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.opmap-map-legend__swatch {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  font-style: normal;
+}
+
+.opmap-map-legend__swatch--green { background: #4ade80; }
+.opmap-map-legend__swatch--blue { background: #60a5fa; }
+.opmap-map-legend__swatch--amber { background: #fbbf24; }
+.opmap-map-legend__swatch--grey { background: #64748b; }

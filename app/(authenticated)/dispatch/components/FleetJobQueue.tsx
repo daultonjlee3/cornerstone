@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, ArrowRight, ChevronLeft, Sparkles } from "lucide-react";
+import { AppIcon } from "@/src/components/design-system/icons";
 import { motion } from "framer-motion";
 import type { FleetDispatchJob, FleetDispatchTruckLane, FleetRecommendationInstance, FleetDispatchBoardData } from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
@@ -23,7 +24,7 @@ import {
 import { confidenceLabel } from "../../operations/components/fleet-recommendation-utils";
 
 type FleetJobQueueProps = {
-  layout?: "panel" | "float" | "cockpit";
+  layout?: "panel" | "float" | "cockpit" | "embedded";
   jobs: FleetDispatchJob[];
   board: FleetDispatchBoardData;
   selectedJobId: string | null;
@@ -62,41 +63,27 @@ export function FleetJobQueue({
 }: FleetJobQueueProps) {
   const sorted = sortJobs(jobs);
   const isDock = layout === "float" || layout === "cockpit";
+  const isEmbedded = layout === "embedded";
+  const useDockItems = isDock || isEmbedded;
 
-  const shellClass = isDock
-    ? "dispatch-console__rail-panel"
-    : "dispatch-mission__panel dispatch-mission__panel--inbox";
+  const shellClass = isEmbedded
+    ? ""
+    : isDock
+      ? "dispatch-console__rail-panel"
+      : "dispatch-mission__panel dispatch-mission__panel--inbox";
 
-  return (
-    <aside id="fleet-job-queue" className={shellClass}>
-      <div className={isDock ? "dispatch-console__rail-header" : "dispatch-mission__panel-header dispatch-mission__panel-header--minimal"}>
-        <div className="min-w-0 flex-1">
-          <p className={isDock ? "dispatch-console__dock-eyebrow" : "dispatch-mission__panel-eyebrow"}>
-            Dispatch inbox
-          </p>
-          <p className={isDock ? "dispatch-console__dock-title" : "dispatch-mission__panel-title"}>
-            {jobs.length} need{jobs.length === 1 ? "s" : ""} a decision
-          </p>
-          <p className={isDock ? "dispatch-console__dock-meta" : "dispatch-mission__panel-meta"}>
-            Priority · revenue · arrival
-          </p>
-        </div>
-        {layout === "cockpit" && onCollapse ? (
-          <button
-            type="button"
-            className="dispatch-console__rail-collapse"
-            onClick={onCollapse}
-            aria-label="Collapse dispatch inbox"
-            title="Collapse inbox"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-        ) : null}
-      </div>
-
-      <ul className={isDock ? "dispatch-console__rail-body" : "dispatch-mission__panel-body dispatch-mission__inbox-list"}>
+  const listBody = (
+    <ul
+      className={
+        isEmbedded
+          ? "dispatch-console__inbox-embedded"
+          : isDock
+            ? "dispatch-console__rail-body"
+            : "dispatch-mission__panel-body dispatch-mission__inbox-list"
+      }
+    >
         {sorted.length === 0 ? (
-          <li className={isDock ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
+          <li className={useDockItems ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
             <p className="font-medium">Inbox clear</p>
             <p className="mt-1 text-xs">All jobs assigned</p>
           </li>
@@ -115,7 +102,7 @@ export function FleetJobQueue({
             const jobType = extractJobType(job.title);
             const risk = operationalRiskMessage(job);
 
-            if (isDock) {
+            if (useDockItems) {
               return (
                 <motion.li
                   key={job.id}
@@ -141,16 +128,16 @@ export function FleetJobQueue({
                       ) : null}
                     </div>
                     {topTruck ? (
-                      <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--brand-operational)]">
-                        <Sparkles className="size-3" />
+                      <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[var(--brand-operational)]">
+                        <AppIcon icon={Sparkles} size="xs" intent="ai" />
                         Truck {topTruck.unit_number}
                         {confidence ? ` · ${confidenceLabel(confidence)}` : ""}
                       </p>
                     ) : null}
                     {ignoreRisk ? <p className="mt-1 text-[10px] text-[var(--status-warning)]">{ignoreRisk}</p> : null}
                     {risk ? (
-                      <p className="dispatch-console__inbox-warn">
-                        <AlertCircle className="size-3" />
+                      <p className="dispatch-console__inbox-warn flex items-center gap-1.5">
+                        <AppIcon icon={AlertCircle} size="xs" intent="warning" />
                         {risk}
                       </p>
                     ) : null}
@@ -177,7 +164,7 @@ export function FleetJobQueue({
                           >
                             {lane.unit_number}
                             {topTruck?.truck_id === lane.truck_id ? (
-                              <ArrowRight className="size-3" />
+                            <AppIcon icon={ArrowRight} size="xs" intent="muted" />
                             ) : null}
                           </Button>
                         ))}
@@ -202,6 +189,39 @@ export function FleetJobQueue({
           })
         )}
       </ul>
+  );
+
+  if (isEmbedded) {
+    return <div id="fleet-job-queue">{listBody}</div>;
+  }
+
+  return (
+    <aside id="fleet-job-queue" className={shellClass}>
+      <div className={isDock ? "dispatch-console__rail-header" : "dispatch-mission__panel-header dispatch-mission__panel-header--minimal"}>
+        <div className="min-w-0 flex-1">
+          <p className={isDock ? "dispatch-console__dock-eyebrow" : "dispatch-mission__panel-eyebrow"}>
+            Dispatch inbox
+          </p>
+          <p className={isDock ? "dispatch-console__dock-title" : "dispatch-mission__panel-title"}>
+            {jobs.length} need{jobs.length === 1 ? "s" : ""} a decision
+          </p>
+          <p className={isDock ? "dispatch-console__dock-meta" : "dispatch-mission__panel-meta"}>
+            Priority · revenue · arrival
+          </p>
+        </div>
+        {layout === "cockpit" && onCollapse ? (
+          <button
+            type="button"
+            className="dispatch-console__rail-collapse"
+            onClick={onCollapse}
+            aria-label="Collapse dispatch inbox"
+            title="Collapse inbox"
+          >
+            <AppIcon icon={ChevronLeft} size="sm" intent="muted" />
+          </button>
+        ) : null}
+      </div>
+      {listBody}
     </aside>
   );
 }

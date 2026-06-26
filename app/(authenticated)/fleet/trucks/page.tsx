@@ -82,7 +82,7 @@ export default async function TrucksPage({
   return (
     <div className="space-y-8">
       <PageHeader
-        icon={<Truck className="size-5" />}
+        iconLucide={Truck}
         title="Trucks"
         subtitle="Manage fleet vehicles and unit assignments."
         variant="surface"

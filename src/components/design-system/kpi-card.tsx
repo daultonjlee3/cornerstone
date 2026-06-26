@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { Panel } from "./panel";
+import { MetricIcon } from "./icons";
 import type { KpiEmphasis } from "./types";
 
 type KpiCardProps = {
@@ -10,6 +11,8 @@ type KpiCardProps = {
   value: string | number;
   hint?: string;
   icon?: LucideIcon;
+  /** When true, renders icon in IconChip (anchor metrics). Default false for dense grids. */
+  iconProminent?: boolean;
   emphasis?: KpiEmphasis;
   className?: string;
 };
@@ -27,7 +30,8 @@ export function KpiCard({
   label,
   value,
   hint,
-  icon: Icon,
+  icon,
+  iconProminent = false,
   emphasis = "default",
   className = "",
 }: KpiCardProps) {
@@ -41,7 +45,14 @@ export function KpiCard({
       <Panel padding="md" className={`cs-kpi-card ${EMPHASIS_CLASS[emphasis]} ${className}`}>
         <div className="cs-kpi-card__header">
           <p className="cs-text-micro cs-text-muted">{label}</p>
-          {Icon ? <Icon className="cs-icon cs-icon--sm cs-text-muted" strokeWidth={1.5} aria-hidden /> : null}
+          {icon ? (
+            <MetricIcon
+              icon={icon}
+              prominent={iconProminent}
+              emphasis={emphasis}
+              className="cs-kpi-card__metric-icon"
+            />
+          ) : null}
         </div>
         <p className="cs-text-kpi cs-kpi-card__value">{value}</p>
         {hint ? <p className="cs-text-caption cs-text-muted cs-kpi-card__hint">{hint}</p> : null}

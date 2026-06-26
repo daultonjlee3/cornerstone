@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CompanyOperatingRules, ProfitabilityContext, TruckCostProfile } from "./types";
+import { loadOperatorContextMaps } from "@/src/lib/fleet/queries/operator-context";
+
+function weekStartIso(boardDay: string): string {
+  const anchor = new Date(`${boardDay}T12:00:00.000Z`);
+  anchor.setUTCDate(anchor.getUTCDate() - anchor.getUTCDay());
+  return anchor.toISOString().slice(0, 10);
+}
 
 export const DEFAULT_OPERATING_RULES: Omit<
   CompanyOperatingRules,
@@ -121,23 +128,45 @@ export async function loadProfitabilityContext(
   const operatorDailyHours = new Map<string, number>();
   const operatorWeeklyHours = new Map<string, number>();
 
-  const weekStart = new Date(`${day}T12:00:00.000Z`);
-  weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
-  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const weekStart = weekStartIso(day);
 
-  const { data: martRows } = await supabase
-    .from("utilization_daily")
-    .select("committed_hours, truck_id")
-    .eq("tenant_id", tenantId)
-    .gte("date", weekStartStr)
-    .lte("date", day);
+  const [{ data: martRows }, { data: operatorHourRows }, operatorContext] = await Promise.all([
+    supabase
+      .from("utilization_daily")
+      .select("committed_hours, truck_id")
+      .eq("tenant_id", tenantId)
+      .gte("date", weekStart)
+      .lte("date", day),
+    supabase
+      .from("fleet_operator_hours_daily")
+      .select("operator_id, date, committed_hours")
+      .eq("tenant_id", tenantId)
+      .gte("date", weekStart)
+      .lte("date", day),
+    loadOperatorContextMaps(supabase, tenantId, day).catch(() => null),
+  ]);
 
-  // Proxy operator hours from truck committed hours until operator assignment is wired
-  for (const row of martRows ?? []) {
-    const truckId = (row as { truck_id: string }).truck_id;
+  for (const row of operatorHourRows ?? []) {
+    const operatorId = (row as { operator_id: string }).operator_id;
     const hours = Number((row as { committed_hours: number }).committed_hours) || 0;
-    operatorDailyHours.set(truckId, hours);
-    operatorWeeklyHours.set(truckId, (operatorWeeklyHours.get(truckId) ?? 0) + hours);
+    const rowDate = (row as { date: string }).date;
+    if (rowDate === day) {
+      operatorDailyHours.set(operatorId, hours);
+    }
+    operatorWeeklyHours.set(operatorId, (operatorWeeklyHours.get(operatorId) ?? 0) + hours);
+  }
+
+  // Fallback: proxy operator hours from truck committed hours when operator hours are absent
+  if ((operatorHourRows ?? []).length === 0) {
+    for (const row of martRows ?? []) {
+      const truckId = (row as { truck_id: string }).truck_id;
+      const hours = Number((row as { committed_hours: number }).committed_hours) || 0;
+      const operatorId = operatorContext?.truckToOperatorId.get(truckId) ?? truckId;
+      if (!operatorDailyHours.has(operatorId)) {
+        operatorDailyHours.set(operatorId, hours);
+      }
+      operatorWeeklyHours.set(operatorId, (operatorWeeklyHours.get(operatorId) ?? 0) + hours);
+    }
   }
 
   return {
@@ -210,11 +239,24 @@ export async function loadTenantProfitabilitySummary(
     0
   );
 
-  const { count: pendingRecs } = await supabase
+  const { data: pendingRecRows } = await supabase
     .from("recommendation_instances")
-    .select("id", { count: "exact", head: true })
+    .select("rationale")
     .eq("tenant_id", tenantId)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString());
+
+  let recommendationOpportunity = 0;
+  for (const row of pendingRecRows ?? []) {
+    const rationale = (row as { rationale: Record<string, unknown> }).rationale as {
+      board_date?: string;
+      candidate_snapshots?: Array<{ estimated_contribution?: number }>;
+    };
+    if (rationale.board_date && rationale.board_date !== date) continue;
+    const contribution = rationale.candidate_snapshots?.[0]?.estimated_contribution ?? 0;
+    recommendationOpportunity += Number(contribution) || 0;
+  }
+  recommendationOpportunity = Math.round(recommendationOpportunity * 100) / 100;
 
   const { data: unassigned } = await supabase
     .from("fleet_jobs")
@@ -241,6 +283,6 @@ export async function loadTenantProfitabilitySummary(
     deadheadCostToday: Math.round(deadheadCostToday * 100) / 100,
     idleCostToday: Math.round(idleCostToday * 100) / 100,
     laborCostToday: Math.round(laborCostToday * 100) / 100,
-    recommendationOpportunity: pendingRecs ?? 0,
+    recommendationOpportunity,
   };
 }
