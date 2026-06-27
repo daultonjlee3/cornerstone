@@ -28,6 +28,7 @@ import {
 type TruckIntelPanelProps = {
   lane: FleetDispatchTruckLane;
   recommendations: FleetRecommendationInstance[];
+  jobAlternatives?: Array<{ jobId: string; jobTitle: string; score: number; explanation: string[] }>;
   onClose: () => void;
   onSelectJob: (jobId: string | null) => void;
 };
@@ -46,6 +47,7 @@ function timelineEntries(lane: FleetDispatchTruckLane): Array<{ label: string; t
 export function TruckIntelPanel({
   lane,
   recommendations,
+  jobAlternatives = [],
   onClose,
   onSelectJob,
 }: TruckIntelPanelProps) {
@@ -162,6 +164,30 @@ export function TruckIntelPanel({
                     onClick={() => entry.job && onSelectJob(entry.job.id)}
                   >
                     {entry.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {jobAlternatives.length > 0 ? (
+          <section className="opmap-intel-panel__section">
+            <p className="opmap-intel-panel__section-title">
+              <Sparkles className="size-3.5" />
+              Top jobs for this truck
+            </p>
+            <ul className="opmap-intel-panel__alt-list">
+              {jobAlternatives.slice(0, 3).map((alt) => (
+                <li key={alt.jobId}>
+                  <button
+                    type="button"
+                    className="opmap-intel-panel__alt-row"
+                    onClick={() => onSelectJob(alt.jobId)}
+                  >
+                    <span className="line-clamp-1 text-left">{alt.jobTitle}</span>
+                    <span>{Math.round(alt.score)}</span>
+                    <span className="line-clamp-1">{alt.explanation[0] ?? "Recommended"}</span>
                   </button>
                 </li>
               ))}

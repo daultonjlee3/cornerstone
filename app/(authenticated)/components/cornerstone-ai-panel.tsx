@@ -242,9 +242,8 @@ export function CornerstoneAiPanel({
   }, [response]);
 
   useEffect(() => {
-    if (layoutVariant === "docked" && open && preferExpanded) {
-      setCollapsed(false);
-    }
+    if (layoutVariant !== "docked" || !open) return;
+    setCollapsed(!preferExpanded);
   }, [layoutVariant, open, preferExpanded]);
 
   useEffect(() => {

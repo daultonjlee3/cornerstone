@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from "lucide-react";
 import type { FleetDispatchBoardData, FleetTodayViewData } from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
@@ -34,9 +34,21 @@ export function FleetDispatchMissionBriefing({
   onDateChange,
   onRefresh,
 }: FleetDispatchMissionBriefingProps) {
-  const [lastRefresh] = useState(() =>
-    new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-  );
+  const [lastRefresh, setLastRefresh] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLastRefresh(
+      new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!pending) {
+      setLastRefresh(
+        new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+      );
+    }
+  }, [pending]);
 
   const availableTrucks = board.truckLanes.filter(
     (lane) => lane.status === "active" && lane.jobs.length === 0
@@ -96,7 +108,9 @@ export function FleetDispatchMissionBriefing({
             <RefreshCw className={`mr-1.5 size-3.5 ${pending ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <span className="dispatch-console__refresh-time">Updated {lastRefresh}</span>
+          <span className="dispatch-console__refresh-time" suppressHydrationWarning>
+            Updated {lastRefresh ?? "—"}
+          </span>
         </div>
       </div>
 

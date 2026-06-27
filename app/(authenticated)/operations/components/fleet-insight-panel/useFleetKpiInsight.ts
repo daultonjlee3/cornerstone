@@ -29,7 +29,9 @@ async function fetchInsight(kpiId: FleetKpiId, date: string): Promise<FleetKpiIn
   const promise = (async () => {
     try {
       const params = new URLSearchParams({ kpi: kpiId, date });
-      const res = await fetch(`/api/fleet/insights?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`/api/fleet/operations/kpi-insight?${params.toString()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Unable to load insight");
       const data = (await res.json()) as FleetKpiInsightPayload;
       cache.set(key, { data, fetchedAt: Date.now() });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FleetTodayViewData, FleetOperationsSummary } from "@/src/types/fleet";
 import type { FleetOperationsBriefing } from "@/src/lib/fleet/operations/load-briefing";
 import type { FleetOperationsEnrichment } from "@/src/lib/fleet/operations/load-enrichment";
@@ -40,6 +40,9 @@ async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
 
 export function useOperationsProgressiveLoad() {
   const date = todayDateOnly();
+  const dateRef = useRef(date);
+  dateRef.current = date;
+
   const [data, setData] = useState<FleetTodayViewData>(() => createEmptyTodayView(date));
   const [loaded, setLoaded] = useState<OperationsSectionLoadState>({
     summary: false,
@@ -121,8 +124,8 @@ export function useOperationsProgressiveLoad() {
     return () => controller.abort();
   }, [date]);
 
-  const refresh = async () => {
-    const params = new URLSearchParams({ date, refresh: "true" });
+  const refresh = useCallback(async () => {
+    const params = new URLSearchParams({ date: dateRef.current, refresh: "true" });
     try {
       const summary = await fetchJson<FleetOperationsSummary>(
         `/api/fleet/operations/summary?${params.toString()}`,
@@ -152,7 +155,7 @@ export function useOperationsProgressiveLoad() {
     } catch {
       /* keep existing */
     }
-  };
+  }, []);
 
   return { data, loaded, errors, refresh };
 }

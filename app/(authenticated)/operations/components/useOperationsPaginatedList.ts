@@ -52,7 +52,15 @@ export function useOperationsPaginatedList<T extends { id: string }>({
         if (!res.ok) throw new Error("Unable to load list");
         const payload = (await res.json()) as FleetPaginatedResult<T>;
 
-        setItems((prev) => (replace ? payload.items : [...prev, ...payload.items]));
+        setItems((prev) => {
+          const merged = replace ? payload.items : [...prev, ...payload.items];
+          const seen = new Set<string>();
+          return merged.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          });
+        });
         setTotalCount(payload.totalCount);
         setHasMore(payload.hasMore);
         setPage(pageNum);

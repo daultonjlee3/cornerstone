@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import type {
   FleetDispatchBoardData,
+  FleetDispatchJob,
   FleetRecommendationInstance,
   FleetRecommendationRecalculationNotice,
   FleetTodayViewData,
 } from "@/src/types/fleet";
-import { assignTruckToJob } from "../../fleet/actions";
 import { FleetDispatchMapPanel } from "./FleetDispatchMapPanel";
 import { FleetDispatchRecommendationsPanel } from "./FleetDispatchRecommendationsPanel";
 import { FleetDispatchDecisionQueuePanel } from "./FleetDispatchDecisionQueuePanel";
@@ -16,9 +16,14 @@ import { FleetDispatchMissionBriefing } from "./FleetDispatchMissionBriefing";
 import { FleetDispatchOutlookStrip } from "./FleetDispatchOutlookStrip";
 import { CockpitCollapsedRail } from "./CockpitCollapsedRail";
 import { FleetDispatchCopilotBridge } from "./FleetDispatchCopilotBridge";
+import { useDispatchSecondaryLoad } from "./useDispatchSecondaryLoad";
+import { useDispatchMapAssignment } from "./useDispatchMapAssignment";
+import { buildMinimalDispatchIntel } from "@/src/lib/fleet/dispatch/minimal-intel";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { scrollToSection } from "./fleet-dispatch-utils";
 import { FleetMissionControlLoader } from "@/src/components/fleet-intelligence/FleetMissionControlLoader";
+import { JobIntelPanel } from "./operational-map/JobIntelPanel";
+import { DispatchAssignmentConfirmPanel } from "./operational-map/DispatchAssignmentConfirmPanel";
 import "./dispatch-console.css";
 
 function shiftDate(dateStr: string, days: number): string {
@@ -32,22 +37,28 @@ function formatDisplayDate(dateStr: string): string {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
+function parseDateParam(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  return value;
+}
+
 type FleetDispatchViewProps = {
   initialBoard: FleetDispatchBoardData;
-  initialIntel: FleetTodayViewData;
   selectedDate: string;
 };
 
 export function FleetDispatchView({
   initialBoard,
-  initialIntel,
   selectedDate,
 }: FleetDispatchViewProps) {
+  const [activeDate, setActiveDate] = useState(selectedDate);
   const [board, setBoard] = useState(initialBoard);
-  const [intel, setIntel] = useState(initialIntel);
-  const [recommendations, setRecommendations] = useState<FleetRecommendationInstance[]>(
-    initialIntel.recommendations.pending
-  );
+  const [intel, setIntel] = useState(() => buildMinimalDispatchIntel(initialBoard, selectedDate));
+  const [boardLoading, setBoardLoading] = useState(false);
+  const dateChangeAbortRef = useRef<AbortController | null>(null);
+  const [recommendations, setRecommendations] = useState<FleetRecommendationInstance[]>([]);
+  const [recsLoading, setRecsLoading] = useState(true);
+  const [recsRefreshing, setRecsRefreshing] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [highlightedTruckId, setHighlightedTruckId] = useState<string | null>(null);
   const [activeRecommendation, setActiveRecommendation] = useState<FleetRecommendationInstance | null>(null);
@@ -57,26 +68,140 @@ export function FleetDispatchView({
   const [error, setError] = useState<string | null>(null);
   const [queueOpen, setQueueOpen] = useState(true);
   const [decisionOpen, setDecisionOpen] = useState(true);
+  const [mapAssignSuccessToken, setMapAssignSuccessToken] = useState(0);
+  const [jobSuggestDisplayRec, setJobSuggestDisplayRec] =
+    useState<FleetRecommendationInstance | null>(null);
+  const [jobSuggestAlternatives, setJobSuggestAlternatives] = useState<
+    import("@/src/lib/fleet/dispatch/assignment-service").AssignmentAlternative[]
+  >([]);
+  const [truckJobAlternatives, setTruckJobAlternatives] = useState<
+    Array<{ jobId: string; jobTitle: string; score: number; explanation: string[] }>
+  >([]);
   const [pending, startTransition] = useTransition();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const displayDate = useMemo(() => formatDisplayDate(selectedDate), [selectedDate]);
+  const displayDate = useMemo(() => formatDisplayDate(activeDate), [activeDate]);
+  const branchId = searchParams.get("branch_id");
+  const isBusy = pending || boardLoading;
+
+  useDispatchSecondaryLoad({
+    board,
+    selectedDate: activeDate,
+    branchId,
+    onIntelUpdate: setIntel,
+    onRecommendationsUpdate: (recs, notice, refreshing) => {
+      setRecommendations(recs);
+      setRecalculationNotice(notice);
+      setRecsLoading(false);
+      setRecsRefreshing(refreshing);
+    },
+    onRecError: (message) => {
+      setRecError(message);
+      setRecsLoading(false);
+      setRecsRefreshing(false);
+    },
+  });
+
+  useEffect(() => {
+    const jobId = searchParams.get("job_id")?.trim() || null;
+    const truckId = searchParams.get("truck_id")?.trim() || null;
+
+    if (jobId && board.jobs.some((job) => job.id === jobId)) {
+      setSelectedJobId(jobId);
+      setQueueOpen(true);
+    }
+    if (truckId && board.truckLanes.some((lane) => lane.truck_id === truckId)) {
+      setHighlightedTruckId(truckId);
+    }
+  }, [board.jobs, board.truckLanes, searchParams]);
+
+  const syncDateInUrl = useCallback((date: string) => {
+    const next = new URLSearchParams(window.location.search);
+    next.set("date", date);
+    const qs = next.toString();
+    window.history.replaceState(null, "", qs ? `/dispatch?${qs}` : "/dispatch");
+  }, []);
+
+  const fetchBoardForDate = useCallback(
+    async (date: string, options?: { refresh?: boolean; signal?: AbortSignal }) => {
+      const params = new URLSearchParams(buildFleetDispatchBoardQuery(date, branchId));
+      if (options?.refresh) params.set("refresh", "true");
+      const res = await fetch(`/api/fleet/dispatch-board?${params.toString()}`, {
+        cache: "no-store",
+        signal: options?.signal,
+      });
+      if (!res.ok) throw new Error("Unable to load dispatch board.");
+      return (await res.json()) as FleetDispatchBoardData;
+    },
+    [branchId]
+  );
+
+  const resetDateChangeUi = useCallback(() => {
+    setRecommendations([]);
+    setRecsLoading(true);
+    setRecsRefreshing(false);
+    setSelectedJobId(null);
+    setHighlightedTruckId(null);
+    setActiveRecommendation(null);
+    setJobSuggestDisplayRec(null);
+    setRecError(null);
+    setRecalculationNotice(null);
+  }, []);
+
+  const applyDateChange = useCallback(
+    async (date: string) => {
+      if (date === activeDate) return;
+
+      dateChangeAbortRef.current?.abort();
+      const controller = new AbortController();
+      dateChangeAbortRef.current = controller;
+
+      setBoardLoading(true);
+      setActiveDate(date);
+      syncDateInUrl(date);
+      resetDateChangeUi();
+      setError(null);
+
+      try {
+        const newBoard = await fetchBoardForDate(date, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        setBoard(newBoard);
+        setIntel(buildMinimalDispatchIntel(newBoard, date));
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          setError(e instanceof Error ? e.message : "Unable to load dispatch board for selected date.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setBoardLoading(false);
+      }
+    },
+    [activeDate, fetchBoardForDate, resetDateChangeUi, syncDateInUrl]
+  );
 
   const navigateDate = useCallback(
     (date: string) => {
-      const next = new URLSearchParams(searchParams.toString());
-      next.set("date", date);
-      router.push(`/dispatch?${next.toString()}`);
+      void applyDateChange(date);
     },
-    [router, searchParams]
+    [applyDateChange]
   );
+
+  useEffect(() => {
+    const onPopState = () => {
+      const date =
+        parseDateParam(new URLSearchParams(window.location.search).get("date")) ?? selectedDate;
+      if (date !== activeDate) {
+        void applyDateChange(date);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [activeDate, applyDateChange, selectedDate]);
 
   const loadRecommendations = useCallback(
     async (refresh = false) => {
       const branchId = searchParams.get("branch_id");
       const params = new URLSearchParams();
-      params.set("date", selectedDate);
+      params.set("date", activeDate);
       if (branchId?.trim()) params.set("branch_id", branchId.trim());
       if (refresh) params.set("refresh", "true");
       const res = await fetch(`/api/fleet/recommendations?${params.toString()}`, { cache: "no-store" });
@@ -87,46 +212,58 @@ export function FleetDispatchView({
       const payload = await res.json();
       setRecommendations(payload.pending ?? []);
       setRecalculationNotice(payload.recalculationNotice ?? null);
+      setRecsRefreshing(Boolean(payload.refreshing));
+      setRecsLoading(false);
       setRecError(null);
     },
-    [searchParams, selectedDate]
+    [searchParams, activeDate]
   );
 
   const refreshBoard = useCallback(async () => {
-    const branchId = searchParams.get("branch_id");
-    const query = buildFleetDispatchBoardQuery(selectedDate, branchId);
-    const [boardRes, intelRes] = await Promise.all([
-      fetch(`/api/fleet/dispatch-board?${query}`),
-      fetch(`/api/fleet/today-view?date=${encodeURIComponent(selectedDate)}`),
-    ]);
-    if (boardRes.ok) {
-      setBoard((await boardRes.json()) as FleetDispatchBoardData);
+    setBoardLoading(true);
+    try {
+      const newBoard = await fetchBoardForDate(activeDate, { refresh: true });
+      setBoard(newBoard);
+      setIntel(buildMinimalDispatchIntel(newBoard, activeDate));
+      await loadRecommendations(true);
+    } catch {
+      setError("Unable to refresh dispatch board.");
+    } finally {
+      setBoardLoading(false);
     }
-    if (intelRes.ok) {
-      const intelPayload = (await intelRes.json()) as FleetTodayViewData;
-      setIntel(intelPayload);
-      setRecommendations(intelPayload.recommendations.pending);
-    } else {
-      await loadRecommendations();
-    }
-  }, [loadRecommendations, searchParams, selectedDate]);
+  }, [activeDate, fetchBoardForDate, loadRecommendations]);
+
+  const afterAssignmentRefresh = useCallback(async () => {
+    await refreshBoard();
+    await loadRecommendations(true);
+    setSelectedJobId(null);
+    setHighlightedTruckId(null);
+    setActiveRecommendation(null);
+    setJobSuggestDisplayRec(null);
+    setMapAssignSuccessToken((t) => t + 1);
+  }, [loadRecommendations, refreshBoard]);
+
+  const assignment = useDispatchMapAssignment({
+    selectedDate: activeDate,
+    branchId,
+    onAssigned: afterAssignmentRefresh,
+  });
 
   const handleAssign = useCallback(
     (jobId: string, truckId: string) => {
       setError(null);
-      startTransition(async () => {
-        const result = await assignTruckToJob(jobId, truckId);
-        if (result.error) {
-          setError(result.error);
-          return;
-        }
-        await refreshBoard();
-        setSelectedJobId(null);
-        setHighlightedTruckId(null);
-        setActiveRecommendation(null);
+      void assignment.validatePair(truckId, jobId).then((validation) => {
+        if (!validation?.valid) return;
+        void assignment.commitAssignment({
+          truckId,
+          jobId,
+          validationId: validation.validationId,
+          snapshotId: validation.snapshotId,
+          assignmentSource: "map_click",
+        });
       });
     },
-    [refreshBoard]
+    [assignment]
   );
 
   const onRecommendationAction = useCallback(
@@ -136,7 +273,7 @@ export function FleetDispatchView({
         const res = await fetch(`/api/fleet/recommendations/${id}/${action}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date: selectedDate }),
+          body: JSON.stringify({ date: activeDate }),
         });
         if (!res.ok) {
           let message =
@@ -159,7 +296,7 @@ export function FleetDispatchView({
         setRecError(null);
       });
     },
-    [loadRecommendations, refreshBoard, selectedDate]
+    [loadRecommendations, refreshBoard, activeDate]
   );
 
   const handleHighlightRecommendation = useCallback((rec: FleetRecommendationInstance | null) => {
@@ -180,6 +317,123 @@ export function FleetDispatchView({
       scrollToSection("fleet-dispatch-map");
     },
     [handleHighlightRecommendation]
+  );
+
+  const isUnassignedJob = useCallback(
+    (job: FleetDispatchJob) => job.status === "unassigned" || !job.assigned_truck_id,
+    []
+  );
+
+  const handleMapJobClick = useCallback(
+    async (jobId: string | null) => {
+      if (!jobId) {
+        setSelectedJobId(null);
+        setJobSuggestDisplayRec(null);
+        return;
+      }
+      const job = board.jobs.find((item) => item.id === jobId);
+      if (!job) return;
+
+      setSelectedJobId(jobId);
+      setHighlightedTruckId(null);
+
+      if (!isUnassignedJob(job)) return;
+
+      const result = await assignment.suggestForJob(jobId);
+      if (!result) return;
+
+      setJobSuggestAlternatives(result.alternatives);
+      const displayRec = result.displayRecommendation ?? result.recommendation;
+      if (displayRec) {
+        setJobSuggestDisplayRec(displayRec);
+        handleHighlightRecommendation(displayRec);
+        setDecisionOpen(true);
+      }
+    },
+    [assignment, board.jobs, handleHighlightRecommendation, isUnassignedJob]
+  );
+
+  const handleMapTruckClick = useCallback(
+    async (truckId: string | null) => {
+      setHighlightedTruckId(truckId);
+      if (!truckId) {
+        setTruckJobAlternatives([]);
+        return;
+      }
+      const result = await assignment.suggestForTruck(truckId);
+      if (!result) return;
+      setTruckJobAlternatives(
+        result.alternatives
+          .filter((alt) => alt.jobId && alt.jobTitle)
+          .map((alt) => ({
+            jobId: alt.jobId as string,
+            jobTitle: alt.jobTitle as string,
+            score: alt.score,
+            explanation: alt.explanation,
+          }))
+      );
+      if (result.displayRecommendation) {
+        handleHighlightRecommendation(result.displayRecommendation);
+      }
+    },
+    [assignment, handleHighlightRecommendation]
+  );
+
+  const handleTruckDropOnJob = useCallback(
+    (truckId: string, jobId: string) => {
+      setHighlightedTruckId(truckId);
+      setSelectedJobId(jobId);
+      void assignment.validatePair(truckId, jobId, assignment.suggestResult?.snapshotId);
+    },
+    [assignment]
+  );
+
+  const handleConfirmAssignment = useCallback(() => {
+    const validation = assignment.validation;
+    if (!validation?.valid) return;
+    const recommendationId =
+      assignment.suggestResult?.recommendation?.id ??
+      jobSuggestDisplayRec?.id ??
+      activeRecommendation?.id ??
+      null;
+    void assignment.commitAssignment({
+      truckId: validation.truckId,
+      jobId: validation.jobId,
+      validationId: validation.validationId,
+      snapshotId: validation.snapshotId,
+      assignmentSource:
+        assignment.panelMode === "confirm" && jobSuggestDisplayRec
+          ? "ai_recommendation"
+          : "manual_drag",
+      recommendationId,
+    });
+  }, [activeRecommendation?.id, assignment, jobSuggestDisplayRec]);
+
+  const selectedJob = selectedJobId
+    ? board.jobs.find((job) => job.id === selectedJobId) ?? null
+    : null;
+
+  const showJobIntel =
+    selectedJob &&
+    isUnassignedJob(selectedJob) &&
+    jobSuggestDisplayRec &&
+    assignment.panelMode === "idle";
+
+  const assignmentToasts = (
+    <div className="opmap-toast-stack" aria-live="polite">
+      {assignment.toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={`opmap-toast opmap-toast--${toast.variant}`}
+          role="status"
+        >
+          {toast.message}
+          <button type="button" onClick={() => assignment.dismissToast(toast.id)} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
   );
 
   useEffect(() => {
@@ -223,11 +477,11 @@ export function FleetDispatchView({
         intel={intel}
         recommendationCount={recommendations.length}
         recommendations={recommendations}
-        selectedDate={selectedDate}
+        selectedDate={activeDate}
         displayDate={displayDate}
-        pending={pending}
-        onPrevDay={() => navigateDate(shiftDate(selectedDate, -1))}
-        onNextDay={() => navigateDate(shiftDate(selectedDate, 1))}
+        pending={isBusy}
+        onPrevDay={() => navigateDate(shiftDate(activeDate, -1))}
+        onNextDay={() => navigateDate(shiftDate(activeDate, 1))}
         onDateChange={navigateDate}
         onRefresh={() => void refreshBoard()}
       />
@@ -244,7 +498,9 @@ export function FleetDispatchView({
               recommendations={recommendations}
               board={board}
               activeRecommendationId={activeRecommendation?.id ?? null}
-              pending={pending}
+              pending={isBusy}
+              recommendationsLoading={recsLoading}
+              recommendationsRefreshing={recsRefreshing}
               error={recError}
               recalculationNotice={recalculationNotice}
               onRefresh={() => void loadRecommendations(true)}
@@ -280,8 +536,64 @@ export function FleetDispatchView({
               selectedJobId={selectedJobId}
               highlightedTruckId={highlightedTruckId}
               activeRecommendation={activeRecommendation}
-              onSelectJob={setSelectedJobId}
-              onSelectTruck={setHighlightedTruckId}
+              onSelectJob={handleMapJobClick}
+              onSelectTruck={handleMapTruckClick}
+              onTruckDropOnJob={handleTruckDropOnJob}
+              onTruckDragCancel={assignment.dismissPanel}
+              truckJobAlternatives={truckJobAlternatives}
+              mapAssignSuccessToken={mapAssignSuccessToken}
+              assignmentToasts={assignmentToasts}
+              jobIntelPanel={
+                showJobIntel && selectedJob && jobSuggestDisplayRec ? (
+                  <JobIntelPanel
+                    job={selectedJob}
+                    displayRecommendation={jobSuggestDisplayRec}
+                    alternatives={jobSuggestAlternatives}
+                    onClose={() => {
+                      setSelectedJobId(null);
+                      setJobSuggestDisplayRec(null);
+                    }}
+                    onAccept={() => {
+                      const truckId =
+                        jobSuggestDisplayRec.rationale.candidates?.[0]?.truck_id ??
+                        jobSuggestDisplayRec.rationale.entities.truck_id;
+                      if (!truckId) return;
+                      void assignment.validatePair(truckId, selectedJob.id).then((validation) => {
+                        if (validation?.valid) {
+                          void assignment.commitAssignment({
+                            truckId,
+                            jobId: selectedJob.id,
+                            validationId: validation.validationId,
+                            snapshotId: validation.snapshotId,
+                            assignmentSource: "ai_recommendation",
+                            recommendationId: assignment.suggestResult?.recommendation?.id ?? null,
+                          });
+                        }
+                      });
+                    }}
+                    onSelectTruck={(truckId) => {
+                      setHighlightedTruckId(truckId);
+                      void assignment.validatePair(truckId, selectedJob.id);
+                    }}
+                    onViewAlternatives={() => setDecisionOpen(true)}
+                    onReject={() => {
+                      setJobSuggestDisplayRec(null);
+                      handleHighlightRecommendation(null);
+                    }}
+                    pending={assignment.committing}
+                  />
+                ) : null
+              }
+              assignmentPanel={
+                <DispatchAssignmentConfirmPanel
+                  mode={assignment.panelMode}
+                  validation={assignment.validation}
+                  committing={assignment.committing}
+                  onConfirm={handleConfirmAssignment}
+                  onCancel={assignment.dismissPanel}
+                  onCompareAlternatives={() => setDecisionOpen(true)}
+                />
+              }
             />
           </div>
           <FleetDispatchOutlookStrip board={board} intel={intel} recommendations={recommendations} />
@@ -296,7 +608,7 @@ export function FleetDispatchView({
               board={board}
               selectedJobId={selectedJobId}
               activeRecommendationId={activeRecommendation?.id ?? null}
-              pending={pending}
+              pending={isBusy}
               onSelectJob={setSelectedJobId}
               onAssignToTruck={handleAssign}
               truckLanes={board.truckLanes}

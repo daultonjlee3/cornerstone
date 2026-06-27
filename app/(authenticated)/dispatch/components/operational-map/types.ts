@@ -32,9 +32,19 @@ export type TruckVisualState =
   | "critical"
   | "highRevenue"
   | "recommended"
-  | "selected";
+  | "selected"
+  | "dragging";
 
-export type JobVisualState = "normal" | "late" | "risk" | "recommended" | "selected" | "waiting";
+export type JobVisualState =
+  | "normal"
+  | "late"
+  | "risk"
+  | "recommended"
+  | "selected"
+  | "waiting"
+  | "eligible"
+  | "invalid"
+  | "dropTarget";
 
 export type BranchZone = {
   branch_id: string;

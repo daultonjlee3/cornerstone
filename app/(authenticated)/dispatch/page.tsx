@@ -3,69 +3,80 @@ import { redirect } from "next/navigation";
 import { getTenantIdForUser, getProductProfileForTenant } from "@/src/lib/auth-context";
 import { resolveSearchParams, type SearchParams } from "@/src/lib/page-utils";
 import { loadDispatchData } from "./dispatch-data";
-import { loadFleetDispatchData } from "./fleet-dispatch-data";
-import { parseFilterStateFromParams } from "./filter-state";
+import { loadFleetDispatchCriticalData } from "./fleet-dispatch-data";
+import { parseFilterStateFromParams, parseDateSafe } from "./filter-state";
 import { DispatchViewClient } from "./components/DispatchViewClient";
 import { FleetDispatchViewClient } from "./components/FleetDispatchViewClient";
 import { isFleetProductProfile } from "../nav-config";
+import { createDispatchPerfTimer } from "@/src/lib/fleet/dispatch/perf";
+import { ensurePeachtreeDemoTelematicsFresh } from "@/src/lib/fleet/demo/peachtree-demo-telematics";
 
 export const metadata = {
   title: "Dispatch Intelligence | Cornerstone Fleet",
   description: "Fleet dispatch mission control — assignments, recommendations, and capacity",
 };
 
+function peachtreeDemoBoardDate(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default async function DispatchPage({
   searchParams,
 }: {
   searchParams: SearchParams | Promise<SearchParams>;
 }) {
+  const perf = createDispatchPerfTimer("dispatch-page");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  perf.stage("auth");
 
   const tenantId = await getTenantIdForUser(supabase);
   if (!tenantId) redirect("/onboarding");
+  perf.stage("tenant");
 
   const productProfile = await getProductProfileForTenant(tenantId, supabase);
   const params = await resolveSearchParams(searchParams);
-  const hasDateParam =
-    typeof params?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date.trim());
+  perf.stage("context");
 
-  if (isFleetProductProfile(productProfile) && !hasDateParam) {
+  const filterState = parseFilterStateFromParams(params ?? {});
+  let selectedDate = filterState.selectedDate;
+
+  if (isFleetProductProfile(productProfile)) {
+    const dateParam = typeof params?.date === "string" ? params.date.trim() : "";
+    const hasDateParam = parseDateSafe(dateParam) != null;
+
     const { data: tenant } = await supabase
       .from("tenants")
       .select("slug")
       .eq("id", tenantId)
       .maybeSingle();
-    if (tenant?.slug === "peachtree-industrial") {
-      const tomorrow = new Date();
-      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-      redirect(`/dispatch?date=${tomorrowStr}`);
+
+    if (!hasDateParam && tenant?.slug === "peachtree-industrial") {
+      selectedDate = peachtreeDemoBoardDate();
     }
-  }
 
-  const filterState = parseFilterStateFromParams(params ?? {});
+    if (tenant?.slug === "peachtree-industrial") {
+      await ensurePeachtreeDemoTelematicsFresh(supabase, tenantId);
+    }
 
-  if (isFleetProductProfile(productProfile)) {
     const branchId =
       typeof params?.branch_id === "string" ? params.branch_id.trim() || null : null;
-    const fleetResult = await loadFleetDispatchData(
+    const { board } = await loadFleetDispatchCriticalData(
       supabase,
       tenantId,
-      filterState.selectedDate,
+      selectedDate,
       branchId
     );
+    perf.stage("critical-board");
+    perf.finish();
 
     return (
-      <FleetDispatchViewClient
-        initialBoard={fleetResult.board}
-        initialIntel={fleetResult.intel}
-        selectedDate={filterState.selectedDate}
-      />
+      <FleetDispatchViewClient initialBoard={board} selectedDate={selectedDate} />
     );
   }
 

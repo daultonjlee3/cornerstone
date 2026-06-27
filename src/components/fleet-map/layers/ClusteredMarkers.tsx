@@ -25,6 +25,10 @@ type ClusteredMarkersProps<T extends Record<string, unknown>> = {
   clusterRadius?: number;
   /** When provided, markers use interpolated coordinates from telemetry updates. */
   animatedPositions?: Map<string, AnimatedPosition>;
+  draggable?: boolean;
+  onPointDragStart?: (id: string) => void;
+  onPointDragMove?: (id: string, lngLat: { longitude: number; latitude: number }) => void;
+  onPointDragEnd?: (id: string, lngLat: { longitude: number; latitude: number }) => void;
 };
 
 function ClusteredMarkersInner<T extends Record<string, unknown>>({
@@ -36,6 +40,10 @@ function ClusteredMarkersInner<T extends Record<string, unknown>>({
   getOpacity,
   clusterRadius,
   animatedPositions,
+  draggable = false,
+  onPointDragStart,
+  onPointDragMove,
+  onPointDragEnd,
 }: ClusteredMarkersProps<T>) {
   const { bounds, zoom } = useFleetMapViewport();
 
@@ -88,6 +96,18 @@ function ClusteredMarkersInner<T extends Record<string, unknown>>({
         const opacity = getOpacity ? getOpacity(props) : 1;
         const { __id: _id, cluster: _c, cluster_id: _ci, point_count: _pc, ...cleanProps } = props;
         const anim = animatedPositions?.get(id);
+        const canDrag = draggable && kind === "truck";
+        const jobState = kind === "job" ? (cleanProps as { state?: string }).state : null;
+        const markerShellClass =
+          kind === "job" && jobState === "eligible"
+            ? " opmap-marker-shell--eligible"
+            : kind === "job" && jobState === "invalid"
+              ? " opmap-marker-shell--invalid"
+              : kind === "job" && jobState === "dropTarget"
+                ? " opmap-marker-shell--drop-target"
+                : kind === "truck" && (cleanProps as { state?: string }).state === "dragging"
+                  ? " opmap-marker-shell--dragging"
+                  : "";
 
         return (
           <Marker
@@ -100,7 +120,19 @@ function ClusteredMarkersInner<T extends Record<string, unknown>>({
               onPointClick(id);
             }}
           >
-            <div className="fleet-map-marker opmap-marker-shell" style={{ opacity }}>
+            <div
+              className={`fleet-map-marker opmap-marker-shell${canDrag ? " opmap-marker-shell--draggable" : ""}${markerShellClass}`}
+              style={{ opacity, touchAction: canDrag ? "none" : undefined }}
+              onPointerDown={
+                canDrag
+                  ? (event) => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      onPointDragStart?.(id);
+                    }
+                  : undefined
+              }
+            >
               {renderPoint(cleanProps as T, anim ? { bearing: anim.bearing } : undefined)}
             </div>
           </Marker>

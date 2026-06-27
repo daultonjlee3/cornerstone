@@ -123,6 +123,7 @@ export async function loadFleetKpiInsight(
       date: boardDate,
       board,
       skipHistory,
+      deferGeneration: true,
     }),
     loadRecommendationRoiSummary(supabase, tenantId, weekStart.toISOString().slice(0, 10), boardDate),
     supabase

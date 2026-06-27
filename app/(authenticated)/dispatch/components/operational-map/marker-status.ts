@@ -6,8 +6,10 @@ export function truckVisualState(
   lane: FleetDispatchTruckLane,
   highlightedTruckId: string | null,
   recTopTruckId: string | undefined,
-  highRevenueThreshold = Infinity
+  highRevenueThreshold = Infinity,
+  dragTruckId: string | null = null
 ): TruckVisualState {
+  if (dragTruckId === lane.truck_id) return "dragging";
   if (highlightedTruckId === lane.truck_id) return "selected";
   if (recTopTruckId === lane.truck_id) return "recommended";
   if (lane.telematics_status === "offline") return "offline";
@@ -26,8 +28,19 @@ export function truckVisualState(
 export function jobVisualState(
   job: FleetDispatchJob,
   selectedJobId: string | null,
-  recJobId: string | undefined
+  recJobId: string | undefined,
+  dragContext?: {
+    dragTruckId: string | null;
+    eligibleJobIds: Set<string>;
+    invalidJobIds: Set<string>;
+    hoverDropJobId: string | null;
+  }
 ): JobVisualState {
+  if (dragContext?.hoverDropJobId === job.id) return "dropTarget";
+  if (dragContext?.dragTruckId) {
+    if (dragContext.eligibleJobIds.has(job.id)) return "eligible";
+    if (dragContext.invalidJobIds.has(job.id)) return "invalid";
+  }
   if (selectedJobId === job.id) return "selected";
   if (recJobId === job.id) return "recommended";
   if (isLateJob(job)) return "late";

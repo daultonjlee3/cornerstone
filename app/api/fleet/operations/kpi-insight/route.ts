@@ -5,6 +5,8 @@ import { can } from "@/src/lib/permissions";
 import { loadFleetKpiInsight } from "@/src/lib/fleet/insights/load-kpi-insight";
 import { parseFleetKpiId } from "@/src/lib/fleet/insights/kpi-registry";
 
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const supabase = await createClient();
 
@@ -32,6 +34,14 @@ export async function GET(request: Request) {
   const dateParam = url.searchParams.get("date")?.trim();
   const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
 
-  const data = await loadFleetKpiInsight(supabase, auth.tenantId, kpiId, date);
-  return NextResponse.json(data);
+  try {
+    const data = await loadFleetKpiInsight(supabase, auth.tenantId, kpiId, date);
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("[operations/kpi-insight]", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Insight unavailable" },
+      { status: 503 }
+    );
+  }
 }

@@ -1,10 +1,11 @@
 import type {
   FleetDispatchBoardData,
   FleetDispatchJob,
+  FleetDispatchTruckLane,
   FleetRecommendationInstance,
 } from "@/src/types/fleet";
 import type { ProfitabilityContext } from "@/src/lib/operational-profitability/types";
-import { filterEligibleTrucksForJob, operationalNowForBoard } from "./constraints";
+import { filterEligibleTrucksForJob, operationalNowForBoard, isJobAssignable, evaluateTruckJobHardConstraints } from "./constraints";
 import {
   finalizeCandidateScores,
   scoreTruckForJob,
@@ -44,6 +45,38 @@ export function rankTruckCandidatesForJob(args: {
       scoreTruckForJob({
         job: args.job,
         lane,
+        board: args.board,
+        profitCtx: args.profitCtx,
+      })
+    )
+  );
+}
+
+/** Score unassigned jobs a truck can serve (truck-first dispatch). */
+export function rankJobCandidatesForTruck(args: {
+  lane: FleetDispatchTruckLane;
+  board: FleetDispatchBoardData;
+  profitCtx: ProfitabilityContext;
+  now?: Date;
+}): ScoredCandidate[] {
+  const now = args.now ?? operationalNowForBoard(args.board);
+  const eligibleJobs = args.board.unassignedJobs.filter((job) => {
+    const jobCheck = isJobAssignable(job, args.board, now);
+    if (!jobCheck.ok) return false;
+    const truckJob = evaluateTruckJobHardConstraints({
+      job,
+      lane: args.lane,
+      board: args.board,
+      now,
+    });
+    return truckJob.ok;
+  });
+
+  return finalizeCandidateScores(
+    eligibleJobs.map((job) =>
+      scoreTruckForJob({
+        job,
+        lane: args.lane,
         board: args.board,
         profitCtx: args.profitCtx,
       })

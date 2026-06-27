@@ -75,8 +75,6 @@ describe("fleet operations progressive merge", () => {
     const merged = mergeBriefingIntoTodayView(base, {
       date: "2026-06-23",
       executiveSummary: "Brief",
-      board: base.board,
-      martRows: [],
       exceptionCounts: { total: 25, critical: 2 },
       pendingRecommendationCount: 12,
       recommendations: {
@@ -90,8 +88,6 @@ describe("fleet operations progressive merge", () => {
       revenueAtRisk: 0,
       pendingActionCount: 14,
       integrationHealth: [],
-      upcomingCapacityIssues: [],
-      unusedCapacityBranches: [],
     });
 
     expect(merged.exceptions).toHaveLength(0);

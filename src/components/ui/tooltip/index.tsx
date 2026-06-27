@@ -22,7 +22,6 @@ type TooltipContextValue = {
   placement: Placement;
   triggerRef: React.RefObject<HTMLDivElement | null>;
   contentId: string;
-  triggerId: string;
   delayMs: number;
 };
 
@@ -61,10 +60,7 @@ export function Tooltip({
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement | null>(null);
-  // Single useId + suffix so server/client stay in sync (avoids hydration mismatch when tree differs)
-  const baseId = useId();
-  const contentId = `${baseId}-content`;
-  const triggerId = `${baseId}-trigger`;
+  const contentId = useId();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleShow = useCallback(() => {
@@ -86,7 +82,6 @@ export function Tooltip({
     placement,
     triggerRef,
     contentId,
-    triggerId,
     delayMs,
   };
 
@@ -111,20 +106,17 @@ type TooltipTriggerProps = {
 };
 
 export function TooltipTrigger({ children, asChild }: TooltipTriggerProps) {
-  const { triggerRef, triggerId, contentId, open } = useTooltipContext();
+  const { triggerRef, contentId, open } = useTooltipContext();
 
-  const trigger = (
+  return (
     <div
       ref={triggerRef}
-      id={triggerId}
       aria-describedby={open ? contentId : undefined}
       className="inline-flex cursor-default"
     >
       {children}
     </div>
   );
-
-  return trigger;
 }
 
 function getContentStyle(

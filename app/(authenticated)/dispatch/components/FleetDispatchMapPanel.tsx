@@ -1,26 +1,31 @@
 "use client";
 
-import type {
-  FleetDispatchBoardData,
-  FleetDispatchJob,
-  FleetDispatchTruckLane,
-  FleetRecommendationInstance,
-} from "@/src/types/fleet";
-import { FleetOperationalMap } from "./operational-map/FleetOperationalMap";
+import dynamic from "next/dynamic";
+import { memo, type ComponentProps } from "react";
 
-type FleetDispatchMapPanelProps = {
-  jobs: FleetDispatchJob[];
-  truckLanes: FleetDispatchTruckLane[];
-  branchCapacity: FleetDispatchBoardData["branchCapacity"];
-  recommendations: FleetRecommendationInstance[];
-  selectedJobId: string | null;
-  highlightedTruckId: string | null;
-  activeRecommendation: FleetRecommendationInstance | null;
-  onSelectJob: (id: string | null) => void;
-  onSelectTruck: (id: string | null) => void;
+const FleetOperationalMap = dynamic(
+  () => import("./operational-map/FleetOperationalMap").then((mod) => mod.FleetOperationalMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="flex h-full min-h-[280px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--surface-border-subtle)] bg-[color-mix(in_srgb,var(--surface-default)_92%,transparent)] text-sm text-[var(--text-muted)]"
+        aria-busy="true"
+        aria-label="Loading map"
+      >
+        Loading map…
+      </div>
+    ),
+  }
+);
+
+type FleetDispatchMapPanelProps = ComponentProps<typeof FleetOperationalMap> & {
   consoleMode?: boolean;
 };
 
-export function FleetDispatchMapPanel({ consoleMode = true, ...props }: FleetDispatchMapPanelProps) {
+export const FleetDispatchMapPanel = memo(function FleetDispatchMapPanel({
+  consoleMode = true,
+  ...props
+}: FleetDispatchMapPanelProps) {
   return <FleetOperationalMap {...props} consoleMode={consoleMode} />;
-}
+});

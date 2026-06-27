@@ -39,6 +39,7 @@ export function FleetCopilotProvider({
 
   const clearSelectedRecommendation = useCallback(() => {
     setFleetOverrides((prev) => {
+      if (!("selectedRecommendation" in prev)) return prev;
       const next = { ...prev };
       delete next.selectedRecommendation;
       return next;

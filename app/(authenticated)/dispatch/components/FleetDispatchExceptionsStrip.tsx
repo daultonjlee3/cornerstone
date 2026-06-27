@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { FleetOperationalException } from "@/src/types/fleet";
 import { groupExceptions, scrollToSection } from "./fleet-dispatch-utils";
+import { runFleetExceptionAct, resolveFleetExceptionAct } from "@/src/lib/fleet/ui/exception-actions";
 
 type FleetDispatchExceptionsStripProps = {
   exceptions: FleetOperationalException[];
@@ -84,6 +86,7 @@ function ExceptionGroup({
 }) {
   const [open, setOpen] = useState(false);
   const top = group.items[0];
+  const router = useRouter();
 
   return (
     <div
@@ -116,8 +119,16 @@ function ExceptionGroup({
                 type="button"
                 className="w-full rounded px-1.5 py-1 text-left transition hover:bg-[var(--background)]"
                 onClick={() => {
-                  if (ex.href.startsWith("#")) scrollToSection(ex.href.slice(1));
-                  else if (ex.href.startsWith("/dispatch")) scrollToSection("fleet-job-queue");
+                  const act = resolveFleetExceptionAct(ex, "/dispatch");
+                  if (act.kind === "scroll") {
+                    scrollToSection(act.elementId);
+                    return;
+                  }
+                  if (act.href.startsWith("/dispatch")) {
+                    router.push(act.href);
+                    return;
+                  }
+                  runFleetExceptionAct(act, (href) => router.push(href));
                 }}
               >
                 <p className="text-[11px] font-medium text-[var(--foreground)]">{ex.title}</p>

@@ -323,6 +323,8 @@ export function buildDispatchExecutiveSummary(input: {
   revenueAtRisk: number;
   unusedBranches: FleetCapacityAlert[];
   overloadBranches: FleetCapacityAlert[];
+  /** When exceptions are not loaded yet (light briefing). */
+  unassignedJobCount?: number;
 }): string {
   const parts: string[] = [];
 
@@ -336,6 +338,9 @@ export function buildDispatchExecutiveSummary(input: {
   } else if (input.exceptions.some((e) => e.category === "unassigned_job")) {
     const count = input.exceptions.filter((e) => e.category === "unassigned_job").length;
     parts.push(`${count} high-priority job${count === 1 ? "" : "s"} need assignment`);
+  } else if ((input.unassignedJobCount ?? 0) > 0) {
+    const count = input.unassignedJobCount!;
+    parts.push(`${count} job${count === 1 ? "" : "s"} need assignment`);
   }
 
   if (input.overloadBranches.length > 0 && input.unusedBranches.length > 0) {
@@ -456,7 +461,7 @@ export async function loadDayOverDayMetrics(
     buildMetricDelta(
       "unassigned_jobs",
       "Unassigned jobs",
-      board.unassignedJobs.length,
+      commandCenter.unassignedJobs,
       null,
       "count",
       false

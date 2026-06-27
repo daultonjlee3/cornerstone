@@ -180,24 +180,39 @@ export async function loadPaginatedPendingRecommendations(
 ): Promise<FleetPaginatedResult<FleetRecommendationInstance>> {
   const date = query.date ?? todayDateOnly();
   const perf = createOperationsPerfTimer("operations-recommendations-page");
-  const offset = query.skip + (query.page - 1) * query.pageSize;
-  const fetchSize = query.pageSize + 1;
-  const windowEnd = offset + Math.max(fetchSize * 4, 40) - 1;
+  const startIndex = query.skip + (query.page - 1) * query.pageSize;
+  const endIndex = startIndex + query.pageSize;
 
-  let dbQuery = pendingBaseQuery(supabase, tenantId).range(offset, windowEnd);
-  if (query.branchId) dbQuery = dbQuery.eq("branch_id", query.branchId);
+  const BATCH = 250;
+  const MAX_SCAN = 5000;
+  let dbFrom = 0;
+  const filtered: FleetRecommendationInstance[] = [];
+  const seenIds = new Set<string>();
 
-  const { data, error } = await dbQuery;
-  if (error) throw new Error(error.message);
+  while (filtered.length < endIndex && dbFrom < MAX_SCAN) {
+    let dbQuery = pendingBaseQuery(supabase, tenantId).range(dbFrom, dbFrom + BATCH - 1);
+    if (query.branchId) dbQuery = dbQuery.eq("branch_id", query.branchId);
 
-  const mapped = (data ?? []).map((row) => mapRecommendationInstanceRow(row as RecommendationRow));
-  const filtered = mapped.filter((rec) => matchesBoardDate(rec, date));
-  const items = filtered.slice(0, query.pageSize);
-  const hasMore = filtered.length > query.pageSize || mapped.length >= windowEnd - offset + 1;
-  const last = items[items.length - 1];
+    const { data, error } = await dbQuery;
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
 
+    for (const row of data) {
+      const rec = mapRecommendationInstanceRow(row as RecommendationRow);
+      if (!matchesBoardDate(rec, date) || seenIds.has(rec.id)) continue;
+      seenIds.add(rec.id);
+      filtered.push(rec);
+    }
+
+    if (data.length < BATCH) break;
+    dbFrom += BATCH;
+  }
+
+  const items = filtered.slice(startIndex, endIndex);
   const fullCount = await getCachedPendingCount(supabase, tenantId, date);
   const totalCount = Math.max(0, fullCount - query.skip);
+  const hasMore = startIndex + items.length < totalCount;
+  const last = items[items.length - 1];
 
   perf.finish({ page: query.page, pageSize: query.pageSize, returned: items.length, totalCount });
 

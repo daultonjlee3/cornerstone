@@ -32,54 +32,41 @@ type ShellProps = {
 };
 
 export function Shell(props: ShellProps) {
+  // Pathname is stable on SSR; keep dispatch layout in sync with Suspense fallback.
+  const pathname = usePathname();
+  const isDispatchRoute = pathname === "/dispatch";
+
   return (
-    <Suspense fallback={<ShellFallback {...props} />}>
-      <ShellWithSearchParams {...props} />
+    <Suspense
+      fallback={
+        <ShellLayout
+          {...props}
+          isDispatchRoute={isDispatchRoute}
+          isDispatchFullscreen={false}
+          isScreenshotMode={false}
+        />
+      }
+    >
+      <ShellWithSearchParams {...props} isDispatchRoute={isDispatchRoute} />
     </Suspense>
   );
 }
 
-function ShellFallback({
-  children,
-  tenantName,
-  companyName,
-  userName,
-  showPlatformAdmin = false,
-  impersonationBanner = null,
-  isDemoGuest = false,
-  productProfile = "cmms",
-}: ShellProps) {
-  return (
-    <ShellLayout
-      children={children}
-      tenantName={tenantName}
-      companyName={companyName}
-      userName={userName}
-      showPlatformAdmin={showPlatformAdmin}
-      impersonationBanner={impersonationBanner}
-      isDemoGuest={isDemoGuest}
-      productProfile={productProfile}
-      isDispatchFullscreen={false}
-      isScreenshotMode={false}
-      isDispatchRoute={false}
-    />
-  );
-}
-
-function ShellWithSearchParams(props: ShellProps) {
-  const pathname = usePathname();
+function ShellWithSearchParams({
+  isDispatchRoute,
+  ...props
+}: ShellProps & { isDispatchRoute: boolean }) {
   const searchParams = useSearchParams();
   const isDispatchFullscreen =
-    pathname === "/dispatch" && searchParams.get("dispatch_fullscreen") === "1";
+    isDispatchRoute && searchParams.get("dispatch_fullscreen") === "1";
   const isScreenshotMode = searchParams.get("screenshotMode") === "true";
-  const isDispatchRoute = pathname === "/dispatch";
 
   return (
     <ShellLayout
       {...props}
+      isDispatchRoute={isDispatchRoute}
       isDispatchFullscreen={isDispatchFullscreen}
       isScreenshotMode={isScreenshotMode}
-      isDispatchRoute={isDispatchRoute}
     />
   );
 }
@@ -123,6 +110,12 @@ function ShellLayout({
 
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [copilotDockExpanded, setCopilotDockExpanded] = useState(false);
+
+  useEffect(() => {
+    if (isDispatchRoute) {
+      setAiPanelOpen(false);
+    }
+  }, [isDispatchRoute]);
 
   const isFleetUi = isFleetProductProfile(productProfile);
   const cmmsOnboardingEnabled = usesCmmsOnboarding(productProfile);

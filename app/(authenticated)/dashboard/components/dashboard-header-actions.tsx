@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/src/components/ui/tooltip";
 import { Button } from "@/src/components/ui/button";
 import type { ProductProfile } from "@/src/types/fleet";
+import { fleetOperationsSectionHref } from "@/src/lib/fleet/ui/operations-sections";
 import { isFleetProductProfile } from "../../nav-config";
 
 type DashboardHeaderActionsProps = {
@@ -34,7 +35,7 @@ export function DashboardHeaderActions({
         </Tooltip>
         <Tooltip placement="bottom">
           <TooltipTrigger>
-            <Link href="/operations?focus=exceptions">
+            <Link href={fleetOperationsSectionHref("exceptions")}>
               <Button variant="secondary">Exceptions</Button>
             </Link>
           </TooltipTrigger>
@@ -42,7 +43,7 @@ export function DashboardHeaderActions({
         </Tooltip>
         <Tooltip placement="bottom">
           <TooltipTrigger>
-            <Link href="/operations?focus=recommendations">
+            <Link href={fleetOperationsSectionHref("recommendations")}>
               <Button>Recommendations</Button>
             </Link>
           </TooltipTrigger>

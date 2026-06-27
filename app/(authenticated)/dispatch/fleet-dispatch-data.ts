@@ -1,29 +1,32 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { FleetDispatchBoardData, FleetTodayViewData } from "@/src/types/fleet";
-import { getFleetRecommendations } from "@/src/lib/fleet-recommendation-engine/service";
+import type { FleetDispatchBoardData } from "@/src/types/fleet";
 import { loadFleetDispatchBoardData } from "@/src/lib/fleet/queries/dispatch-board";
-import { loadFleetTodayViewData } from "@/src/lib/fleet/queries/today-view";
+import { createDispatchPerfTimer } from "@/src/lib/fleet/dispatch/perf";
+import {
+  getCachedDispatchBoard,
+  setCachedDispatchBoard,
+} from "@/src/lib/fleet/dispatch/board-cache";
 
-export type LoadFleetDispatchResult = {
+export type LoadFleetDispatchCriticalResult = {
   board: FleetDispatchBoardData;
-  intel: FleetTodayViewData;
 };
 
-export async function loadFleetDispatchData(
+/** Critical path only — board snapshot for instant dispatch shell. */
+export async function loadFleetDispatchCriticalData(
   supabase: SupabaseClient,
   tenantId: string,
   date: string,
   branchId?: string | null
-): Promise<LoadFleetDispatchResult> {
-  // Load board first, then recommendations — never run getFleetRecommendations in parallel
-  // with loadFleetTodayViewData (race on insert crashes /dispatch).
-  const board = await loadFleetDispatchBoardData(supabase, tenantId, date, branchId);
-  const recommendations = await getFleetRecommendations(supabase, tenantId, { date, branchId });
-  const intel = await loadFleetTodayViewData(supabase, tenantId, {
-    date,
-    board,
-    recommendations,
-  });
+): Promise<LoadFleetDispatchCriticalResult> {
+  const branch = branchId ?? null;
+  const cached = getCachedDispatchBoard(tenantId, date, branch);
+  if (cached) {
+    return { board: cached };
+  }
 
-  return { board, intel };
+  const perf = createDispatchPerfTimer("dispatch-page-critical");
+  const board = await loadFleetDispatchBoardData(supabase, tenantId, date, branchId);
+  setCachedDispatchBoard(tenantId, date, branch, board);
+  perf.finish();
+  return { board };
 }

@@ -17,6 +17,8 @@ type FleetDispatchRecommendationsPanelProps = {
   board: FleetDispatchBoardData;
   activeRecommendationId: string | null;
   pending?: boolean;
+  recommendationsLoading?: boolean;
+  recommendationsRefreshing?: boolean;
   error?: string | null;
   recalculationNotice?: FleetRecommendationRecalculationNotice | null;
   onRefresh: () => void;
@@ -35,6 +37,8 @@ export function FleetDispatchRecommendationsPanel({
   board,
   activeRecommendationId,
   pending,
+  recommendationsLoading,
+  recommendationsRefreshing,
   error,
   recalculationNotice,
   onRefresh,
@@ -63,7 +67,13 @@ export function FleetDispatchRecommendationsPanel({
                 Cornerstone AI
               </p>
               <p className="dispatch-console__dock-title">Command decision</p>
-              <p className="dispatch-console__dock-meta">Highest-impact assignment</p>
+              <p className="dispatch-console__dock-meta">
+                {recommendationsLoading
+                  ? "Loading recommendations…"
+                  : recommendationsRefreshing
+                    ? "Refreshing recommendations…"
+                    : "Highest-impact assignment"}
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={onRefresh} disabled={pending}>

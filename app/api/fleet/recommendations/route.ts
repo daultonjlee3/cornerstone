@@ -27,11 +27,17 @@ export async function GET(request: Request) {
   const date = url.searchParams.get("date")?.trim() || undefined;
   const forceRefresh =
     (url.searchParams.get("refresh")?.trim() ?? "").toLowerCase() === "true";
+  const deferGeneration =
+    (url.searchParams.get("defer_generation")?.trim() ?? "").toLowerCase() === "true";
+  const skipHistory =
+    (url.searchParams.get("skip_history")?.trim() ?? "").toLowerCase() === "true";
 
   const data = await getFleetRecommendations(supabase, auth.tenantId, {
     branchId,
     date,
     forceRefresh,
+    deferGeneration,
+    skipHistory,
   });
 
   return NextResponse.json(data);

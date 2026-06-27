@@ -27,7 +27,14 @@ function weekStartIso(day: string): string {
 export async function loadOperatorContextMaps(
   supabase: SupabaseClient,
   tenantId: string,
-  boardDate: string
+  boardDate: string,
+  options?: {
+    trucks?: Array<{
+      id: string;
+      capacity: Record<string, unknown> | null;
+      notes: string | null;
+    }>;
+  }
 ): Promise<OperatorContextMaps> {
   const operatorsById = new Map<string, FleetOperatorRecord>();
   const operatorsByName = new Map<string, FleetOperatorRecord>();
@@ -35,6 +42,10 @@ export async function loadOperatorContextMaps(
   const dailyHoursByOperator = new Map<string, number>();
   const weeklyHoursByOperator = new Map<string, number>();
   const truckToOperatorId = new Map<string, string>();
+
+  const trucksPromise = options?.trucks
+    ? Promise.resolve({ data: options.trucks, error: null })
+    : supabase.from("trucks").select("id, capacity, notes").eq("tenant_id", tenantId);
 
   const [{ data: operators }, { data: ptoRows }, { data: hourRows }, { data: trucks }] =
     await Promise.all([
@@ -55,7 +66,7 @@ export async function loadOperatorContextMaps(
         .eq("tenant_id", tenantId)
         .gte("date", weekStartIso(boardDate))
         .lte("date", boardDate),
-      supabase.from("trucks").select("id, capacity, notes").eq("tenant_id", tenantId),
+      trucksPromise,
     ]);
 
   for (const row of operators ?? []) {

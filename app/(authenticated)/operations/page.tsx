@@ -32,7 +32,7 @@ import { DashboardSectionEmpty } from "../dashboard/components/dashboard-section
 import { DashboardSetupGuidance } from "../dashboard/components/dashboard-setup-guidance";
 import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
-import { FleetNavFocusScroll } from "./components/fleet-nav-focus-scroll";
+import { FleetNavFocusScroll, FLEET_OPS_NAV_FOCUS_TARGETS } from "./components/fleet-nav-focus-scroll";
 import { FleetCommandCenterClient } from "./components/fleet-command-center-client";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
@@ -212,12 +212,7 @@ export default async function OperationsCenterPage() {
   if (fleetOnly) {
     return (
       <div className="space-y-8" data-testid="operations-center-page">
-        <FleetNavFocusScroll
-          targets={[
-            { focusId: "fleet-recommendations", paramValue: "recommendations" },
-            { focusId: "fleet-exceptions", paramValue: "exceptions" },
-          ]}
-        />
+        <FleetNavFocusScroll targets={FLEET_OPS_NAV_FOCUS_TARGETS} />
         <FleetCommandCenterClient />
       </div>
     );
@@ -245,12 +240,7 @@ export default async function OperationsCenterPage() {
   return (
     <div className="space-y-8" data-testid="operations-center-page">
       {showFleet ? (
-        <FleetNavFocusScroll
-          targets={[
-            { focusId: "fleet-recommendations", paramValue: "recommendations" },
-            { focusId: "fleet-exceptions", paramValue: "exceptions" },
-          ]}
-        />
+        <FleetNavFocusScroll targets={FLEET_OPS_NAV_FOCUS_TARGETS} />
       ) : null}
       <div className="space-y-8">
         {!fleetOnly ? (

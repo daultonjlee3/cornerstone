@@ -108,6 +108,21 @@ export function IntegrationsClient() {
     return () => window.clearTimeout(timer);
   }, [searchParams]);
 
+  useEffect(() => {
+    const connectionId = searchParams.get("connection")?.trim();
+    if (!connectionId) return;
+    const el = document.getElementById(`integration-connection-${connectionId}`);
+    if (!el) return;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-[var(--accent)]");
+    }, 150);
+    return () => {
+      window.clearTimeout(timer);
+      el.classList.remove("ring-2", "ring-[var(--accent)]");
+    };
+  }, [searchParams, connections]);
+
   const samsaraConnection = connections.find((c) => c.provider === "samsara");
   const jobsWebhook = connections.find((c) => c.provider === "webhook_jobs");
   const telematicsWebhook = connections.find((c) => c.provider === "webhook_telematics");
@@ -293,7 +308,7 @@ export function IntegrationsClient() {
                 {connections.map((c) => {
                   const health = connectionHealth(c);
                   return (
-                    <Tr key={c.id}>
+                    <Tr key={c.id} id={`integration-connection-${c.id}`}>
                       <Td>{PROVIDER_LABELS[c.provider] ?? c.provider}</Td>
                       <Td>
                         <FleetStatusChip

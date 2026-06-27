@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { AppIcon } from "./icons";
 
@@ -80,7 +80,7 @@ type NavRailItemProps = {
   icon?: LucideIcon;
   active?: boolean;
   collapsed?: boolean;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   tourId?: string;
 };
 
