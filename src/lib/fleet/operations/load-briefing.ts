@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FleetTodayViewData } from "@/src/types/fleet";
-import { loadCachedFleetRecommendations } from "@/src/lib/fleet-recommendation-engine/service";
 import { loadFleetDispatchBoardData } from "@/src/lib/fleet/queries/dispatch-board";
 import {
   buildCapacityAlerts,
@@ -10,6 +9,12 @@ import {
 } from "@/src/lib/fleet/queries/today-view";
 import type { IntegrationConnection } from "@/src/types/fleet";
 import { createOperationsPerfTimer } from "./perf";
+import { setCachedDispatchExceptions } from "./exceptions-cache";
+import {
+  countPendingRecommendationsForDate,
+  loadPrimaryPendingRecommendation,
+} from "./load-recommendations-page";
+import { FLEET_RECOMMENDATION_ENGINE_VERSION } from "@/src/lib/fleet-recommendation-engine/constants";
 
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
@@ -38,16 +43,18 @@ export type FleetOperationsBriefing = Pick<
   | "executiveSummary"
   | "board"
   | "martRows"
-  | "exceptions"
-  | "recommendations"
   | "revenueAtRisk"
   | "pendingActionCount"
   | "integrationHealth"
   | "upcomingCapacityIssues"
   | "unusedCapacityBranches"
->;
+  | "recommendations"
+> & {
+  exceptionCounts: { total: number; critical: number };
+  pendingRecommendationCount: number;
+};
 
-/** Board + cached recommendations + exceptions — no recommendation engine regeneration. */
+/** Board + hero recommendation + counts — list sections paginate separately. */
 export async function loadFleetOperationsBriefing(
   supabase: SupabaseClient,
   tenantId: string,
@@ -59,20 +66,29 @@ export async function loadFleetOperationsBriefing(
   const board = await loadFleetDispatchBoardData(supabase, tenantId, date);
   perf.stage("board");
 
-  const [recommendations, connectionsResult, martRows] = await Promise.all([
-    loadCachedFleetRecommendations(supabase, tenantId, { date }),
-    supabase
-      .from("integration_connections")
-      .select("id, provider, display_name, status, config, last_sync_at, last_error")
-      .eq("tenant_id", tenantId),
-    loadUtilizationMartRows(supabase, tenantId, date),
-  ]);
-  perf.stage("parallel-cached");
+  const [primaryRecommendation, pendingRecommendationCount, connectionsResult, martRows] =
+    await Promise.all([
+      loadPrimaryPendingRecommendation(supabase, tenantId, { date }),
+      countPendingRecommendationsForDate(supabase, tenantId, date),
+      supabase
+        .from("integration_connections")
+        .select("id, provider, display_name, status, config, last_sync_at, last_error")
+        .eq("tenant_id", tenantId),
+      loadUtilizationMartRows(supabase, tenantId, date),
+    ]);
+  perf.stage("parallel-light");
 
   const connections = (connectionsResult.data ?? []) as IntegrationConnection[];
   const integrationHealth = buildIntegrationHealthFromConnections(connections);
   const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
   const exceptions = buildDispatchExceptions(board, integrationHealth, revenueAtRisk);
+  setCachedDispatchExceptions(tenantId, date, exceptions);
+
+  const exceptionCounts = {
+    total: exceptions.length,
+    critical: exceptions.filter((e) => e.severity === "critical").length,
+  };
+
   const { upcoming, unused } = buildCapacityAlerts(board);
   const overloadBranches = board.branchCapacity.filter(
     (b) => b.available_truck_hours > 0 && b.utilization > 1
@@ -81,7 +97,7 @@ export async function loadFleetOperationsBriefing(
   const executiveSummary = buildDispatchExecutiveSummary({
     exceptions,
     changes: [],
-    recommendations: recommendations.pending.length,
+    recommendations: pendingRecommendationCount,
     revenueAtRisk,
     unusedBranches: unused,
     overloadBranches: overloadBranches.map((b) => ({
@@ -95,8 +111,8 @@ export async function loadFleetOperationsBriefing(
   });
 
   perf.finish({
-    pending: recommendations.pending.length,
-    exceptions: exceptions.length,
+    pending: pendingRecommendationCount,
+    exceptions: exceptionCounts.total,
   });
 
   return {
@@ -104,12 +120,26 @@ export async function loadFleetOperationsBriefing(
     executiveSummary,
     board,
     martRows: martRows as FleetTodayViewData["martRows"],
-    exceptions,
-    recommendations,
+    exceptionCounts,
+    pendingRecommendationCount,
+    recommendations: {
+      generatedAt: new Date().toISOString(),
+      engineVersion: FLEET_RECOMMENDATION_ENGINE_VERSION,
+      pending: primaryRecommendation ? [primaryRecommendation] : [],
+      history: [],
+      summary: {
+        volume: pendingRecommendationCount,
+        accepted: 0,
+        dismissed: 0,
+        expired: 0,
+        acceptanceRate: null,
+        dismissalRate: null,
+      },
+      refreshing: pendingRecommendationCount === 0,
+    },
     revenueAtRisk,
     pendingActionCount:
-      recommendations.pending.length +
-      exceptions.filter((e) => e.severity === "critical").length,
+      pendingRecommendationCount + exceptionCounts.critical,
     integrationHealth,
     upcomingCapacityIssues: upcoming,
     unusedCapacityBranches: unused,

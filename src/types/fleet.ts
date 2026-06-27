@@ -333,6 +333,8 @@ export type FleetTodayViewData = {
   commandCenter: FleetCommandCenterData;
   executiveInsights?: FleetExecutiveInsights;
   exceptions: FleetOperationalException[];
+  exceptionCounts?: { total: number; critical: number };
+  pendingRecommendationCount?: number;
   changesSinceYesterday: FleetMetricDelta[];
   integrationHealth: FleetIntegrationHealthItem[];
   upcomingCapacityIssues: FleetCapacityAlert[];
@@ -350,6 +352,7 @@ export type FleetOperationsSummary = {
   commandCenter: FleetCommandCenterData;
   revenueAtRisk: number;
   criticalExceptionCount: number;
+  totalExceptionCount: number | null;
   pendingRecommendations: number;
   pendingActionCount: number;
   acceptanceRate: number | null;

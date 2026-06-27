@@ -67,11 +67,19 @@ export function mergeSummaryIntoTodayView(
     commandCenter: summary.commandCenter,
     revenueAtRisk: summary.revenueAtRisk,
     pendingActionCount: summary.pendingActionCount,
+    pendingRecommendationCount: summary.pendingRecommendations,
     integrationHealth: summary.integrationHealth,
+    exceptionCounts: summary.totalExceptionCount != null
+      ? {
+          total: summary.totalExceptionCount,
+          critical: summary.criticalExceptionCount,
+        }
+      : base.exceptionCounts,
     recommendations: {
       ...base.recommendations,
       summary: {
         ...base.recommendations.summary,
+        volume: summary.pendingRecommendations,
         acceptanceRate: summary.acceptanceRate,
       },
       generatedAt: summary.lastUpdated,
@@ -87,6 +95,9 @@ export function mergeBriefingIntoTodayView(
     ...base,
     ...briefing,
     commandCenter: base.commandCenter,
+    exceptions: [],
+    pendingRecommendationCount: briefing.pendingRecommendationCount,
+    exceptionCounts: briefing.exceptionCounts,
   };
 }
 
@@ -94,15 +105,26 @@ export function mergeEnrichmentIntoTodayView(
   base: FleetTodayViewData,
   enrichment: FleetOperationsEnrichment
 ): FleetTodayViewData {
+  const pendingRecommendationCount =
+    base.pendingRecommendationCount ?? enrichment.recommendations.pending.length;
+
   return {
     ...base,
     commandCenter: enrichment.commandCenter,
     executiveInsights: enrichment.executiveInsights,
     recommendationRoi: enrichment.recommendationRoi,
     changesSinceYesterday: enrichment.changesSinceYesterday,
-    recommendations: enrichment.recommendations,
+    recommendations: {
+      ...enrichment.recommendations,
+      pending: base.recommendations.pending,
+      summary: {
+        ...enrichment.recommendations.summary,
+        volume: pendingRecommendationCount,
+      },
+    },
     pendingActionCount:
-      enrichment.recommendations.pending.length +
-      base.exceptions.filter((e) => e.severity === "critical").length,
+      pendingRecommendationCount +
+      (base.exceptionCounts?.critical ??
+        base.exceptions.filter((e) => e.severity === "critical").length),
   };
 }

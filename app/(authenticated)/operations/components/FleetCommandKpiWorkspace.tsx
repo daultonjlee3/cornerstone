@@ -46,7 +46,10 @@ export function FleetCommandKpiWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const cc = todayView.commandCenter;
-  const pendingRecommendations = todayView.recommendations.pending.length;
+  const pendingRecommendations =
+    todayView.pendingRecommendationCount ??
+    todayView.recommendations.summary.volume ??
+    todayView.recommendations.pending.length;
 
   const [selectedKpi, setSelectedKpiState] = useState<FleetKpiId | null>(() =>
     parseFleetKpiId(searchParams.get("kpi"))

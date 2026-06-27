@@ -85,6 +85,7 @@ export async function loadFleetOperationsSummary(
     commandCenter,
     revenueAtRisk,
     criticalExceptionCount: commandCenter.unassignedJobs > 0 ? 1 : 0,
+    totalExceptionCount: null,
     pendingRecommendations,
     pendingActionCount: pendingRecommendations + (commandCenter.unassignedJobs > 0 ? 1 : 0),
     acceptanceRate,

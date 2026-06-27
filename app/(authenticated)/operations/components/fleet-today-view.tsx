@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
@@ -34,21 +33,14 @@ import {
   StatusChip,
   AppIcon,
 } from "@/src/components/design-system";
-import { fleetLegacySeverityToTone } from "@/src/components/design-system/chip-maps";
 import type {
   FleetMetricDelta,
-  FleetOperationalException,
   FleetRecommendationHistoryEntry,
   FleetRecommendationInstance,
   FleetTodayViewData,
 } from "@/src/types/fleet";
 import { formatFleetCurrency } from "@/src/lib/fleet/ui/format";
 import { RelativeFreshness } from "@/src/components/fleet/ui/fleet-data-freshness";
-import { severityToFleetSeverity } from "@/src/lib/fleet/ui/severity";
-import {
-  resolveFleetExceptionAct,
-  runFleetExceptionAct,
-} from "@/src/lib/fleet/ui/exception-actions";
 import {
   confidenceLabel,
   formatRecommendationType,
@@ -58,6 +50,8 @@ import {
 import { FleetCommandKpiWorkspace } from "./FleetCommandKpiWorkspace";
 import { useOperationsProgressiveLoad } from "./useOperationsProgressiveLoad";
 import { useOperationsSecondaryLoad } from "./useOperationsSecondaryLoad";
+import { OperationsRecommendationsList } from "./OperationsRecommendationsList";
+import { OperationsExceptionQueue } from "./OperationsExceptionQueue";
 
 type FleetTodayViewProps = {
   initialData?: FleetTodayViewData;
@@ -106,6 +100,7 @@ export function FleetTodayView({ initialData, progressive = false, enrichOnMount
   const [legacyData, setLegacyData] = useState(initialData ?? progressiveLoad.data);
   const [legacyEnrichmentDone, setLegacyEnrichmentDone] = useState(!enrichOnMount);
   const [error, setError] = useState<string | null>(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
   const [pending, startTransition] = useTransition();
 
   const loaded = progressive
@@ -132,6 +127,7 @@ export function FleetTodayView({ initialData, progressive = false, enrichOnMount
   const refresh = useCallback(async () => {
     if (progressive) {
       await progressiveLoad.refresh();
+      setListRefreshKey((k) => k + 1);
       setError(null);
       return;
     }
@@ -139,6 +135,7 @@ export function FleetTodayView({ initialData, progressive = false, enrichOnMount
     if (!res.ok) return;
     const payload = (await res.json()) as FleetTodayViewData;
     setLegacyData(payload);
+    setListRefreshKey((k) => k + 1);
     setError(null);
   }, [progressive, progressiveLoad]);
 
@@ -156,6 +153,7 @@ export function FleetTodayView({ initialData, progressive = false, enrichOnMount
           return;
         }
         await refresh();
+        setListRefreshKey((k) => k + 1);
       });
     },
     [refresh]
@@ -163,9 +161,14 @@ export function FleetTodayView({ initialData, progressive = false, enrichOnMount
 
   const cc = data.commandCenter;
   const insights = data.executiveInsights;
-  const criticalCount = data.exceptions.filter((e) => e.severity === "critical").length;
+  const criticalCount =
+    data.exceptionCounts?.critical ??
+    data.exceptions.filter((e) => e.severity === "critical").length;
+  const exceptionTotalCount = data.exceptionCounts?.total ?? 0;
+  const pendingRecommendationCount =
+    data.pendingRecommendationCount ?? data.recommendations.summary.volume ?? data.recommendations.pending.length;
+  const secondaryRecommendationCount = Math.max(0, pendingRecommendationCount - (data.recommendations.pending[0] ? 1 : 0));
   const primaryRec = data.recommendations.pending[0];
-  const secondaryRecs = data.recommendations.pending.slice(1);
   const recentHistory = data.recommendations.history.slice(0, 6);
 
   const contributionProtected = useMemo(() => {
@@ -358,65 +361,25 @@ export function FleetTodayView({ initialData, progressive = false, enrichOnMount
       {/* Recent operational activity */}
       <PageSection>
         <div className="grid gap-6 xl:grid-cols-12">
-          {/* More recommendations */}
-          {secondaryRecs.length > 0 ? (
-            <div className="space-y-4 xl:col-span-5">
-              <SectionHeader
-                title="More recommendations"
-                description={`${secondaryRecs.length} additional decision${secondaryRecs.length === 1 ? "" : "s"} ready`}
-              />
-              <ul className="space-y-3">
-                {secondaryRecs.map((rec) => (
-                  <li key={rec.id}>
-                    <CompactRecommendationRow
-                      recommendation={rec}
-                      pending={pending}
-                      onAction={onRecommendationAction}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {secondaryRecommendationCount > 0 ? (
+            <OperationsRecommendationsList
+              date={data.date}
+              enabled={loaded.briefing}
+              totalCount={secondaryRecommendationCount}
+              pending={pending}
+              refreshKey={listRefreshKey}
+              onAction={onRecommendationAction}
+            />
           ) : null}
 
-          {/* Exception queue */}
-          <div
-            id="fleet-exceptions"
-            className={`scroll-mt-6 space-y-4 ${secondaryRecs.length > 0 ? "xl:col-span-7" : "xl:col-span-12"}`}
-          >
-            <SectionHeader
-              title="Exception queue"
-              description="Issues that need attention before they become costly."
-              action={
-                criticalCount > 0 ? (
-                  <StatusChip label={`${criticalCount} critical`} tone="danger" />
-                ) : null
-              }
-            />
-            {data.exceptions.length === 0 ? (
-              <EmptyState
-                icon={<CheckCircle2 className="size-7 text-[var(--status-success)]" />}
-                title="No exceptions"
-                description="No operational exceptions detected for today."
-              />
-            ) : (
-              <DataTable>
-                <Table className="min-w-[520px]">
-                  <TableHead>
-                    <Th>Severity</Th>
-                    <Th>Issue</Th>
-                    <Th>Recommended action</Th>
-                    <Th className="w-24">Action</Th>
-                  </TableHead>
-                  <TBody>
-                    {data.exceptions.map((ex) => (
-                      <ExceptionTableRow key={ex.id} exception={ex} />
-                    ))}
-                  </TBody>
-                </Table>
-              </DataTable>
-            )}
-          </div>
+          <OperationsExceptionQueue
+            date={data.date}
+            enabled={loaded.briefing}
+            criticalCount={criticalCount}
+            totalCount={exceptionTotalCount}
+            refreshKey={listRefreshKey}
+            showRecommendationsColumn={secondaryRecommendationCount > 0}
+          />
         </div>
       </PageSection>
 
@@ -775,83 +738,6 @@ function HeroRecommendationBody({
         </Button>
       </div>
     </div>
-  );
-}
-
-function CompactRecommendationRow({
-  recommendation,
-  pending,
-  onAction,
-}: {
-  recommendation: FleetRecommendationInstance;
-  pending: boolean;
-  onAction: (id: string, action: "accept" | "dismiss") => void;
-}) {
-  const confidence = recommendationConfidence(recommendation);
-  const snapshot = recommendation.rationale.candidate_snapshots?.[0];
-  const isCapacityOnly = recommendation.recommendation_type === "capacity_overload";
-
-  return (
-    <Panel level="default" padding="sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="cs-text-body font-medium">{recommendation.rationale.title}</p>
-          <p className="cs-text-caption cs-text-muted mt-0.5">
-            {formatRecommendationType(recommendation.recommendation_type)}
-            {snapshot ? ` · ${formatFleetCurrency(snapshot.estimated_contribution)}` : ""}
-          </p>
-        </div>
-        <StatusChip label={confidenceLabel(confidence)} tone={confidenceTone(confidence)} />
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => onAction(recommendation.id, "accept")}
-          disabled={pending}
-        >
-          {isCapacityOnly ? "Acknowledge" : "Accept"}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => onAction(recommendation.id, "dismiss")}
-          disabled={pending}
-        >
-          Dismiss
-        </Button>
-      </div>
-    </Panel>
-  );
-}
-
-function ExceptionTableRow({ exception: ex }: { exception: FleetOperationalException }) {
-  const tone = fleetLegacySeverityToTone(severityToFleetSeverity(ex.severity));
-  const router = useRouter();
-  const pathname = usePathname();
-  const act = useMemo(() => resolveFleetExceptionAct(ex, pathname), [ex, pathname]);
-
-  const handleAct = useCallback(() => {
-    runFleetExceptionAct(act, (href) => router.push(href));
-  }, [act, router]);
-
-  return (
-    <Tr>
-      <Td>
-        <StatusChip label={ex.severity} tone={tone} />
-      </Td>
-      <Td>
-        <p className="font-medium">{ex.title}</p>
-        <p className="cs-text-caption cs-text-muted mt-0.5">{ex.whyItMatters}</p>
-      </Td>
-      <Td className="cs-text-caption cs-text-muted">{ex.recommendedAction}</Td>
-      <Td>
-        <Button type="button" size="sm" variant="secondary" onClick={handleAct}>
-          {act.label}
-        </Button>
-      </Td>
-    </Tr>
   );
 }
 
