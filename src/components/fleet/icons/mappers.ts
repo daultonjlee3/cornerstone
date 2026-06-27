@@ -15,12 +15,30 @@ export function mapTruckVisualStatus(state: string): FleetTruckStatus {
     "busy",
   ]);
   if (allowed.has(state)) return state as FleetTruckStatus;
+  if (state === "dragging") return "selected";
   return "driving";
 }
 
 /** Map job visual states from dispatch to icon statuses */
 export function mapJobVisualStatus(state: string): FleetJobStatus {
-  return state as FleetJobStatus;
+  const allowed = new Set([
+    "scheduled",
+    "active",
+    "highPriority",
+    "emergency",
+    "completed",
+    "delayed",
+    "recommended",
+    "selected",
+    "waiting",
+    "normal",
+    "late",
+    "risk",
+  ]);
+  if (allowed.has(state)) return state as FleetJobStatus;
+  if (state === "invalid" || state === "dropTarget") return "waiting";
+  if (state === "eligible") return "normal";
+  return "normal";
 }
 
 /** Derive optional status badge from truck lane telemetry */

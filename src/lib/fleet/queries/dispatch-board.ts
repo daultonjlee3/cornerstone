@@ -6,6 +6,7 @@ import {
   enrichTruckLaneWithOperator,
   loadOperatorContextMaps,
 } from "@/src/lib/fleet/queries/operator-context";
+import { createDispatchPerfTimer } from "@/src/lib/fleet/dispatch/perf";
 
 const DEFAULT_TRUCK_HOURS = 10;
 
@@ -82,26 +83,107 @@ function isScheduledOnDate(
   return start < dayEnd && end > dayStart;
 }
 
+function shiftDateIso(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function loadFleetDispatchBoardData(
   supabase: SupabaseClient,
   tenantId: string,
   date: string,
   branchId?: string | null
 ): Promise<FleetDispatchBoardData> {
+  const perf = createDispatchPerfTimer("dispatch-board");
   const jobSelect =
     "id, title, status, priority, branch_id, assigned_truck_id, required_truck_type, scheduled_start, scheduled_end, revenue_estimate, customer_sites(name, latitude, longitude), branches(name)";
+
+  const windowStart = `${shiftDateIso(date, -1)}T00:00:00.000Z`;
 
   let jobsQuery = supabase
     .from("fleet_jobs")
     .select(jobSelect)
     .eq("tenant_id", tenantId)
     .not("status", "eq", "cancelled")
+    .not("status", "eq", "completed")
+    .or(
+      `scheduled_start.gte.${windowStart},status.eq.in_progress,status.eq.unassigned,assigned_truck_id.is.null`
+    )
     .order("scheduled_start", { ascending: true, nullsFirst: false });
 
   if (branchId) jobsQuery = jobsQuery.eq("branch_id", branchId);
 
-  const { data: allJobs, error: jobsError } = await jobsQuery;
+  let trucksQuery = supabase
+    .from("trucks")
+    .select(
+      "id, unit_number, truck_type, branch_id, status, capacity, home_latitude, home_longitude, last_telematics_at, notes, branches(name, latitude, longitude)"
+    )
+    .eq("tenant_id", tenantId)
+    .neq("status", "retired")
+    .order("unit_number");
+
+  if (branchId) trucksQuery = trucksQuery.eq("branch_id", branchId);
+
+  let capacityQuery = supabase
+    .from("branch_capacity_snapshots")
+    .select("branch_id, available_truck_hours, committed_hours, branches(name)")
+    .eq("tenant_id", tenantId)
+    .eq("date", date);
+
+  if (branchId) capacityQuery = capacityQuery.eq("branch_id", branchId);
+
+  const trucksResultPromise = trucksQuery;
+  const operatorContextPromise = trucksResultPromise.then(({ data: truckRows }) =>
+    loadOperatorContextMaps(supabase, tenantId, date, {
+      trucks: (truckRows ?? []).map((row) => {
+        const t = row as {
+          id: string;
+          capacity: Record<string, unknown> | null;
+          notes: string | null;
+        };
+        return { id: t.id, capacity: t.capacity, notes: t.notes };
+      }),
+    })
+  );
+
+  const [
+    { data: allJobs, error: jobsError },
+    { data: truckData, error: trucksError },
+    positions,
+    { data: martRows, error: martError },
+    { data: capacityData, error: capacityError },
+    operatorContext,
+  ] = await Promise.all([
+    jobsQuery,
+    trucksResultPromise,
+    listTruckLatestPositions(supabase, tenantId),
+    supabase
+      .from("utilization_daily")
+      .select("truck_id, committed_hours, revenue, idle_hours")
+      .eq("tenant_id", tenantId)
+      .eq("date", date),
+    capacityQuery,
+    operatorContextPromise,
+  ]);
+
   if (jobsError) throw new Error(jobsError.message);
+  if (trucksError) throw new Error(trucksError.message);
+  if (martError) throw new Error(martError.message);
+  if (capacityError) throw new Error(capacityError.message);
+  perf.stage("parallel-queries");
+
+  const positionByTruck = new Map(positions.map((p) => [p.truck_id, p]));
+
+  const committedByTruck = new Map<string, number>();
+  const revenueByTruck = new Map<string, number>();
+  const idleByTruck = new Map<string, number>();
+  for (const row of martRows ?? []) {
+    const truckId = (row as { truck_id: string }).truck_id;
+    committedByTruck.set(truckId, Number((row as { committed_hours: number }).committed_hours));
+    revenueByTruck.set(truckId, Number((row as { revenue: number }).revenue) || 0);
+    idleByTruck.set(truckId, Number((row as { idle_hours: number }).idle_hours) || 0);
+  }
 
   const allJobRows = (allJobs ?? []) as Record<string, unknown>[];
   const scheduledForDay = allJobRows.filter((row) =>
@@ -124,54 +206,7 @@ export async function loadFleetDispatchBoardData(
       !row.scheduled_start
   );
   const rawJobs = mergeJobRows(scheduledForDay, [...backlogRows, ...assignedUnscheduled]);
-
-  let trucksQuery = supabase
-    .from("trucks")
-    .select(
-      "id, unit_number, truck_type, branch_id, status, capacity, home_latitude, home_longitude, last_telematics_at, notes, branches(name, latitude, longitude)"
-    )
-    .eq("tenant_id", tenantId)
-    .neq("status", "retired")
-    .order("unit_number");
-
-  if (branchId) trucksQuery = trucksQuery.eq("branch_id", branchId);
-
-  const { data: truckData, error: trucksError } = await trucksQuery;
-  if (trucksError) throw new Error(trucksError.message);
-
-  const positions = await listTruckLatestPositions(supabase, tenantId);
-  const positionByTruck = new Map(positions.map((p) => [p.truck_id, p]));
-
-  const { data: martRows, error: martError } = await supabase
-    .from("utilization_daily")
-    .select("truck_id, committed_hours, revenue, idle_hours")
-    .eq("tenant_id", tenantId)
-    .eq("date", date);
-
-  if (martError) throw new Error(martError.message);
-
-  const committedByTruck = new Map<string, number>();
-  const revenueByTruck = new Map<string, number>();
-  const idleByTruck = new Map<string, number>();
-  for (const row of martRows ?? []) {
-    const truckId = (row as { truck_id: string }).truck_id;
-    committedByTruck.set(truckId, Number((row as { committed_hours: number }).committed_hours));
-    revenueByTruck.set(truckId, Number((row as { revenue: number }).revenue) || 0);
-    idleByTruck.set(truckId, Number((row as { idle_hours: number }).idle_hours) || 0);
-  }
-
-  let capacityQuery = supabase
-    .from("branch_capacity_snapshots")
-    .select("branch_id, available_truck_hours, committed_hours, branches(name)")
-    .eq("tenant_id", tenantId)
-    .eq("date", date);
-
-  if (branchId) capacityQuery = capacityQuery.eq("branch_id", branchId);
-
-  const { data: capacityData, error: capacityError } = await capacityQuery;
-  if (capacityError) throw new Error(capacityError.message);
-
-  const operatorContext = await loadOperatorContextMaps(supabase, tenantId, date);
+  perf.stage("job-filter");
 
   const truckPoints = (truckData ?? []).map((truck) => {
     const t = truck as {
@@ -189,6 +224,10 @@ export async function loadFleetDispatchBoardData(
     };
   });
 
+  const truckPointById = new Map(
+    truckPoints.map((p) => [p.truck_id, p] as const)
+  );
+
   function nearestTruckPoint(job: Record<string, unknown>) {
     const siteRaw = job.customer_sites;
     const site = (Array.isArray(siteRaw) ? siteRaw[0] : siteRaw) as {
@@ -199,13 +238,14 @@ export async function loadFleetDispatchBoardData(
     let best: { latitude: number; longitude: number } | undefined;
     let bestDist = Infinity;
     for (const tp of truckPoints) {
+      if (tp.latitude == null || tp.longitude == null) continue;
       const deadhead = estimateDeadheadMiles(tp, {
         latitude: site.latitude ?? null,
         longitude: site.longitude ?? null,
       });
       if (deadhead && deadhead.miles < bestDist) {
         bestDist = deadhead.miles;
-        best = { latitude: tp.latitude as number, longitude: tp.longitude as number };
+        best = { latitude: tp.latitude, longitude: tp.longitude };
       }
     }
     return best;
@@ -215,7 +255,7 @@ export async function loadFleetDispatchBoardData(
     const assignedId = row.assigned_truck_id as string | null;
     let truckPoint: { latitude: number | null; longitude: number | null } | undefined;
     if (assignedId) {
-      const tp = truckPoints.find((p) => p.truck_id === assignedId);
+      const tp = truckPointById.get(assignedId);
       truckPoint = tp
         ? { latitude: tp.latitude, longitude: tp.longitude }
         : undefined;
@@ -317,11 +357,15 @@ export async function loadFleetDispatchBoardData(
     };
   });
 
-  return {
+  perf.stage("assemble-lanes");
+
+  const result: FleetDispatchBoardData = {
     date,
     jobs,
     unassignedJobs,
     truckLanes,
     branchCapacity,
   };
+  perf.finish();
+  return result;
 }

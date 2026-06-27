@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import { getAuthContext } from "@/src/lib/auth-context";
 import { can } from "@/src/lib/permissions";
-import { loadFleetTodayViewData } from "@/src/lib/fleet/queries/today-view";
+import { loadFleetOperationsSummary } from "@/src/lib/fleet/operations/load-summary";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -24,18 +24,12 @@ export async function GET(request: NextRequest) {
 
   const dateParam = request.nextUrl.searchParams.get("date")?.trim();
   const date =
-    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
-      ? dateParam
-      : undefined;
-  const scopeParam = request.nextUrl.searchParams.get("scope")?.trim();
-  const scope =
-    scopeParam === "shell" || scopeParam === "dispatch" || scopeParam === "full"
-      ? scopeParam
-      : "full";
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
+  const skipCache = request.nextUrl.searchParams.get("refresh") === "true";
 
-  const data = await loadFleetTodayViewData(supabase, auth.tenantId, {
-    ...(date ? { date } : {}),
-    scope,
+  const data = await loadFleetOperationsSummary(supabase, auth.tenantId, {
+    date,
+    skipCache,
   });
   return NextResponse.json(data);
 }

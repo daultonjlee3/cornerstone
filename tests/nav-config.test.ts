@@ -71,15 +71,27 @@ describe("isNavItemActive", () => {
     const commandCenter = { label: "Fleet Command Center", href: "/operations" };
     const recommendations = {
       label: "Recommendations",
-      href: "/operations?focus=recommendations",
+      href: "/operations#fleet-recommendations",
     };
-    const params = new URLSearchParams("focus=recommendations");
-    expect(isNavItemActive(recommendations, "/operations", params)).toBe(true);
-    expect(isNavItemActive(commandCenter, "/operations", params)).toBe(false);
+    expect(isNavItemActive(recommendations, "/operations", new URLSearchParams(), "#fleet-recommendations")).toBe(
+      true
+    );
+    expect(isNavItemActive(commandCenter, "/operations", new URLSearchParams(), "#fleet-recommendations")).toBe(
+      false
+    );
 
     const empty = new URLSearchParams();
-    expect(isNavItemActive(commandCenter, "/operations", empty)).toBe(true);
-    expect(isNavItemActive(recommendations, "/operations", empty)).toBe(false);
+    expect(isNavItemActive(commandCenter, "/operations", empty, "")).toBe(true);
+    expect(isNavItemActive(recommendations, "/operations", empty, "")).toBe(false);
+  });
+
+  it("supports legacy ?focus= query params for bookmarks", () => {
+    const recommendations = {
+      label: "Recommendations",
+      href: "/operations#fleet-recommendations",
+    };
+    const params = new URLSearchParams("focus=recommendations");
+    expect(isNavItemActive(recommendations, "/operations", params, "")).toBe(true);
   });
 
   it("distinguishes integrations and webhooks focus", () => {

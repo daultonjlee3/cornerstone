@@ -53,10 +53,10 @@ const fleetOperationsGroup: NavGroup = {
   label: "Operations",
   items: [
     { label: "Fleet Command Center", href: "/operations", icon: "LayoutGrid" },
-    { label: "Recommendations", href: "/operations?focus=recommendations", icon: "Sparkles" },
+    { label: "Recommendations", href: "/operations#fleet-recommendations", icon: "Sparkles" },
     { label: "Dispatch Intelligence", href: "/dispatch", icon: "Truck" },
     { label: "Fleet Performance", href: "/reports/operations", icon: "TrendingUp" },
-    { label: "Exceptions", href: "/operations?focus=exceptions", icon: "AlertTriangle" },
+    { label: "Exceptions", href: "/operations#fleet-exceptions", icon: "AlertTriangle" },
   ],
 };
 
@@ -285,22 +285,37 @@ export function usesCmmsOnboarding(productProfile: ProductProfile): boolean {
 export function isNavItemActive(
   item: NavItem,
   pathname: string,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
+  hash = ""
 ): boolean {
+  const hashId = hash.replace(/^#/, "");
   const [pathPart, queryPart] = item.href.split("?");
-  const path = pathPart || item.href;
+  const pathBeforeHash = (pathPart || item.href).split("#")[0];
+  const itemHash = item.href.includes("#") ? item.href.split("#")[1] : "";
 
-  if (path === "/operations") {
+  if (pathBeforeHash === "/operations") {
     if (pathname !== "/operations") return false;
     const focus = searchParams.get("focus");
+
+    if (itemHash === "fleet-recommendations") {
+      return hashId === "fleet-recommendations" || focus === "recommendations";
+    }
+    if (itemHash === "fleet-exceptions") {
+      return hashId === "fleet-exceptions" || focus === "exceptions";
+    }
+
+    // Legacy query deep links (bookmarks)
     if (queryPart?.includes("focus=recommendations")) {
       return focus === "recommendations";
     }
     if (queryPart?.includes("focus=exceptions")) {
       return focus === "exceptions";
     }
-    return !focus || focus === "";
+
+    return !hashId && !focus;
   }
+
+  const path = pathBeforeHash;
 
   if (path === "/settings/integrations") {
     if (!pathname.startsWith("/settings/integrations")) return false;

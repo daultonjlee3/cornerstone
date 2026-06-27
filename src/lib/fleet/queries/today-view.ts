@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFleetRecommendations } from "@/src/lib/fleet-recommendation-engine/service";
+import { ensurePeachtreeDemoTelematicsFresh } from "@/src/lib/fleet/demo/peachtree-demo-telematics";
 import type {
   FleetCapacityAlert,
   FleetCommandCenterData,
@@ -11,11 +12,14 @@ import type {
   FleetOperationalException,
   FleetRecommendationsResponse,
   FleetTodayViewData,
+  FleetUtilizationMartRow,
   IntegrationConnection,
 } from "@/src/types/fleet";
 import { loadFleetCommandCenterData } from "./command-center";
 import { loadFleetDispatchBoardData } from "./dispatch-board";
 import { loadFleetExecutiveInsights, loadRecommendationRoiSummary } from "@/src/lib/operational-profitability/performance-reports";
+import { buildDispatchExceptionHref } from "@/src/lib/fleet/ui/exception-actions";
+import { fleetOperationsSectionHref } from "@/src/lib/fleet/ui/operations-sections";
 
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
@@ -107,11 +111,17 @@ function buildIntegrationHealth(
   });
 }
 
+export function buildIntegrationHealthFromConnections(
+  connections: IntegrationConnection[]
+): FleetIntegrationHealthItem[] {
+  return buildIntegrationHealth(connections);
+}
+
 function isUrgentJob(job: FleetDispatchJob): boolean {
   return job.priority === "urgent" || job.priority === "high";
 }
 
-function buildExceptions(
+export function buildDispatchExceptions(
   board: FleetDispatchBoardData,
   integrationHealth: FleetIntegrationHealthItem[],
   revenueAtRisk: number
@@ -127,7 +137,7 @@ function buildExceptions(
       title: `${job.priority === "urgent" ? "Urgent" : "High priority"} job unassigned: ${job.title}`,
       whyItMatters: `$${Math.round(job.revenue_estimate).toLocaleString()} revenue at risk if not dispatched.`,
       recommendedAction: "Assign a truck on the dispatch board or accept a recommendation.",
-      href: `/dispatch?date=${board.date}`,
+      href: buildDispatchExceptionHref(board.date, { jobId: job.id }),
     });
   }
 
@@ -142,7 +152,7 @@ function buildExceptions(
         title: `${branch.branch_name} over capacity (${Math.round(util * 100)}%)`,
         whyItMatters: `${branch.committed_hours.toFixed(1)}h committed vs ${branch.available_truck_hours.toFixed(1)}h available — jobs may slip.`,
         recommendedAction: "Rebalance work across branches or defer lower-priority jobs.",
-        href: `/dispatch?date=${board.date}`,
+        href: buildDispatchExceptionHref(board.date, { branchId: branch.branch_id }),
       });
     }
   }
@@ -157,7 +167,7 @@ function buildExceptions(
         title: `Truck ${lane.unit_number} offline — no live GPS`,
         whyItMatters: "Dispatch recommendations may use stale location data.",
         recommendedAction: "Verify telematics device and integration sync.",
-        href: "/settings/integrations",
+        href: buildDispatchExceptionHref(board.date, { truckId: lane.truck_id }),
       });
     } else if (lane.telematics_status === "stale") {
       exceptions.push({
@@ -167,7 +177,7 @@ function buildExceptions(
         title: `Truck ${lane.unit_number} GPS stale`,
         whyItMatters: "Last position may not reflect current location.",
         recommendedAction: "Check telematics feed or confirm truck status with operator.",
-        href: "/settings/integrations",
+        href: buildDispatchExceptionHref(board.date, { truckId: lane.truck_id }),
       });
     }
 
@@ -183,7 +193,7 @@ function buildExceptions(
         title: `Truck ${lane.unit_number} underutilized today`,
         whyItMatters: "Unused capacity while jobs remain in queue.",
         recommendedAction: "Assign pending jobs or review branch workload.",
-        href: `/dispatch?date=${board.date}`,
+        href: buildDispatchExceptionHref(board.date, { truckId: lane.truck_id }),
       });
     }
 
@@ -226,7 +236,7 @@ function buildExceptions(
         title: `Late job: ${job.title}`,
         whyItMatters: "Scheduled start has passed — customer SLA may be at risk.",
         recommendedAction: "Update schedule or mark in progress on dispatch board.",
-        href: `/dispatch?date=${board.date}`,
+        href: buildDispatchExceptionHref(board.date, { jobId: job.id }),
       });
     }
 
@@ -243,7 +253,7 @@ function buildExceptions(
         title: `Incomplete dispatch: ${job.title}`,
         whyItMatters: "Job is scheduled but no truck is assigned.",
         recommendedAction: "Assign truck before start time.",
-        href: `/dispatch?date=${board.date}`,
+        href: buildDispatchExceptionHref(board.date, { jobId: job.id }),
       });
     }
   }
@@ -256,7 +266,7 @@ function buildExceptions(
       title: `$${Math.round(revenueAtRisk).toLocaleString()} revenue at risk from unassigned jobs`,
       whyItMatters: `${board.unassignedJobs.length} job(s) without truck assignment.`,
       recommendedAction: "Review recommendations and dispatch queue.",
-      href: "/operations?focus=recommendations",
+      href: fleetOperationsSectionHref("recommendations"),
     });
   }
 
@@ -268,7 +278,7 @@ function buildExceptions(
       title: `Integration issue: ${conn.displayName}`,
       whyItMatters: conn.message ?? "Data feed may be stale or disconnected.",
       recommendedAction: "Open integrations and verify connection health.",
-      href: "/settings/integrations",
+      href: `/settings/integrations?connection=${conn.id}`,
     });
   }
 
@@ -282,7 +292,7 @@ function buildExceptions(
   );
 }
 
-function buildCapacityAlerts(board: FleetDispatchBoardData): {
+export function buildCapacityAlerts(board: FleetDispatchBoardData): {
   upcoming: FleetCapacityAlert[];
   unused: FleetCapacityAlert[];
 } {
@@ -306,7 +316,7 @@ function buildCapacityAlerts(board: FleetDispatchBoardData): {
   return { upcoming, unused };
 }
 
-function buildExecutiveSummary(input: {
+export function buildDispatchExecutiveSummary(input: {
   exceptions: FleetOperationalException[];
   changes: FleetMetricDelta[];
   recommendations: number;
@@ -379,7 +389,7 @@ function buildExecutiveSummary(input: {
   return `${parts[0].charAt(0).toUpperCase()}${parts[0].slice(1)}${parts.length > 1 ? `. ${parts.slice(1).join(". ")}.` : "."}`;
 }
 
-async function loadDayOverDayMetrics(
+export async function loadDayOverDayMetrics(
   supabase: SupabaseClient,
   tenantId: string,
   today: string,
@@ -469,7 +479,60 @@ export type LoadFleetTodayViewOptions = {
   board?: FleetDispatchBoardData;
   /** Preloaded recommendations — avoids duplicate generation on /dispatch */
   recommendations?: FleetRecommendationsResponse;
+  /**
+   * Dispatch-only load: skip command center, executive insights, ROI, and day-over-day
+   * queries — builds intel from board + integration connections only.
+   * Shell: instant command center — cached recommendations only, enrichment deferred to client.
+   */
+  scope?: "full" | "dispatch" | "shell";
 };
+
+export function commandCenterFromBoard(board: FleetDispatchBoardData): FleetCommandCenterData {
+  const activeTrucks = board.truckLanes.filter((l) => l.status === "active").length;
+  const idleTrucks = board.truckLanes.filter(
+    (l) => l.status === "active" && l.jobs.length === 0
+  ).length;
+  const avgUtil =
+    board.truckLanes.length > 0
+      ? Math.round(
+          (board.truckLanes.reduce((sum, lane) => sum + lane.utilization, 0) /
+            board.truckLanes.length) *
+            100
+        )
+      : null;
+  const revenueScheduled = board.jobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
+  const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
+
+  return {
+    activeTrucks,
+    idleTrucks,
+    jobsToday: board.jobs.length,
+    unassignedJobs: board.unassignedJobs.length,
+    utilizationPercent: avgUtil,
+    revenuePerTruckMtd: null,
+    truckCount: board.truckLanes.length,
+    revenueScheduledToday: revenueScheduled,
+    revenueAtRisk,
+    contributionAtRisk: revenueAtRisk,
+  };
+}
+
+async function loadUtilizationMartRows(
+  supabase: SupabaseClient,
+  tenantId: string,
+  date: string
+): Promise<FleetUtilizationMartRow[]> {
+  const { data, error } = await supabase
+    .from("utilization_daily")
+    .select(
+      "truck_id, branch_id, deadhead_miles, deadhead_cost, contribution, billable_hours, total_hours, overtime_cost, trucks(unit_number), branches(name)"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("date", date);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as FleetUtilizationMartRow[];
+}
 
 export async function loadFleetTodayViewData(
   supabase: SupabaseClient,
@@ -477,38 +540,153 @@ export async function loadFleetTodayViewData(
   options?: LoadFleetTodayViewOptions
 ): Promise<FleetTodayViewData> {
   const date = options?.date ?? todayDateOnly();
+  const scope = options?.scope ?? "full";
+
+  await ensurePeachtreeDemoTelematicsFresh(supabase, tenantId);
+
+  const board =
+    options?.board ?? (await loadFleetDispatchBoardData(supabase, tenantId, date));
+
+  const recommendations =
+    options?.recommendations ??
+    (await getFleetRecommendations(supabase, tenantId, {
+      date,
+      board,
+      skipHistory: scope !== "full",
+      deferGeneration: scope === "shell",
+    }));
+
+  if (scope === "dispatch") {
+    const [connectionsResult, martRows] = await Promise.all([
+      supabase
+        .from("integration_connections")
+        .select("id, provider, display_name, status, config, last_sync_at, last_error")
+        .eq("tenant_id", tenantId),
+      loadUtilizationMartRows(supabase, tenantId, date),
+    ]);
+
+    const connections = (connectionsResult.data ?? []) as IntegrationConnection[];
+    const integrationHealth = buildIntegrationHealth(connections);
+    const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
+    const exceptions = buildDispatchExceptions(board, integrationHealth, revenueAtRisk);
+    const { upcoming, unused } = buildCapacityAlerts(board);
+    const commandCenter = commandCenterFromBoard(board);
+    const overloadBranches = board.branchCapacity.filter(
+      (b) => b.available_truck_hours > 0 && b.utilization > 1
+    );
+
+    const executiveSummary = buildDispatchExecutiveSummary({
+      exceptions,
+      changes: [],
+      recommendations: recommendations.pending.length,
+      revenueAtRisk,
+      unusedBranches: unused,
+      overloadBranches: overloadBranches.map((b) => ({
+        branch_id: b.branch_id,
+        branch_name: b.branch_name,
+        utilization: b.utilization,
+        committed_hours: b.committed_hours,
+        available_truck_hours: b.available_truck_hours,
+        href: `/dispatch?date=${date}`,
+      })),
+    });
+
+    return {
+      date,
+      executiveSummary,
+      board,
+      martRows,
+      commandCenter,
+      exceptions,
+      changesSinceYesterday: [],
+      integrationHealth,
+      upcomingCapacityIssues: upcoming,
+      unusedCapacityBranches: unused,
+      recommendations,
+      revenueAtRisk,
+      pendingActionCount:
+        recommendations.pending.length +
+        exceptions.filter((e) => e.severity === "critical").length,
+    };
+  }
+
+  if (scope === "shell") {
+    const [commandCenter, connectionsResult, martRows] = await Promise.all([
+      loadFleetCommandCenterData(supabase, tenantId),
+      supabase
+        .from("integration_connections")
+        .select("id, provider, display_name, status, config, last_sync_at, last_error")
+        .eq("tenant_id", tenantId),
+      loadUtilizationMartRows(supabase, tenantId, date),
+    ]);
+
+    const connections = (connectionsResult.data ?? []) as IntegrationConnection[];
+    const integrationHealth = buildIntegrationHealth(connections);
+    const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
+    const exceptions = buildDispatchExceptions(board, integrationHealth, revenueAtRisk);
+    const { upcoming, unused } = buildCapacityAlerts(board);
+    const overloadBranches = board.branchCapacity.filter(
+      (b) => b.available_truck_hours > 0 && b.utilization > 1
+    );
+
+    const executiveSummary = buildDispatchExecutiveSummary({
+      exceptions,
+      changes: [],
+      recommendations: recommendations.pending.length,
+      revenueAtRisk,
+      unusedBranches: unused,
+      overloadBranches: overloadBranches.map((b) => ({
+        branch_id: b.branch_id,
+        branch_name: b.branch_name,
+        utilization: b.utilization,
+        committed_hours: b.committed_hours,
+        available_truck_hours: b.available_truck_hours,
+        href: `/dispatch?date=${date}`,
+      })),
+    });
+
+    return {
+      date,
+      executiveSummary,
+      board,
+      martRows,
+      commandCenter,
+      exceptions,
+      changesSinceYesterday: [],
+      integrationHealth,
+      upcomingCapacityIssues: upcoming,
+      unusedCapacityBranches: unused,
+      recommendations,
+      revenueAtRisk,
+      pendingActionCount:
+        recommendations.pending.length +
+        exceptions.filter((e) => e.severity === "critical").length,
+    };
+  }
+
   const yesterday = yesterdayDateOnly();
 
   const weekStart = new Date(`${date}T12:00:00.000Z`);
   weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
   const weekStartStr = weekStart.toISOString().slice(0, 10);
 
-  const boardPromise = options?.board
-    ? Promise.resolve(options.board)
-    : loadFleetDispatchBoardData(supabase, tenantId, date);
-
-  const recommendationsPromise = options?.recommendations
-    ? Promise.resolve(options.recommendations)
-    : getFleetRecommendations(supabase, tenantId, { date });
-
-  const [commandCenter, board, recommendations, connectionsResult, executiveInsights, recommendationRoi] =
+  const [commandCenter, connectionsResult, executiveInsights, recommendationRoi, martRows] =
     await Promise.all([
     loadFleetCommandCenterData(supabase, tenantId),
-    boardPromise,
-    recommendationsPromise,
     supabase
       .from("integration_connections")
       .select("id, provider, display_name, status, config, last_sync_at, last_error")
       .eq("tenant_id", tenantId),
     loadFleetExecutiveInsights(supabase, tenantId, date),
     loadRecommendationRoiSummary(supabase, tenantId, weekStartStr, date),
+    loadUtilizationMartRows(supabase, tenantId, date),
   ]);
 
   const connections = (connectionsResult.data ?? []) as IntegrationConnection[];
   const integrationHealth = buildIntegrationHealth(connections);
 
   const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
-  const exceptions = buildExceptions(board, integrationHealth, revenueAtRisk);
+  const exceptions = buildDispatchExceptions(board, integrationHealth, revenueAtRisk);
   const { upcoming, unused } = buildCapacityAlerts(board);
 
   const changesSinceYesterday = await loadDayOverDayMetrics(
@@ -526,7 +704,7 @@ export async function loadFleetTodayViewData(
     (b) => b.available_truck_hours > 0 && b.utilization > 1
   );
 
-  const executiveSummary = buildExecutiveSummary({
+  const executiveSummary = buildDispatchExecutiveSummary({
     exceptions,
     changes: changesSinceYesterday,
     recommendations: recommendations.pending.length,
@@ -545,6 +723,8 @@ export async function loadFleetTodayViewData(
   return {
     date,
     executiveSummary,
+    board,
+    martRows,
     commandCenter,
     executiveInsights,
     exceptions,

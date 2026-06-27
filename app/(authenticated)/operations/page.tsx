@@ -33,10 +33,9 @@ import { DashboardSetupGuidance } from "../dashboard/components/dashboard-setup-
 import { formatDate } from "@/src/lib/date-utils";
 import { Suspense } from "react";
 import { FleetNavFocusScroll } from "./components/fleet-nav-focus-scroll";
+import { FleetCommandCenterClient } from "./components/fleet-command-center-client";
 import type { OperationsIntelligenceData } from "@/src/lib/dashboard/operations-intelligence";
 import { OperationOptimizationWidget } from "@/src/components/operation-optimization/OperationOptimizationWidget";
-import { FleetTodayView } from "./components/fleet-today-view";
-import { loadFleetTodayViewData } from "@/src/lib/fleet/queries/today-view";
 import { isFleetProductProfile } from "../nav-config";
 
 export const metadata = {
@@ -210,7 +209,19 @@ export default async function OperationsCenterPage() {
   const showFleet = isFleetProductProfile(productProfile);
   const fleetOnly = productProfile === "fleet_intelligence";
 
-  const fleetTodayView = showFleet ? await loadFleetTodayViewData(supabase, tenantId) : null;
+  if (fleetOnly) {
+    return (
+      <div className="space-y-8" data-testid="operations-center-page">
+        <FleetNavFocusScroll
+          targets={[
+            { focusId: "fleet-recommendations", paramValue: "recommendations" },
+            { focusId: "fleet-exceptions", paramValue: "exceptions" },
+          ]}
+        />
+        <FleetCommandCenterClient />
+      </div>
+    );
+  }
 
   const { data: companies } = await supabase
     .from("companies")
@@ -234,14 +245,12 @@ export default async function OperationsCenterPage() {
   return (
     <div className="space-y-8" data-testid="operations-center-page">
       {showFleet ? (
-        <Suspense fallback={null}>
-          <FleetNavFocusScroll
-            targets={[
-              { focusId: "fleet-recommendations", paramValue: "recommendations" },
-              { focusId: "fleet-exceptions", paramValue: "exceptions" },
-            ]}
-          />
-        </Suspense>
+        <FleetNavFocusScroll
+          targets={[
+            { focusId: "fleet-recommendations", paramValue: "recommendations" },
+            { focusId: "fleet-exceptions", paramValue: "exceptions" },
+          ]}
+        />
       ) : null}
       <div className="space-y-8">
         {!fleetOnly ? (
@@ -257,9 +266,7 @@ export default async function OperationsCenterPage() {
           />
         ) : null}
 
-        {showFleet && fleetTodayView ? (
-          <FleetTodayView initialData={fleetTodayView} />
-        ) : null}
+        {showFleet ? <FleetCommandCenterClient /> : null}
 
         {!fleetOnly ? (
         <div className="space-y-3">

@@ -13,6 +13,8 @@ import type {
 } from "@/src/types/fleet";
 import {
   truckBadgeFromLane,
+  mapTruckVisualStatus,
+  mapJobVisualStatus,
   type FleetBadgeType,
 } from "@/src/components/fleet/icons";
 import {
@@ -52,6 +54,19 @@ type FleetOperationalMapProps = {
   onSelectJob: (id: string | null) => void;
   onSelectTruck: (id: string | null) => void;
   consoleMode?: boolean;
+  dragTruckId?: string | null;
+  dragCursorLngLat?: [number, number] | null;
+  dragEligibleJobIds?: Set<string>;
+  dragInvalidJobIds?: Set<string>;
+  hoverDropJobId?: string | null;
+  onTruckDragStart?: (truckId: string) => void;
+  onTruckDropOnJob?: (truckId: string, jobId: string) => void;
+  onTruckDragCancel?: () => void;
+  jobIntelPanel?: React.ReactNode;
+  truckJobAlternatives?: Array<{ jobId: string; jobTitle: string; score: number; explanation: string[] }>;
+  assignmentPanel?: React.ReactNode;
+  assignmentToasts?: React.ReactNode;
+  mapAssignSuccessToken?: number;
 };
 
 type TruckMarkerProps = {
@@ -99,6 +114,19 @@ export function FleetOperationalMap({
   onSelectJob,
   onSelectTruck,
   consoleMode = false,
+  dragTruckId = null,
+  dragCursorLngLat = null,
+  dragEligibleJobIds,
+  dragInvalidJobIds,
+  hoverDropJobId = null,
+  onTruckDragStart,
+  onTruckDropOnJob,
+  onTruckDragCancel,
+  jobIntelPanel,
+  truckJobAlternatives,
+  assignmentPanel,
+  assignmentToasts,
+  mapAssignSuccessToken = 0,
 }: FleetOperationalMapProps) {
   const [layers, setLayers] = useState<OperationalMapLayers>(DEFAULT_OPERATIONAL_LAYERS);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -106,9 +134,103 @@ export function FleetOperationalMap({
   const [basemap, setBasemap] = useState<"dark" | "satellite">("dark");
   const [trafficOn, setTrafficOn] = useState(false);
   const mapRef = useRef<FleetMapHandle | null>(null);
+  const [internalDragTruckId, setInternalDragTruckId] = useState<string | null>(null);
+  const [internalDragCursor, setInternalDragCursor] = useState<[number, number] | null>(null);
+  const [internalHoverJobId, setInternalHoverJobId] = useState<string | null>(null);
+
+  const activeDragTruckId = dragTruckId ?? internalDragTruckId;
+  const activeDragCursor = dragCursorLngLat ?? internalDragCursor;
+  const activeHoverJobId = hoverDropJobId ?? internalHoverJobId;
+
+  const unassignedJobIds = useMemo(
+    () => new Set(jobs.filter((j) => j.status === "unassigned" || !j.assigned_truck_id).map((j) => j.id)),
+    [jobs]
+  );
+  const assignedJobIds = useMemo(
+    () => new Set(jobs.filter((j) => j.assigned_truck_id && j.status !== "unassigned").map((j) => j.id)),
+    [jobs]
+  );
+  const activeEligibleJobs = dragEligibleJobIds ?? unassignedJobIds;
+  const activeInvalidJobs = dragInvalidJobIds ?? assignedJobIds;
+
+  const findNearestJobId = useCallback(
+    (lng: number, lat: number): string | null => {
+      let bestId: string | null = null;
+      let bestDist = Infinity;
+      for (const job of jobs) {
+        if (!hasCoordinate(job.site_latitude, job.site_longitude)) continue;
+        const dLng = (job.site_longitude as number) - lng;
+        const dLat = (job.site_latitude as number) - lat;
+        const dist = dLng * dLng + dLat * dLat;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = job.id;
+        }
+      }
+      return bestDist < 0.0004 ? bestId : null;
+    },
+    [jobs]
+  );
+
+  const handleInternalDragStart = useCallback(
+    (truckId: string) => {
+      if (!onTruckDropOnJob) {
+        onTruckDragStart?.(truckId);
+        return;
+      }
+      setInternalDragTruckId(truckId);
+      onTruckDragStart?.(truckId);
+    },
+    [onTruckDragStart, onTruckDropOnJob]
+  );
+
+  useEffect(() => {
+    if (!internalDragTruckId || !onTruckDropOnJob) return;
+
+    const handleMove = (event: PointerEvent) => {
+      const map = mapRef.current?.getMap();
+      if (!map) return;
+      const rect = map.getContainer().getBoundingClientRect();
+      const lngLat = map.unproject([event.clientX - rect.left, event.clientY - rect.top]);
+      setInternalDragCursor([lngLat.lng, lngLat.lat]);
+      setInternalHoverJobId(findNearestJobId(lngLat.lng, lngLat.lat));
+    };
+
+    const handleUp = (event: PointerEvent) => {
+      const map = mapRef.current?.getMap();
+      if (map) {
+        const rect = map.getContainer().getBoundingClientRect();
+        const lngLat = map.unproject([event.clientX - rect.left, event.clientY - rect.top]);
+        const jobId = findNearestJobId(lngLat.lng, lngLat.lat);
+        if (jobId) {
+          onTruckDropOnJob(internalDragTruckId, jobId);
+        } else {
+          onTruckDragCancel?.();
+        }
+      }
+      setInternalDragTruckId(null);
+      setInternalDragCursor(null);
+      setInternalHoverJobId(null);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    return () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+  }, [findNearestJobId, internalDragTruckId, onTruckDragCancel, onTruckDropOnJob]);
 
   const recJobId = activeRecommendation?.rationale.entities.job_id;
   const recTopTruckId = activeRecommendation?.rationale.candidates?.[0]?.truck_id;
+  const dragContext = activeDragTruckId
+    ? {
+        dragTruckId: activeDragTruckId,
+        eligibleJobIds: activeEligibleJobs,
+        invalidJobIds: activeInvalidJobs,
+        hoverDropJobId: activeHoverJobId,
+      }
+    : undefined;
   const recAltTruckIds = useMemo(
     () =>
       activeRecommendation?.rationale.candidates?.slice(1, 3).map((candidate) => candidate.truck_id) ?? [],
@@ -186,6 +308,22 @@ export function FleetOperationalMap({
       addRoute(highlightedTruckId, selectedJobId, "selection", { primary: true });
     }
 
+    if (activeDragTruckId && activeDragCursor) {
+      const truck = truckLanes.find((l) => l.truck_id === activeDragTruckId);
+      if (truck && hasCoordinate(truck.latitude, truck.longitude)) {
+        lines.push({
+          id: "drag-preview",
+          dashed: true,
+          animated: true,
+          primary: true,
+          coordinates: [
+            [truck.longitude as number, truck.latitude as number],
+            activeDragCursor,
+          ],
+        });
+      }
+    }
+
     if (layers.deadhead && activeRecommendation && recTopTruckId && recJobId && !layers.recommendations) {
       const deadheadLabel =
         topSnapshot?.deadhead_miles != null
@@ -212,6 +350,8 @@ export function FleetOperationalMap({
     selectedJobId,
     topSnapshot,
     truckLanes,
+    dragTruckId,
+    dragCursorLngLat,
   ]);
 
   const visibleTrucks = useMemo(() => {
@@ -257,7 +397,13 @@ export function FleetOperationalMap({
   const truckClusterPoints = useMemo(
     () =>
       visibleTrucks.map((lane) => {
-        const state = truckVisualState(lane, highlightedTruckId, recTopTruckId, highRevenueThreshold);
+        const state = truckVisualState(
+          lane,
+          highlightedTruckId,
+          recTopTruckId,
+          highRevenueThreshold,
+          activeDragTruckId
+        );
         const dimmed =
           layers.recommendations &&
           activeRecommendation &&
@@ -284,6 +430,7 @@ export function FleetOperationalMap({
       recTopTruckId,
       visibleTrucks,
       highRevenueThreshold,
+      dragTruckId,
     ]
   );
 
@@ -294,11 +441,11 @@ export function FleetOperationalMap({
         longitude: job.site_longitude as number,
         latitude: job.site_latitude as number,
         properties: {
-          state: jobVisualState(job, selectedJobId, recJobId),
+          state: jobVisualState(job, selectedJobId, recJobId, dragContext),
           priority: job.priority,
         } satisfies JobMarkerProps,
       })),
-    [recJobId, selectedJobId, visibleJobs]
+    [dragContext, recJobId, selectedJobId, visibleJobs]
   );
 
   const branchZoneFeatures = useMemo(
@@ -449,7 +596,7 @@ export function FleetOperationalMap({
   const renderTruck = useCallback(
     (props: TruckMarkerProps, meta?: { bearing: number | null }) => (
       <TruckMarker
-        state={props.state}
+        state={mapTruckVisualStatus(props.state)}
         unitNumber={props.unitNumber}
         headingDeg={meta?.bearing ?? null}
         dimmed={props.dimmed === 1}
@@ -460,12 +607,17 @@ export function FleetOperationalMap({
   );
 
   const renderJob = useCallback(
-    (props: JobMarkerProps) => <JobMarker state={props.state} priority={props.priority} />,
+    (props: JobMarkerProps) => (
+      <JobMarker state={mapJobVisualStatus(props.state)} priority={props.priority} />
+    ),
     []
   );
 
   return (
-    <div className={`opmap-shell relative h-full w-full ${consoleMode ? "opmap-shell--console" : ""}`}>
+    <div
+      className={`opmap-shell relative h-full w-full ${consoleMode ? "opmap-shell--console" : ""}${mapAssignSuccessToken ? " opmap-shell--assign-success" : ""}`}
+      data-assign-flash={mapAssignSuccessToken || undefined}
+    >
       <FleetMap
         ref={mapRef}
         className="opmap-mapbox h-full w-full"
@@ -490,6 +642,8 @@ export function FleetOperationalMap({
             onClusterClick={handleClusterZoom}
             getOpacity={(props) => (props.dimmed === 1 ? 0.45 : 1)}
             animatedPositions={animatedTruckPositions}
+            draggable={Boolean(onTruckDropOnJob || onTruckDragStart)}
+            onPointDragStart={handleInternalDragStart}
           />
         ) : null}
 
@@ -619,14 +773,20 @@ export function FleetOperationalMap({
         </div>
       ) : null}
 
-      {selectedTruckLane ? (
+      {jobIntelPanel}
+
+      {selectedTruckLane && !jobIntelPanel ? (
         <TruckIntelPanel
           lane={selectedTruckLane}
           recommendations={recommendations}
+          jobAlternatives={truckJobAlternatives}
           onClose={() => onSelectTruck(null)}
           onSelectJob={onSelectJob}
         />
       ) : null}
+
+      {assignmentPanel}
+      {assignmentToasts}
 
       {!hasMapPoints ? (
         <div className="opmap-empty-state">

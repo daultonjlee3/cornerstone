@@ -2,19 +2,14 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
   ClipboardList,
-  Clock,
   DollarSign,
-  Percent,
   Radio,
-  Route,
-  Sparkles,
-  Truck,
-  Users,
 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -47,17 +42,28 @@ import type {
   FleetRecommendationInstance,
   FleetTodayViewData,
 } from "@/src/types/fleet";
-import { formatFleetCurrency, formatDataFreshness } from "@/src/lib/fleet/ui/format";
+import { formatFleetCurrency } from "@/src/lib/fleet/ui/format";
+import { RelativeFreshness } from "@/src/components/fleet/ui/fleet-data-freshness";
 import { severityToFleetSeverity } from "@/src/lib/fleet/ui/severity";
+import {
+  resolveFleetExceptionAct,
+  runFleetExceptionAct,
+} from "@/src/lib/fleet/ui/exception-actions";
 import {
   confidenceLabel,
   formatRecommendationType,
   recommendationConfidence,
   type RecommendationConfidence,
 } from "./fleet-recommendation-utils";
+import { FleetCommandKpiWorkspace } from "./FleetCommandKpiWorkspace";
+import { useOperationsProgressiveLoad } from "./useOperationsProgressiveLoad";
+import { useOperationsSecondaryLoad } from "./useOperationsSecondaryLoad";
 
 type FleetTodayViewProps = {
-  initialData: FleetTodayViewData;
+  initialData?: FleetTodayViewData;
+  /** Client-first progressive loading — no server data required. */
+  progressive?: boolean;
+  enrichOnMount?: boolean;
 };
 
 function shiftGreeting(): string {
@@ -95,18 +101,46 @@ function formatDeltaValue(delta: FleetMetricDelta): string {
   }
 }
 
-export function FleetTodayView({ initialData }: FleetTodayViewProps) {
-  const [data, setData] = useState(initialData);
+export function FleetTodayView({ initialData, progressive = false, enrichOnMount = false }: FleetTodayViewProps) {
+  const progressiveLoad = useOperationsProgressiveLoad();
+  const [legacyData, setLegacyData] = useState(initialData ?? progressiveLoad.data);
+  const [legacyEnrichmentDone, setLegacyEnrichmentDone] = useState(!enrichOnMount);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const loaded = progressive
+    ? progressiveLoad.loaded
+    : { summary: true, briefing: true, enrichment: legacyEnrichmentDone };
+  const sectionErrors = progressive ? progressiveLoad.errors : { summary: null, briefing: null, enrichment: null };
+
+  const data = progressive ? progressiveLoad.data : legacyData;
+
+  useOperationsSecondaryLoad(
+    Boolean(enrichOnMount && !progressive && initialData),
+    data.date,
+    (payload) => {
+      setLegacyData(payload);
+      setLegacyEnrichmentDone(true);
+    }
+  );
+
+  const enriching =
+    (progressive && !loaded.enrichment) ||
+    (!progressive && enrichOnMount && !loaded.enrichment) ||
+    Boolean(data.recommendations.refreshing);
+
   const refresh = useCallback(async () => {
+    if (progressive) {
+      await progressiveLoad.refresh();
+      setError(null);
+      return;
+    }
     const res = await fetch("/api/fleet/today-view", { cache: "no-store" });
     if (!res.ok) return;
     const payload = (await res.json()) as FleetTodayViewData;
-    setData(payload);
+    setLegacyData(payload);
     setError(null);
-  }, []);
+  }, [progressive, progressiveLoad]);
 
   const onRecommendationAction = useCallback(
     (id: string, action: "accept" | "dismiss") => {
@@ -155,14 +189,24 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
             <p className="cs-text-eyebrow">Operational briefing</p>
           </div>
           <h1 className="cs-text-display">{shiftGreeting()}</h1>
-          <p className="cs-text-body cs-text-muted max-w-3xl">{data.executiveSummary}</p>
+          {loaded.briefing ? (
+            <p className="cs-text-body cs-text-muted max-w-3xl">{data.executiveSummary}</p>
+          ) : (
+            <div className="space-y-2 max-w-3xl" aria-hidden>
+              <div className="h-4 w-full animate-pulse rounded bg-[var(--surface-border-subtle)]" />
+              <div className="h-4 w-5/6 animate-pulse rounded bg-[var(--surface-border-subtle)]" />
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <span className="cs-text-caption cs-text-muted">{data.date}</span>
           <span className="inline-flex items-center gap-1.5 cs-text-caption cs-text-muted">
             <AppIcon icon={Radio} size="sm" intent="operational" />
-            Data {formatDataFreshness(data.recommendations.generatedAt)}
+            <RelativeFreshness iso={data.recommendations.generatedAt} prefix="Data " />
           </span>
+          {enriching || data.recommendations.refreshing ? (
+            <StatusChip label="Syncing recommendations…" tone="operational" showDot={false} />
+          ) : null}
           <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()} disabled={pending}>
             Refresh
           </Button>
@@ -203,6 +247,8 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
 
       {/* Hero metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {loaded.summary ? (
+          <>
         <div>
           <p className="cs-text-micro cs-text-muted">Contribution protected today</p>
           <p className="cs-text-kpi mt-1 text-[var(--status-success)]">
@@ -229,10 +275,24 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
             {data.revenueAtRisk > 0 ? formatFleetCurrency(data.revenueAtRisk) : "—"}
           </p>
         </div>
+          </>
+        ) : (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 animate-pulse rounded-lg bg-[var(--surface-border-subtle)]" aria-hidden />
+          ))
+        )}
       </div>
 
       {/* Top recommendation — focal action inside hero */}
       <div id="fleet-recommendations" className="scroll-mt-6 space-y-4 border-t border-[var(--surface-border-subtle)] pt-6">
+        {!loaded.briefing ? (
+          <div className="space-y-4 animate-pulse" aria-busy="true" aria-label="Loading recommendations">
+            <div className="h-5 w-48 rounded bg-[var(--surface-border-subtle)]" />
+            <div className="h-8 w-3/4 rounded bg-[var(--surface-border-subtle)]" />
+            <div className="h-24 rounded-xl bg-[var(--surface-border-subtle)]" />
+          </div>
+        ) : (
+          <>
         <SectionHeader
           eyebrow="Highest-value decision"
           title={primaryRec ? primaryRec.rationale.title : "No pending recommendations"}
@@ -272,6 +332,8 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
             }
           />
         )}
+          </>
+        )}
       </div>
     </HeroPanel>
   );
@@ -279,81 +341,20 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
   return (
     <div data-testid="fleet-today-view">
       <PageLayout hero={hero}>
-      {error ? (
+      {error || sectionErrors.summary || sectionErrors.briefing ? (
         <Panel level="default" padding="sm" className="border-[color-mix(in_srgb,var(--status-danger)_25%,transparent)] bg-[var(--status-danger-subtle)]">
-          <p className="cs-text-body text-[var(--status-danger)]">{error}</p>
+          <p className="cs-text-body text-[var(--status-danger)]">
+            {error ?? sectionErrors.briefing ?? sectionErrors.summary}
+          </p>
         </Panel>
       ) : null}
 
-      {/* Supporting KPI strip */}
       <PageSection>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <KpiCard label="Active trucks" value={cc.activeTrucks} hint="Live on GPS" icon={Truck} emphasis="operational" iconProminent />
-          <KpiCard
-            label="Idle / offline"
-            value={cc.idleTrucks}
-            hint="Needs attention"
-            icon={Clock}
-            emphasis={cc.idleTrucks > 0 ? "warning" : "default"}
-          />
-          <KpiCard
-            label="Jobs today"
-            value={cc.jobsToday}
-            hint={`${cc.unassignedJobs} unassigned`}
-            icon={ClipboardList}
-            emphasis={cc.unassignedJobs > 0 ? "warning" : "default"}
-          />
-          <KpiCard
-            label="Utilization"
-            value={cc.utilizationPercent != null ? `${cc.utilizationPercent.toFixed(1)}%` : "—"}
-            hint="Billable today"
-            icon={Percent}
-          />
-          <KpiCard
-            label="Est. contribution"
-            value={
-              cc.estimatedContributionToday != null
-                ? formatFleetCurrency(cc.estimatedContributionToday)
-                : "—"
-            }
-            hint="Operational margin"
-            icon={DollarSign}
-            emphasis="success"
-            iconProminent
-          />
-          <KpiCard
-            label="Deadhead cost"
-            value={
-              cc.deadheadCostToday != null ? formatFleetCurrency(cc.deadheadCostToday) : "—"
-            }
-            hint="Today"
-            icon={Route}
-            emphasis={
-              cc.deadheadCostToday != null && cc.deadheadCostToday > 0 ? "warning" : "default"
-            }
-          />
-          <KpiCard
-            label="Overtime risk"
-            value={
-              cc.overtimeCostToday != null ? formatFleetCurrency(cc.overtimeCostToday) : "—"
-            }
-            hint="Estimated today"
-            icon={Users}
-            emphasis={
-              cc.overtimeCostToday != null && cc.overtimeCostToday > 0 ? "warning" : "default"
-            }
-          />
-          <KpiCard
-            label="Acceptance rate"
-            value={acceptanceRate != null ? `${acceptanceRate.toFixed(0)}%` : "—"}
-            hint={`${data.recommendations.pending.length} pending`}
-            icon={Sparkles}
-            emphasis={data.recommendations.pending.length > 0 ? "info" : "default"}
-            iconProminent
-          />
-        </div>
-      </PageSection>
-
+        {loaded.briefing ? (
+        <FleetCommandKpiWorkspace
+          todayView={data}
+          acceptanceRate={acceptanceRate}
+        >
       {/* Recent operational activity */}
       <PageSection>
         <div className="grid gap-6 xl:grid-cols-12">
@@ -650,6 +651,21 @@ export function FleetTodayView({ initialData }: FleetTodayViewProps) {
           </div>
         </PageSection>
       ) : null}
+        </FleetCommandKpiWorkspace>
+        ) : (
+          <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Loading operations sections">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-24 rounded-xl bg-[var(--surface-border-subtle)]" />
+              ))}
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="h-64 rounded-xl bg-[var(--surface-border-subtle)]" />
+              <div className="h-64 rounded-xl bg-[var(--surface-border-subtle)]" />
+            </div>
+          </div>
+        )}
+      </PageSection>
       </PageLayout>
     </div>
   );
@@ -812,6 +828,13 @@ function CompactRecommendationRow({
 
 function ExceptionTableRow({ exception: ex }: { exception: FleetOperationalException }) {
   const tone = fleetLegacySeverityToTone(severityToFleetSeverity(ex.severity));
+  const router = useRouter();
+  const pathname = usePathname();
+  const act = useMemo(() => resolveFleetExceptionAct(ex, pathname), [ex, pathname]);
+
+  const handleAct = useCallback(() => {
+    runFleetExceptionAct(act, (href) => router.push(href));
+  }, [act, router]);
 
   return (
     <Tr>
@@ -824,8 +847,8 @@ function ExceptionTableRow({ exception: ex }: { exception: FleetOperationalExcep
       </Td>
       <Td className="cs-text-caption cs-text-muted">{ex.recommendedAction}</Td>
       <Td>
-        <Button type="button" size="sm" variant="secondary" asChild>
-          <Link href={ex.href}>Act</Link>
+        <Button type="button" size="sm" variant="secondary" onClick={handleAct}>
+          {act.label}
         </Button>
       </Td>
     </Tr>
@@ -856,7 +879,7 @@ function HistoryTableRow({ entry }: { entry: FleetRecommendationHistoryEntry }) 
         <StatusChip label={action.replace(/_/g, " ")} tone={tone} showDot={false} />
       </Td>
       <Td className="cs-text-caption cs-text-muted">
-        {outcome?.acted_at ? formatDataFreshness(outcome.acted_at) : "—"}
+        {outcome?.acted_at ? <RelativeFreshness iso={outcome.acted_at} /> : "—"}
       </Td>
     </Tr>
   );

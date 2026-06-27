@@ -172,8 +172,9 @@ export async function validatePeachtreeFleetDemo(
     .eq("tenant_id", tid)
     .limit(500);
   const missingJobCoords = (jobsMissingCoords ?? []).filter((row) => {
-    const site = (row as { customer_sites: { latitude: number | null; longitude: number | null } })
+    const raw = (row as { customer_sites: { latitude: number | null; longitude: number | null } | { latitude: number | null; longitude: number | null }[] })
       .customer_sites;
+    const site = Array.isArray(raw) ? raw[0] : raw;
     return site?.latitude == null || site?.longitude == null;
   }).length;
   checks.push({

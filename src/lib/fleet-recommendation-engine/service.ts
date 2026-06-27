@@ -58,7 +58,11 @@ import type {
   RecommendationLifecyclePhase,
 } from "@/src/types/fleet";
 
+import { createDispatchPerfTimer } from "@/src/lib/fleet/dispatch/perf";
+import { ensurePeachtreeDemoTelematicsFresh } from "@/src/lib/fleet/demo/peachtree-demo-telematics";
+
 export { FLEET_RECOMMENDATION_ENGINE_VERSION } from "@/src/lib/fleet-recommendation-engine/constants";
+
 const MAX_TRUCK_ASSIGNMENT = 8;
 const MAX_IDLE_MATCH = 8;
 const MAX_CAPACITY_ALERTS = 4;
@@ -786,15 +790,30 @@ export async function getFleetRecommendations(
     branchId?: string | null;
     date?: string;
     forceRefresh?: boolean;
+    /** Preloaded board — avoids duplicate dispatch query on /dispatch */
+    board?: FleetDispatchBoardData;
+    /** Skip expensive regeneration — return cached pending or empty with refreshing=true */
+    deferGeneration?: boolean;
+    /** Skip history query on initial dispatch load */
+    skipHistory?: boolean;
   }
 ): Promise<FleetRecommendationsResponse> {
+  const perf = createDispatchPerfTimer("recommendations");
   const branchId = options?.branchId ?? null;
   const date = options?.date ?? new Date().toISOString().slice(0, 10);
 
-  await expireStalePendingRecommendations(supabase, tenantId, branchId);
+  await ensurePeachtreeDemoTelematicsFresh(supabase, tenantId);
 
-  const board = await loadFleetDispatchBoardData(supabase, tenantId, date, branchId);
+  await expireStalePendingRecommendations(supabase, tenantId, branchId);
+  perf.stage("expire-stale");
+
+  const board =
+    options?.board ??
+    (await loadFleetDispatchBoardData(supabase, tenantId, date, branchId));
+  perf.stage("board");
+
   const profitCtx = await loadProfitabilityContext(supabase, tenantId, null, date);
+  perf.stage("profitability-context");
   const expiresAt = new Date(Date.now() + RECOMMENDATION_TTL_MS).toISOString();
 
   if (options?.forceRefresh) {
@@ -802,6 +821,7 @@ export async function getFleetRecommendations(
   }
 
   let pending = await loadPendingRecommendations(supabase, tenantId, branchId);
+  perf.stage("load-pending");
   const wrongBoardDate = pending.filter(
     (rec) => rec.rationale.board_date && rec.rationale.board_date !== date
   );
@@ -841,9 +861,26 @@ export async function getFleetRecommendations(
     pending = dedupeRecommendationsByJobAndType(partition.valid);
     invalidated = partition.invalidated;
     replacements = partition.replacements;
+    perf.stage("validate-pending");
   }
 
   const needsRegeneration = pending.length === 0;
+  if (needsRegeneration && options?.deferGeneration) {
+    const history = options.skipHistory
+      ? []
+      : await loadRecommendationHistory(supabase, tenantId, branchId);
+    perf.finish();
+    return {
+      generatedAt: new Date().toISOString(),
+      engineVersion: FLEET_RECOMMENDATION_ENGINE_VERSION,
+      pending: [],
+      history,
+      summary: summarizeRecommendations([], history),
+      recalculationNotice: buildRecalculationNotice(invalidated, 0, replacements),
+      refreshing: true,
+    };
+  }
+
   if (needsRegeneration) {
     pending = await generateAndLoadPending(
       supabase,
@@ -870,10 +907,15 @@ export async function getFleetRecommendations(
   const replacedCount = replacements.length;
   const recalculationNotice = buildRecalculationNotice(invalidated, replacedCount, replacements);
   pending = await markDisplayed(supabase, tenantId, pending);
+  perf.stage("mark-displayed");
 
-  const history = await loadRecommendationHistory(supabase, tenantId, branchId);
+  const history = options?.skipHistory
+    ? []
+    : await loadRecommendationHistory(supabase, tenantId, branchId);
+  perf.stage("history");
   const summary = summarizeRecommendations(pending, history);
 
+  perf.finish();
   return {
     generatedAt: new Date().toISOString(),
     engineVersion: FLEET_RECOMMENDATION_ENGINE_VERSION,
@@ -881,6 +923,29 @@ export async function getFleetRecommendations(
     history,
     summary,
     recalculationNotice,
+  };
+}
+
+/** DB-only pending recommendations — no board load, validation, or regeneration. */
+export async function loadCachedFleetRecommendations(
+  supabase: SupabaseClient,
+  tenantId: string,
+  options?: { date?: string; branchId?: string | null }
+): Promise<FleetRecommendationsResponse> {
+  const date = options?.date ?? new Date().toISOString().slice(0, 10);
+  const branchId = options?.branchId ?? null;
+  await expireStalePendingRecommendations(supabase, tenantId, branchId);
+  let pending = await loadPendingRecommendations(supabase, tenantId, branchId);
+  pending = pending.filter(
+    (rec) => !rec.rationale.board_date || rec.rationale.board_date === date
+  );
+  return {
+    generatedAt: new Date().toISOString(),
+    engineVersion: FLEET_RECOMMENDATION_ENGINE_VERSION,
+    pending,
+    history: [],
+    summary: summarizeRecommendations(pending, []),
+    refreshing: pending.length === 0,
   };
 }
 

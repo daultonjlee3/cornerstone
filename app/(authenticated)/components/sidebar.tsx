@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -53,6 +53,7 @@ import {
 } from "@/src/components/design-system";
 import { SidebarTooltip } from "@/src/components/ui/tooltip";
 import { getNavConfig, isNavItemActive, type NavGroup, type NavItem } from "../nav-config";
+import { scrollToFleetOperationsSection } from "@/src/lib/fleet/ui/operations-sections";
 import type { ProductProfile } from "@/src/types/fleet";
 import { useGetStartedOnboarding } from "@/hooks/useGetStartedOnboarding";
 import { AppIcon } from "@/src/components/design-system/icons";
@@ -133,8 +134,16 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [locationHash, setLocationHash] = useState("");
   const { skipped, allComplete, resumeOnboarding } = useGetStartedOnboarding();
   const showResume = showResumeOnboarding && skipped && !allComplete;
+
+  useEffect(() => {
+    const syncHash = () => setLocationHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, [pathname]);
 
   const navGroups = isDemoGuest
     ? getNavConfig(productProfile).filter((g) => g.id !== "administration")
@@ -241,6 +250,7 @@ export function Sidebar({
                 group={group}
                 pathname={pathname ?? ""}
                 searchParams={searchParams}
+                locationHash={locationHash}
                 collapsed={collapsed}
                 onClose={onClose}
               />
@@ -298,12 +308,14 @@ function NavGroupBlock({
   group,
   pathname,
   searchParams,
+  locationHash,
   collapsed,
   onClose,
 }: {
   group: NavGroup;
   pathname: string;
   searchParams: URLSearchParams;
+  locationHash: string;
   collapsed: boolean;
   onClose: () => void;
 }) {
@@ -335,6 +347,27 @@ function NavGroupBlock({
     });
   }, [group.id]);
 
+  const handleItemClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+      onClose();
+      const hashIndex = href.indexOf("#");
+      if (hashIndex === -1) return;
+      const path = href.slice(0, hashIndex) || pathname;
+      const hash = href.slice(hashIndex + 1);
+      if (pathname !== path) return;
+      event.preventDefault();
+      window.history.replaceState(null, "", `${path}#${hash}`);
+      if (hash === "fleet-recommendations") {
+        scrollToFleetOperationsSection("recommendations");
+      } else if (hash === "fleet-exceptions") {
+        scrollToFleetOperationsSection("exceptions");
+      } else {
+        document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    },
+    [onClose, pathname]
+  );
+
   return (
     <NavRailGroup
       label={collapsed ? undefined : group.label}
@@ -344,7 +377,7 @@ function NavGroupBlock({
       onToggleSection={toggleSection}
     >
       {group.items.map((item) => {
-        const active = isNavItemActive(item, pathname, searchParams);
+        const active = isNavItemActive(item, pathname, searchParams, locationHash);
         const Icon = getIcon(item);
         const tourId = demoNavTourId(item.href);
 
@@ -356,7 +389,7 @@ function NavGroupBlock({
             icon={Icon ?? undefined}
             active={active}
             collapsed={collapsed}
-            onClick={onClose}
+            onClick={(event) => handleItemClick(event, item.href)}
             tourId={tourId ?? undefined}
           />
         );

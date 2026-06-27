@@ -312,9 +312,24 @@ export type FleetCapacityAlert = {
   href: string;
 };
 
+export type FleetUtilizationMartRow = {
+  truck_id: string;
+  branch_id: string;
+  deadhead_miles: number;
+  deadhead_cost: number;
+  contribution: number;
+  billable_hours: number;
+  total_hours: number;
+  overtime_cost: number;
+  trucks: { unit_number: string } | { unit_number: string }[] | null;
+  branches: { name: string } | { name: string }[] | null;
+};
+
 export type FleetTodayViewData = {
   date: string;
   executiveSummary: string;
+  board: FleetDispatchBoardData;
+  martRows: FleetUtilizationMartRow[];
   commandCenter: FleetCommandCenterData;
   executiveInsights?: FleetExecutiveInsights;
   exceptions: FleetOperationalException[];
@@ -326,6 +341,19 @@ export type FleetTodayViewData = {
   recommendationRoi?: FleetRecommendationRoiSummary;
   revenueAtRisk: number;
   pendingActionCount: number;
+};
+
+/** Fast first-paint payload for /operations — KPI counts only, no board or engine. */
+export type FleetOperationsSummary = {
+  date: string;
+  lastUpdated: string;
+  commandCenter: FleetCommandCenterData;
+  revenueAtRisk: number;
+  criticalExceptionCount: number;
+  pendingRecommendations: number;
+  pendingActionCount: number;
+  acceptanceRate: number | null;
+  integrationHealth: FleetIntegrationHealthItem[];
 };
 
 export type FleetDispatchJob = {
@@ -797,4 +825,6 @@ export type FleetRecommendationsResponse = {
   history: FleetRecommendationHistoryEntry[];
   summary: FleetRecommendationSummary;
   recalculationNotice?: FleetRecommendationRecalculationNotice;
+  /** True when generation was deferred — client should fetch full recommendations in background */
+  refreshing?: boolean;
 };
