@@ -66,19 +66,38 @@ export async function loadFleetOperationsBriefing(
   const board = await loadFleetDispatchBoardData(supabase, tenantId, date);
   perf.stage("board");
 
-  const [primaryRecommendation, pendingRecommendationCount, connectionsResult, martRows] =
-    await Promise.all([
-      loadPrimaryPendingRecommendation(supabase, tenantId, { date }),
-      countPendingRecommendationsForDate(supabase, tenantId, date),
-      supabase
-        .from("integration_connections")
-        .select("id, provider, display_name, status, config, last_sync_at, last_error")
-        .eq("tenant_id", tenantId),
-      loadUtilizationMartRows(supabase, tenantId, date),
-    ]);
+  const [primaryResult, pendingCountResult, connectionsResult, martRows] = await Promise.allSettled([
+    loadPrimaryPendingRecommendation(supabase, tenantId, { date }),
+    countPendingRecommendationsForDate(supabase, tenantId, date),
+    supabase
+      .from("integration_connections")
+      .select("id, provider, display_name, status, config, last_sync_at, last_error")
+      .eq("tenant_id", tenantId),
+    loadUtilizationMartRows(supabase, tenantId, date),
+  ]);
+
+  const primaryRecommendation =
+    primaryResult.status === "fulfilled" ? primaryResult.value : null;
+  const pendingRecommendationCount =
+    pendingCountResult.status === "fulfilled" ? pendingCountResult.value : 0;
+
+  if (primaryResult.status === "rejected") {
+    console.warn("[operations-briefing] primary recommendation:", primaryResult.reason);
+  }
+  if (pendingCountResult.status === "rejected") {
+    console.warn("[operations-briefing] pending count:", pendingCountResult.reason);
+  }
+
+  if (connectionsResult.status === "rejected") {
+    throw connectionsResult.reason;
+  }
+  if (martRows.status === "rejected") {
+    throw martRows.reason;
+  }
+
   perf.stage("parallel-light");
 
-  const connections = (connectionsResult.data ?? []) as IntegrationConnection[];
+  const connections = (connectionsResult.value.data ?? []) as IntegrationConnection[];
   const integrationHealth = buildIntegrationHealthFromConnections(connections);
   const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
   const exceptions = buildDispatchExceptions(board, integrationHealth, revenueAtRisk);
@@ -119,7 +138,7 @@ export async function loadFleetOperationsBriefing(
     date,
     executiveSummary,
     board,
-    martRows: martRows as FleetTodayViewData["martRows"],
+    martRows: martRows.value as FleetTodayViewData["martRows"],
     exceptionCounts,
     pendingRecommendationCount,
     recommendations: {

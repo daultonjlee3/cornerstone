@@ -11,6 +11,10 @@ import {
   setCachedOperationsSummary,
 } from "./summary-cache";
 
+import {
+  countPendingRecommendationsFast,
+} from "./load-recommendations-page";
+
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -19,15 +23,7 @@ async function countPendingRecommendations(
   supabase: SupabaseClient,
   tenantId: string
 ): Promise<number> {
-  const { count, error } = await supabase
-    .from("recommendation_instances")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId)
-    .eq("status", "pending")
-    .gt("expires_at", new Date().toISOString());
-
-  if (error) throw new Error(error.message);
-  return count ?? 0;
+  return countPendingRecommendationsFast(supabase, tenantId);
 }
 
 async function loadAcceptanceRateSnapshot(
@@ -70,7 +66,7 @@ export async function loadFleetOperationsSummary(
         .from("integration_connections")
         .select("id, provider, display_name, status, config, last_sync_at, last_error")
         .eq("tenant_id", tenantId),
-      countPendingRecommendations(supabase, tenantId),
+      countPendingRecommendations(supabase, tenantId).catch(() => 0),
       loadAcceptanceRateSnapshot(supabase, tenantId),
     ]);
   perf.stage("parallel-queries");

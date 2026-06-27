@@ -27,9 +27,17 @@ export async function GET(request: NextRequest) {
     dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
   const skipCache = request.nextUrl.searchParams.get("refresh") === "true";
 
-  const data = await loadFleetOperationsSummary(supabase, auth.tenantId, {
-    date,
-    skipCache,
-  });
-  return NextResponse.json(data);
+  try {
+    const data = await loadFleetOperationsSummary(supabase, auth.tenantId, {
+      date,
+      skipCache,
+    });
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("[operations/summary]", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Summary unavailable" },
+      { status: 503 }
+    );
+  }
 }

@@ -28,6 +28,14 @@ export async function GET(request: NextRequest) {
   const date =
     dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
 
-  const data = await loadFleetOperationsBriefing(supabase, auth.tenantId, { date });
-  return NextResponse.json(data);
+  try {
+    const data = await loadFleetOperationsBriefing(supabase, auth.tenantId, { date });
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("[operations/briefing]", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Briefing unavailable" },
+      { status: 503 }
+    );
+  }
 }
