@@ -14,6 +14,7 @@ export const FLEET_ROUTES = {
   integrations: "/integrations",
   implementation: "/launch",
   launchEstimator: "/launch-estimator",
+  requestPilot: "/request-pilot",
   contact: "/contact",
   login: "/login",
   about: "/about",
@@ -52,7 +53,7 @@ export const FLEET_NAV = {
     label: "Company",
     children: [
       { label: "About", href: FLEET_ROUTES.about },
-      { label: "Contact", href: FLEET_ROUTES.contact },
+      { label: "Request Pilot", href: FLEET_ROUTES.requestPilot },
       { label: "Privacy", href: FLEET_ROUTES.privacy },
       { label: "Terms", href: FLEET_ROUTES.terms },
     ],
@@ -64,8 +65,8 @@ export const FLEET_HERO = {
   headline: "Every Dispatch Decision Matters.",
   subheadline:
     "Cornerstone helps industrial fleet operators reduce deadhead, improve utilization, protect revenue, and dispatch with confidence using operational intelligence and explainable AI.",
-  primaryCta: "Request Demo",
-  secondaryCta: "See Fleet Intelligence",
+  primaryCta: "Request Pilot",
+  secondaryCta: "Launch Estimator",
 } as const;
 
 export const FLEET_TRUST_BADGES = [
@@ -374,9 +375,14 @@ export const FLEET_SEO = {
       "Cornerstone is the Dispatch Operating System for industrial fleets — operational intelligence and explainable AI built around the systems you already use.",
   },
   contact: {
-    title: "Request Demo | Cornerstone Fleet Intelligence",
+    title: "Request Pilot | Cornerstone Fleet Intelligence",
     description:
-      "Request a demo of Cornerstone Fleet Intelligence. See how operational intelligence and explainable AI improve dispatch decisions for industrial fleets.",
+      "Request a design-partner pilot or schedule an operations review. See how operational intelligence improves dispatch for industrial fleets.",
+  },
+  requestPilot: {
+    title: "Request Pilot | Cornerstone Fleet Intelligence",
+    description:
+      "Apply for a design-partner pilot. Cornerstone Fleet Intelligence helps industrial operators reduce deadhead, improve utilization, and dispatch with confidence.",
   },
 } as const;
 
@@ -398,6 +404,6 @@ export const FLEET_MESSAGING = {
   ],
   audience: "Industrial fleet operators, dispatch leaders, operations executives, fleet owners",
   proofPoints: FLEET_IMPACT_METRICS,
-  primaryCta: "Request Demo",
-  secondaryCta: "See Fleet Intelligence",
+  primaryCta: "Request Pilot",
+  secondaryCta: "Launch Estimator",
 } as const;

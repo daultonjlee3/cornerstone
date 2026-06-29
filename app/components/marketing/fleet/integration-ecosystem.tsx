@@ -93,7 +93,7 @@ export function IntegrationEcosystem({
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-[var(--muted)]">
             {FLEET_INTEGRATIONS_PAGE.customConnector.body}
           </p>
-          <Link href={FLEET_ROUTES.contact} className="fm-btn-primary mt-8">
+          <Link href={FLEET_ROUTES.requestPilot} className="fm-btn-primary mt-8">
             {FLEET_INTEGRATIONS_PAGE.customConnector.cta}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>

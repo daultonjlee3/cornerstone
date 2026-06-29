@@ -108,9 +108,9 @@ export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFor
         {isPending ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-center text-sm text-[var(--muted)]">
-        Don&apos;t have an account?{" "}
-        <Link href="/signup" className="font-semibold text-teal-400 hover:text-teal-300">
-          Create account
+        Need pilot access?{" "}
+        <Link href="/request-pilot" className="font-semibold text-teal-400 hover:text-teal-300">
+          Request Pilot
         </Link>
       </p>
     </form>

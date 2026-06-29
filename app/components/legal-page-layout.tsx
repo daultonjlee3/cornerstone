@@ -46,8 +46,8 @@ export function LegalPageLayout({
               support@cornerstonecmms.com
             </a>
             {" · "}
-            <Link href={FLEET_ROUTES.contact} className="font-medium text-teal-400 hover:text-teal-300">
-              Contact us
+            <Link href={FLEET_ROUTES.requestPilot} className="font-medium text-teal-400 hover:text-teal-300">
+              Request Pilot
             </Link>
           </p>
         </div>

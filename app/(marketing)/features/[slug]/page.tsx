@@ -129,16 +129,16 @@ export default async function FeaturePage({ params }: Props) {
             See {feature.title} in the full platform
           </h2>
         <p className="mt-2 text-[var(--muted)]">
-          {feature.title} is one module in a connected maintenance operations platform. Start a
-          free trial to see how it works alongside work orders, PM, dispatch, assets, inventory,
+          {feature.title} is one module in a connected maintenance operations platform. Request a
+          pilot to see how it works alongside work orders, PM, dispatch, assets, inventory,
           and operations reporting—or browse the full product overview.
         </p>
         <div className="mt-6 flex flex-wrap gap-4">
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Start Free Trial
+            Request Pilot
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link

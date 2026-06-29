@@ -197,14 +197,14 @@ export default function InventoryProcurementPage() {
 
       <CTASection
         title="Bring inventory and purchasing into your maintenance operations"
-        description={`Start a free trial of ${SITE_NAME} and see how inventory, vendors, and purchase orders connect directly to work orders and preventive maintenance.`}
+        description={`Request a pilot of ${SITE_NAME} and see how inventory, vendors, and purchase orders connect directly to work orders and preventive maintenance.`}
         actions={
           <>
             <Link
-              href={ROUTES.signup}
+              href={ROUTES.requestPilot}
               className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"
             >
-              Start Free Trial
+              Request Pilot
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
             <SeeHowItWorksButton className="w-full sm:w-auto min-h-[44px] sm:min-h-[48px]" />

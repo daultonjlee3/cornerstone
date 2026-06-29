@@ -61,8 +61,8 @@ export default function AboutPage() {
         description="Request a demo and see how Cornerstone connects your operational stack, delivers explainable recommendations, and protects margin with every dispatch decision."
         actions={
           <>
-            <Link href={FLEET_ROUTES.contact} className="fm-btn-primary">
-              Request Demo
+            <Link href={FLEET_ROUTES.requestPilot} className="fm-btn-primary">
+              Request Pilot
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link href={FLEET_ROUTES.integrations} className="fm-btn-secondary">

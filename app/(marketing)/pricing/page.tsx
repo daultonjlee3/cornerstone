@@ -92,10 +92,10 @@ export default function PricingPage() {
         </p>
         <div className="mt-6">
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Start Free Trial
+            Request Pilot
           </Link>
         </div>
       </section>

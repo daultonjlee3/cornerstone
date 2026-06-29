@@ -85,10 +85,10 @@ export function FleetMarketingHeader() {
             Log in
           </Link>
           <Link
-            href={FLEET_ROUTES.contact}
+            href={FLEET_ROUTES.requestPilot}
             className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-[var(--shadow-glow)] transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Request Demo
+            Request Pilot
           </Link>
         </div>
 
@@ -153,11 +153,11 @@ export function FleetMarketingHeader() {
                   Log in
                 </Link>
                 <Link
-                  href={FLEET_ROUTES.contact}
+                  href={FLEET_ROUTES.requestPilot}
                   className="flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--accent)] font-semibold text-slate-950"
                   onClick={closeMobile}
                 >
-                  Request Demo
+                  Request Pilot
                 </Link>
               </div>
             </div>

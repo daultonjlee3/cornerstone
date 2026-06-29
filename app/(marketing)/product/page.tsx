@@ -60,10 +60,10 @@ export default function ProductPage() {
         actions={
           <>
             <Link
-              href={ROUTES.signup}
+              href={ROUTES.requestPilot}
               className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)] sm:w-auto sm:min-h-[48px]"
             >
-              Start Free Trial
+              Request Pilot
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
             <SeeHowItWorksButton className="w-full sm:w-auto" />
@@ -335,14 +335,14 @@ export default function ProductPage() {
       {/* Final CTA */}
       <CTASection
         title="Ready to modernize your maintenance operations?"
-        description={`Start a free trial or explore how ${SITE_NAME} works—no demo required.`}
+        description={`Request a pilot or explore how ${SITE_NAME} works with your operations team.`}
         actions={
           <>
             <Link
-              href={ROUTES.signup}
+              href={ROUTES.requestPilot}
               className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-4 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"
             >
-              Start Free Trial
+              Request Pilot
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Link>
             <SeeHowItWorksButton className="w-full sm:w-auto">

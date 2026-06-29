@@ -27,7 +27,6 @@ import {
   Brain,
   CheckCircle2,
   Layers,
-  Play,
   Shield,
   Sparkles,
   TrendingUp,
@@ -57,12 +56,11 @@ export default function FleetMarketingHomePage() {
               {FLEET_HERO.subheadline}
             </p>
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link href={FLEET_ROUTES.contact} className="fm-btn-primary">
+              <Link href={FLEET_ROUTES.requestPilot} className="fm-btn-primary">
                 {FLEET_HERO.primaryCta}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
-              <Link href={FLEET_ANCHORS.intelligence} className="fm-btn-secondary">
-                <Play className="h-4 w-4" aria-hidden />
+              <Link href={FLEET_ROUTES.launchEstimator} className="fm-btn-secondary">
                 {FLEET_HERO.secondaryCta}
               </Link>
             </div>
@@ -306,8 +304,8 @@ export default function FleetMarketingHomePage() {
         description={`${FLEET_SITE_NAME} is the intelligence layer that sits on top of your business — connecting your systems, recommending the next best action, and protecting margin with every dispatch decision.`}
         actions={
           <>
-            <Link href={FLEET_ROUTES.contact} className="fm-btn-primary">
-              Request Demo
+            <Link href={FLEET_ROUTES.requestPilot} className="fm-btn-primary">
+              Request Pilot
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link href={FLEET_ROUTES.integrations} className="fm-btn-secondary">

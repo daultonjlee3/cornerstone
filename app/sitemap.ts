@@ -32,10 +32,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: `${base}${FLEET_ROUTES.contact}`,
+      url: `${base}${FLEET_ROUTES.requestPilot}`,
       lastModified: new Date(),
       changeFrequency: "monthly",
-      priority: 0.85,
+      priority: 0.9,
     },
     {
       url: `${base}${FLEET_ROUTES.privacy}`,

@@ -141,14 +141,14 @@ export function IndustryPageContent({ industrySlug }: Props) {
           See {SITE_NAME} in action for {industry.title.toLowerCase()}
         </h2>
         <p className="mt-2 text-[var(--muted)]">
-          {content.heroSubheading} Start a free trial or talk to us about your team&apos;s needs.
+          {content.heroSubheading} Request a pilot or talk to us about your team&apos;s needs.
         </p>
         <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Start Free Trial
+            Request Pilot
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link

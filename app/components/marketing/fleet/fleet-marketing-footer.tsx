@@ -23,7 +23,7 @@ const solutionLinks = [
   { label: "Implementation", href: FLEET_ROUTES.implementation },
   { label: "Launch Estimator", href: FLEET_ROUTES.launchEstimator },
   { label: "About", href: FLEET_ROUTES.about },
-  { label: "Contact", href: FLEET_ROUTES.contact },
+  { label: "Request Pilot", href: FLEET_ROUTES.requestPilot },
 ];
 
 export function FleetMarketingFooter() {

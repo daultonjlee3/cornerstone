@@ -113,10 +113,10 @@ export function MarketingHeader() {
         {/* Desktop CTAs */}
         <div className="hidden shrink-0 items-center gap-3 md:flex">
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Start Free Trial
+            Request Pilot
           </Link>
           <Link
             href={ROUTES.login}
@@ -140,7 +140,7 @@ export function MarketingHeader() {
         </div>
       </div>
 
-      {/* Mobile nav panel: full-width, vertical menu with Home, Product, Industries, Pricing, About, Login, Start Free Trial */}
+      {/* Mobile nav panel: Home, Product, Industries, Pricing, About, Login, Request Pilot */}
       {mobileOpen && (
         <div
           className="border-t border-[var(--card-border)] bg-[var(--card)] md:hidden"
@@ -206,11 +206,11 @@ export function MarketingHeader() {
                   Sign In
                 </Link>
                 <Link
-                  href={ROUTES.signup}
+                  href={ROUTES.requestPilot}
                   className="flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--accent)] px-6 font-semibold text-white hover:bg-[var(--accent-hover)]"
                   onClick={closeMobile}
                 >
-                  Start Free Trial
+                  Request Pilot
                 </Link>
               </div>
             </div>

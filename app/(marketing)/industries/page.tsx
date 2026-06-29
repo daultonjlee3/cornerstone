@@ -119,10 +119,10 @@ export default function IndustriesIndexPage() {
         </div>
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Start Free Trial
+            Request Pilot
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link

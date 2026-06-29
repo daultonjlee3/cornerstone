@@ -22,9 +22,11 @@ export const ROUTES = {
   howItWorks: "/how-it-works",
   about: "/about",
   contact: "/contact",
+  requestPilot: "/request-pilot",
   privacy: "/privacy",
   terms: "/terms",
   login: "/login",
+  /** @deprecated Public marketing uses requestPilot; route redirects for invited/demo flows. */
   signup: "/signup",
 } as const;
 
@@ -244,16 +246,18 @@ export const SEO: Record<string, { title: string; description: string }> = {
       "Join the first 25 founding customers. Lock in your pricing as an early customer, get direct roadmap influence, priority feature requests, early access to new features, and concierge onboarding.",
   },
   [ROUTES.howItWorks]: {
-    title: "How It Works | Get Started with Our CMMS",
-    description: "Get started with Cornerstone OS maintenance software. Start a free trial, explore the product, or request a demo.",
+    title: "How It Works | Cornerstone Fleet Intelligence",
+    description:
+      "Request a design-partner pilot, scope your rollout with the Launch Estimator, or schedule an operations review with our team.",
   },
   [ROUTES.about]: {
     title: "About | Cornerstone OS — Facility Management Platform",
     description: "Building the operations system for maintenance teams. Modern CMMS and facility maintenance software for asset-heavy organizations.",
   },
   [ROUTES.contact]: {
-    title: "Contact & Demo | Cornerstone OS CMMS",
-    description: "Get in touch or request a demo of our maintenance management software. Start a free trial or explore the product.",
+    title: "Request Pilot | Cornerstone Fleet Intelligence",
+    description:
+      "Request a design-partner pilot or schedule an operations review. Enterprise fleet intelligence for industrial operators.",
   },
   "/industries": {
     title: "Industries | Facility Maintenance Software by Sector",

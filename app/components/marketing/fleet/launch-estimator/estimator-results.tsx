@@ -161,7 +161,7 @@ export function EstimatorResults({
               className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"
             >
               <Link
-                href={`${FLEET_ROUTES.contact}?${contactQuery}`}
+                href={`${FLEET_ROUTES.requestPilot}?${contactQuery}`}
                 className="fm-btn-primary inline-flex min-h-[48px] items-center justify-center gap-2"
               >
                 <Calendar className="h-4 w-4" aria-hidden />
@@ -270,7 +270,7 @@ export function EstimatorResults({
                   Download PDF
                 </button>
                 <Link
-                  href={`${FLEET_ROUTES.contact}?${contactQuery}`}
+                  href={`${FLEET_ROUTES.requestPilot}?${contactQuery}`}
                   className="inline-flex min-h-[48px] items-center justify-center gap-2 text-sm font-semibold text-teal-400 hover:text-teal-300"
                 >
                   Schedule Discovery Call

@@ -90,10 +90,10 @@ export default function FoundingCustomerPage() {
             <ArrowRight className="h-5 w-5" aria-hidden />
           </a>
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="inline-flex items-center rounded-xl border border-[var(--card-border)] bg-[var(--card)] px-6 py-4 font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
-            Start Free Trial
+            Request Pilot
           </Link>
         </div>
       </section>

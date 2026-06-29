@@ -123,8 +123,8 @@ export default function IntegrationsPage() {
         description="Tell us what systems you run today. We'll show you how Cornerstone connects them into one intelligent decision platform."
         actions={
           <>
-            <Link href={FLEET_ROUTES.contact} className="fm-btn-primary">
-              Request Demo
+            <Link href={FLEET_ROUTES.requestPilot} className="fm-btn-primary">
+              Request Pilot
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link href={FLEET_ROUTES.implementation} className="fm-btn-secondary">

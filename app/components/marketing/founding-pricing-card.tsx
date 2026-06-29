@@ -99,10 +99,10 @@ export function FoundingPricingCard({ className = "" }: Props) {
 
         <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Link
-            href={ROUTES.signup}
+            href={ROUTES.requestPilot}
             className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[var(--accent)] px-6 py-3 text-base font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition-all duration-200 hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_24px_rgba(59,130,246,0.45)]"
           >
-            Start Free Trial
+            Request Pilot
           </Link>
           <SeeHowItWorksButton className="w-full min-h-[48px]" variant="secondary">
             View Demo

@@ -134,8 +134,8 @@ export default function LaunchPage() {
         description={`See how ${FLEET_SITE_NAME} connects your systems and delivers explainable recommendations in four weeks — without replacing the software your team already knows.`}
         actions={
           <>
-            <Link href={FLEET_ROUTES.contact} className="fm-btn-primary">
-              Request Demo
+            <Link href={FLEET_ROUTES.requestPilot} className="fm-btn-primary">
+              Request Pilot
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link href={FLEET_ROUTES.integrations} className="fm-btn-secondary">
