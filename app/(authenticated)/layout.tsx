@@ -1,6 +1,7 @@
 import { createClient } from "@/src/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Shell } from "./components/shell";
+import { ActiveSessionGuard } from "@/app/components/active-session-guard";
 import { isPlatformSuperAdmin, isDemoGuestUser } from "@/src/lib/auth-context";
 import { getImpersonationStateFromCookie } from "@/src/lib/impersonation";
 import { getImpersonationSession } from "@/src/lib/portal/access";
@@ -164,6 +165,7 @@ export default async function AuthenticatedLayout({
       isDemoGuest={effectiveIsDemoGuest}
       productProfile={productProfile}
     >
+      <ActiveSessionGuard />
       {children}
     </Shell>
   );

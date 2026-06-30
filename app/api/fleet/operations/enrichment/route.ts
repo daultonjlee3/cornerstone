@@ -29,5 +29,9 @@ export async function GET(request: NextRequest) {
     dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
 
   const data = await loadFleetOperationsEnrichment(supabase, auth.tenantId, { date });
-  return NextResponse.json(data);
+  return NextResponse.json(data, {
+    headers: {
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+    },
+  });
 }

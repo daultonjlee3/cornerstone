@@ -20,6 +20,8 @@ type FleetDispatchDecisionQueuePanelProps = {
   pending?: boolean;
   onSelectJob: (id: string | null) => void;
   onAssignToTruck: (jobId: string, truckId: string) => void;
+  onAcceptRecommendation?: (id: string) => void;
+  onBulkAcceptRecommendations?: () => void;
   truckLanes: FleetDispatchBoardData["truckLanes"];
   onHighlightRecommendation: (rec: FleetRecommendationInstance | null) => void;
   onCollapse?: () => void;
@@ -39,6 +41,8 @@ export function FleetDispatchDecisionQueuePanel({
   pending,
   onSelectJob,
   onAssignToTruck,
+  onAcceptRecommendation,
+  onBulkAcceptRecommendations,
   truckLanes,
   onHighlightRecommendation,
   onCollapse,
@@ -72,7 +76,20 @@ export function FleetDispatchDecisionQueuePanel({
       <div className="dispatch-console__rail-body dispatch-console__queue-body">
         {rankedRecs.length > 0 ? (
           <section className="dispatch-console__queue-section">
-            <p className="dispatch-console__queue-section-title">AI recommendations</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="dispatch-console__queue-section-title">AI recommendations</p>
+              {onBulkAcceptRecommendations && rankedRecs.length > 1 ? (
+                <button
+                  type="button"
+                  className="dispatch-console__bulk-assign-btn"
+                  disabled={pending}
+                  onClick={onBulkAcceptRecommendations}
+                  title="Accept top recommendations (Ctrl+Shift+A)"
+                >
+                  Bulk apply
+                </button>
+              ) : null}
+            </div>
             <ul className="dispatch-console__queue-rec-list">
               {rankedRecs.map((rec, index) => {
                 const contribution = contributionForRec(rec);
@@ -82,9 +99,11 @@ export function FleetDispatchDecisionQueuePanel({
                     <button
                       type="button"
                       className={`dispatch-console__queue-rec-item ${active ? "dispatch-console__queue-rec-item--active" : ""}`}
+                      title={`${rec.rationale.title} — double-click to accept`}
                       onMouseEnter={() => onHighlightRecommendation(rec)}
                       onMouseLeave={() => onHighlightRecommendation(null)}
                       onClick={() => onHighlightRecommendation(rec)}
+                      onDoubleClick={() => onAcceptRecommendation?.(rec.id)}
                     >
                       <span className="dispatch-console__queue-rec-rank">{index + 1}</span>
                       <span className="dispatch-console__queue-rec-title">{rec.rationale.title}</span>

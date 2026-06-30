@@ -11,6 +11,7 @@ import {
 import { getRequestIp } from "@/lib/security/getRequestIp";
 import { redirect } from "next/navigation";
 import { getDefaultLandingPathForProfile, getProductProfileForTenant, getTenantIdForUser } from "@/src/lib/auth-context";
+import { establishSingleUserSession } from "@/src/lib/auth/single-session";
 
 export type LoginState = { error?: string; needsVerification?: boolean };
 
@@ -66,6 +67,11 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     }
     if (!data.session) {
       return { error: "Invalid email or password" };
+    }
+
+    const sessionResult = await establishSingleUserSession(supabase);
+    if (!sessionResult.ok) {
+      console.warn("[auth] establishSingleUserSession after login:", sessionResult.error);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

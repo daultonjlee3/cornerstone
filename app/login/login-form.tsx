@@ -12,12 +12,13 @@ import {
 
 type LoginFormProps = {
   next?: string;
+  sessionReplaced?: boolean;
   demoEmail?: string;
   demoLabel?: string;
   demoPassword?: string;
 };
 
-export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFormProps) {
+export function LoginForm({ next, sessionReplaced, demoEmail, demoLabel, demoPassword }: LoginFormProps) {
   const [state, formAction, isPending] = useActionState(loginAction, {} as LoginState);
   const [email, setEmail] = useState(demoEmail ?? "");
   const isDemo = Boolean(demoEmail && demoLabel);
@@ -31,6 +32,14 @@ export function LoginForm({ next, demoEmail, demoLabel, demoPassword }: LoginFor
   return (
     <form action={formAction} className="space-y-5">
       {next ? <input type="hidden" name="next" value={next} /> : null}
+      {sessionReplaced ? (
+        <div
+          className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+          role="status"
+        >
+          You were signed out because this account was used to sign in on another device.
+        </div>
+      ) : null}
       {isDemo ? (
         <p className="rounded-xl border border-teal-400/20 bg-teal-400/5 px-4 py-3 text-sm text-[var(--muted)]">
           Sign in to open the <strong className="text-[var(--foreground)]">{demoLabel}</strong> demo.

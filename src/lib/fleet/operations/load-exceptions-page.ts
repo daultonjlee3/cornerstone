@@ -1,11 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FleetOperationalException } from "@/src/types/fleet";
 import { loadFleetDispatchBoardData } from "@/src/lib/fleet/queries/dispatch-board";
-import {
-  buildDispatchExceptions,
-  buildIntegrationHealthFromConnections,
-} from "@/src/lib/fleet/queries/today-view";
-import type { IntegrationConnection } from "@/src/types/fleet";
+import { buildDispatchExceptions } from "@/src/lib/fleet/queries/today-view";
 import { createOperationsPerfTimer } from "./perf";
 import type { FleetPaginatedResult, OperationsListQuery } from "./pagination-types";
 import { slicePaginated } from "./pagination-types";
@@ -13,6 +9,7 @@ import {
   getCachedDispatchExceptions,
   setCachedDispatchExceptions,
 } from "./exceptions-cache";
+import { loadIntegrationHealthCached } from "./shared-loaders";
 
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
@@ -54,13 +51,7 @@ async function loadAllDispatchExceptions(
   if (cached) return cached;
 
   const board = await loadFleetDispatchBoardData(supabase, tenantId, boardDate);
-  const { data: connectionsResult } = await supabase
-    .from("integration_connections")
-    .select("id, provider, display_name, status, config, last_sync_at, last_error")
-    .eq("tenant_id", tenantId);
-
-  const connections = (connectionsResult ?? []) as IntegrationConnection[];
-  const integrationHealth = buildIntegrationHealthFromConnections(connections);
+  const integrationHealth = await loadIntegrationHealthCached(supabase, tenantId);
   const revenueAtRisk = board.unassignedJobs.reduce((sum, j) => sum + (j.revenue_estimate || 0), 0);
   const exceptions = buildDispatchExceptions(board, integrationHealth, revenueAtRisk);
   setCachedDispatchExceptions(tenantId, boardDate, exceptions);

@@ -59,6 +59,12 @@ import type {
 } from "@/src/types/fleet";
 
 import { createDispatchPerfTimer } from "@/src/lib/fleet/dispatch/perf";
+import {
+  attachTrustToHistory,
+  attachTrustToRecommendations,
+} from "@/src/lib/fleet-recommendation-engine/trust-surface";
+import { refreshRecommendationMeasuredOutcomes } from "@/src/lib/fleet-recommendation-engine/outcome-refresh";
+import { loadRecommendationTrustDashboard } from "@/src/lib/fleet-recommendation-engine/trust-dashboard";
 import { ensurePeachtreeDemoTelematicsFresh } from "@/src/lib/fleet/demo/peachtree-demo-telematics";
 
 export { FLEET_RECOMMENDATION_ENGINE_VERSION } from "@/src/lib/fleet-recommendation-engine/constants";
@@ -474,18 +480,46 @@ function summarizeRecommendations(
   pending: FleetRecommendationInstance[],
   history: FleetRecommendationHistoryEntry[]
 ): FleetRecommendationSummary {
-  const accepted = history.filter((h) => h.status === "accepted").length;
-  const dismissed = history.filter((h) => h.status === "dismissed").length;
+  const accepted = history.filter((h) =>
+    ["accepted", "applied", "completed"].includes(h.status)
+  ).length;
+  const rejected = history.filter((h) => h.status === "dismissed").length;
   const expired = history.filter((h) => h.status === "expired").length;
-  const acted = accepted + dismissed;
+  const applied = history.filter((h) => h.status === "applied" || h.status === "completed").length;
+  const failed = history.filter((h) => h.status === "failed").length;
+  const completed = history.filter((h) => h.status === "completed").length;
+  const acted = accepted + rejected;
   const volume = pending.length + history.length;
+
+  let trustScore: number | null = null;
+  if (history.length > 0) {
+    const onTime = history.filter((h) => {
+      const m = h.latest_outcome?.measured_impact as { completed_on_time?: { actual?: boolean } } | undefined;
+      return m?.completed_on_time?.actual === true;
+    }).length;
+    const measured = history.filter((h) => h.latest_outcome?.measured_impact).length;
+    const parts: number[] = [];
+    if (acted > 0) parts.push((accepted / acted) * 100 * 0.4);
+    if (measured > 0) parts.push((onTime / measured) * 100 * 0.3);
+    if (applied + failed > 0) parts.push((applied / (applied + failed)) * 100 * 0.3);
+    if (parts.length > 0) {
+      trustScore = normalizeScore(parts.reduce((a, b) => a + b, 0));
+    }
+  }
+
   return {
     volume,
     accepted,
-    dismissed,
+    rejected,
+    dismissed: rejected,
     expired,
+    applied,
+    failed,
+    completed,
     acceptanceRate: acted > 0 ? normalizeScore((accepted / acted) * 100) : null,
-    dismissalRate: acted > 0 ? normalizeScore((dismissed / acted) * 100) : null,
+    rejectionRate: acted > 0 ? normalizeScore((rejected / acted) * 100) : null,
+    dismissalRate: acted > 0 ? normalizeScore((rejected / acted) * 100) : null,
+    trustScore,
   };
 }
 
@@ -804,6 +838,9 @@ export async function getFleetRecommendations(
 
   await ensurePeachtreeDemoTelematicsFresh(supabase, tenantId);
 
+  await refreshRecommendationMeasuredOutcomes(supabase, tenantId, { branchId });
+  perf.stage("refresh-outcomes");
+
   await expireStalePendingRecommendations(supabase, tenantId, branchId);
   perf.stage("expire-stale");
 
@@ -866,9 +903,10 @@ export async function getFleetRecommendations(
 
   const needsRegeneration = pending.length === 0;
   if (needsRegeneration && options?.deferGeneration) {
-    const history = options.skipHistory
+    const historyRaw = options.skipHistory
       ? []
       : await loadRecommendationHistory(supabase, tenantId, branchId);
+    const history = attachTrustToHistory(historyRaw);
     perf.finish();
     return {
       generatedAt: new Date().toISOString(),
@@ -907,13 +945,33 @@ export async function getFleetRecommendations(
   const replacedCount = replacements.length;
   const recalculationNotice = buildRecalculationNotice(invalidated, replacedCount, replacements);
   pending = await markDisplayed(supabase, tenantId, pending);
+  pending = attachTrustToRecommendations(pending, board, profitCtx);
   perf.stage("mark-displayed");
 
-  const history = options?.skipHistory
+  const historyRaw = options?.skipHistory
     ? []
     : await loadRecommendationHistory(supabase, tenantId, branchId);
+  const history = attachTrustToHistory(historyRaw);
   perf.stage("history");
   const summary = summarizeRecommendations(pending, history);
+
+  let trustMetrics: FleetRecommendationsResponse["trustMetrics"];
+  if (!options?.skipHistory && history.length > 0) {
+    try {
+      const dash = await loadRecommendationTrustDashboard(supabase, tenantId, {
+        branchId,
+        refreshOutcomes: false,
+      });
+      trustMetrics = {
+        rates: dash.rates,
+        estimatedImpact: dash.estimatedImpact,
+        measuredOutcomes: dash.measuredOutcomes,
+        trustScore: dash.trustScore,
+      };
+    } catch {
+      trustMetrics = undefined;
+    }
+  }
 
   perf.finish();
   return {
@@ -923,6 +981,7 @@ export async function getFleetRecommendations(
     history,
     summary,
     recalculationNotice,
+    trustMetrics,
   };
 }
 
@@ -946,6 +1005,23 @@ export async function loadCachedFleetRecommendations(
     history: [],
     summary: summarizeRecommendations(pending, []),
     refreshing: pending.length === 0,
+  };
+}
+
+/** History-only recommendations for /operations enrichment — no dispatch board. */
+export async function loadFleetRecommendationHistoryLight(
+  supabase: SupabaseClient,
+  tenantId: string,
+  branchId?: string | null
+): Promise<FleetRecommendationsResponse> {
+  const historyRaw = await loadRecommendationHistory(supabase, tenantId, branchId);
+  const history = attachTrustToHistory(historyRaw);
+  return {
+    generatedAt: new Date().toISOString(),
+    engineVersion: FLEET_RECOMMENDATION_ENGINE_VERSION,
+    pending: [],
+    history,
+    summary: summarizeRecommendations([], history),
   };
 }
 

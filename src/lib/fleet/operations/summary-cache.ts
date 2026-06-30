@@ -2,7 +2,7 @@ import type { FleetOperationsSummary } from "@/src/types/fleet";
 
 type Entry = { data: FleetOperationsSummary; expiresAt: number };
 
-const CACHE_TTL_MS = 45_000;
+const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, Entry>();
 
 function key(tenantId: string, date: string): string {

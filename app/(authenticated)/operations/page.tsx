@@ -209,15 +209,39 @@ export default async function OperationsCenterPage() {
   const showFleet = isFleetProductProfile(productProfile);
   const fleetOnly = productProfile === "fleet_intelligence";
 
-  if (fleetOnly) {
+  if (fleetOnly || showFleet) {
     return (
       <div className="space-y-8" data-testid="operations-center-page">
         <FleetNavFocusScroll targets={FLEET_OPS_NAV_FOCUS_TARGETS} />
         <FleetCommandCenterClient />
+        {!fleetOnly ? (
+          <Suspense fallback={<PmComplianceSectionSkeleton />}>
+            <CmmsOperationsDeferred tenantId={tenantId} productProfile={productProfile} />
+          </Suspense>
+        ) : null}
       </div>
     );
   }
 
+  return (
+    <div className="space-y-8" data-testid="operations-center-page">
+      <Suspense fallback={<PmComplianceSectionSkeleton />}>
+        <CmmsOperationsDeferred tenantId={tenantId} productProfile={productProfile} showFleet={false} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function CmmsOperationsDeferred({
+  tenantId,
+  productProfile,
+  showFleet = false,
+}: {
+  tenantId: string;
+  productProfile: Awaited<ReturnType<typeof getProductProfileForTenant>>;
+  showFleet?: boolean;
+}) {
+  const supabase = await createClient();
   const { data: companies } = await supabase
     .from("companies")
     .select("id")
@@ -237,28 +261,24 @@ export default async function OperationsCenterPage() {
     operations.backlog.pmNotScheduled === 0 &&
     operations.backlog.upcomingPmTasks === 0;
 
+  const fleetOnly = productProfile === "fleet_intelligence";
+
   return (
-    <div className="space-y-8" data-testid="operations-center-page">
-      {showFleet ? (
-        <FleetNavFocusScroll targets={FLEET_OPS_NAV_FOCUS_TARGETS} />
+    <div className="space-y-8">
+      {!fleetOnly ? (
+        <PageHeader
+          icon={<LayoutGrid className="size-5" />}
+          title="Operations Command Center"
+          subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
+          actions={
+            <div className="flex items-center gap-2">
+              <DashboardHeaderActions productProfile={productProfile} />
+            </div>
+          }
+        />
       ) : null}
-      <div className="space-y-8">
-        {!fleetOnly ? (
-          <PageHeader
-            icon={<LayoutGrid className="size-5" />}
-            title="Operations Command Center"
-            subtitle="Live operational intelligence across work orders, preventive maintenance, and technician execution."
-            actions={
-              <div className="flex items-center gap-2">
-                <DashboardHeaderActions productProfile={productProfile} />
-              </div>
-            }
-          />
-        ) : null}
 
-        {showFleet ? <FleetCommandCenterClient /> : null}
-
-        {!fleetOnly ? (
+      {!fleetOnly ? (
         <div className="space-y-3">
           <div>
             <h2 className="text-lg font-semibold text-[var(--foreground)]">Daily Priority Plan</h2>
@@ -274,10 +294,10 @@ export default async function OperationsCenterPage() {
           </div>
           <OperationOptimizationWidget maxVisible={3} />
         </div>
-        ) : null}
+      ) : null}
 
       {!fleetOnly ? (
-      <DashboardHelperTips overdueWorkOrders={operations.kpis.overdueWorkOrders} />
+        <DashboardHelperTips overdueWorkOrders={operations.kpis.overdueWorkOrders} />
       ) : null}
 
       {!fleetOnly && (noCompanies || hasNoVisibleActivity) && (
@@ -285,7 +305,21 @@ export default async function OperationsCenterPage() {
       )}
 
       {!fleetOnly ? (
-      <>
+        <CmmsOperationsMetrics operations={operations} intelligencePromise={intelligencePromise} />
+      ) : null}
+    </div>
+  );
+}
+
+function CmmsOperationsMetrics({
+  operations,
+  intelligencePromise,
+}: {
+  operations: Awaited<ReturnType<typeof loadOperationsDashboardData>>;
+  intelligencePromise: Promise<OperationsIntelligenceData>;
+}) {
+  return (
+    <>
       <section>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard
@@ -338,6 +372,23 @@ export default async function OperationsCenterPage() {
         </div>
       </section>
 
+      <Suspense fallback={<PmComplianceSectionSkeleton />}>
+        <PmComplianceSection intelligencePromise={intelligencePromise} />
+      </Suspense>
+
+      {/* Remaining CMMS sections kept inline below — truncated in refactor; full content preserved in original page */}
+      <CmmsOperationsAlerts operations={operations} />
+    </>
+  );
+}
+
+function CmmsOperationsAlerts({
+  operations,
+}: {
+  operations: Awaited<ReturnType<typeof loadOperationsDashboardData>>;
+}) {
+  return (
+    <>
       <section className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
@@ -419,10 +470,6 @@ export default async function OperationsCenterPage() {
           </Card>
         </div>
       </section>
-
-      <Suspense fallback={<PmComplianceSectionSkeleton />}>
-        <PmComplianceSection intelligencePromise={intelligencePromise} />
-      </Suspense>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -597,9 +644,6 @@ export default async function OperationsCenterPage() {
           icon={Calendar}
         />
       </section>
-      </>
-      ) : null}
-      </div>
-    </div>
+    </>
   );
 }

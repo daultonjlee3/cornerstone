@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createClient } from "@/src/lib/supabase/client";
+import { establishClientAuthSession } from "@/lib/auth/establish-client-session";
 
 /**
  * When Supabase redirects after magic link (or similar), it often sends users to the Site URL
@@ -32,11 +33,12 @@ export function AuthHashHandler() {
     const supabase = createClient();
     supabase.auth
       .setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error }) => {
+      .then(async ({ error }) => {
         if (error) {
           handled.current = false;
           return;
         }
+        await establishClientAuthSession();
         // Prefer ?next= (e.g. demo deep link) when Supabase lands on site root with hash tokens.
         let next = "/operations";
         try {

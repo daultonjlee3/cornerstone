@@ -1,19 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FleetOperationsSummary } from "@/src/types/fleet";
 import { loadFleetCommandCenterSummary } from "@/src/lib/fleet/queries/command-center-summary";
-import {
-  buildIntegrationHealthFromConnections,
-} from "@/src/lib/fleet/queries/today-view";
-import type { IntegrationConnection } from "@/src/types/fleet";
 import { createOperationsPerfTimer } from "./perf";
 import {
   getCachedOperationsSummary,
   setCachedOperationsSummary,
 } from "./summary-cache";
-
-import {
-  countPendingRecommendationsFast,
-} from "./load-recommendations-page";
+import { countPendingRecommendationsFast } from "./load-recommendations-page";
+import { loadIntegrationHealthCached } from "./shared-loaders";
 
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
@@ -59,20 +53,15 @@ export async function loadFleetOperationsSummary(
 
   const perf = createOperationsPerfTimer("operations-summary");
 
-  const [commandCenter, connectionsResult, pendingRecommendations, acceptanceRate] =
+  const [commandCenter, pendingRecommendations, acceptanceRate, integrationHealth] =
     await Promise.all([
       loadFleetCommandCenterSummary(supabase, tenantId, date),
-      supabase
-        .from("integration_connections")
-        .select("id, provider, display_name, status, config, last_sync_at, last_error")
-        .eq("tenant_id", tenantId),
       countPendingRecommendations(supabase, tenantId).catch(() => 0),
       loadAcceptanceRateSnapshot(supabase, tenantId),
+      loadIntegrationHealthCached(supabase, tenantId),
     ]);
   perf.stage("parallel-queries");
 
-  const connections = (connectionsResult.data ?? []) as IntegrationConnection[];
-  const integrationHealth = buildIntegrationHealthFromConnections(connections);
   const revenueAtRisk = commandCenter.revenueAtRisk ?? 0;
 
   const summary: FleetOperationsSummary = {

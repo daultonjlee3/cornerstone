@@ -19,10 +19,16 @@ const EMPTY_RECOMMENDATIONS = {
   summary: {
     volume: 0,
     accepted: 0,
+    rejected: 0,
     dismissed: 0,
     expired: 0,
+    applied: 0,
+    failed: 0,
+    completed: 0,
     acceptanceRate: null,
+    rejectionRate: null,
     dismissalRate: null,
+    trustScore: null,
   },
 };
 

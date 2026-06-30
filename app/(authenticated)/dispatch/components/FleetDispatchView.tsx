@@ -18,10 +18,13 @@ import { CockpitCollapsedRail } from "./CockpitCollapsedRail";
 import { FleetDispatchCopilotBridge } from "./FleetDispatchCopilotBridge";
 import { useDispatchSecondaryLoad } from "./useDispatchSecondaryLoad";
 import { useDispatchMapAssignment } from "./useDispatchMapAssignment";
+import { useDebouncedDispatchRefresh } from "./useDebouncedDispatchRefresh";
+import { useDispatchKeyboardShortcuts } from "./useDispatchKeyboardShortcuts";
+import { DispatchKeyboardHints } from "./DispatchKeyboardHints";
 import { buildMinimalDispatchIntel } from "@/src/lib/fleet/dispatch/minimal-intel";
+import { applyOptimisticFleetAssignment } from "@/src/lib/fleet/dispatch/optimistic-board";
 import { buildFleetDispatchBoardQuery } from "./fleet-dispatch-query";
 import { scrollToSection } from "./fleet-dispatch-utils";
-import { FleetMissionControlLoader } from "@/src/components/fleet-intelligence/FleetMissionControlLoader";
 import { JobIntelPanel } from "./operational-map/JobIntelPanel";
 import { DispatchAssignmentConfirmPanel } from "./operational-map/DispatchAssignmentConfirmPanel";
 import "./dispatch-console.css";
@@ -77,12 +80,18 @@ export function FleetDispatchView({
   const [truckJobAlternatives, setTruckJobAlternatives] = useState<
     Array<{ jobId: string; jobTitle: string; score: number; explanation: string[] }>
   >([]);
+  const [bulkDispatching, setBulkDispatching] = useState(false);
   const [pending, startTransition] = useTransition();
   const searchParams = useSearchParams();
 
   const displayDate = useMemo(() => formatDisplayDate(activeDate), [activeDate]);
   const branchId = searchParams.get("branch_id");
-  const isBusy = pending || boardLoading;
+  const isBusy = pending || boardLoading || bulkDispatching;
+
+  const unassignedJobIds = useMemo(
+    () => board.unassignedJobs.map((job) => job.id),
+    [board.unassignedJobs]
+  );
 
   useDispatchSecondaryLoad({
     board,
@@ -215,38 +224,66 @@ export function FleetDispatchView({
       setRecsRefreshing(Boolean(payload.refreshing));
       setRecsLoading(false);
       setRecError(null);
+      setIntel((prev) => ({
+        ...prev,
+        recommendations: {
+          ...prev.recommendations,
+          ...payload,
+        },
+      }));
     },
     [searchParams, activeDate]
   );
 
-  const refreshBoard = useCallback(async () => {
-    setBoardLoading(true);
+  const refreshBoardOnly = useCallback(async () => {
     try {
       const newBoard = await fetchBoardForDate(activeDate, { refresh: true });
       setBoard(newBoard);
-      setIntel(buildMinimalDispatchIntel(newBoard, activeDate));
-      await loadRecommendations(true);
+      setIntel((prev) => ({
+        ...buildMinimalDispatchIntel(newBoard, activeDate),
+        recommendations: prev.recommendations,
+        integrationHealth: prev.integrationHealth,
+        exceptions: prev.exceptions,
+        exceptionCounts: prev.exceptionCounts,
+      }));
     } catch {
       setError("Unable to refresh dispatch board.");
+    }
+  }, [activeDate, fetchBoardForDate]);
+
+  const refreshBoard = useCallback(async () => {
+    setBoardLoading(true);
+    try {
+      await refreshBoardOnly();
+      await loadRecommendations(true);
     } finally {
       setBoardLoading(false);
     }
-  }, [activeDate, fetchBoardForDate, loadRecommendations]);
+  }, [loadRecommendations, refreshBoardOnly]);
 
   const afterAssignmentRefresh = useCallback(async () => {
-    await refreshBoard();
-    await loadRecommendations(true);
+    await refreshBoardOnly();
+    void loadRecommendations(true);
     setSelectedJobId(null);
     setHighlightedTruckId(null);
     setActiveRecommendation(null);
     setJobSuggestDisplayRec(null);
     setMapAssignSuccessToken((t) => t + 1);
-  }, [loadRecommendations, refreshBoard]);
+  }, [loadRecommendations, refreshBoardOnly]);
+
+  const handleOptimisticAssign = useCallback((truckId: string, jobId: string) => {
+    setBoard((prev) => applyOptimisticFleetAssignment(prev, truckId, jobId));
+    setRecommendations((prev) =>
+      prev.filter((rec) => rec.rationale.entities.job_id !== jobId)
+    );
+    setMapAssignSuccessToken((t) => t + 1);
+  }, []);
 
   const assignment = useDispatchMapAssignment({
     selectedDate: activeDate,
     branchId,
     onAssigned: afterAssignmentRefresh,
+    onOptimisticAssign: handleOptimisticAssign,
   });
 
   const handleAssign = useCallback(
@@ -267,7 +304,19 @@ export function FleetDispatchView({
   );
 
   const onRecommendationAction = useCallback(
-    (id: string, action: "accept" | "dismiss") => {
+    (id: string, action: "accept" | "dismiss", optimistic = true) => {
+      const rec = recommendations.find((item) => item.id === id);
+      if (optimistic && action === "accept" && rec) {
+        const jobId = rec.rationale.entities.job_id;
+        const truckId =
+          rec.rationale.candidates?.[0]?.truck_id ?? rec.rationale.entities.truck_id;
+        if (jobId && truckId) {
+          handleOptimisticAssign(truckId, jobId);
+        }
+        setRecommendations((prev) => prev.filter((item) => item.id !== id));
+        setActiveRecommendation(null);
+      }
+
       startTransition(async () => {
         setRecError(null);
         const res = await fetch(`/api/fleet/recommendations/${id}/${action}`, {
@@ -288,16 +337,37 @@ export function FleetDispatchView({
             message = "You do not have permission to manage fleet recommendations.";
           }
           setRecError(message);
+          if (optimistic && action === "accept") {
+            await refreshBoard();
+          }
           return;
         }
-        await refreshBoard();
-        await loadRecommendations(true);
+        void refreshBoardOnly();
+        void loadRecommendations(true);
         setActiveRecommendation(null);
         setRecError(null);
       });
     },
-    [loadRecommendations, refreshBoard, activeDate]
+    [
+      activeDate,
+      handleOptimisticAssign,
+      loadRecommendations,
+      recommendations,
+      refreshBoard,
+      refreshBoardOnly,
+    ]
   );
+
+  const onBulkAcceptRecommendations = useCallback(async () => {
+    if (recommendations.length === 0 || bulkDispatching) return;
+    setBulkDispatching(true);
+    const batch = recommendations.slice(0, 8);
+    for (const rec of batch) {
+      onRecommendationAction(rec.id, "accept", true);
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+    }
+    setBulkDispatching(false);
+  }, [bulkDispatching, onRecommendationAction, recommendations]);
 
   const handleHighlightRecommendation = useCallback((rec: FleetRecommendationInstance | null) => {
     setActiveRecommendation(rec);
@@ -436,21 +506,33 @@ export function FleetDispatchView({
     </div>
   );
 
-  useEffect(() => {
-    const source = new EventSource("/api/fleet/dispatch-board/stream");
-    const refreshOnSignal = () => {
-      void refreshBoard();
-      void loadRecommendations(true);
-    };
+  const { subscribe: subscribeDispatchSignals } = useDebouncedDispatchRefresh({
+    onRefreshBoard: refreshBoardOnly,
+    onRefreshRecommendations: () => loadRecommendations(true),
+  });
 
-    source.addEventListener("recommendations_invalidated", refreshOnSignal);
-    source.addEventListener("telematics_updated", refreshOnSignal);
-    source.addEventListener("jobs_updated", refreshOnSignal);
+  useDispatchKeyboardShortcuts({
+    recommendations,
+    activeRecommendationId: activeRecommendation?.id ?? null,
+    panelMode: assignment.panelMode,
+    selectedJobId,
+    unassignedJobIds,
+    onAcceptRecommendation: (id) => onRecommendationAction(id, "accept"),
+    onDismissRecommendation: (id) => onRecommendationAction(id, "dismiss", false),
+    onConfirmAssignment: handleConfirmAssignment,
+    onCancelPanel: () => {
+      assignment.dismissPanel();
+      setJobSuggestDisplayRec(null);
+    },
+    onSelectJob: (id) => {
+      void handleMapJobClick(id);
+    },
+    onHighlightRecommendation: handleHighlightRecommendation,
+    onBulkAcceptRecommendations: () => void onBulkAcceptRecommendations(),
+    onRefresh: () => void refreshBoard(),
+  });
 
-    return () => {
-      source.close();
-    };
-  }, [loadRecommendations, refreshBoard]);
+  useEffect(() => subscribeDispatchSignals(), [subscribeDispatchSignals]);
 
   return (
     <div className="dispatch-console" data-testid="fleet-dispatch-board">
@@ -458,19 +540,15 @@ export function FleetDispatchView({
         activeRecommendation={activeRecommendation}
         branchId={searchParams.get("branch_id")}
       />
-      {pending ? (
-        <div className="dispatch-console__loading">
-          <FleetMissionControlLoader
-            variant="overlay"
-            testId="fleet-dispatch-refresh-loading"
-            messages={[
-              "Refreshing dispatch board…",
-              "Updating recommendations…",
-              "Syncing telematics…",
-            ]}
-          />
+      {boardLoading && !pending ? (
+        <div className="dispatch-console__sync-indicator" aria-live="polite">
+          Syncing board…
         </div>
       ) : null}
+      <DispatchKeyboardHints
+        recommendationCount={recommendations.length}
+        unassignedCount={board.unassignedJobs.length}
+      />
 
       <FleetDispatchMissionBriefing
         board={board}
@@ -503,6 +581,8 @@ export function FleetDispatchView({
               recommendationsRefreshing={recsRefreshing}
               error={recError}
               recalculationNotice={recalculationNotice}
+              recommendationSummary={intel.recommendations.summary}
+              trustMetrics={intel.recommendations.trustMetrics}
               onRefresh={() => void loadRecommendations(true)}
               onAccept={(id) => onRecommendationAction(id, "accept")}
               onDismiss={(id) => onRecommendationAction(id, "dismiss")}
@@ -526,7 +606,8 @@ export function FleetDispatchView({
         <main className="dispatch-console__major">
           <div
             id="fleet-dispatch-map"
-            className={`dispatch-console__map-cell ${activeRecommendation ? "dispatch-console__map-cell--active" : ""}`}
+            className={`dispatch-console__map-cell ${activeRecommendation ? "dispatch-console__map-cell--active" : ""} ${mapAssignSuccessToken > 0 ? "dispatch-console__map-cell--assigned" : ""}`}
+            data-assign-flash={mapAssignSuccessToken}
           >
             <FleetDispatchMapPanel
               jobs={board.jobs}
@@ -609,8 +690,10 @@ export function FleetDispatchView({
               selectedJobId={selectedJobId}
               activeRecommendationId={activeRecommendation?.id ?? null}
               pending={isBusy}
-              onSelectJob={setSelectedJobId}
+              onSelectJob={(id) => void handleMapJobClick(id)}
               onAssignToTruck={handleAssign}
+              onAcceptRecommendation={(id) => onRecommendationAction(id, "accept")}
+              onBulkAcceptRecommendations={() => void onBulkAcceptRecommendations()}
               truckLanes={board.truckLanes}
               onHighlightRecommendation={handleHighlightRecommendation}
               onCollapse={() => setQueueOpen(false)}

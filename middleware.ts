@@ -8,6 +8,10 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  enforceActiveSessionOrSignOut,
+  SESSION_REPLACED_LOGIN_REASON,
+} from "@/src/lib/auth/single-session";
 
 const protectedPaths = [
   "/operations",
@@ -82,6 +86,28 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+
+  if (user) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      const sessionStatus = await enforceActiveSessionOrSignOut(
+        supabase,
+        user.id,
+        session.access_token
+      );
+      if (sessionStatus === "stale") {
+        const login = new URL("/login", request.url);
+        login.searchParams.set("reason", SESSION_REPLACED_LOGIN_REASON);
+        const redirectResponse = NextResponse.redirect(login);
+        response.cookies.getAll().forEach(({ name, value, ...options }) => {
+          redirectResponse.cookies.set(name, value, options);
+        });
+        return redirectResponse;
+      }
+    }
+  }
 
   if (isProtected(pathname) && !user) {
     const login = new URL("/login", request.url);

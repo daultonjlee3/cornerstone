@@ -289,6 +289,24 @@
   scrollbar-color: color-mix(in srgb, white 12%, transparent) transparent;
 }
 
+.dispatch-console__trust-strip,
+.dispatch-mission__trust-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--brand-operational) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-operational) 18%, transparent);
+}
+
+.dispatch-console__trust-strip--compact {
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+}
+
 .dispatch-console__rail-body::-webkit-scrollbar {
   width: 6px;
 }
@@ -1501,6 +1519,87 @@
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.dispatch-console__sync-indicator {
+  position: fixed;
+  top: calc(var(--header-height, 56px) + 8px);
+  right: 16px;
+  z-index: 40;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  border: 1px solid var(--surface-border-subtle);
+  pointer-events: none;
+}
+
+.dispatch-console__keyboard-hints {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-elevated) 90%, transparent);
+  border: 1px solid var(--surface-border-subtle);
+  pointer-events: none;
+}
+
+.dispatch-console__keyboard-hints kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 1px 4px;
+  margin-right: 3px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: inherit;
+  background: color-mix(in srgb, white 8%, transparent);
+  border: 1px solid color-mix(in srgb, white 14%, transparent);
+}
+
+.dispatch-console__bulk-assign-btn {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--brand-operational);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--brand-operational) 35%, transparent);
+  background: color-mix(in srgb, var(--brand-operational) 10%, transparent);
+}
+
+.dispatch-console__bulk-assign-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-operational) 18%, transparent);
+}
+
+.dispatch-console__bulk-assign-btn:disabled {
+  opacity: 0.5;
+}
+
+.dispatch-console__map-cell--assigned {
+  animation: dispatch-assign-flash 0.65s ease-out;
+}
+
+@keyframes dispatch-assign-flash {
+  0% {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand-operational) 70%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+.dispatch-console__inbox-scroll {
+  overflow-y: auto;
+  max-height: min(70vh, 640px);
 }
 
 .dispatch-console__outlook-metric--gain .dispatch-console__outlook-metric-value {

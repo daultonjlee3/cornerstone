@@ -1,29 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowRight,
-  Calendar,
-  CheckCircle2,
-  Download,
-  Mail,
-  Phone,
-  Sparkles,
-} from "lucide-react";
+import { CheckCircle2, RotateCcw, Sparkles } from "lucide-react";
 import type {
   LaunchEstimatorInput,
   LaunchEstimatorLead,
   LaunchEstimatorResult,
 } from "@/lib/launch-estimator/types";
-import { FLEET_ROUTES } from "@/lib/fleet-marketing-site";
-import {
-  EstimatorCard,
-  estimatorHintClass,
-  estimatorInputClass,
-  estimatorLabelClass,
-} from "./estimator-card";
+import { EstimatorCard } from "./estimator-card";
 
 type Props = {
   input: LaunchEstimatorInput;
@@ -34,6 +17,7 @@ type Props = {
   submitting: boolean;
   submitError: string | null;
   emailSent: boolean;
+  onReset: () => void;
 };
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -48,21 +32,14 @@ function StatTile({ label, value }: { label: string; value: string }) {
 export function EstimatorResults({
   input,
   result,
-  lead,
-  onLeadChange,
-  onSubmit,
-  submitting,
-  submitError,
-  emailSent,
+  lead: _lead,
+  onLeadChange: _onLeadChange,
+  onSubmit: _onSubmit,
+  submitting: _submitting,
+  submitError: _submitError,
+  emailSent: _emailSent,
+  onReset,
 }: Props) {
-  const [showLeadForm, setShowLeadForm] = useState(false);
-
-  const contactQuery = new URLSearchParams({
-    source: "launch_estimator",
-    company: lead.companyName || input.companyName,
-    email: lead.email ?? "",
-  }).toString();
-
   return (
     <div className="space-y-6">
       <EstimatorCard className="overflow-hidden !p-0">
@@ -81,6 +58,19 @@ export function EstimatorResults({
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="border-b border-[var(--card-border)] px-6 py-6 sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-400">
+            Estimated monthly platform
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
+            {result.estimatedMonthlyLabel}
+          </p>
+          <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
+            Illustrative recurring platform pricing after launch — scoped from your fleet size,
+            branches, and integrations. Final pricing confirmed during pilot onboarding.
+          </p>
         </div>
 
         <div className="grid gap-4 p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
@@ -145,142 +135,16 @@ export function EstimatorResults({
         <p className="mt-4 text-xs leading-relaxed text-[var(--muted)]">{result.disclaimer}</p>
       </EstimatorCard>
 
-      <EstimatorCard title="Get your estimate">
-        <p className="mb-6 text-sm text-[var(--muted)]">
-          Save this scope summary, share it with your team, or schedule a discovery call to validate
-          rollout details with our implementation team.
-        </p>
-
-        <AnimatePresence mode="wait">
-          {!showLeadForm ? (
-            <motion.div
-              key="cta"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"
-            >
-              <Link
-                href={`${FLEET_ROUTES.requestPilot}?${contactQuery}`}
-                className="fm-btn-primary inline-flex min-h-[48px] items-center justify-center gap-2"
-              >
-                <Calendar className="h-4 w-4" aria-hidden />
-                Schedule Discovery Call
-              </Link>
-              <button
-                type="button"
-                onClick={() => setShowLeadForm(true)}
-                className="fm-btn-secondary inline-flex min-h-[48px] items-center justify-center gap-2"
-              >
-                <Download className="h-4 w-4" aria-hidden />
-                Download Estimate
-              </button>
-            </motion.div>
-          ) : (
-            <motion.form
-              key="form"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                await onSubmit("email");
-              }}
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="lead-company" className={estimatorLabelClass}>
-                    Company
-                  </label>
-                  <input
-                    id="lead-company"
-                    type="text"
-                    value={lead.companyName ?? input.companyName}
-                    onChange={(e) => onLeadChange({ companyName: e.target.value })}
-                    className={`${estimatorInputClass} mt-2`}
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="lead-email" className={estimatorLabelClass}>
-                    Email
-                  </label>
-                  <input
-                    id="lead-email"
-                    type="email"
-                    autoComplete="email"
-                    value={lead.email ?? ""}
-                    onChange={(e) => onLeadChange({ email: e.target.value })}
-                    className={`${estimatorInputClass} mt-2`}
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="lead-phone" className={estimatorLabelClass}>
-                  Phone <span className="font-normal text-[var(--muted)]">(optional)</span>
-                </label>
-                <div className="relative mt-2">
-                  <Phone
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
-                    aria-hidden
-                  />
-                  <input
-                    id="lead-phone"
-                    type="tel"
-                    autoComplete="tel"
-                    value={lead.phone ?? ""}
-                    onChange={(e) => onLeadChange({ phone: e.target.value })}
-                    className={`${estimatorInputClass} pl-10`}
-                  />
-                </div>
-                <p className={estimatorHintClass}>
-                  We&apos;ll email your PDF summary and save this estimate for your discovery call.
-                </p>
-              </div>
-
-              {submitError ? (
-                <p className="text-sm text-red-400" role="alert">
-                  {submitError}
-                </p>
-              ) : null}
-              {emailSent ? (
-                <p className="text-sm text-teal-400" role="status">
-                  Estimate sent — check your inbox for the PDF summary.
-                </p>
-              ) : null}
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="fm-btn-primary inline-flex min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-                >
-                  <Mail className="h-4 w-4" aria-hidden />
-                  {submitting ? "Sending…" : "Email Estimate to Me"}
-                </button>
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => onSubmit("download")}
-                  className="fm-btn-secondary inline-flex min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-                >
-                  <Download className="h-4 w-4" aria-hidden />
-                  Download PDF
-                </button>
-                <Link
-                  href={`${FLEET_ROUTES.requestPilot}?${contactQuery}`}
-                  className="inline-flex min-h-[48px] items-center justify-center gap-2 text-sm font-semibold text-teal-400 hover:text-teal-300"
-                >
-                  Schedule Discovery Call
-                  <ArrowRight className="h-4 w-4" aria-hidden />
-                </Link>
-              </div>
-            </motion.form>
-          )}
-        </AnimatePresence>
-      </EstimatorCard>
+      <div className="flex justify-center pt-2">
+        <button
+          type="button"
+          onClick={onReset}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--card-border)] px-5 py-2.5 text-sm font-semibold text-[var(--muted)] transition-colors hover:border-teal-400/40 hover:text-teal-400"
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden />
+          Start new estimate
+        </button>
+      </div>
     </div>
   );
 }

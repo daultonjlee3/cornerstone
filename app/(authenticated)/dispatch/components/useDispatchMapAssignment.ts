@@ -23,12 +23,14 @@ type UseDispatchMapAssignmentArgs = {
   selectedDate: string;
   branchId: string | null;
   onAssigned: () => void | Promise<void>;
+  onOptimisticAssign?: (truckId: string, jobId: string) => void;
 };
 
 export function useDispatchMapAssignment({
   selectedDate,
   branchId,
   onAssigned,
+  onOptimisticAssign,
 }: UseDispatchMapAssignmentArgs) {
   const [panelMode, setPanelMode] = useState<AssignmentPanelMode>("idle");
   const [validation, setValidation] = useState<AssignmentValidationResult | null>(null);
@@ -99,8 +101,8 @@ export function useDispatchMapAssignment({
   );
 
   const validatePair = useCallback(
-    async (truckId: string, jobId: string, snapshotId?: string) => {
-      setPanelMode("loading");
+    async (truckId: string, jobId: string, snapshotId?: string, options?: { silent?: boolean }) => {
+      if (!options?.silent) setPanelMode("loading");
       try {
         const res = await fetch("/api/fleet/dispatch/validate-assignment", {
           method: "POST",
@@ -151,11 +153,12 @@ export function useDispatchMapAssignment({
           throw new Error("error" in payload ? payload.error : "Assignment failed.");
         }
         const result = payload as CommitAssignmentResult;
+        onOptimisticAssign?.(args.truckId, args.jobId);
         pushToast(`${result.unitNumber} assigned to ${result.jobTitle}.`, "success");
         setPanelMode("idle");
         setValidation(null);
         setSuggestResult(null);
-        await onAssigned();
+        void onAssigned();
         return result;
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "Assignment failed.", "error");
@@ -164,7 +167,7 @@ export function useDispatchMapAssignment({
         setCommitting(false);
       }
     },
-    [branchId, onAssigned, pushToast, selectedDate]
+    [branchId, onAssigned, onOptimisticAssign, pushToast, selectedDate]
   );
 
   return {

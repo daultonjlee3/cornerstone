@@ -6,7 +6,7 @@ import type {
 } from "./types";
 import { branchCountToNumber, branchCountDisplay, countActiveIntegrations } from "./config";
 import { computeComplexity } from "./complexity";
-import { computeImplementationPrice, computeTimeline } from "./pricing";
+import { computeImplementationPrice, computeMonthlyPrice, computeTimeline } from "./pricing";
 import {
   buildOperationalFocus,
   buildOpportunities,
@@ -17,6 +17,7 @@ export function calculateLaunchEstimate(input: LaunchEstimatorInput): LaunchEsti
   const { tier, score } = computeComplexity(input);
   const integrationCount = countActiveIntegrations(input.integrations);
   const pricing = computeImplementationPrice(input);
+  const monthly = computeMonthlyPrice(input);
   const timeline = computeTimeline(tier);
 
   return {
@@ -25,6 +26,8 @@ export function calculateLaunchEstimate(input: LaunchEstimatorInput): LaunchEsti
     integrationCount,
     estimatedImplementation: pricing.amount,
     estimatedImplementationLabel: `$${pricing.amount.toLocaleString()}`,
+    estimatedMonthly: monthly.amount,
+    estimatedMonthlyLabel: monthly.label,
     customPlanningRecommended: pricing.customPlanningRecommended,
     timelineLabel: timeline.label,
     timelineWeeksDisplay: timeline.weeksDisplay,
@@ -57,6 +60,8 @@ export function buildCrmPayload(
     goals: input.goals,
     estimated_implementation: result.estimatedImplementation,
     estimated_implementation_label: result.estimatedImplementationLabel,
+    estimated_monthly: result.estimatedMonthly,
+    estimated_monthly_label: result.estimatedMonthlyLabel,
     complexity: result.complexity,
     timeline: result.timelineLabel,
     custom_planning_recommended: result.customPlanningRecommended,

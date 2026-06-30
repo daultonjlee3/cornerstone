@@ -38,6 +38,9 @@ async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
   return data;
 }
 
+/**
+ * Progressive loader — summary first for sub-2s KPI paint, then briefing, then enrichment.
+ */
 export function useOperationsProgressiveLoad() {
   const date = todayDateOnly();
   const dateRef = useRef(date);
@@ -61,14 +64,38 @@ export function useOperationsProgressiveLoad() {
     const params = new URLSearchParams({ date });
 
     const loadSummary = async () => {
+      const summary = await fetchJson<FleetOperationsSummary>(
+        `/api/fleet/operations/summary?${params.toString()}`,
+        signal
+      );
+      if (signal.aborted) return;
+      setData((prev) => mergeSummaryIntoTodayView(prev, summary));
+      setLoaded((s) => ({ ...s, summary: true }));
+    };
+
+    const loadBriefing = async () => {
+      const briefing = await fetchJson<FleetOperationsBriefing>(
+        `/api/fleet/operations/briefing?${params.toString()}`,
+        signal
+      );
+      if (signal.aborted) return;
+      setData((prev) => mergeBriefingIntoTodayView(prev, briefing));
+      setLoaded((s) => ({ ...s, briefing: true }));
+    };
+
+    const loadEnrichment = async () => {
+      const enrichment = await fetchJson<FleetOperationsEnrichment>(
+        `/api/fleet/operations/enrichment?${params.toString()}`,
+        signal
+      );
+      if (signal.aborted) return;
+      setData((prev) => mergeEnrichmentIntoTodayView(prev, enrichment));
+      setLoaded((s) => ({ ...s, enrichment: true }));
+    };
+
+    void (async () => {
       try {
-        const summary = await fetchJson<FleetOperationsSummary>(
-          `/api/fleet/operations/summary?${params.toString()}`,
-          signal
-        );
-        if (signal.aborted) return;
-        setData((prev) => mergeSummaryIntoTodayView(prev, summary));
-        setLoaded((s) => ({ ...s, summary: true }));
+        await loadSummary();
       } catch (e) {
         if (!signal.aborted) {
           setErrors((s) => ({
@@ -77,49 +104,27 @@ export function useOperationsProgressiveLoad() {
           }));
         }
       }
-    };
 
-    const loadBriefing = async () => {
-      try {
-        const briefing = await fetchJson<FleetOperationsBriefing>(
-          `/api/fleet/operations/briefing?${params.toString()}`,
-          signal
-        );
-        if (signal.aborted) return;
-        setData((prev) => mergeBriefingIntoTodayView(prev, briefing));
-        setLoaded((s) => ({ ...s, briefing: true }));
-      } catch (e) {
+      if (signal.aborted) return;
+
+      void loadBriefing().catch((e) => {
         if (!signal.aborted) {
           setErrors((s) => ({
             ...s,
             briefing: e instanceof Error ? e.message : "Briefing unavailable",
           }));
         }
-      }
-    };
+      });
 
-    const loadEnrichment = async () => {
-      try {
-        const enrichment = await fetchJson<FleetOperationsEnrichment>(
-          `/api/fleet/operations/enrichment?${params.toString()}`,
-          signal
-        );
-        if (signal.aborted) return;
-        setData((prev) => mergeEnrichmentIntoTodayView(prev, enrichment));
-        setLoaded((s) => ({ ...s, enrichment: true }));
-      } catch (e) {
+      void loadEnrichment().catch((e) => {
         if (!signal.aborted) {
           setErrors((s) => ({
             ...s,
             enrichment: e instanceof Error ? e.message : "Enrichment unavailable",
           }));
         }
-      }
-    };
-
-    void loadSummary();
-    void loadBriefing();
-    void loadEnrichment();
+      });
+    })();
 
     return () => controller.abort();
   }, [date]);
@@ -132,6 +137,7 @@ export function useOperationsProgressiveLoad() {
         new AbortController().signal
       );
       setData((prev) => mergeSummaryIntoTodayView(prev, summary));
+      setLoaded((s) => ({ ...s, summary: true }));
     } catch {
       /* keep existing */
     }

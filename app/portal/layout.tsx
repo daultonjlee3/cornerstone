@@ -7,6 +7,7 @@ import { resolvePortalAccessContext } from "@/src/lib/portal/access";
 import { endTechnicianImpersonationAction } from "@/app/(authenticated)/technicians/impersonation-actions";
 import { PortalLocationTracker } from "./components/portal-location-tracker";
 import { RestoreMainAppButton } from "./components/restore-main-app-button";
+import { ActiveSessionGuard } from "@/app/components/active-session-guard";
 
 export default async function PortalLayout({
   children,
@@ -29,6 +30,7 @@ export default async function PortalLayout({
 
   return (
     <div className="min-h-screen text-[var(--foreground)]">
+      <ActiveSessionGuard />
       <header className="sticky top-0 z-40 border-b border-[var(--card-border)] bg-white/84 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <div>

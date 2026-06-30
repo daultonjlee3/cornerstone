@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import {
   calculateLaunchEstimate,
   normalizeInput,
@@ -10,6 +10,7 @@ import {
 import type { LaunchEstimatorInput, LaunchEstimatorState } from "@/lib/launch-estimator/types";
 import {
   createInitialState,
+  clearEstimatorState,
   loadEstimatorState,
   saveEstimatorState,
 } from "@/lib/launch-estimator/storage";
@@ -92,6 +93,30 @@ export function LaunchEstimatorWizard() {
     setState((prev) => ({ ...prev, step: Math.max(prev.step - 1, 0), result: null }));
   }, []);
 
+  const hasProgress = useMemo(() => {
+    if (state.step > 0) return true;
+    const input = state.input;
+    return Boolean(
+      input.companyName?.trim() ||
+        input.industry?.trim() ||
+        (input.integrations?.length ?? 0) > 0 ||
+        (input.goals?.length ?? 0) > 0
+    );
+  }, [state]);
+
+  const handleReset = useCallback(() => {
+    if (
+      hasProgress &&
+      !window.confirm("Reset the estimator and start from the beginning? Your current answers will be cleared.")
+    ) {
+      return;
+    }
+    clearEstimatorState();
+    setState(createInitialState());
+    setSubmitError(null);
+    setEmailSent(false);
+  }, [hasProgress]);
+
   const normalizedInput = useMemo(() => normalizeInput(state.input), [state.input]);
 
   const handleSubmit = useCallback(
@@ -161,12 +186,25 @@ export function LaunchEstimatorWizard() {
         submitting={submitting}
         submitError={submitError}
         emailSent={emailSent}
+        onReset={handleReset}
       />
     ) : null,
   ];
 
   return (
     <div className="mx-auto max-w-3xl">
+      <div className="mb-3 flex items-center justify-end">
+        {hasProgress ? (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-teal-400"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            Start over
+          </button>
+        ) : null}
+      </div>
       <EstimatorProgress currentStep={state.step} />
 
       <AnimatePresence mode="wait">

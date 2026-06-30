@@ -77,12 +77,23 @@ export function FleetDispatchNextDecision({
 }: FleetDispatchNextDecisionProps) {
   const topCandidate = recommendation.rationale.candidates?.[0];
   const topSnapshot = recommendation.rationale.candidate_snapshots?.[0];
+  const trust = recommendation.trust;
   const snapshots = recommendation.rationale.candidate_snapshots ?? [];
-  const alternatives = (recommendation.rationale.candidates ?? []).slice(1, 4);
-  const confidence = recommendationConfidence(recommendation);
-  const rankingScore = Math.round(
-    Number(topCandidate?.score ?? recommendation.score ?? 0)
-  );
+  const alternatives = trust?.alternativeOptions.length
+    ? trust.alternativeOptions.map((alt) => ({
+        truck_id: alt.truck_id,
+        unit_number: alt.unit_number,
+        score: alt.score,
+        summary: alt.summary,
+      }))
+    : (recommendation.rationale.candidates ?? []).slice(1, 4).map((alt) => ({
+        truck_id: alt.truck_id,
+        unit_number: alt.unit_number,
+        score: alt.score,
+        summary: null as string | null,
+      }));
+  const confidence = trust?.confidenceLabel ?? recommendationConfidence(recommendation);
+  const rankingScore = Math.round(trust?.confidenceScore ?? Number(topCandidate?.score ?? recommendation.score ?? 0));
   const ringScore = rankingScore;
   const jobId = recommendation.rationale.entities.job_id;
   const job = jobId ? board.jobs.find((item) => item.id === jobId) : null;
@@ -98,11 +109,17 @@ export function FleetDispatchNextDecision({
       <h2 className="dispatch-console__next-decision-title">{recommendation.rationale.title}</h2>
 
       <div className="dispatch-console__next-decision-hero">
-        {topSnapshot ? (
+        {topSnapshot || trust ? (
           <div className="dispatch-console__next-decision-contribution">
             <span className="dispatch-console__next-decision-contribution-label">Expected contribution</span>
             <span className="dispatch-console__next-decision-contribution-value">
-              +{formatCurrency(topSnapshot.estimated_contribution)}
+              +
+              {formatCurrency(
+                trust?.estimatedContributionImprovement ??
+                  trust?.financialImpact ??
+                  topSnapshot?.estimated_contribution ??
+                  0
+              )}
             </span>
           </div>
         ) : null}
@@ -145,11 +162,14 @@ export function FleetDispatchNextDecision({
         </div>
       ) : null}
 
-      {recommendation.rationale.reasons.length > 0 ? (
+      {(trust?.whyThisRecommendation.length ?? 0) > 0 ||
+      recommendation.rationale.reasons.length > 0 ? (
         <div className="dispatch-console__next-decision-reasons">
           <p className="dispatch-console__next-decision-section-title">Why this is the best option</p>
           <ul>
-            {recommendation.rationale.reasons.slice(0, 4).map((reason) => (
+            {(trust?.whyThisRecommendation ?? recommendation.rationale.reasons)
+              .slice(0, 4)
+              .map((reason) => (
               <li key={reason}>
                 <Check className="size-3.5 shrink-0" aria-hidden />
                 <span>{reason}</span>
@@ -174,11 +194,12 @@ export function FleetDispatchNextDecision({
               {alternatives.map((alt) => {
                 const snap = snapshots.find((s) => s.truck_id === alt.truck_id);
                 const tradeoff =
-                  snap && snap.projected_overtime_cost > 0
+                  alt.summary ??
+                  (snap && snap.projected_overtime_cost > 0
                     ? "Overtime risk"
                     : snap && !snap.truck_type_match
                       ? "Wrong equipment"
-                      : "Lower score";
+                      : "Lower score");
                 return (
                   <tr key={alt.truck_id}>
                     <td>{alt.unit_number}</td>

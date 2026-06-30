@@ -129,6 +129,20 @@ export const PRICING_RULES = {
 
 export const CLEAN_PRICE_TIERS = [10_000, 25_000, 40_000, 65_000, 85_000, 100_000] as const;
 
+/** Recurring platform pricing — design-partner pilot tiers */
+export const MONTHLY_PRICING_RULES = {
+  base: 5_000,
+  includedBranches: 1,
+  includedTrucks: 25,
+  includedIntegrations: 3,
+  additionalBranch: 2_500,
+  trucksPerBranch26to50: 1_500,
+  trucksPerBranch51to100: 3_000,
+  additionalIntegration: 500,
+} as const;
+
+export const CLEAN_MONTHLY_TIERS = [5_000, 7_500, 10_000, 12_500, 15_000, 20_000] as const;
+
 export function branchCountToNumber(band: BranchCountBand): number {
   switch (band) {
     case "1":

@@ -35,6 +35,7 @@ import {
   type FleetMapRouteFeature,
 } from "@/src/components/fleet-map";
 import { hasCoordinate } from "../../dispatch-map-utils";
+import { buildJobSpatialIndex } from "@/src/lib/fleet/dispatch/spatial-index";
 import { formatCurrency, operationalRiskMessage, recommendationConfidence } from "../fleet-dispatch-utils";
 import { confidenceLabel } from "../../../operations/components/fleet-recommendation-utils";
 import { computeBranchZones } from "./branch-zones";
@@ -153,23 +154,13 @@ export function FleetOperationalMap({
   const activeEligibleJobs = dragEligibleJobIds ?? unassignedJobIds;
   const activeInvalidJobs = dragInvalidJobIds ?? assignedJobIds;
 
+  const jobSpatialIndex = useMemo(() => buildJobSpatialIndex(jobs), [jobs]);
+
   const findNearestJobId = useCallback(
     (lng: number, lat: number): string | null => {
-      let bestId: string | null = null;
-      let bestDist = Infinity;
-      for (const job of jobs) {
-        if (!hasCoordinate(job.site_latitude, job.site_longitude)) continue;
-        const dLng = (job.site_longitude as number) - lng;
-        const dLat = (job.site_latitude as number) - lat;
-        const dist = dLng * dLng + dLat * dLat;
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestId = job.id;
-        }
-      }
-      return bestDist < 0.0004 ? bestId : null;
+      return jobSpatialIndex.findNearest(lng, lat);
     },
-    [jobs]
+    [jobSpatialIndex]
   );
 
   const handleInternalDragStart = useCallback(
@@ -187,16 +178,35 @@ export function FleetOperationalMap({
   useEffect(() => {
     if (!internalDragTruckId || !onTruckDropOnJob) return;
 
-    const handleMove = (event: PointerEvent) => {
+    let rafId: number | null = null;
+    let pendingEvent: PointerEvent | null = null;
+
+    const applyPointerMove = () => {
+      rafId = null;
+      const event = pendingEvent;
+      pendingEvent = null;
+      if (!event) return;
       const map = mapRef.current?.getMap();
       if (!map) return;
       const rect = map.getContainer().getBoundingClientRect();
       const lngLat = map.unproject([event.clientX - rect.left, event.clientY - rect.top]);
       setInternalDragCursor([lngLat.lng, lngLat.lat]);
-      setInternalHoverJobId(findNearestJobId(lngLat.lng, lngLat.lat));
+      const nearest = findNearestJobId(lngLat.lng, lngLat.lat);
+      setInternalHoverJobId((prev) => (prev === nearest ? prev : nearest));
+    };
+
+    const handleMove = (event: PointerEvent) => {
+      pendingEvent = event;
+      if (rafId == null) {
+        rafId = window.requestAnimationFrame(applyPointerMove);
+      }
     };
 
     const handleUp = (event: PointerEvent) => {
+      if (rafId != null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       const map = mapRef.current?.getMap();
       if (map) {
         const rect = map.getContainer().getBoundingClientRect();
@@ -216,6 +226,7 @@ export function FleetOperationalMap({
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
     return () => {
+      if (rafId != null) window.cancelAnimationFrame(rafId);
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
     };
@@ -350,8 +361,8 @@ export function FleetOperationalMap({
     selectedJobId,
     topSnapshot,
     truckLanes,
-    dragTruckId,
-    dragCursorLngLat,
+    activeDragTruckId,
+    activeDragCursor,
   ]);
 
   const visibleTrucks = useMemo(() => {
@@ -392,7 +403,9 @@ export function FleetOperationalMap({
     [visibleTrucks]
   );
 
-  const animatedTruckPositions = useAnimatedPositions(truckAnimSource);
+  const animatedTruckPositions = useAnimatedPositions(truckAnimSource, {
+    enabled: !activeDragTruckId,
+  });
 
   const truckClusterPoints = useMemo(
     () =>

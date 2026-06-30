@@ -6,10 +6,13 @@ import type {
   FleetDispatchBoardData,
   FleetRecommendationInstance,
   FleetRecommendationRecalculationNotice,
+  FleetRecommendationSummary,
+  FleetRecommendationsResponse,
 } from "@/src/types/fleet";
 import { FleetDispatchNextDecision } from "./FleetDispatchNextDecision";
 import { FleetDispatchRecommendationCard } from "./FleetDispatchRecommendationCard";
 import { FleetDispatchRecalculationCard } from "./FleetDispatchRecalculationCard";
+import { FleetDispatchTrustStrip } from "./FleetDispatchTrustStrip";
 
 type FleetDispatchRecommendationsPanelProps = {
   layout?: "panel" | "float" | "cockpit";
@@ -21,6 +24,8 @@ type FleetDispatchRecommendationsPanelProps = {
   recommendationsRefreshing?: boolean;
   error?: string | null;
   recalculationNotice?: FleetRecommendationRecalculationNotice | null;
+  recommendationSummary?: FleetRecommendationSummary;
+  trustMetrics?: FleetRecommendationsResponse["trustMetrics"];
   onRefresh: () => void;
   onAccept: (id: string) => void;
   onDismiss: (id: string) => void;
@@ -41,6 +46,8 @@ export function FleetDispatchRecommendationsPanel({
   recommendationsRefreshing,
   error,
   recalculationNotice,
+  recommendationSummary,
+  trustMetrics,
   onRefresh,
   onAccept,
   onDismiss,
@@ -94,6 +101,11 @@ export function FleetDispatchRecommendationsPanel({
         </div>
 
         <div className="dispatch-console__rail-body">
+          <FleetDispatchTrustStrip
+            summary={recommendationSummary}
+            trustMetrics={trustMetrics}
+            compact
+          />
           {recalculationNotice ? (
             <FleetDispatchRecalculationCard notice={recalculationNotice} />
           ) : null}
@@ -146,6 +158,9 @@ export function FleetDispatchRecommendationsPanel({
       </div>
 
       <div className="dispatch-mission__panel-body dispatch-mission__rec-list">
+        <div className="px-4 pt-3">
+          <FleetDispatchTrustStrip summary={recommendationSummary} trustMetrics={trustMetrics} />
+        </div>
         {recalculationNotice ? (
           <div className="px-4 pt-4">
             <FleetDispatchRecalculationCard notice={recalculationNotice} />

@@ -13,6 +13,7 @@ import { getRequestIp } from "@/lib/security/getRequestIp";
 import { TURNSTILE_VERIFY_FAILED, verifyTurnstileToken } from "@/lib/security/verifyTurnstile";
 import { redirect } from "next/navigation";
 import { buildEmailRedirectTo, resolveAuthRedirectOrigin } from "@/lib/auth/auth-redirect-origin";
+import { establishSingleUserSession } from "@/src/lib/auth/single-session";
 
 export type SignupState = {
   error?: string;
@@ -142,6 +143,11 @@ export async function signupAction(_prev: SignupState, formData: FormData): Prom
       console.warn(
         "[security] Signup returned an immediate session. Enable email confirmation in Supabase (Auth → Providers → Email) for production so new users must verify before access."
       );
+    }
+
+    const sessionResult = await establishSingleUserSession(supabase);
+    if (!sessionResult.ok) {
+      console.warn("[auth] establishSingleUserSession after signup:", sessionResult.error);
     }
 
     const isNewSignup = Boolean(data.user?.id && (data.user.identities?.length ?? 0) > 0);

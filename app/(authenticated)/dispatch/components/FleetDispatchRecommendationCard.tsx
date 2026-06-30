@@ -41,7 +41,8 @@ export function FleetDispatchRecommendationCard({
   onHighlightTruck,
   onHighlightJob,
 }: FleetDispatchRecommendationCardProps) {
-  const confidence = recommendationConfidence(recommendation);
+  const trust = recommendation.trust;
+  const confidence = trust?.confidenceLabel ?? recommendationConfidence(recommendation);
   const candidates = recommendation.rationale.candidates ?? [];
   const topCandidate = candidates[0];
   const isCapacityOnly = recommendation.recommendation_type === "capacity_overload";
@@ -49,15 +50,21 @@ export function FleetDispatchRecommendationCard({
   const primaryTruckId =
     topCandidate?.truck_id ?? recommendation.rationale.entities.truck_id ?? null;
   const topSnapshot = recommendation.rationale.candidate_snapshots?.[0];
-  const topReason = recommendation.rationale.reasons[0];
+  const topReason = trust?.whyThisRecommendation[0] ?? recommendation.rationale.reasons[0];
   const primaryCta = isCapacityOnly ? "Acknowledge" : "Review & Assign";
-  const revenueValue = topSnapshot
-    ? topSnapshot.estimated_contribution.toLocaleString(undefined, {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      })
-    : null;
+  const financialImpact =
+    trust?.financialImpact ??
+    trust?.estimatedContributionImprovement ??
+    topSnapshot?.estimated_contribution ??
+    null;
+  const revenueValue =
+    financialImpact != null
+      ? financialImpact.toLocaleString(undefined, {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0,
+        })
+      : null;
 
   return (
     <motion.li
@@ -103,30 +110,54 @@ export function FleetDispatchRecommendationCard({
         </div>
       ) : null}
 
-      {topSnapshot ? (
+      {topSnapshot || trust ? (
         <div className="dispatch-mission__impact-grid">
           <ImpactTag
             icon={Route}
             label="Deadhead"
-            value={topSnapshot.deadhead_miles != null ? `${topSnapshot.deadhead_miles.toFixed(1)} mi` : "—"}
+            value={
+              trust?.deadheadReductionMiles != null
+                ? `−${trust.deadheadReductionMiles.toFixed(1)} mi`
+                : topSnapshot?.deadhead_miles != null
+                  ? `${topSnapshot.deadhead_miles.toFixed(1)} mi`
+                  : "—"
+            }
           />
           <ImpactTag
             icon={Clock3}
-            label="Travel"
-            value={topSnapshot.travel_minutes != null ? `${Math.round(topSnapshot.travel_minutes)} min` : "—"}
+            label="Time saved"
+            value={
+              trust?.timeSavingsMinutes != null
+                ? `${Math.round(trust.timeSavingsMinutes)} min`
+                : topSnapshot?.travel_minutes != null
+                  ? `${Math.round(topSnapshot.travel_minutes)} min`
+                  : "—"
+            }
           />
           <ImpactTag
             icon={Gauge}
             label="Utilization"
-            value={`${Math.round(topSnapshot.projected_utilization_pct)}%`}
+            value={`${Math.round(trust?.projectedUtilizationPct ?? topSnapshot?.projected_utilization_pct ?? 0)}%`}
           />
           <ImpactTag
             icon={DollarSign}
             label="Revenue"
-            value={revenueValue ?? "—"}
+            value={
+              trust?.revenueProtected != null
+                ? trust.revenueProtected.toLocaleString(undefined, {
+                    style: "currency",
+                    currency: "USD",
+                    maximumFractionDigits: 0,
+                  })
+                : revenueValue ?? "—"
+            }
             accent
           />
         </div>
+      ) : null}
+
+      {trust?.risks[0] ? (
+        <p className="dispatch-mission__rec-risk text-xs text-amber-800">{trust.risks[0]}</p>
       ) : null}
 
       {topReason ? (

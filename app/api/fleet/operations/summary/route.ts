@@ -32,7 +32,11 @@ export async function GET(request: NextRequest) {
       date,
       skipCache,
     });
-    return NextResponse.json(data);
+    const response = NextResponse.json(data);
+    if (!skipCache) {
+      response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    }
+    return response;
   } catch (error) {
     console.error("[operations/summary]", error);
     return NextResponse.json(

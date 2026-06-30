@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FleetTodayViewData } from "@/src/types/fleet";
-import { getFleetRecommendations } from "@/src/lib/fleet-recommendation-engine/service";
-import { ensurePeachtreeDemoTelematicsFresh } from "@/src/lib/fleet/demo/peachtree-demo-telematics";
+import { loadFleetRecommendationHistoryLight } from "@/src/lib/fleet-recommendation-engine/service";
 import { loadFleetCommandCenterData } from "@/src/lib/fleet/queries/command-center";
 import {
   loadFleetExecutiveInsights,
@@ -10,6 +9,10 @@ import {
 import { loadDayOverDayMetrics } from "@/src/lib/fleet/queries/today-view";
 import { createOperationsPerfTimer } from "./perf";
 import { countPendingRecommendationsForDate } from "./load-recommendations-page";
+import {
+  commandCenterFromSummaryCache,
+  resolveCommandCenterForEnrichment,
+} from "./shared-loaders";
 
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
@@ -38,7 +41,7 @@ export type FleetOperationsEnrichment = Pick<
   | "recommendations"
 >;
 
-/** ROI, history, day-over-day — skips recommendation engine regeneration. */
+/** ROI, history, day-over-day — no dispatch board or recommendation engine regeneration. */
 export async function loadFleetOperationsEnrichment(
   supabase: SupabaseClient,
   tenantId: string,
@@ -48,38 +51,49 @@ export async function loadFleetOperationsEnrichment(
   const yesterday = yesterdayDateOnly();
   const perf = createOperationsPerfTimer("operations-enrichment");
 
-  void ensurePeachtreeDemoTelematicsFresh(supabase, tenantId);
-
   const weekStart = new Date(`${date}T12:00:00.000Z`);
   weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
   const weekStartStr = weekStart.toISOString().slice(0, 10);
 
-  const [commandCenter, executiveInsights, recommendationRoi, recommendations, pendingCount] =
-    await Promise.all([
-      loadFleetCommandCenterData(supabase, tenantId),
-      loadFleetExecutiveInsights(supabase, tenantId, date),
-      loadRecommendationRoiSummary(supabase, tenantId, weekStartStr, date),
-      getFleetRecommendations(supabase, tenantId, {
-        date,
-        deferGeneration: true,
-        skipHistory: false,
-      }),
-      countPendingRecommendationsForDate(supabase, tenantId, date).catch(() => 0),
-    ]);
-  perf.stage("parallel-enrichment");
+  const summaryCommandCenter = commandCenterFromSummaryCache(tenantId, date);
 
-  const changesSinceYesterday = await loadDayOverDayMetrics(
+  const commandCenterPromise = resolveCommandCenterForEnrichment(
     supabase,
     tenantId,
     date,
-    yesterday,
-    commandCenter,
-    { ...EMPTY_BOARD_STUB, date },
-    pendingCount,
-    0
+    () => loadFleetCommandCenterData(supabase, tenantId)
   );
-  perf.stage("day-over-day");
-  perf.finish();
+
+  const pendingCountPromise = countPendingRecommendationsForDate(supabase, tenantId, date).catch(
+    () => 0
+  );
+
+  const dayOverDayPromise = Promise.all([commandCenterPromise, pendingCountPromise]).then(
+    ([commandCenter, pendingCount]) =>
+      loadDayOverDayMetrics(
+        supabase,
+        tenantId,
+        date,
+        yesterday,
+        summaryCommandCenter ?? commandCenter,
+        { ...EMPTY_BOARD_STUB, date },
+        pendingCount,
+        0
+      )
+  );
+
+  const [commandCenter, executiveInsights, recommendationRoi, recommendations, pendingCount, changesSinceYesterday] =
+    await Promise.all([
+      commandCenterPromise,
+      loadFleetExecutiveInsights(supabase, tenantId, date),
+      loadRecommendationRoiSummary(supabase, tenantId, weekStartStr, date),
+      loadFleetRecommendationHistoryLight(supabase, tenantId),
+      pendingCountPromise,
+      dayOverDayPromise,
+    ]);
+
+  perf.stage("parallel-enrichment");
+  perf.finish({ history: recommendations.history.length });
 
   return {
     commandCenter,

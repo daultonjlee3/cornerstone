@@ -53,7 +53,7 @@ const fleetOperationsGroup: NavGroup = {
   label: "Operations",
   items: [
     { label: "Fleet Command Center", href: "/operations", icon: "LayoutGrid" },
-    { label: "Recommendations", href: "/operations#fleet-recommendations", icon: "Sparkles" },
+    { label: "Recommendations", href: "/fleet/recommendations", icon: "Sparkles" },
     { label: "Dispatch Intelligence", href: "/dispatch", icon: "Truck" },
     { label: "Fleet Performance", href: "/reports/operations", icon: "TrendingUp" },
     { label: "Exceptions", href: "/operations#fleet-exceptions", icon: "AlertTriangle" },

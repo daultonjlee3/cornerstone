@@ -764,6 +764,8 @@ export type FleetRecommendationInstance = {
   engine_version: string;
   created_at: string;
   expires_at: string;
+  /** Enterprise trust surface — financial impact, confidence, alternatives, risks */
+  trust?: FleetRecommendationTrustSurface;
 };
 
 export type FleetRecommendationOutcome = {
@@ -808,17 +810,89 @@ export type FleetRecommendationDecisionRecord = {
   factors: FleetRecommendationFactors;
 };
 
+export type FleetRecommendationTrustAlternative = {
+  truck_id: string;
+  unit_number: string;
+  score: number;
+  travel_minutes: number | null;
+  deadhead_miles: number | null;
+  estimated_contribution: number | null;
+  summary: string;
+};
+
+/** Enterprise trust surface attached to each recommendation (live or historical). */
+export type FleetRecommendationTrustSurface = {
+  financialImpact: number | null;
+  confidenceScore: number;
+  confidenceLabel: "high" | "medium" | "low";
+  confidenceExplanation: string;
+  whyThisRecommendation: string[];
+  alternativeOptions: FleetRecommendationTrustAlternative[];
+  risks: string[];
+  estimatedContributionImprovement: number | null;
+  deadheadReductionMiles: number | null;
+  overtimeImpact: number | null;
+  revenueProtected: number | null;
+  timeSavingsMinutes: number | null;
+  fuelSaved: number | null;
+  laborSaved: number | null;
+  projectedUtilizationPct: number | null;
+  branchCapacityLabel: string | null;
+  measuredOutcome?: Record<string, unknown> | null;
+};
+
+export type FleetRecommendationTrustMeasuredSummary = {
+  measuredCount: number;
+  pendingCount: number;
+  contributionAccuracyPct: number | null;
+  onTimeCompletionRate: number | null;
+  totalMeasuredContribution: number;
+  totalEstimatedContribution: number;
+};
+
+export type FleetRecommendationTrustDashboard = {
+  from: string;
+  to: string;
+  totals: {
+    generated: number;
+    accepted: number;
+    rejected: number;
+    dismissed: number;
+    expired: number;
+    applied: number;
+    failed: number;
+    completed: number;
+  };
+  rates: {
+    acceptanceRate: number | null;
+    rejectionRate: number | null;
+    applicationSuccessRate: number | null;
+  };
+  estimatedImpact: FleetRecommendationRoiSummary;
+  measuredOutcomes: FleetRecommendationTrustMeasuredSummary;
+  recentHistory: FleetRecommendationHistoryEntry[];
+  trustScore: number | null;
+};
+
 export type FleetRecommendationHistoryEntry = FleetRecommendationInstance & {
   latest_outcome: FleetRecommendationOutcome | null;
+  trust?: FleetRecommendationTrustSurface;
 };
 
 export type FleetRecommendationSummary = {
   volume: number;
   accepted: number;
+  rejected: number;
   dismissed: number;
   expired: number;
+  applied: number;
+  failed: number;
+  completed: number;
   acceptanceRate: number | null;
+  rejectionRate: number | null;
   dismissalRate: number | null;
+  /** Aggregate dispatcher trust score (0–100) from recent outcomes */
+  trustScore: number | null;
 };
 
 export type FleetRecommendationsResponse = {
@@ -830,4 +904,9 @@ export type FleetRecommendationsResponse = {
   recalculationNotice?: FleetRecommendationRecalculationNotice;
   /** True when generation was deferred — client should fetch full recommendations in background */
   refreshing?: boolean;
+  /** Rolling trust metrics for dispatch/command center surfaces */
+  trustMetrics?: Pick<
+    FleetRecommendationTrustDashboard,
+    "rates" | "estimatedImpact" | "measuredOutcomes" | "trustScore"
+  >;
 };

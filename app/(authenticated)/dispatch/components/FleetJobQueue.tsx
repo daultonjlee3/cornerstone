@@ -1,9 +1,14 @@
 "use client";
 
+import { memo, useRef } from "react";
 import { AlertCircle, ArrowRight, ChevronLeft, Sparkles } from "lucide-react";
 import { AppIcon } from "@/src/components/design-system/icons";
-import { motion } from "framer-motion";
-import type { FleetDispatchJob, FleetDispatchTruckLane, FleetRecommendationInstance, FleetDispatchBoardData } from "@/src/types/fleet";
+import type {
+  FleetDispatchBoardData,
+  FleetDispatchJob,
+  FleetDispatchTruckLane,
+  FleetRecommendationInstance,
+} from "@/src/types/fleet";
 import { Button } from "@/src/components/ui/button";
 import { PriorityBadge } from "@/src/components/ui/priority-badge";
 import {
@@ -22,6 +27,10 @@ import {
   recommendationIgnoreRisk,
 } from "./fleet-dispatch-utils";
 import { confidenceLabel } from "../../operations/components/fleet-recommendation-utils";
+import { useVirtualWindow } from "./useVirtualWindow";
+
+const VIRTUAL_THRESHOLD = 24;
+const INBOX_ITEM_HEIGHT = 112;
 
 type FleetJobQueueProps = {
   layout?: "panel" | "float" | "cockpit" | "embedded";
@@ -49,6 +58,108 @@ function sortJobs(jobs: FleetDispatchJob[]): FleetDispatchJob[] {
   });
 }
 
+type InboxJobRowProps = {
+  job: FleetDispatchJob;
+  board: FleetDispatchBoardData;
+  selected: boolean;
+  recommendations: FleetRecommendationInstance[];
+  truckLanes: FleetDispatchTruckLane[];
+  pending?: boolean;
+  onSelectJob: (id: string | null) => void;
+  onAssignToTruck: (jobId: string, truckId: string) => void;
+};
+
+const InboxJobRow = memo(function InboxJobRow({
+  job,
+  board,
+  selected,
+  recommendations,
+  truckLanes,
+  pending,
+  onSelectJob,
+  onAssignToTruck,
+}: InboxJobRowProps) {
+  const late = isLateJob(job);
+  const duration = jobDurationHours(job);
+  const rec = recommendationForJob(job.id, recommendations);
+  const topTruck = rec?.rationale.candidates?.[0];
+  const confidence = rec ? recommendationConfidence(rec) : null;
+  const ignoreRisk = rec ? recommendationIgnoreRisk(rec, board) : null;
+  const estimatedProfit = jobEstimatedProfit(job);
+  const customer = extractCustomer(job.title, job.site_name);
+  const jobType = extractJobType(job.title);
+  const risk = operationalRiskMessage(job);
+  const previewTitle = rec?.rationale.title ?? `${jobType} · ${formatCurrency(job.revenue_estimate)}`;
+
+  const assignLanes = topTruck
+    ? truckLanes.filter((lane) => lane.truck_id === topTruck.truck_id)
+    : truckLanes.filter(
+        (lane) => lane.truck_type === job.required_truck_type || job.required_truck_type === "any"
+      );
+
+  return (
+    <li
+      className={`dispatch-console__inbox-item ${selected ? "dispatch-console__inbox-item--selected" : ""} ${late || risk ? "dispatch-console__inbox-item--urgent" : ""}`}
+    >
+      <button
+        type="button"
+        className="dispatch-console__inbox-btn"
+        title={previewTitle}
+        onClick={() => onSelectJob(selected ? null : job.id)}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span className="dispatch-console__inbox-revenue">{formatCurrency(job.revenue_estimate)}</span>
+          <PriorityBadge priority={job.priority} />
+        </div>
+        <p className="text-[10px] text-[var(--text-muted)]">{customer}</p>
+        <p className="dispatch-console__inbox-title">{jobType}</p>
+        <div className="dispatch-console__inbox-facts">
+          <span>{formatCurrency(estimatedProfit)} contrib</span>
+          <span>{formatTime(job.scheduled_start)}</span>
+          {duration != null ? <span>{duration}h</span> : null}
+          {job.estimated_deadhead_miles != null ? (
+            <span>{job.estimated_deadhead_miles.toFixed(1)} mi deadhead</span>
+          ) : null}
+        </div>
+        {topTruck ? (
+          <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[var(--brand-operational)]">
+            <AppIcon icon={Sparkles} size="xs" intent="ai" />
+            Truck {topTruck.unit_number}
+            {confidence ? ` · ${confidenceLabel(confidence)}` : ""}
+          </p>
+        ) : null}
+        {ignoreRisk ? <p className="mt-1 text-[10px] text-[var(--status-warning)]">{ignoreRisk}</p> : null}
+        {risk ? (
+          <p className="dispatch-console__inbox-warn flex items-center gap-1.5">
+            <AppIcon icon={AlertCircle} size="xs" intent="warning" />
+            {risk}
+          </p>
+        ) : null}
+      </button>
+      {selected ? (
+        <div className="dispatch-console__inbox-assign">
+          {assignLanes.slice(0, 4).map((lane) => (
+            <Button
+              key={lane.truck_id}
+              type="button"
+              size="sm"
+              variant={topTruck?.truck_id === lane.truck_id ? "primary" : "secondary"}
+              className="mb-1 w-full justify-between text-[11px]"
+              disabled={pending}
+              onClick={() => onAssignToTruck(job.id, lane.truck_id)}
+            >
+              {lane.unit_number}
+              {topTruck?.truck_id === lane.truck_id ? (
+                <AppIcon icon={ArrowRight} size="xs" intent="muted" />
+              ) : null}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+    </li>
+  );
+});
+
 export function FleetJobQueue({
   layout = "panel",
   jobs,
@@ -65,6 +176,17 @@ export function FleetJobQueue({
   const isDock = layout === "float" || layout === "cockpit";
   const isEmbedded = layout === "embedded";
   const useDockItems = isDock || isEmbedded;
+  const scrollRef = useRef<HTMLUListElement>(null);
+  const virtual = useVirtualWindow(
+    sorted.length,
+    INBOX_ITEM_HEIGHT,
+    scrollRef,
+    useDockItems && sorted.length > VIRTUAL_THRESHOLD ? 5 : 0
+  );
+  const useVirtual = useDockItems && sorted.length > VIRTUAL_THRESHOLD;
+  const visibleJobs = useVirtual
+    ? sorted.slice(virtual.startIndex, virtual.endIndex)
+    : sorted;
 
   const shellClass = isEmbedded
     ? ""
@@ -74,121 +196,60 @@ export function FleetJobQueue({
 
   const listBody = (
     <ul
+      ref={scrollRef}
+      onScroll={useVirtual ? virtual.onScroll : undefined}
       className={
         isEmbedded
           ? "dispatch-console__inbox-embedded"
           : isDock
-            ? "dispatch-console__rail-body"
+            ? "dispatch-console__rail-body dispatch-console__inbox-scroll"
             : "dispatch-mission__panel-body dispatch-mission__inbox-list"
       }
+      style={
+        useVirtual
+          ? { position: "relative", overflowY: "auto", maxHeight: "min(70vh, 640px)" }
+          : undefined
+      }
     >
-        {sorted.length === 0 ? (
-          <li className={useDockItems ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
-            <p className="font-medium">Inbox clear</p>
-            <p className="mt-1 text-xs">All jobs assigned</p>
-          </li>
-        ) : (
-          sorted.map((job, index) => {
-            const selected = selectedJobId === job.id;
-            const late = isLateJob(job);
-            const duration = jobDurationHours(job);
-            const rec = recommendationForJob(job.id, recommendations);
-            const topTruck = rec?.rationale.candidates?.[0];
-            const confidence = rec ? recommendationConfidence(rec) : null;
-            const confidenceExplanation = rec ? recommendationConfidenceExplanation(rec, board) : null;
-            const ignoreRisk = rec ? recommendationIgnoreRisk(rec, board) : null;
-            const estimatedProfit = jobEstimatedProfit(job);
-            const customer = extractCustomer(job.title, job.site_name);
-            const jobType = extractJobType(job.title);
-            const risk = operationalRiskMessage(job);
-
-            if (useDockItems) {
-              return (
-                <motion.li
-                  key={job.id}
-                  layout
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.18, delay: index * 0.025 }}
-                  className={`dispatch-console__inbox-item ${selected ? "dispatch-console__inbox-item--selected" : ""} ${late || risk ? "dispatch-console__inbox-item--urgent" : ""}`}
-                >
-                  <button type="button" className="dispatch-console__inbox-btn" onClick={() => onSelectJob(selected ? null : job.id)}>
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="dispatch-console__inbox-revenue">{formatCurrency(job.revenue_estimate)}</span>
-                      <PriorityBadge priority={job.priority} />
-                    </div>
-                    <p className="text-[10px] text-[var(--text-muted)]">{customer}</p>
-                    <p className="dispatch-console__inbox-title">{jobType}</p>
-                    <div className="dispatch-console__inbox-facts">
-                      <span>{formatCurrency(estimatedProfit)} contrib</span>
-                      <span>{formatTime(job.scheduled_start)}</span>
-                      {duration != null ? <span>{duration}h</span> : null}
-                      {job.estimated_deadhead_miles != null ? (
-                        <span>{job.estimated_deadhead_miles.toFixed(1)} mi deadhead</span>
-                      ) : null}
-                    </div>
-                    {topTruck ? (
-                      <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[var(--brand-operational)]">
-                        <AppIcon icon={Sparkles} size="xs" intent="ai" />
-                        Truck {topTruck.unit_number}
-                        {confidence ? ` · ${confidenceLabel(confidence)}` : ""}
-                      </p>
-                    ) : null}
-                    {ignoreRisk ? <p className="mt-1 text-[10px] text-[var(--status-warning)]">{ignoreRisk}</p> : null}
-                    {risk ? (
-                      <p className="dispatch-console__inbox-warn flex items-center gap-1.5">
-                        <AppIcon icon={AlertCircle} size="xs" intent="warning" />
-                        {risk}
-                      </p>
-                    ) : null}
-                  </button>
-                  {selected ? (
-                    <div className="dispatch-console__inbox-assign">
-                      {(topTruck
-                        ? truckLanes.filter((l) => l.truck_id === topTruck.truck_id)
-                        : truckLanes.filter(
-                            (lane) =>
-                              lane.truck_type === job.required_truck_type || job.required_truck_type === "any"
-                          )
-                      )
-                        .slice(0, 4)
-                        .map((lane) => (
-                          <Button
-                            key={lane.truck_id}
-                            type="button"
-                            size="sm"
-                            variant={topTruck?.truck_id === lane.truck_id ? "primary" : "secondary"}
-                            className="mb-1 w-full justify-between text-[11px]"
-                            disabled={pending}
-                            onClick={() => onAssignToTruck(job.id, lane.truck_id)}
-                          >
-                            {lane.unit_number}
-                            {topTruck?.truck_id === lane.truck_id ? (
-                            <AppIcon icon={ArrowRight} size="xs" intent="muted" />
-                            ) : null}
-                          </Button>
-                        ))}
-                    </div>
-                  ) : null}
-                </motion.li>
-              );
-            }
-
-            return (
-              <li
+      {sorted.length === 0 ? (
+        <li className={useDockItems ? "py-8 text-center text-sm text-[var(--text-muted)]" : "dispatch-mission__inbox-empty"}>
+          <p className="font-medium">Inbox clear</p>
+          <p className="mt-1 text-xs">All jobs assigned</p>
+        </li>
+      ) : useVirtual ? (
+        <div style={{ height: virtual.totalHeight, position: "relative" }}>
+          <div style={{ transform: `translateY(${virtual.offsetTop}px)` }}>
+            {visibleJobs.map((job) => (
+              <InboxJobRow
                 key={job.id}
-                className={`dispatch-mission__job-card ${selected ? "dispatch-mission__job-card--selected" : ""}`}
-              >
-                <button type="button" className="dispatch-mission__job-card-body w-full text-left" onClick={() => onSelectJob(selected ? null : job.id)}>
-                  <p className="dispatch-mission__job-revenue-value">{formatCurrency(job.revenue_estimate)}</p>
-                  <p className="dispatch-mission__job-title">{jobType}</p>
-                  {confidenceExplanation ? <p className="text-xs text-[var(--text-muted)]">{confidenceExplanation}</p> : null}
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
+                job={job}
+                board={board}
+                selected={selectedJobId === job.id}
+                recommendations={recommendations}
+                truckLanes={truckLanes}
+                pending={pending}
+                onSelectJob={onSelectJob}
+                onAssignToTruck={onAssignToTruck}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        visibleJobs.map((job) => (
+          <InboxJobRow
+            key={job.id}
+            job={job}
+            board={board}
+            selected={selectedJobId === job.id}
+            recommendations={recommendations}
+            truckLanes={truckLanes}
+            pending={pending}
+            onSelectJob={onSelectJob}
+            onAssignToTruck={onAssignToTruck}
+          />
+        ))
+      )}
+    </ul>
   );
 
   if (isEmbedded) {

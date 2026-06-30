@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/client";
+import { establishClientAuthSession } from "@/lib/auth/establish-client-session";
 
 /**
  * Handles auth redirect after magic link (or OAuth). Exchanges code/session from URL and redirects to app.
@@ -25,12 +26,13 @@ function AuthCallbackContent() {
       handled.current = true;
       supabase.auth
         .exchangeCodeForSession(code)
-        .then(({ error }) => {
+        .then(async ({ error }) => {
           if (error) {
             setStatus("error");
             handled.current = false;
             return;
           }
+          await establishClientAuthSession();
           setStatus("done");
           router.replace(next.startsWith("/") ? next : "/operations");
         })
@@ -51,12 +53,13 @@ function AuthCallbackContent() {
         handled.current = true;
         supabase.auth
           .setSession({ access_token: accessToken, refresh_token: refreshToken })
-          .then(({ error }) => {
+          .then(async ({ error }) => {
             if (error) {
               setStatus("error");
               handled.current = false;
               return;
             }
+            await establishClientAuthSession();
             setStatus("done");
             window.history.replaceState(null, "", next);
             router.replace(next.startsWith("/") ? next : "/operations");

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isPlatformSuperAdmin } from "@/src/lib/auth-context";
 import { getSupabaseClient } from "@/src/lib/auth-context";
 import Link from "next/link";
+import { ActiveSessionGuard } from "@/app/components/active-session-guard";
 
 export default async function PlatformAdminLayout({
   children,
@@ -14,6 +15,7 @@ export default async function PlatformAdminLayout({
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
+      <ActiveSessionGuard />
       <header className="border-b border-[var(--card-border)] bg-[var(--card)] px-4 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Platform Admin</h1>

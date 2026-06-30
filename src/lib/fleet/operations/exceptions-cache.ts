@@ -2,7 +2,7 @@ import type { FleetOperationalException } from "@/src/types/fleet";
 
 type Entry = { exceptions: FleetOperationalException[]; expiresAt: number };
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, Entry>();
 
 function key(tenantId: string, date: string): string {

@@ -30,7 +30,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const data = await loadFleetOperationsBriefing(supabase, auth.tenantId, { date });
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+      },
+    });
   } catch (error) {
     console.error("[operations/briefing]", error);
     return NextResponse.json(

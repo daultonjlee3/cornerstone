@@ -17,9 +17,9 @@ export const metadata: Metadata = buildMarketingMetadata(
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; demo?: string }>;
+  searchParams: Promise<{ next?: string; demo?: string; reason?: string }>;
 }) {
-  const { next, demo } = await searchParams;
+  const { next, demo, reason } = await searchParams;
   const demoConfig = demo ? DEMO_LOGIN_CONFIG[demo] : null;
   const demoPassword =
     demoConfig && process.env.DEMO_PASSWORD ? process.env.DEMO_PASSWORD : undefined;
@@ -32,6 +32,7 @@ export default async function LoginPage({
     >
       <LoginForm
         next={next}
+        sessionReplaced={reason === "session_replaced"}
         demoEmail={demoConfig?.demoEmail}
         demoLabel={demoConfig?.label}
         demoPassword={demoPassword}

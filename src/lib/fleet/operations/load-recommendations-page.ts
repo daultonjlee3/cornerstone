@@ -119,6 +119,21 @@ export async function countPendingRecommendationsFast(
   options?: { date?: string }
 ): Promise<number> {
   const date = options?.date;
+
+  if (!date) {
+    const { count, error } = await supabase
+      .from("recommendation_instances")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending")
+      .eq("engine_version", FLEET_RECOMMENDATION_ENGINE_VERSION)
+      .gt("expires_at", new Date().toISOString());
+
+    if (!error && count != null) {
+      return count > 5000 ? 5000 : count;
+    }
+  }
+
   const selectCols = date ? "id, rationale" : "id";
 
   const { data, error } = await supabase

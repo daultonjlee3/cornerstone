@@ -50,6 +50,8 @@ export type LaunchEstimatorResult = {
   integrationCount: number;
   estimatedImplementation: number;
   estimatedImplementationLabel: string;
+  estimatedMonthly: number | null;
+  estimatedMonthlyLabel: string;
   customPlanningRecommended: boolean;
   timelineLabel: string;
   timelineWeeksDisplay: string;
@@ -84,6 +86,8 @@ export type LaunchEstimatorCrmPayload = {
   goals: string[];
   estimated_implementation: number;
   estimated_implementation_label: string;
+  estimated_monthly: number | null;
+  estimated_monthly_label: string;
   complexity: ComplexityTier;
   timeline: string;
   custom_planning_recommended: boolean;
